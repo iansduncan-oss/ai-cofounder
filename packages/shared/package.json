@@ -1,0 +1,12 @@
+{
+  "name": "@ai-cofounder/shared",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "echo 'TODO: configure build'",
+    "lint": "echo 'TODO: configure lint'",
+    "test": "echo 'TODO: configure test'",
+    "clean": "rm -rf dist"
+  }
+}

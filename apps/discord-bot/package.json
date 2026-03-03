@@ -1,0 +1,12 @@
+{
+  "name": "@ai-cofounder/discord-bot",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'TODO: configure build'",
+    "dev": "echo 'TODO: configure dev'",
+    "lint": "echo 'TODO: configure lint'",
+    "test": "echo 'TODO: configure test'",
+    "clean": "rm -rf dist"
+  }
+}
