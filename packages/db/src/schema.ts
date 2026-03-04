@@ -5,6 +5,7 @@ import {
   timestamp,
   jsonb,
   pgEnum,
+  integer,
 } from "drizzle-orm/pg-core";
 
 export const agentRoleEnum = pgEnum("agent_role", [
@@ -76,4 +77,98 @@ export const agentRuns = pgTable("agent_runs", {
     .notNull()
     .defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+/* ── Goal / Task / Approval enums ── */
+
+export const goalStatusEnum = pgEnum("goal_status", [
+  "draft",
+  "active",
+  "completed",
+  "cancelled",
+]);
+
+export const goalPriorityEnum = pgEnum("goal_priority", [
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const taskStatusEnum = pgEnum("task_status", [
+  "pending",
+  "assigned",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const approvalStatusEnum = pgEnum("approval_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+/* ── Goals ── */
+
+export const goals = pgTable("goals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: goalStatusEnum("status").notNull().default("draft"),
+  priority: goalPriorityEnum("priority").notNull().default("medium"),
+  createdBy: uuid("created_by").references(() => users.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/* ── Tasks (children of goals) ── */
+
+export const tasks = pgTable("tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  goalId: uuid("goal_id")
+    .notNull()
+    .references(() => goals.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: taskStatusEnum("status").notNull().default("pending"),
+  assignedAgent: agentRoleEnum("assigned_agent"),
+  orderIndex: integer("order_index").notNull().default(0),
+  input: text("input"),
+  output: text("output"),
+  error: text("error"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+/* ── Approvals (gate tasks that need human sign-off) ── */
+
+export const approvals = pgTable("approvals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  taskId: uuid("task_id")
+    .notNull()
+    .references(() => tasks.id),
+  requestedBy: agentRoleEnum("requested_by").notNull(),
+  status: approvalStatusEnum("status").notNull().default("pending"),
+  reason: text("reason").notNull(),
+  decision: text("decision"),
+  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });

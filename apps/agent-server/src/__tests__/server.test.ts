@@ -3,6 +3,14 @@ import { describe, it, expect, vi, beforeAll } from "vitest";
 // Set env before any imports that read it
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+});
+
+// Mock the DB package so tests don't need a real Postgres connection
+vi.mock("@ai-cofounder/db", () => {
+  return {
+    createDb: vi.fn().mockReturnValue({}),
+  };
 });
 
 // Mock the Anthropic SDK so tests don't make real API calls

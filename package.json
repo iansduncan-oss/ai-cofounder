@@ -27,5 +27,8 @@
     "turbo": "^2.8.12",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
+  },
+  "dependencies": {
+    "@rollup/rollup-linux-arm64-gnu": "^4.59.0"
   }
 }
