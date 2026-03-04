@@ -10,7 +10,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ai-cofounder/db": "*",
     "@ai-cofounder/shared": "*",
-    "@ai-cofounder/db": "*"
+    "fastify": "^5.7.4"
   }
 }
