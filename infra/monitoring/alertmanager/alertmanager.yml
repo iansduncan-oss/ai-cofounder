@@ -11,11 +11,7 @@ route:
 receivers:
   - name: "discord"
     webhook_configs:
-      # Discord webhooks need /slack suffix for Alertmanager compatibility
-      # Create a webhook in Discord: Server Settings > Integrations > Webhooks
-      # Then append /slack to the URL, e.g.:
-      # https://discord.com/api/webhooks/XXXXX/YYYYY/slack
-      - url: "REPLACE_WITH_DISCORD_WEBHOOK_URL/slack"
+      - url: "REDACTED_DISCORD_WEBHOOK_URL/slack"
         send_resolved: true
 
 templates: []

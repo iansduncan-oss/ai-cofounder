@@ -40,6 +40,12 @@ jobs:
             echo "==> Restarting services..."
             docker compose -f docker-compose.prod.yml up -d --force-recreate
 
+            echo "==> Starting n8n..."
+            docker compose -f docker-compose.n8n.yml up -d
+
+            echo "==> Starting Uptime Kuma..."
+            docker compose -f docker-compose.uptimekuma.yml up -d
+
             echo "==> Restarting monitoring stack..."
             docker compose -f docker-compose.monitoring.yml up -d
 

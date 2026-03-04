@@ -1,0 +1,18 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: ai-cofounder-uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    volumes:
+      - uptimekuma_data:/app/data
+    networks:
+      - avion_avion_net
+
+volumes:
+  uptimekuma_data:
+
+networks:
+  avion_avion_net:
+    external: true
