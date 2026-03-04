@@ -2,9 +2,11 @@
   "name": "@ai-cofounder/shared",
   "version": "0.1.0",
   "private": true,
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "build": "echo 'TODO: configure build'",
+    "build": "tsc",
+    "dev": "tsc --watch",
     "lint": "echo 'TODO: configure lint'",
     "test": "echo 'TODO: configure test'",
     "clean": "rm -rf dist"
