@@ -12,15 +12,45 @@ const AGENT_SERVER_URL = optionalEnv(
   "http://localhost:3100"
 );
 
-// In-memory conversation tracking per Discord channel
-const channelConversations = new Map<string, string>();
-
 interface AgentResponse {
   conversationId: string;
   agentRole: string;
   response: string;
   model?: string;
   usage?: { inputTokens: number; outputTokens: number };
+}
+
+async function getChannelConversationId(
+  channelId: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `${AGENT_SERVER_URL}/api/channels/${channelId}/conversation`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { conversationId: string };
+    return data.conversationId;
+  } catch {
+    return null;
+  }
+}
+
+async function saveChannelConversationId(
+  channelId: string,
+  conversationId: string,
+): Promise<void> {
+  try {
+    await fetch(
+      `${AGENT_SERVER_URL}/api/channels/${channelId}/conversation`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, platform: "discord" }),
+      },
+    );
+  } catch (err) {
+    logger.warn({ err, channelId }, "failed to persist conversation mapping");
+  }
 }
 
 export async function handleInteraction(
@@ -50,8 +80,8 @@ async function handleAsk(
   try {
     const payload: Record<string, unknown> = { message };
 
-    // Attach conversation ID if we have one for this channel
-    const existingConvId = channelConversations.get(channelId);
+    // Look up persisted conversation for this channel
+    const existingConvId = await getChannelConversationId(channelId);
     if (existingConvId) {
       payload.conversationId = existingConvId;
     }
@@ -69,8 +99,8 @@ async function handleAsk(
 
     const data = (await res.json()) as AgentResponse;
 
-    // Track conversation for this channel
-    channelConversations.set(channelId, data.conversationId);
+    // Persist conversation mapping for this channel
+    await saveChannelConversationId(channelId, data.conversationId);
 
     // Build a nice embed
     const embed = new EmbedBuilder()
@@ -93,7 +123,7 @@ async function handleAsk(
     logger.error({ err, channelId }, "ask command failed");
     await interaction.editReply({
       content:
-        "⚠️ Something went wrong talking to the AI Cofounder. Is the agent server running?",
+        "Something went wrong talking to the AI Cofounder. Is the agent server running?",
     });
   }
 }
@@ -122,7 +152,7 @@ async function handleStatus(
       .setColor(0x22c55e) // green
       .setTitle("AI Cofounder — System Status")
       .addFields(
-        { name: "Status", value: `✅ ${data.status}`, inline: true },
+        { name: "Status", value: `${data.status}`, inline: true },
         {
           name: "Uptime",
           value: `${uptimeMinutes}m`,
@@ -135,7 +165,7 @@ async function handleStatus(
   } catch (err) {
     logger.error({ err }, "status command failed");
     await interaction.editReply({
-      content: `⚠️ Agent server unreachable at ${AGENT_SERVER_URL}`,
+      content: `Agent server unreachable at ${AGENT_SERVER_URL}`,
     });
   }
 }

@@ -7,6 +7,7 @@ import {
   approvals,
   conversations,
   messages,
+  channelConversations,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -28,6 +29,39 @@ export async function findOrCreateUser(
   const [created] = await db
     .insert(users)
     .values({ externalId, platform, displayName })
+    .returning();
+  return created;
+}
+
+/* ──────────────── Channel Conversations ──────────────────── */
+
+export async function getChannelConversation(db: Db, channelId: string) {
+  const rows = await db
+    .select()
+    .from(channelConversations)
+    .where(eq(channelConversations.channelId, channelId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertChannelConversation(
+  db: Db,
+  channelId: string,
+  conversationId: string,
+  platform = "discord",
+) {
+  const existing = await getChannelConversation(db, channelId);
+  if (existing) {
+    const [updated] = await db
+      .update(channelConversations)
+      .set({ conversationId, updatedAt: new Date() })
+      .where(eq(channelConversations.channelId, channelId))
+      .returning();
+    return updated;
+  }
+  const [created] = await db
+    .insert(channelConversations)
+    .values({ channelId, conversationId, platform })
     .returning();
   return created;
 }

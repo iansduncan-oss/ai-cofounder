@@ -13,8 +13,10 @@
     "@ai-cofounder/db": "*",
     "@ai-cofounder/shared": "*",
     "@anthropic-ai/sdk": "^0.78.0",
+    "@fastify/cors": "^11.2.0",
     "@sinclair/typebox": "^0.34.48",
     "fastify": "^5.7.4",
-    "fastify-plugin": "^5.1.0"
+    "fastify-plugin": "^5.1.0",
+    "prom-client": "^15.1.3"
   }
 }

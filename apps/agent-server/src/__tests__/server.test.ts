@@ -9,7 +9,9 @@ beforeAll(() => {
 // Mock the DB package so tests don't need a real Postgres connection
 vi.mock("@ai-cofounder/db", () => {
   return {
-    createDb: vi.fn().mockReturnValue({}),
+    createDb: vi.fn().mockReturnValue({
+      execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+    }),
   };
 });
 

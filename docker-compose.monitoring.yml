@@ -1,0 +1,55 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: ai-cofounder-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    ports:
+      - "127.0.0.1:9090:9090"
+    networks:
+      - avion_avion_net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: ai-cofounder-alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+    networks:
+      - avion_avion_net
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: ai-cofounder-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://grafana.aviontechs.com}
+    volumes:
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3200:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - avion_avion_net
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  avion_avion_net:
+    external: true

@@ -1,0 +1,42 @@
+services:
+  agent-server:
+    image: ai-cofounder-agent-server:latest
+    container_name: ai-cofounder-agent-server
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      - PORT=3100
+      - HOST=0.0.0.0
+      - DATABASE_URL=${DATABASE_URL}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - API_SECRET=${API_SECRET:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+      - avion_avion_net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  discord-bot:
+    image: ai-cofounder-discord-bot:latest
+    container_name: ai-cofounder-discord-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - AGENT_SERVER_URL=http://agent-server:3100
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      agent-server:
+        condition: service_healthy
+    networks:
+      - avion_avion_net
+
+networks:
+  avion_avion_net:
+    external: true

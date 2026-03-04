@@ -79,6 +79,20 @@ export const agentRuns = pgTable("agent_runs", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
 });
 
+/* ── Channel ↔ Conversation mapping (Discord bot persistence) ── */
+
+export const channelConversations = pgTable("channel_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  channelId: text("channel_id").notNull().unique(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id),
+  platform: text("platform").notNull().default("discord"),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 /* ── Goal / Task / Approval enums ── */
 
 export const goalStatusEnum = pgEnum("goal_status", [

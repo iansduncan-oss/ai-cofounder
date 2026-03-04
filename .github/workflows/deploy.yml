@@ -18,6 +18,7 @@ jobs:
 
     steps:
       - name: Deploy via SSH
+        id: deploy
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -39,6 +40,9 @@ jobs:
             echo "==> Restarting services..."
             docker compose -f docker-compose.prod.yml up -d --force-recreate
 
+            echo "==> Restarting monitoring stack..."
+            docker compose -f docker-compose.monitoring.yml up -d
+
             echo "==> Waiting for health check..."
             sleep 10
             curl -sf http://localhost:3100/health || { echo "Health check failed!"; exit 1; }
@@ -47,3 +51,29 @@ jobs:
             docker image prune -f
 
             echo "==> Deploy complete!"
+
+      - name: Notify Discord — Success
+        if: success()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Deploy Successful\",\"description\":\"AI Cofounder deployed to production.\",\"color\":2278400,\"fields\":[{\"name\":\"Commit\",\"value\":\"\`${SHORT_SHA}\`\",\"inline\":true},{\"name\":\"Branch\",\"value\":\"main\",\"inline\":true}],\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" \
+            "$DISCORD_WEBHOOK"
+
+      - name: Notify Discord — Failure
+        if: failure()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
+          COMMIT_SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          curl -s -H "Content-Type: application/json" \
+            -d "{\"embeds\":[{\"title\":\"Deploy FAILED\",\"description\":\"AI Cofounder deploy to production failed!\",\"color\":15548997,\"fields\":[{\"name\":\"Commit\",\"value\":\"\`${SHORT_SHA}\`\",\"inline\":true},{\"name\":\"Branch\",\"value\":\"main\",\"inline\":true},{\"name\":\"Action\",\"value\":\"[View logs](https://github.com/${REPO}/actions/runs/${RUN_ID})\",\"inline\":false}],\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" \
+            "$DISCORD_WEBHOOK"
