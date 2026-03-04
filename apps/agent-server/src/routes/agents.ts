@@ -9,7 +9,8 @@ interface RunBody {
 }
 
 export const agentRoutes: FastifyPluginAsync = async (app) => {
-  const orchestrator = new Orchestrator();
+  // Pass the DB connection so the orchestrator can persist goals/tasks
+  const orchestrator = new Orchestrator(app.db);
 
   app.post<{ Body: RunBody }>("/run", async (request, reply) => {
     const { message, conversationId, history } = request.body;
