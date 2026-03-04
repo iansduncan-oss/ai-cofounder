@@ -12,6 +12,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
       - API_SECRET=${API_SECRET:-}
+      - CORS_ORIGINS=${CORS_ORIGINS:-}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-20}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
+      - DAILY_TOKEN_LIMIT=${DAILY_TOKEN_LIMIT:-100000}
       - LOG_LEVEL=${LOG_LEVEL:-info}
     networks:
       - avion_avion_net
