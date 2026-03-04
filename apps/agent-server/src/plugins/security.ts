@@ -143,6 +143,9 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     const url = request.url.toLowerCase();
     const ua = (request.headers["user-agent"] ?? "").toLowerCase();
 
+    // 0. Allow health checks through (Docker, load balancers, uptime monitors)
+    if (url === "/health") return;
+
     // 1. Check banned IPs
     if (isBannedIp(ip)) {
       reply.code(403).send({ error: "Forbidden" });
