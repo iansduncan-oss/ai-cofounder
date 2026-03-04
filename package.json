@@ -11,7 +11,14 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "db:push": "npm run db:push -w @ai-cofounder/db",
+    "db:generate": "npm run db:generate -w @ai-cofounder/db",
+    "db:migrate": "npm run db:migrate -w @ai-cofounder/db",
+    "db:studio": "npm run db:studio -w @ai-cofounder/db"
   },
   "packageManager": "npm@11.6.2",
   "devDependencies": {

@@ -1,5 +1,27 @@
-import { describe, it, expect } from "vitest";
-import { buildServer } from "../server.js";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+
+// Set env before any imports that read it
+beforeAll(() => {
+  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+});
+
+// Mock the Anthropic SDK so tests don't make real API calls
+vi.mock("@anthropic-ai/sdk", () => {
+  return {
+    default: class MockAnthropic {
+      messages = {
+        create: vi.fn().mockResolvedValue({
+          content: [{ type: "text", text: "Mock orchestrator response" }],
+          model: "claude-sonnet-4-20250514",
+          usage: { input_tokens: 10, output_tokens: 20 },
+        }),
+      };
+    },
+  };
+});
+
+// Dynamic import after mocks are set up
+const { buildServer } = await import("../server.js");
 
 describe("agent-server", () => {
   describe("GET /health", () => {
@@ -20,7 +42,7 @@ describe("agent-server", () => {
   });
 
   describe("POST /api/agents/run", () => {
-    it("returns orchestrator stub response", async () => {
+    it("returns orchestrator response from Claude", async () => {
       const { app } = buildServer();
       const response = await app.inject({
         method: "POST",
@@ -33,7 +55,9 @@ describe("agent-server", () => {
       const body = response.json();
       expect(body.agentRole).toBe("orchestrator");
       expect(body.conversationId).toBeDefined();
-      expect(body.response).toContain("Hello, AI Cofounder");
+      expect(body.response).toBe("Mock orchestrator response");
+      expect(body.model).toBeDefined();
+      expect(body.usage).toBeDefined();
     });
 
     it("preserves conversationId when provided", async () => {
@@ -48,6 +72,18 @@ describe("agent-server", () => {
 
       const body = response.json();
       expect(body.conversationId).toBe(conversationId);
+    });
+
+    it("returns 400 when message is missing", async () => {
+      const { app } = buildServer();
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/agents/run",
+        payload: {},
+      });
+      await app.close();
+
+      expect(response.statusCode).toBe(400);
     });
   });
 });

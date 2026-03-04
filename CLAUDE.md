@@ -9,7 +9,7 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 ## Monorepo Structure
 
 - **apps/agent-server** — Fastify server, multi-agent orchestration (port 3100)
-- **apps/discord-bot** — Discord bot (not yet implemented)
+- **apps/discord-bot** — Discord bot with `/ask` and `/status` slash commands, calls agent-server
 - **apps/n8n** — n8n workflow automation (Docker-based)
 - **packages/shared** — Types (AgentMessage, AgentRun, Conversation), pino logger, env config helpers
 - **packages/db** — Drizzle ORM schema (users, conversations, messages, agent_runs) + postgres.js client
@@ -27,11 +27,30 @@ npm run clean          # Clean dist/ and .turbo/
 npm run build -w @ai-cofounder/agent-server
 npm run test -w @ai-cofounder/shared
 
-# Database (from packages/db)
+# Docker (Postgres + n8n)
+npm run docker:up      # Start Postgres + n8n containers
+npm run docker:down    # Stop containers
+npm run docker:logs    # Tail container logs
+
+# Database (from root or packages/db)
+npm run db:push        # Push schema to DB (dev, no migration files)
 npm run db:generate    # Generate Drizzle migrations
 npm run db:migrate     # Run migrations
 npm run db:studio      # Open Drizzle Studio
 ```
+
+## Local Dev Setup
+
+```bash
+cp .env.example .env   # Copy and fill in secrets
+npm run docker:up      # Start Postgres + n8n
+npm run db:push        # Push schema to Postgres
+npm run dev            # Start all services in watch mode
+```
+
+Services available at:
+- Agent Server: http://localhost:3100
+- n8n: http://localhost:5678 (admin / localdev)
 
 ## Architecture
 
@@ -41,6 +60,15 @@ npm run db:studio      # Open Drizzle Studio
 - **Database**: Drizzle ORM with PostgreSQL. Schema defines pg enums for `agent_role` and `agent_run_status`. `createDb(connectionString)` returns typed client.
 - **Shared Package**: All cross-cutting types and utilities. Import as `@ai-cofounder/shared`. Logger: `createLogger("service-name")`. Config: `requireEnv()` / `optionalEnv()`.
 
+## Discord Bot
+
+- `/ask <message>` — sends user message to agent-server orchestrator, returns response in an embed
+- `/status` — hits agent-server `/health`, shows system uptime
+- Per-channel conversation tracking (in-memory)
+- `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` required in `.env`
+- `AGENT_SERVER_URL` optional (defaults to `http://localhost:3100`)
+- Slash commands auto-registered on startup via Discord REST API
+
 ## Environment
 
 - Node.js v24.12.0, npm 11.6.2
@@ -48,3 +76,6 @@ npm run db:studio      # Open Drizzle Studio
 - `DATABASE_URL` env var required for db operations
 - `PORT` (default 3100), `HOST` (default 0.0.0.0) for agent-server
 - `LOG_LEVEL` (default "info") for pino logger
+- `ANTHROPIC_API_KEY` required for Claude API (orchestrator)
+- `DISCORD_TOKEN`, `DISCORD_CLIENT_ID` required for Discord bot
+- `AGENT_SERVER_URL` (default `http://localhost:3100`) for bot → server communication

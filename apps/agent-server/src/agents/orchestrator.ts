@@ -1,37 +1,97 @@
-import { createLogger } from "@ai-cofounder/shared";
-import type { AgentRole } from "@ai-cofounder/shared";
+import Anthropic from "@anthropic-ai/sdk";
+import { createLogger, requireEnv, optionalEnv } from "@ai-cofounder/shared";
+import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
 
 export interface OrchestratorResult {
   conversationId: string;
   agentRole: AgentRole;
   response: string;
+  model: string;
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
-/**
- * The Orchestrator is the top-level agent that receives user input,
- * decides which sub-agents to invoke, and assembles the final response.
- *
- * This is a stub — the real implementation will integrate with an LLM
- * to make routing decisions and manage multi-step agent workflows.
- */
+const SYSTEM_PROMPT = `You are the Orchestrator agent in the AI Cofounder system.
+Your job is to understand what the user needs and provide a helpful, actionable response.
+
+You have access to the following specialist roles (not yet wired up):
+- researcher: deep-dives into topics, gathers information
+- coder: writes and reviews code
+- reviewer: critiques plans and deliverables
+- planner: breaks complex goals into actionable steps
+
+For now, handle all requests directly. Be concise and practical.
+When a request would clearly benefit from a specialist, note which role you would delegate to.`;
+
 export class Orchestrator {
   private logger = createLogger("orchestrator");
+  private client: Anthropic;
+  private model: string;
+
+  constructor() {
+    this.client = new Anthropic({
+      apiKey: requireEnv("ANTHROPIC_API_KEY"),
+    });
+    this.model = optionalEnv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514");
+  }
 
   async run(
     message: string,
-    conversationId?: string
+    conversationId?: string,
+    history?: AgentMessage[]
   ): Promise<OrchestratorResult> {
     const id = conversationId ?? crypto.randomUUID();
     this.logger.info({ conversationId: id }, "orchestrator run started");
 
-    // TODO: Integrate LLM to decide which agents to invoke
-    // TODO: Spawn sub-agents (researcher, coder, reviewer, planner)
-    // TODO: Aggregate results and return final response
+    // Build message history for context
+    const messages: Anthropic.MessageParam[] = [];
 
-    return {
-      conversationId: id,
-      agentRole: "orchestrator",
-      response: `[stub] Received: "${message}". Agent orchestration not yet implemented.`,
-    };
+    if (history?.length) {
+      for (const msg of history) {
+        messages.push({
+          role: msg.role === "user" ? "user" : "assistant",
+          content: msg.content,
+        });
+      }
+    }
+
+    messages.push({ role: "user", content: message });
+
+    try {
+      const response = await this.client.messages.create({
+        model: this.model,
+        max_tokens: 4096,
+        system: SYSTEM_PROMPT,
+        messages,
+      });
+
+      const text = response.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+
+      this.logger.info(
+        {
+          conversationId: id,
+          model: response.model,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+        "orchestrator run completed"
+      );
+
+      return {
+        conversationId: id,
+        agentRole: "orchestrator",
+        response: text,
+        model: response.model,
+        usage: {
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
+      };
+    } catch (err) {
+      this.logger.error({ conversationId: id, err }, "orchestrator run failed");
+      throw err;
+    }
   }
 }
