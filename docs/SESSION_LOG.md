@@ -2,12 +2,6 @@
 
 ## Session 1 — Project Skeleton (2026-03-03)
 
-### Environment Verified
-- Node.js v24.12.0, npm 11.6.2, git 2.39.3
-- Docker 29.1.3, Docker Compose v2.40.3
-- Docker daemon: not running (not needed for skeleton)
-- Disk: 345 GB free, RAM: 8 GB
-
 ### What Was Done
 - Initialized Turborepo monorepo with npm workspaces
 - Created workspace structure (agent-server, discord-bot, n8n, shared, db)
@@ -22,21 +16,39 @@
 4. **packages/db built** — Drizzle ORM schema (users, conversations, messages, agent_runs tables), postgres.js client, pg enums. Migration scripts (db:generate, db:migrate, db:studio). 3 tests.
 5. **apps/agent-server built** — Fastify server with `GET /health` and `POST /api/agents/run`. Orchestrator class stub ready for LLM integration. 3 tests.
 
-### Current Status
-- `turbo run build test` — **8/8 tasks pass, 12 tests across 3 packages**
-- Agent server starts on port 3100, health check works, orchestrator returns stub responses
-- No Docker/Postgres running yet — db package is schema-only for now
+## Session 3 — Claude API, Discord Bot, Docker Compose (2026-03-03)
 
-### Commits (5)
-- `c917e0e` feat: configure TypeScript across all workspaces
-- `1e6a24e` feat: add Vitest testing infrastructure
-- `c78d2a0` feat(shared): add types, logger, and config utilities
-- `31d3b99` feat(db): add Drizzle ORM schema and database client
-- `53a0364` feat(agent-server): add Fastify server with health check and agent orchestrator stub
+### What Was Done
+1. **Docker Compose** — Postgres 16 + n8n, healthcheck dependencies, `.env.example`
+2. **Claude API integration** — Orchestrator rewritten with real Anthropic SDK calls, system prompt, conversation history
+3. **Discord bot** — `/ask` and `/status` slash commands, per-channel conversation tracking, auto-register on startup
+4. **Tests updated** — Anthropic SDK mocks, input validation tests
+
+## Session 4 — Full Stack Startup (2026-03-03)
+
+### What Was Done
+1. **Committed Session 3 work** — all uncommitted changes from prior session
+2. **Separated databases** — n8n now uses its own `n8n` database; our app uses `ai_cofounder`. Added `infra/init-n8n-db.sh` init script.
+3. **Schema pushed** — `drizzle-kit push` created all 4 tables (users, conversations, messages, agent_runs) cleanly
+4. **Dev mode fixed** — Switched from `tsc --watch` to `tsx watch` for both apps so dev mode actually runs the servers
+5. **Full stack verified running:**
+   - Postgres: healthy, 4 tables
+   - n8n: running at localhost:5678
+   - Agent Server: running at localhost:3100, Claude API responding
+   - Discord Bot: online as `AI CoFounder#7257`, 2 slash commands registered
+
+### Current Status
+All services operational. The full system is end-to-end functional:
+- User types `/ask` in Discord → bot calls agent-server → orchestrator calls Claude → response returned in embed
+
+### Known Issues
+- Removed obsolete `version: "3.9"` from docker-compose.yml (Docker Compose warned)
+- Conversation history is in-memory only (lost on bot restart)
+- No request validation/auth on agent-server endpoints
 
 ### What's Next
-- Start Docker, spin up Postgres, run Drizzle migrations
-- Integrate an LLM (Claude API) into the Orchestrator
-- Build the Discord bot skeleton
-- Add Docker Compose for local development (Postgres + n8n)
-- Implement real agent routing (orchestrator → researcher/coder/reviewer)
+- Persist conversations to Postgres (wire up packages/db)
+- Add agent routing (orchestrator delegates to researcher/coder/reviewer/planner)
+- Add error handling and rate limiting to agent-server
+- Build n8n workflow templates for automated tasks
+- Add ESLint across workspaces

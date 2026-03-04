@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch",
+    "dev": "tsx watch src/index.ts",
     "lint": "echo 'TODO: configure lint'",
     "test": "vitest run",
     "clean": "rm -rf dist"

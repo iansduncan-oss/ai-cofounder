@@ -55,9 +55,9 @@ Services available at:
 ## Architecture
 
 - **TypeScript**: Strict mode, ES2022 target, Node16 module resolution. Shared `tsconfig.base.json` extended by each workspace.
-- **Testing**: Vitest with root config (`vitest.config.ts`). Tests live in `src/__tests__/`. Run from source (not compiled JS).
-- **Agent Server**: Fastify + pino logging. Routes in `src/routes/`, agents in `src/agents/`. `buildServer()` returns `{ app, logger }` — use `app.inject()` for testing.
-- **Database**: Drizzle ORM with PostgreSQL. Schema defines pg enums for `agent_role` and `agent_run_status`. `createDb(connectionString)` returns typed client.
+- **Testing**: Vitest with root config (`vitest.config.ts`). Tests live in `src/__tests__/` (excluded from tsc build). Run from source (not compiled JS). Mock Anthropic SDK with `vi.mock()`.
+- **Agent Server**: Fastify + pino logging. Routes in `src/routes/`, agents in `src/agents/`. `buildServer()` returns `{ app, logger }` — use `app.inject()` for testing. Dev mode uses `tsx watch`.
+- **Database**: Drizzle ORM with PostgreSQL. App uses `ai_cofounder` database; n8n uses separate `n8n` database (created by `infra/init-n8n-db.sh`). Use `db:push` for dev, `db:generate`/`db:migrate` for production.
 - **Shared Package**: All cross-cutting types and utilities. Import as `@ai-cofounder/shared`. Logger: `createLogger("service-name")`. Config: `requireEnv()` / `optionalEnv()`.
 
 ## Discord Bot
