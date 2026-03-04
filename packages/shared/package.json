@@ -8,7 +8,7 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "lint": "echo 'TODO: configure lint'",
-    "test": "echo 'TODO: configure test'",
+    "test": "vitest run",
     "clean": "rm -rf dist"
   }
 }
