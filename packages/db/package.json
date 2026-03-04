@@ -9,6 +9,17 @@
     "dev": "tsc --watch",
     "lint": "echo 'TODO: configure lint'",
     "test": "vitest run",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "postgres": "^3.4.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3",
+    "drizzle-kit": "^0.31.9"
   }
 }
