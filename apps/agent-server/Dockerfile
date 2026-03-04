@@ -6,7 +6,7 @@ COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/agent-server/package.json apps/agent-server/
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --force
 
 # Copy source and build
 COPY packages/shared/ packages/shared/
@@ -26,7 +26,7 @@ COPY --from=base /app/packages/db/dist/ packages/db/dist/
 COPY --from=base /app/apps/agent-server/package.json apps/agent-server/
 COPY --from=base /app/apps/agent-server/dist/ apps/agent-server/dist/
 
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm ci --omit=dev --ignore-scripts --force
 
 ENV NODE_ENV=production
 EXPOSE 3100
