@@ -2,5 +2,11 @@ node_modules
 dist
 .turbo
 .env
+.env.*
+!.env.example
+!.env.production.example
 *.log
 .git
+.github
+**/__tests__
+**/*.test.ts

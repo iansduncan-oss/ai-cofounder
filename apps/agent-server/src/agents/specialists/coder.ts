@@ -1,0 +1,85 @@
+import type { LlmRegistry, LlmTool, LlmToolUseContent } from "@ai-cofounder/llm";
+import type { AgentRole } from "@ai-cofounder/shared";
+import type { Db } from "@ai-cofounder/db";
+import { SpecialistAgent, type SpecialistContext } from "./base.js";
+
+export class CoderAgent extends SpecialistAgent {
+  readonly role: AgentRole = "coder";
+  readonly taskCategory = "code" as const;
+
+  constructor(registry: LlmRegistry, db?: Db) {
+    super("coder", registry, db);
+  }
+
+  getSystemPrompt(context: SpecialistContext): string {
+    return `You are a coding specialist agent working on a larger goal: "${context.goalTitle}".
+
+Your job is to produce high-quality code, configurations, or technical documentation as specified by the task.
+
+Guidelines:
+- Write clean, production-ready code with proper error handling
+- Follow the conventions of the target language/framework
+- Include brief inline comments only where logic isn't self-evident
+- If the task is ambiguous, state your assumptions before coding
+- Structure output as code blocks with file paths where applicable
+- Consider edge cases and security implications
+- If the task involves modifying existing code, clearly indicate what changes to make and where
+
+You have a review_code tool — use it to self-review your code before finalizing your output.`;
+  }
+
+  getTools(): LlmTool[] {
+    return [
+      {
+        name: "review_code",
+        description:
+          "Self-review code for common issues: syntax errors, missing error handling, security vulnerabilities, and style problems. Submit code and language to get feedback.",
+        input_schema: {
+          type: "object",
+          properties: {
+            code: {
+              type: "string",
+              description: "The code to review",
+            },
+            language: {
+              type: "string",
+              description: "Programming language (e.g. typescript, python, sql)",
+            },
+          },
+          required: ["code", "language"],
+        },
+      },
+    ];
+  }
+
+  protected override async executeTool(
+    block: LlmToolUseContent,
+    _context: SpecialistContext,
+  ): Promise<unknown> {
+    if (block.name === "review_code") {
+      const { code, language } = block.input as { code: string; language: string };
+
+      // Use a fast model to review the code
+      const reviewResponse = await this.registry.complete("simple", {
+        system:
+          "You are a code reviewer. Identify bugs, security issues, missing error handling, and style problems. Be concise — list only real issues, not style preferences. If the code looks good, say so.",
+        messages: [
+          {
+            role: "user",
+            content: `Review this ${language} code:\n\n\`\`\`${language}\n${code}\n\`\`\``,
+          },
+        ],
+        max_tokens: 1024,
+      });
+
+      const text = reviewResponse.content
+        .filter((b): b is { type: "text"; text: string } => b.type === "text")
+        .map((b) => b.text)
+        .join("\n");
+
+      return { review: text };
+    }
+
+    return { error: `Unknown tool: ${block.name}` };
+  }
+}

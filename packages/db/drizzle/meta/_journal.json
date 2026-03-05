@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1772724793158,
+      "tag": "0000_illegal_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772725067573,
+      "tag": "0001_solid_mongu",
+      "breakpoints": true
+    }
+  ]
+}

@@ -89,8 +89,7 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
 
   // Track request start time and record metrics on response
   app.addHook("onRequest", async (request) => {
-    (request as unknown as Record<string, unknown>).__startTime =
-      process.hrtime.bigint();
+    (request as unknown as Record<string, unknown>).__startTime = process.hrtime.bigint();
   });
 
   app.addHook("onResponse", async (request, reply) => {
@@ -101,8 +100,7 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
     // Normalize: if it's not a registered route pattern, label as "unmatched"
     // routeOptions.url is set for registered routes; for 404s it's undefined
     const isRegistered =
-      request.routeOptions?.url !== undefined &&
-      request.routeOptions?.url !== null;
+      request.routeOptions?.url !== undefined && request.routeOptions?.url !== null;
     const normalizedRoute = isRegistered ? routePattern : "unmatched";
 
     const method = request.method;
@@ -122,11 +120,11 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
     }
 
     // Duration
-    const startTime = (request as unknown as Record<string, unknown>)
-      .__startTime as bigint | undefined;
+    const startTime = (request as unknown as Record<string, unknown>).__startTime as
+      | bigint
+      | undefined;
     if (startTime) {
-      const durationMs =
-        Number(process.hrtime.bigint() - startTime) / 1_000_000;
+      const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       recordDuration(normalizedRoute, durationMs);
     }
   });

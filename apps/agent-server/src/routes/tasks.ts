@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from "fastify";
-import type { AgentRole } from "@ai-cofounder/shared";
 import {
   createTask,
   getTask,
@@ -69,11 +68,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     "/:id/assign",
     { schema: { params: IdParams, body: AssignTaskBody } },
     async (request, reply) => {
-      const task = await assignTask(
-        app.db,
-        request.params.id,
-        request.body.agent,
-      );
+      const task = await assignTask(app.db, request.params.id, request.body.agent);
       if (!task) return reply.status(404).send({ error: "Task not found" });
       return task;
     },
@@ -98,11 +93,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     "/:id/complete",
     { schema: { params: IdParams, body: CompleteTaskBody } },
     async (request, reply) => {
-      const task = await completeTask(
-        app.db,
-        request.params.id,
-        request.body.result,
-      );
+      const task = await completeTask(app.db, request.params.id, request.body.result);
       if (!task) return reply.status(404).send({ error: "Task not found" });
       return task;
     },
@@ -112,17 +103,9 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   app.patch<{
     Params: typeof IdParams.static;
     Body: typeof FailTaskBody.static;
-  }>(
-    "/:id/fail",
-    { schema: { params: IdParams, body: FailTaskBody } },
-    async (request, reply) => {
-      const task = await failTask(
-        app.db,
-        request.params.id,
-        request.body.error,
-      );
-      if (!task) return reply.status(404).send({ error: "Task not found" });
-      return task;
-    },
-  );
+  }>("/:id/fail", { schema: { params: IdParams, body: FailTaskBody } }, async (request, reply) => {
+    const task = await failTask(app.db, request.params.id, request.body.error);
+    if (!task) return reply.status(404).send({ error: "Task not found" });
+    return task;
+  });
 };

@@ -49,6 +49,7 @@ npm run dev            # Start all services in watch mode
 ```
 
 Services available at:
+
 - Agent Server: http://localhost:3100
 - n8n: http://localhost:5678 (admin / localdev)
 
@@ -68,6 +69,34 @@ Services available at:
 - `DISCORD_TOKEN` and `DISCORD_CLIENT_ID` required in `.env`
 - `AGENT_SERVER_URL` optional (defaults to `http://localhost:3100`)
 - Slash commands auto-registered on startup via Discord REST API
+
+## Production Infrastructure
+
+Deployed on Hetzner VPS at `168.119.162.59`. Project path: `/opt/ai-cofounder`.
+
+**Services:**
+
+- **Agent Server** — https://api.aviontechs.com (Fastify, port 3100)
+- **Discord Bot** — running, connected to agent-server
+- **n8n** — https://n8n.aviontechs.com (`docker-compose.n8n.yml`)
+- **Uptime Kuma** — https://status.aviontechs.com (`docker-compose.uptimekuma.yml`)
+
+**Monitoring:**
+
+- **Grafana** — https://grafana.aviontechs.com (port 3200)
+- **Prometheus** — localhost:9090
+- **Alertmanager** — localhost:9093 (sends alerts to Discord webhook)
+- All three in `docker-compose.monitoring.yml`
+
+**Reverse Proxy:** Nginx Proxy Manager (NPM) — admin UI on port 8181 (SSH tunnel only). Docker network: `avion_avion_net`.
+
+**Database:** PostgreSQL with two databases: `ai_cofounder` (app) and `n8n`. Nightly backups at `/opt/backups/postgres/` (14-day retention, cron at 3 AM).
+
+**Security:** UFW firewall (ports 22, 80, 443 open). fail2ban on SSH.
+
+**Docker:** Global log rotation configured in `/etc/docker/daemon.json` (10MB, 3 files).
+
+**Deploy:** Push to `main` triggers CI → deploy to VPS via GHCR + Fly.io. Discord notification on deploy via `DISCORD_DEPLOY_WEBHOOK_URL` secret.
 
 ## Environment
 

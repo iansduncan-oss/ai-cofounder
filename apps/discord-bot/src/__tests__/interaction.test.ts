@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 
 beforeAll(() => {
   // Prevent requireEnv from throwing during tests

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
 import {
   users,
@@ -8,6 +8,8 @@ import {
   conversations,
   messages,
   channelConversations,
+  memories,
+  prompts,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -18,11 +20,7 @@ export async function findOrCreateUser(
   platform: string,
   displayName?: string,
 ) {
-  const existing = await db
-    .select()
-    .from(users)
-    .where(eq(users.externalId, externalId))
-    .limit(1);
+  const existing = await db.select().from(users).where(eq(users.externalId, externalId)).limit(1);
 
   if (existing.length > 0) return existing[0];
 
@@ -31,6 +29,15 @@ export async function findOrCreateUser(
     .values({ externalId, platform, displayName })
     .returning();
   return created;
+}
+
+export async function findUserByPlatform(db: Db, platform: string, externalId: string) {
+  const rows = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.platform, platform), eq(users.externalId, externalId)))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 /* ──────────────── Channel Conversations ──────────────────── */
@@ -66,6 +73,43 @@ export async function upsertChannelConversation(
   return created;
 }
 
+/* ──────────────── Conversations ──────────────────────────── */
+
+export async function createConversation(db: Db, data: { userId: string; title?: string }) {
+  const [conv] = await db.insert(conversations).values(data).returning();
+  return conv;
+}
+
+export async function getConversation(db: Db, id: string) {
+  const rows = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+/* ────────────────────── Messages ────────────────────────── */
+
+export async function createMessage(
+  db: Db,
+  data: {
+    conversationId: string;
+    role: "user" | "agent" | "system";
+    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
+    content: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [msg] = await db.insert(messages).values(data).returning();
+  return msg;
+}
+
+export async function getConversationMessages(db: Db, conversationId: string, limit = 50) {
+  return db
+    .select()
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId))
+    .orderBy(desc(messages.createdAt))
+    .limit(limit);
+}
+
 /* ────────────────────────── Goals ────────────────────────── */
 
 export async function createGoal(
@@ -88,10 +132,7 @@ export async function getGoal(db: Db, id: string) {
   return rows[0] ?? null;
 }
 
-export async function listGoalsByConversation(
-  db: Db,
-  conversationId: string,
-) {
+export async function listGoalsByConversation(db: Db, conversationId: string) {
   return db
     .select()
     .from(goals)
@@ -136,11 +177,7 @@ export async function getTask(db: Db, id: string) {
 }
 
 export async function listTasksByGoal(db: Db, goalId: string) {
-  return db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.goalId, goalId))
-    .orderBy(asc(tasks.orderIndex));
+  return db.select().from(tasks).where(eq(tasks.goalId, goalId)).orderBy(asc(tasks.orderIndex));
 }
 
 export async function listPendingTasks(db: Db, limit = 50) {
@@ -202,19 +239,12 @@ export async function createApproval(
     reason: string;
   },
 ) {
-  const [approval] = await db
-    .insert(approvals)
-    .values(data)
-    .returning();
+  const [approval] = await db.insert(approvals).values(data).returning();
   return approval;
 }
 
 export async function getApproval(db: Db, id: string) {
-  const rows = await db
-    .select()
-    .from(approvals)
-    .where(eq(approvals.id, id))
-    .limit(1);
+  const rows = await db.select().from(approvals).where(eq(approvals.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -253,4 +283,178 @@ export async function resolveApproval(
     .where(eq(approvals.id, id))
     .returning();
   return updated ?? null;
+}
+
+/* ────────────────────── Memories ─────────────────────────── */
+
+type MemoryCategory =
+  | "user_info"
+  | "preferences"
+  | "projects"
+  | "decisions"
+  | "goals"
+  | "technical"
+  | "business"
+  | "other";
+
+export async function saveMemory(
+  db: Db,
+  data: {
+    userId: string;
+    category: MemoryCategory;
+    key: string;
+    content: string;
+    source?: string;
+    metadata?: Record<string, unknown>;
+    embedding?: number[];
+  },
+) {
+  // Upsert: if same userId + key exists, update
+  const existing = await db
+    .select()
+    .from(memories)
+    .where(and(eq(memories.userId, data.userId), eq(memories.key, data.key)))
+    .limit(1);
+
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(memories)
+      .set({
+        content: data.content,
+        category: data.category,
+        source: data.source,
+        ...(data.embedding ? { embedding: data.embedding } : {}),
+        updatedAt: new Date(),
+      })
+      .where(eq(memories.id, existing[0].id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db.insert(memories).values(data).returning();
+  return created;
+}
+
+export async function recallMemories(
+  db: Db,
+  userId: string,
+  options?: { category?: string; query?: string; limit?: number },
+) {
+  const limit = options?.limit ?? 20;
+  const conditions = [eq(memories.userId, userId)];
+
+  if (options?.category) {
+    conditions.push(eq(memories.category, options.category as MemoryCategory));
+  }
+
+  if (options?.query) {
+    conditions.push(
+      or(ilike(memories.key, `%${options.query}%`), ilike(memories.content, `%${options.query}%`))!,
+    );
+  }
+
+  return db
+    .select()
+    .from(memories)
+    .where(and(...conditions))
+    .orderBy(desc(memories.updatedAt))
+    .limit(limit);
+}
+
+export async function searchMemoriesByVector(
+  db: Db,
+  embedding: number[],
+  userId: string,
+  limit = 10,
+) {
+  const vectorLiteral = `[${embedding.join(",")}]`;
+  const rows = await db.execute(
+    sql`SELECT id, user_id, category, key, content, source, metadata, created_at, updated_at,
+               embedding <=> ${vectorLiteral}::vector AS distance
+        FROM memories
+        WHERE user_id = ${userId} AND embedding IS NOT NULL
+        ORDER BY distance ASC
+        LIMIT ${limit}`,
+  );
+  return rows as unknown as Array<{
+    id: string;
+    user_id: string;
+    category: string;
+    key: string;
+    content: string;
+    source: string | null;
+    metadata: unknown;
+    created_at: Date;
+    updated_at: Date;
+    distance: number;
+  }>;
+}
+
+export async function listMemoriesByUser(db: Db, userId: string) {
+  return db
+    .select()
+    .from(memories)
+    .where(eq(memories.userId, userId))
+    .orderBy(desc(memories.updatedAt));
+}
+
+export async function deleteMemory(db: Db, id: string) {
+  const [deleted] = await db.delete(memories).where(eq(memories.id, id)).returning();
+  return deleted ?? null;
+}
+
+/* ────────────────────── Prompts ─────────────────────────── */
+
+export async function getActivePrompt(db: Db, name: string) {
+  const rows = await db
+    .select()
+    .from(prompts)
+    .where(and(eq(prompts.name, name), eq(prompts.isActive, 1)))
+    .orderBy(desc(prompts.version))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getPromptVersion(db: Db, name: string, version: number) {
+  const rows = await db
+    .select()
+    .from(prompts)
+    .where(and(eq(prompts.name, name), eq(prompts.version, version)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listPromptVersions(db: Db, name: string) {
+  return db.select().from(prompts).where(eq(prompts.name, name)).orderBy(desc(prompts.version));
+}
+
+export async function createPromptVersion(
+  db: Db,
+  data: { name: string; content: string; metadata?: Record<string, unknown> },
+) {
+  // Get the highest version number for this prompt name
+  const existing = await db
+    .select({ version: prompts.version })
+    .from(prompts)
+    .where(eq(prompts.name, data.name))
+    .orderBy(desc(prompts.version))
+    .limit(1);
+
+  const nextVersion = existing.length > 0 ? existing[0].version + 1 : 1;
+
+  // Deactivate previous versions
+  await db.update(prompts).set({ isActive: 0 }).where(eq(prompts.name, data.name));
+
+  // Insert new active version
+  const [created] = await db
+    .insert(prompts)
+    .values({
+      name: data.name,
+      version: nextVersion,
+      content: data.content,
+      isActive: 1,
+      metadata: data.metadata,
+    })
+    .returning();
+  return created;
 }

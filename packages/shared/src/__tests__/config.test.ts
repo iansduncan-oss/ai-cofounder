@@ -21,7 +21,7 @@ describe("config", () => {
     it("throws when not set", () => {
       delete process.env.TEST_VAR;
       expect(() => requireEnv("TEST_VAR")).toThrow(
-        "Missing required environment variable: TEST_VAR"
+        "Missing required environment variable: TEST_VAR",
       );
     });
   });

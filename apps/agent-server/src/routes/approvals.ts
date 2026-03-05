@@ -41,8 +41,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
     { schema: { params: IdParams } },
     async (request, reply) => {
       const approval = await getApproval(app.db, request.params.id);
-      if (!approval)
-        return reply.status(404).send({ error: "Approval not found" });
+      if (!approval) return reply.status(404).send({ error: "Approval not found" });
       return approval;
     },
   );
@@ -71,8 +70,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
         request.body.decision,
         request.body.decidedBy,
       );
-      if (!approval)
-        return reply.status(404).send({ error: "Approval not found" });
+      if (!approval) return reply.status(404).send({ error: "Approval not found" });
       return approval;
     },
   );

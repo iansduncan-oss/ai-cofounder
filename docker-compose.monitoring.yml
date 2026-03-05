@@ -20,8 +20,16 @@ services:
     image: prom/alertmanager:v0.27.0
     container_name: ai-cofounder-alertmanager
     restart: unless-stopped
+    environment:
+      - ALERTMANAGER_DISCORD_WEBHOOK_URL=${ALERTMANAGER_DISCORD_WEBHOOK_URL}
     volumes:
-      - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./infra/monitoring/alertmanager/alertmanager.yml:/tmp/alertmanager.yml.tpl:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sed "s|\$${ALERTMANAGER_DISCORD_WEBHOOK_URL}|$$ALERTMANAGER_DISCORD_WEBHOOK_URL|g" \
+          /tmp/alertmanager.yml.tpl > /etc/alertmanager/alertmanager.yml
+        exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml
     ports:
       - "127.0.0.1:9093:9093"
     networks:
@@ -40,9 +48,40 @@ services:
       - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
     ports:
-      - "3200:3000"
+      - "127.0.0.1:3200:3000"
     depends_on:
       - prometheus
+    networks:
+      - avion_avion_net
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: ai-cofounder-node-exporter
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--path.rootfs=/rootfs"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    networks:
+      - avion_avion_net
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: ai-cofounder-cadvisor
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
     networks:
       - avion_avion_net
 

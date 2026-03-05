@@ -1,16 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import {
-  createGoal,
-  getGoal,
-  listGoalsByConversation,
-  updateGoalStatus,
-} from "@ai-cofounder/db";
-import {
-  CreateGoalBody,
-  UpdateGoalStatusBody,
-  IdParams,
-  ConversationIdQuery,
-} from "../schemas.js";
+import { createGoal, getGoal, listGoalsByConversation, updateGoalStatus } from "@ai-cofounder/db";
+import { CreateGoalBody, UpdateGoalStatusBody, IdParams, ConversationIdQuery } from "../schemas.js";
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
@@ -51,11 +41,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     "/:id/status",
     { schema: { params: IdParams, body: UpdateGoalStatusBody } },
     async (request, reply) => {
-      const goal = await updateGoalStatus(
-        app.db,
-        request.params.id,
-        request.body.status,
-      );
+      const goal = await updateGoalStatus(app.db, request.params.id, request.body.status);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });
       return goal;
     },

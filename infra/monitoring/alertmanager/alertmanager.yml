@@ -11,7 +11,7 @@ route:
 receivers:
   - name: "discord"
     webhook_configs:
-      - url: "REDACTED_DISCORD_WEBHOOK_URL/slack"
+      - url: "${ALERTMANAGER_DISCORD_WEBHOOK_URL}"
         send_resolved: true
 
 templates: []

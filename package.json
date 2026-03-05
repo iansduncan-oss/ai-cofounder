@@ -10,6 +10,8 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "turbo run test",
     "clean": "turbo run clean",
     "docker:up": "docker compose up -d",
@@ -23,12 +25,16 @@
   "packageManager": "npm@11.6.2",
   "devDependencies": {
     "@types/node": "^25.3.3",
+    "eslint": "^10.0.2",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "turbo": "^2.8.12",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1",
     "vitest": "^4.0.18"
   },
-  "dependencies": {
+  "optionalDependencies": {
     "@rollup/rollup-linux-arm64-gnu": "^4.59.0"
   }
 }

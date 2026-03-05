@@ -12,21 +12,85 @@ vi.mock("@ai-cofounder/db", () => {
     createDb: vi.fn().mockReturnValue({
       execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
     }),
+    findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1", externalId: "ext-1" }),
+    createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
+    getConversationMessages: vi.fn().mockResolvedValue([]),
+    createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
+    createGoal: vi.fn().mockResolvedValue({ id: "goal-1", title: "Test Goal" }),
+    createTask: vi.fn().mockResolvedValue({
+      id: "task-1",
+      title: "Test Task",
+      assignedAgent: "researcher",
+      orderIndex: 0,
+    }),
+    updateGoalStatus: vi.fn().mockResolvedValue({}),
+    saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
+    recallMemories: vi.fn().mockResolvedValue([]),
+    searchMemoriesByVector: vi.fn().mockResolvedValue([]),
+    getGoal: vi.fn(),
+    listGoalsByConversation: vi.fn().mockResolvedValue([]),
+    getTask: vi.fn(),
+    listTasksByGoal: vi.fn().mockResolvedValue([]),
+    listPendingTasks: vi.fn().mockResolvedValue([]),
+    assignTask: vi.fn(),
+    startTask: vi.fn(),
+    completeTask: vi.fn(),
+    failTask: vi.fn(),
+    createApproval: vi.fn(),
+    getApproval: vi.fn(),
+    listPendingApprovals: vi.fn().mockResolvedValue([]),
+    listApprovalsByTask: vi.fn().mockResolvedValue([]),
+    resolveApproval: vi.fn(),
+    listMemoriesByUser: vi.fn().mockResolvedValue([]),
+    deleteMemory: vi.fn(),
+    getChannelConversation: vi.fn(),
+    upsertChannelConversation: vi.fn(),
+    getConversation: vi.fn(),
+    findUserByPlatform: vi.fn().mockResolvedValue(null),
+    getActivePrompt: vi.fn().mockResolvedValue(null),
+    getPromptVersion: vi.fn().mockResolvedValue(null),
+    listPromptVersions: vi.fn().mockResolvedValue([]),
+    createPromptVersion: vi.fn().mockResolvedValue({ id: "p-1", name: "test", version: 1 }),
+    goals: {},
+    channelConversations: {},
+    prompts: {},
   };
 });
 
-// Mock the Anthropic SDK so tests don't make real API calls
-vi.mock("@anthropic-ai/sdk", () => {
+// Mock the LLM package with a fake registry
+vi.mock("@ai-cofounder/llm", () => {
+  const mockComplete = vi.fn().mockResolvedValue({
+    content: [{ type: "text", text: "Mock orchestrator response" }],
+    model: "claude-sonnet-4-20250514",
+    stop_reason: "end_turn",
+    usage: { inputTokens: 10, outputTokens: 20 },
+    provider: "anthropic",
+  });
+
+  class MockLlmRegistry {
+    complete = mockComplete;
+    completeDirect = mockComplete;
+    register = vi.fn();
+    getProvider = vi.fn();
+    resolveProvider = vi.fn();
+    listProviders = vi.fn().mockReturnValue([]);
+  }
+
   return {
-    default: class MockAnthropic {
-      messages = {
-        create: vi.fn().mockResolvedValue({
-          content: [{ type: "text", text: "Mock orchestrator response" }],
-          model: "claude-sonnet-4-20250514",
-          usage: { input_tokens: 10, output_tokens: 20 },
-        }),
-      };
+    LlmRegistry: MockLlmRegistry,
+    AnthropicProvider: class {
+      constructor() {}
     },
+    GroqProvider: class {
+      constructor() {}
+    },
+    OpenRouterProvider: class {
+      constructor() {}
+    },
+    GeminiProvider: class {
+      constructor() {}
+    },
+    createEmbeddingService: vi.fn(),
   };
 });
 
@@ -52,7 +116,7 @@ describe("agent-server", () => {
   });
 
   describe("POST /api/agents/run", () => {
-    it("returns orchestrator response from Claude", async () => {
+    it("returns orchestrator response", async () => {
       const { app } = buildServer();
       const response = await app.inject({
         method: "POST",

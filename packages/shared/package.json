@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "echo 'TODO: configure lint'",
+    "lint": "eslint src/",
     "test": "vitest run",
     "clean": "rm -rf dist"
   },

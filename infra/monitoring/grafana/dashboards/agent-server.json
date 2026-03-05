@@ -15,9 +15,7 @@
         "defaults": {
           "unit": "s",
           "thresholds": {
-            "steps": [
-              { "color": "green", "value": null }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           }
         },
         "overrides": []
@@ -65,9 +63,7 @@
         "defaults": {
           "unit": "reqps",
           "thresholds": {
-            "steps": [
-              { "color": "green", "value": null }
-            ]
+            "steps": [{ "color": "green", "value": null }]
           }
         },
         "overrides": []
@@ -115,9 +111,7 @@
         "defaults": {
           "unit": "short",
           "thresholds": {
-            "steps": [
-              { "color": "blue", "value": null }
-            ]
+            "steps": [{ "color": "blue", "value": null }]
           }
         },
         "overrides": []

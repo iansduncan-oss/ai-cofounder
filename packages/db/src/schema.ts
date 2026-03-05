@@ -6,7 +6,20 @@ import {
   jsonb,
   pgEnum,
   integer,
+  customType,
 } from "drizzle-orm/pg-core";
+
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return "vector(768)";
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: string): number[] {
+    return value.slice(1, -1).split(",").map(Number);
+  },
+});
 
 export const agentRoleEnum = pgEnum("agent_role", [
   "orchestrator",
@@ -29,9 +42,7 @@ export const users = pgTable("users", {
   externalId: text("external_id").notNull().unique(),
   platform: text("platform").notNull(), // "discord", "web", etc.
   displayName: text("display_name"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const conversations = pgTable("conversations", {
@@ -40,12 +51,8 @@ export const conversations = pgTable("conversations", {
     .notNull()
     .references(() => users.id),
   title: text("title"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const messages = pgTable("messages", {
@@ -57,9 +64,7 @@ export const messages = pgTable("messages", {
   agentRole: agentRoleEnum("agent_role"),
   content: text("content").notNull(),
   metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const agentRuns = pgTable("agent_runs", {
@@ -73,9 +78,7 @@ export const agentRuns = pgTable("agent_runs", {
   output: text("output"),
   error: text("error"),
   parentRunId: uuid("parent_run_id"),
-  startedAt: timestamp("started_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 });
 
@@ -88,26 +91,14 @@ export const channelConversations = pgTable("channel_conversations", {
     .notNull()
     .references(() => conversations.id),
   platform: text("platform").notNull().default("discord"),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ── Goal / Task / Approval enums ── */
 
-export const goalStatusEnum = pgEnum("goal_status", [
-  "draft",
-  "active",
-  "completed",
-  "cancelled",
-]);
+export const goalStatusEnum = pgEnum("goal_status", ["draft", "active", "completed", "cancelled"]);
 
-export const goalPriorityEnum = pgEnum("goal_priority", [
-  "low",
-  "medium",
-  "high",
-  "critical",
-]);
+export const goalPriorityEnum = pgEnum("goal_priority", ["low", "medium", "high", "critical"]);
 
 export const taskStatusEnum = pgEnum("task_status", [
   "pending",
@@ -118,11 +109,7 @@ export const taskStatusEnum = pgEnum("task_status", [
   "cancelled",
 ]);
 
-export const approvalStatusEnum = pgEnum("approval_status", [
-  "pending",
-  "approved",
-  "rejected",
-]);
+export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
 
 /* ── Goals ── */
 
@@ -137,12 +124,8 @@ export const goals = pgTable("goals", {
   priority: goalPriorityEnum("priority").notNull().default("medium"),
   createdBy: uuid("created_by").references(() => users.id),
   metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ── Tasks (children of goals) ── */
@@ -161,12 +144,48 @@ export const tasks = pgTable("tasks", {
   output: text("output"),
   error: text("error"),
   metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true })
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Memories (long-term facts about users) ── */
+
+export const memoryCategoryEnum = pgEnum("memory_category", [
+  "user_info",
+  "preferences",
+  "projects",
+  "decisions",
+  "goals",
+  "technical",
+  "business",
+  "other",
+]);
+
+export const memories = pgTable("memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
     .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+    .references(() => users.id),
+  category: memoryCategoryEnum("category").notNull().default("other"),
+  key: text("key").notNull(),
+  content: text("content").notNull(),
+  embedding: vector("embedding"),
+  source: text("source"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Prompts (versioned system prompts for agents) ── */
+
+export const prompts = pgTable("prompts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  version: integer("version").notNull().default(1),
+  content: text("content").notNull(),
+  isActive: integer("is_active").notNull().default(1), // 1 = active, 0 = inactive
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ── Approvals (gate tasks that need human sign-off) ── */
@@ -182,7 +201,5 @@ export const approvals = pgTable("approvals", {
   decision: text("decision"),
   decidedBy: uuid("decided_by").references(() => users.id),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

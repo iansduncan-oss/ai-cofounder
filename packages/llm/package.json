@@ -1,0 +1,23 @@
+{
+  "name": "@ai-cofounder/llm",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ai-cofounder/shared": "*",
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@google/generative-ai": "^0.24.0",
+    "openai": "^4.86.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3"
+  }
+}

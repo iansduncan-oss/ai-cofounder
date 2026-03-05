@@ -1,26 +1,42 @@
 import { REST, Routes } from "discord.js";
-import { createLogger } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { askCommand } from "./ask.js";
 import { statusCommand } from "./status.js";
+import { goalsCommand } from "./goals.js";
+import { tasksCommand } from "./tasks.js";
+import { memoryCommand } from "./memory.js";
+import { clearCommand } from "./clear.js";
+import { executeCommand } from "./execute.js";
+import { approveCommand } from "./approve.js";
 
 const logger = createLogger("discord-commands");
 
-const commands = [askCommand.toJSON(), statusCommand.toJSON()];
+const commands = [
+  askCommand.toJSON(),
+  statusCommand.toJSON(),
+  goalsCommand.toJSON(),
+  tasksCommand.toJSON(),
+  memoryCommand.toJSON(),
+  clearCommand.toJSON(),
+  executeCommand.toJSON(),
+  approveCommand.toJSON(),
+];
 
-export async function registerCommands(
-  token: string,
-  clientId: string
-): Promise<void> {
+export async function registerCommands(token: string, clientId: string): Promise<void> {
   const rest = new REST({ version: "10" }).setToken(token);
+  const guildId = optionalEnv("DISCORD_GUILD_ID", "");
+
+  const route =
+    guildId.length > 0
+      ? Routes.applicationGuildCommands(clientId, guildId)
+      : Routes.applicationCommands(clientId);
 
   logger.info(
-    { count: commands.length },
-    "registering global slash commands"
+    { count: commands.length, scope: guildId.length > 0 ? "guild" : "global" },
+    `registering ${guildId.length > 0 ? "guild" : "global"} slash commands`,
   );
 
-  await rest.put(Routes.applicationCommands(clientId), {
-    body: commands,
-  });
+  await rest.put(route, { body: commands });
 
   logger.info("slash commands registered");
 }

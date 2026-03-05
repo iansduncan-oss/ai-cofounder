@@ -4,16 +4,17 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "tsx watch src/index.ts",
-    "lint": "echo 'TODO: configure lint'",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "lint": "eslint src/",
     "test": "vitest run",
     "clean": "rm -rf dist"
   },
   "dependencies": {
     "@ai-cofounder/db": "*",
+    "@ai-cofounder/llm": "*",
     "@ai-cofounder/shared": "*",
-    "@anthropic-ai/sdk": "^0.78.0",
     "@fastify/cors": "^11.2.0",
+    "@fastify/static": "^9.0.0",
     "@sinclair/typebox": "^0.34.48",
     "fastify": "^5.7.4",
     "fastify-plugin": "^5.1.0",

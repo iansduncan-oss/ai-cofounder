@@ -7,3 +7,4 @@ dist/
 !.env.production.example
 *.log
 .DS_Store
+.eslintcache

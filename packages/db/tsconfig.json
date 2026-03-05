@@ -5,5 +5,5 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/__tests__", "src/seed.ts"]
+  "exclude": ["src/__tests__", "src/seed.ts", "src/backfill-embeddings.ts"]
 }

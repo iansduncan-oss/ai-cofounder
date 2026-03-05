@@ -22,7 +22,7 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: root
+          username: ian
           key: ${{ secrets.VPS_SSH_KEY }}
           script_stop: true
           script: |
@@ -34,27 +34,27 @@ jobs:
             git reset --hard origin/main
 
             echo "==> Building Docker images..."
-            docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
-            docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
+            sudo docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
+            sudo docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
 
             echo "==> Restarting services..."
-            docker compose -f docker-compose.prod.yml up -d --force-recreate
+            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
 
             echo "==> Starting n8n..."
-            docker compose -f docker-compose.n8n.yml up -d
+            sudo docker compose -f docker-compose.n8n.yml up -d
 
             echo "==> Starting Uptime Kuma..."
-            docker compose -f docker-compose.uptimekuma.yml up -d
+            sudo docker compose -f docker-compose.uptimekuma.yml up -d
 
             echo "==> Restarting monitoring stack..."
-            docker compose -f docker-compose.monitoring.yml up -d
+            sudo docker compose -f docker-compose.monitoring.yml up -d
 
             echo "==> Waiting for health check..."
             sleep 10
             curl -sf http://localhost:3100/health || { echo "Health check failed!"; exit 1; }
 
             echo "==> Cleaning up old images..."
-            docker image prune -f
+            sudo docker image prune -f
 
             echo "==> Deploy complete!"
 

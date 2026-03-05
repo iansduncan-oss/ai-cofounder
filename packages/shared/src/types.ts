@@ -1,18 +1,8 @@
 /** Roles an agent can assume in the multi-agent system */
-export type AgentRole =
-  | "orchestrator"
-  | "researcher"
-  | "coder"
-  | "reviewer"
-  | "planner";
+export type AgentRole = "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
 
 /** Status of an agent run */
-export type AgentRunStatus =
-  | "pending"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export type AgentRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
 
 /** A message passed between agents or between user and agent */
 export interface AgentMessage {
@@ -52,13 +42,7 @@ export interface Conversation {
 
 export type GoalStatus = "draft" | "active" | "completed" | "cancelled";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
-export type TaskStatus =
-  | "pending"
-  | "assigned"
-  | "running"
-  | "completed"
-  | "failed"
-  | "cancelled";
+export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export interface Goal {

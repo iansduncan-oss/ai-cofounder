@@ -1,8 +1,27 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { createLogger, requireEnv, optionalEnv } from "@ai-cofounder/shared";
+import type {
+  LlmRegistry,
+  LlmTool,
+  LlmMessage,
+  LlmToolUseContent,
+  LlmToolResultContent,
+  LlmTextContent,
+  TaskCategory,
+  EmbeddingService,
+} from "@ai-cofounder/llm";
+import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
-import { createGoal, createTask, updateGoalStatus } from "@ai-cofounder/db";
+import {
+  createGoal,
+  createTask,
+  updateGoalStatus,
+  saveMemory,
+  recallMemories,
+  searchMemoriesByVector,
+} from "@ai-cofounder/db";
+import { buildSystemPrompt } from "./prompts/system.js";
+import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
+import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 
 /* ── Result types ── */
 
@@ -22,20 +41,21 @@ export interface OrchestratorResult {
   agentRole: AgentRole;
   response: string;
   model: string;
+  provider?: string;
   usage?: { inputTokens: number; outputTokens: number };
   plan?: PlanResult;
 }
 
-/* ── Tool definition for Claude ── */
+/* ── Tool definition for LLM ── */
 
-const CREATE_PLAN_TOOL: Anthropic.Tool = {
+const CREATE_PLAN_TOOL: LlmTool = {
   name: "create_plan",
   description:
     "Decompose a user request into a goal with ordered tasks assigned to specialist agents. " +
     "Use this when a request involves multiple steps, requires research, code, or review, " +
     "or would benefit from structured planning. Do NOT use for simple questions.",
   input_schema: {
-    type: "object" as const,
+    type: "object",
     properties: {
       goal_title: {
         type: "string",
@@ -81,25 +101,6 @@ const CREATE_PLAN_TOOL: Anthropic.Tool = {
   },
 };
 
-/* ── System prompt ── */
-
-const SYSTEM_PROMPT = `You are the Orchestrator agent in the AI Cofounder system.
-Your job is to understand what the user needs and coordinate work across specialist agents.
-
-You have these specialist agents available:
-- researcher: deep-dives into topics, gathers information, analyzes data
-- coder: writes, reviews, and refactors code
-- reviewer: critiques plans, deliverables, and provides quality checks
-- planner: breaks complex goals into actionable step-by-step plans
-
-WHEN TO CREATE A PLAN:
-Use the create_plan tool when the request involves multiple steps, requires different types of work (research + code, planning + review, etc.), or is complex enough to benefit from structured task management.
-
-WHEN TO RESPOND DIRECTLY:
-For simple questions, quick answers, or conversational messages, respond directly without creating a plan.
-
-When you create a plan, also include a brief text summary explaining what you're going to do and why you've structured the tasks this way.`;
-
 /* ── Internal types ── */
 
 interface CreatePlanInput {
@@ -117,31 +118,51 @@ interface CreatePlanInput {
 
 export class Orchestrator {
   private logger = createLogger("orchestrator");
-  private client: Anthropic;
-  private model: string;
   private db?: Db;
+  private registry: LlmRegistry;
+  private taskCategory: TaskCategory;
+  private embeddingService?: EmbeddingService;
 
-  constructor(db?: Db) {
-    this.client = new Anthropic({
-      apiKey: requireEnv("ANTHROPIC_API_KEY"),
-    });
-    this.model = optionalEnv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514");
+  constructor(
+    registry: LlmRegistry,
+    db?: Db,
+    taskCategory: TaskCategory = "conversation",
+    embeddingService?: EmbeddingService,
+  ) {
+    this.registry = registry;
     this.db = db;
+    this.taskCategory = taskCategory;
+    this.embeddingService = embeddingService;
   }
 
   async run(
     message: string,
     conversationId?: string,
     history?: AgentMessage[],
+    userId?: string,
   ): Promise<OrchestratorResult> {
     const id = conversationId ?? crypto.randomUUID();
     this.logger.info({ conversationId: id }, "orchestrator run started");
 
-    // Build message history for context
-    const messages: Anthropic.MessageParam[] = [];
+    // Pre-load user memories for system prompt context
+    let memoryContext = "";
+    if (userId && this.db) {
+      const userMemories = await recallMemories(this.db, userId, { limit: 20 });
+      if (userMemories.length > 0) {
+        memoryContext = userMemories
+          .map((m) => `- [${m.category}] ${m.key}: ${m.content}`)
+          .join("\n");
+      }
+    }
 
-    if (history?.length) {
-      for (const msg of history) {
+    const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
+
+    // Build message history for context
+    const messages: LlmMessage[] = [];
+
+    const trimmed = history?.length ? this.trimHistory(history) : [];
+    if (trimmed.length) {
+      for (const msg of trimmed) {
         messages.push({
           role: msg.role === "user" ? "user" : "assistant",
           content: msg.content,
@@ -151,50 +172,75 @@ export class Orchestrator {
 
     messages.push({ role: "user", content: message });
 
+    // Build tools array (all tools when DB available)
+    const tools: LlmTool[] = this.db
+      ? [CREATE_PLAN_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
+      : [SEARCH_WEB_TOOL];
+
     try {
-      // Include create_plan tool only when DB is available for persistence
-      const response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let plan: PlanResult | undefined;
+      // Agentic tool-use loop
+      let response = await this.registry.complete(this.taskCategory, {
+        system: systemPrompt,
         messages,
-        ...(this.db ? { tools: [CREATE_PLAN_TOOL] } : {}),
+        tools,
+        max_tokens: 4096,
       });
 
-      // Extract text blocks from response
-      const textBlocks = response.content
-        .filter((block): block is Anthropic.TextBlock => block.type === "text")
-        .map((block) => block.text);
+      totalInputTokens += response.usage.inputTokens;
+      totalOutputTokens += response.usage.outputTokens;
+      const providerName = response.provider;
 
-      // Check if Claude called the create_plan tool
-      const toolUseBlock = response.content.find(
-        (block): block is Anthropic.ToolUseBlock =>
-          block.type === "tool_use" && block.name === "create_plan",
-      );
+      const MAX_TOOL_ROUNDS = 5;
+      let round = 0;
 
-      // Persist plan to DB if Claude created one and we have a DB connection
-      let plan: PlanResult | undefined;
+      while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
+        round++;
+        const toolResults: LlmToolResultContent[] = [];
 
-      if (toolUseBlock && this.db) {
-        plan = await this.persistPlan(
-          id,
-          toolUseBlock.input as CreatePlanInput,
-        );
-        this.logger.info(
-          {
-            conversationId: id,
-            goalId: plan.goalId,
-            taskCount: plan.tasks.length,
-          },
-          "plan created and persisted",
-        );
+        for (const block of response.content) {
+          if (block.type === "tool_use") {
+            this.logger.info({ tool: block.name, conversationId: id }, "executing tool");
+            const result = await this.executeTool(block, id, userId);
+
+            // If create_plan returned a plan, capture it
+            if (block.name === "create_plan" && result && "goalId" in (result as object)) {
+              plan = result as PlanResult;
+            }
+
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: JSON.stringify(result),
+            });
+          }
+        }
+
+        // Continue the conversation with tool results
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({ role: "user", content: toolResults });
+
+        response = await this.registry.complete(this.taskCategory, {
+          system: systemPrompt,
+          messages,
+          tools,
+          max_tokens: 4096,
+        });
+
+        totalInputTokens += response.usage.inputTokens;
+        totalOutputTokens += response.usage.outputTokens;
       }
 
-      // Build the response text
+      // Extract final text response
+      const textBlocks = response.content
+        .filter((block): block is LlmTextContent => block.type === "text")
+        .map((block) => block.text);
+
       let responseText = textBlocks.join("\n");
 
       if (!responseText && plan) {
-        // Claude only returned a tool call with no accompanying text — generate a summary
         responseText = this.buildPlanSummary(plan);
       }
 
@@ -202,8 +248,10 @@ export class Orchestrator {
         {
           conversationId: id,
           model: response.model,
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
+          provider: providerName,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
+          toolRounds: round,
           hasPlan: !!plan,
         },
         "orchestrator run completed",
@@ -214,9 +262,10 @@ export class Orchestrator {
         agentRole: "orchestrator",
         response: responseText,
         model: response.model,
+        provider: providerName,
         usage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
+          inputTokens: totalInputTokens,
+          outputTokens: totalOutputTokens,
         },
         plan,
       };
@@ -226,16 +275,97 @@ export class Orchestrator {
     }
   }
 
-  /**
-   * Persist the plan (goal + tasks) to the database.
-   */
-  private async persistPlan(
+  private async executeTool(
+    block: LlmToolUseContent,
     conversationId: string,
-    input: CreatePlanInput,
-  ): Promise<PlanResult> {
+    userId?: string,
+  ): Promise<unknown> {
+    switch (block.name) {
+      case "create_plan": {
+        if (!this.db) return { error: "Database not available" };
+        return this.persistPlan(conversationId, block.input as unknown as CreatePlanInput);
+      }
+      case "save_memory": {
+        if (!userId || !this.db) return { error: "No user context available" };
+        const input = block.input as {
+          category: string;
+          key: string;
+          content: string;
+        };
+        let embedding: number[] | undefined;
+        if (this.embeddingService) {
+          try {
+            embedding = await this.embeddingService.embed(`${input.key}: ${input.content}`);
+          } catch (err) {
+            this.logger.warn({ err }, "failed to generate embedding for memory, saving without");
+          }
+        }
+        const mem = await saveMemory(this.db, {
+          userId,
+          category: input.category as Parameters<typeof saveMemory>[1]["category"],
+          key: input.key,
+          content: input.content,
+          source: conversationId,
+          embedding,
+        });
+        return { saved: true, key: mem.key, category: mem.category };
+      }
+      case "recall_memories": {
+        if (!userId || !this.db) return { error: "No user context available" };
+        const input = block.input as { category?: string; query?: string };
+
+        // Use vector search when query is provided and embedding service is available
+        if (input.query && this.embeddingService) {
+          try {
+            const queryEmbedding = await this.embeddingService.embed(input.query);
+            const results = await searchMemoriesByVector(this.db, queryEmbedding, userId, 10);
+            if (results.length > 0) {
+              return results.map((m) => ({
+                key: m.key,
+                category: m.category,
+                content: m.content,
+                updatedAt: m.updated_at,
+                distance: m.distance,
+              }));
+            }
+          } catch (err) {
+            this.logger.warn({ err }, "vector search failed, falling back to text search");
+          }
+        }
+
+        // Fallback to ILIKE text search
+        const memories = await recallMemories(this.db, userId, input);
+        return memories.map((m) => ({
+          key: m.key,
+          category: m.category,
+          content: m.content,
+          updatedAt: m.updatedAt,
+        }));
+      }
+      case "search_web": {
+        const input = block.input as { query: string; max_results?: number };
+        return executeWebSearch(input.query, input.max_results);
+      }
+      default:
+        return { error: `Unknown tool: ${block.name}` };
+    }
+  }
+
+  private trimHistory(history: AgentMessage[], maxTokenEstimate = 80_000): AgentMessage[] {
+    let tokenCount = 0;
+    const trimmed: AgentMessage[] = [];
+    for (let i = history.length - 1; i >= 0; i--) {
+      const est = Math.ceil(history[i].content.length / 4);
+      if (tokenCount + est > maxTokenEstimate) break;
+      tokenCount += est;
+      trimmed.unshift(history[i]);
+    }
+    return trimmed;
+  }
+
+  private async persistPlan(conversationId: string, input: CreatePlanInput): Promise<PlanResult> {
     const db = this.db!;
 
-    // Create goal in draft, then activate it
     const goal = await createGoal(db, {
       conversationId,
       title: input.goal_title,
@@ -245,7 +375,6 @@ export class Orchestrator {
 
     await updateGoalStatus(db, goal.id, "active");
 
-    // Create tasks in order
     const createdTasks: PlanResult["tasks"] = [];
 
     for (let i = 0; i < input.tasks.length; i++) {
@@ -274,20 +403,11 @@ export class Orchestrator {
     };
   }
 
-  /**
-   * Build a human-readable summary when Claude returns only a tool call.
-   */
   private buildPlanSummary(plan: PlanResult): string {
     const taskLines = plan.tasks
-      .map(
-        (t, i) =>
-          `${i + 1}. ${t.title} (${t.assignedAgent})`,
-      )
+      .map((t, i) => `${i + 1}. ${t.title} (${t.assignedAgent})`)
       .join("\n");
 
-    return (
-      `Plan created: ${plan.goalTitle}\n\n` +
-      `Tasks:\n${taskLines}`
-    );
+    return `Plan created: ${plan.goalTitle}\n\nTasks:\n${taskLines}`;
   }
 }
