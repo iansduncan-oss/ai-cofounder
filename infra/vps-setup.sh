@@ -37,6 +37,7 @@ if grep -q "N8N_ENCRYPTION_KEY" "$ENV_FILE" 2>/dev/null; then
   echo "  → n8n env vars already present, skipping."
 else
   N8N_KEY=$(openssl rand -hex 32)
+  N8N_DB_PASS=$(openssl rand -base64 32)
 
   cat >> "$ENV_FILE" << EOF
 
@@ -44,7 +45,7 @@ else
 N8N_ENCRYPTION_KEY=$N8N_KEY
 N8N_DB_HOST=$PG_CONTAINER
 N8N_DB_USER=avion
-N8N_DB_PASSWORD=REDACTED_PASSWORD
+N8N_DB_PASSWORD=$N8N_DB_PASS
 EOF
   echo "  → Added N8N_ENCRYPTION_KEY, N8N_DB_HOST, N8N_DB_USER, N8N_DB_PASSWORD"
 fi
