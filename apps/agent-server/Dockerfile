@@ -1,9 +1,11 @@
 FROM node:24-alpine AS base
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies — copy all workspace package.json files
+# so npm ci lockfile resolution matches the full monorepo structure
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/agent-server/package.json apps/agent-server/
+COPY apps/discord-bot/package.json apps/discord-bot/
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY packages/llm/package.json packages/llm/
