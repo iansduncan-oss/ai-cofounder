@@ -1,4 +1,4 @@
-import type { LlmRegistry } from "@ai-cofounder/llm";
+import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
@@ -53,9 +53,10 @@ export class TaskDispatcher {
   constructor(
     private registry: LlmRegistry,
     private db: Db,
+    embeddingService?: EmbeddingService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
-      ["researcher", new ResearcherAgent(registry, db)],
+      ["researcher", new ResearcherAgent(registry, db, embeddingService)],
       ["coder", new CoderAgent(registry, db)],
       ["reviewer", new ReviewerAgent(registry, db)],
       ["planner", new PlannerAgent(registry, db)],

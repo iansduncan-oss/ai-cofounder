@@ -6,6 +6,7 @@ import type {
   LlmToolUseContent,
   LlmToolResultContent,
   TaskCategory,
+  EmbeddingService,
 } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole } from "@ai-cofounder/shared";
@@ -31,13 +32,15 @@ export abstract class SpecialistAgent {
   protected logger;
   protected registry: LlmRegistry;
   protected db?: Db;
+  protected embeddingService?: EmbeddingService;
 
   abstract readonly role: AgentRole;
   abstract readonly taskCategory: TaskCategory;
 
-  constructor(name: string, registry: LlmRegistry, db?: Db) {
+  constructor(name: string, registry: LlmRegistry, db?: Db, embeddingService?: EmbeddingService) {
     this.registry = registry;
     this.db = db;
+    this.embeddingService = embeddingService;
     this.logger = createLogger(`specialist-${name}`);
   }
 

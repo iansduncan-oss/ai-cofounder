@@ -403,6 +403,79 @@ export async function deleteMemory(db: Db, id: string) {
   return deleted ?? null;
 }
 
+/* ────────────────── Briefing Queries ─────────────────────── */
+
+export interface GoalSummary {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  createdAt: Date;
+  updatedAt: Date;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
+export async function listActiveGoals(db: Db): Promise<GoalSummary[]> {
+  const rows = await db
+    .select({
+      id: goals.id,
+      title: goals.title,
+      status: goals.status,
+      priority: goals.priority,
+      createdAt: goals.createdAt,
+      updatedAt: goals.updatedAt,
+    })
+    .from(goals)
+    .where(eq(goals.status, "active"))
+    .orderBy(desc(goals.updatedAt));
+
+  const result: GoalSummary[] = [];
+  for (const goal of rows) {
+    const goalTasks = await db
+      .select({ status: tasks.status })
+      .from(tasks)
+      .where(eq(tasks.goalId, goal.id));
+    result.push({
+      ...goal,
+      taskCount: goalTasks.length,
+      completedTaskCount: goalTasks.filter((t) => t.status === "completed").length,
+    });
+  }
+  return result;
+}
+
+export async function listRecentlyCompletedGoals(db: Db, since: Date) {
+  return db
+    .select({
+      id: goals.id,
+      title: goals.title,
+      updatedAt: goals.updatedAt,
+    })
+    .from(goals)
+    .where(
+      and(
+        eq(goals.status, "completed"),
+        sql`${goals.updatedAt} >= ${since.toISOString()}`,
+      ),
+    )
+    .orderBy(desc(goals.updatedAt));
+}
+
+export async function countTasksByStatus(db: Db) {
+  const rows = await db
+    .select({ status: tasks.status })
+    .from(tasks)
+    .innerJoin(goals, eq(tasks.goalId, goals.id))
+    .where(eq(goals.status, "active"));
+
+  const counts: Record<string, number> = {};
+  for (const row of rows) {
+    counts[row.status] = (counts[row.status] ?? 0) + 1;
+  }
+  return counts;
+}
+
 /* ────────────────────── Prompts ─────────────────────────── */
 
 export async function getActivePrompt(db: Db, name: string) {

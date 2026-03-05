@@ -18,6 +18,7 @@ import {
   saveMemory,
   recallMemories,
   searchMemoriesByVector,
+  createApproval,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
@@ -101,6 +102,29 @@ const CREATE_PLAN_TOOL: LlmTool = {
   },
 };
 
+const REQUEST_APPROVAL_TOOL: LlmTool = {
+  name: "request_approval",
+  description:
+    "Request human approval before executing a sensitive or high-impact action. " +
+    "Use this when a plan involves: deploying code, spending money, sending external communications, " +
+    "deleting data, changing infrastructure, or any action that's hard to reverse. " +
+    "The user will be notified and must approve via Discord before execution continues.",
+  input_schema: {
+    type: "object",
+    properties: {
+      task_id: {
+        type: "string",
+        description: "ID of the task that needs approval (from a previously created plan)",
+      },
+      reason: {
+        type: "string",
+        description: "Clear explanation of what will happen and why approval is needed (1-3 sentences)",
+      },
+    },
+    required: ["task_id", "reason"],
+  },
+};
+
 /* ── Internal types ── */
 
 interface CreatePlanInput {
@@ -174,7 +198,7 @@ export class Orchestrator {
 
     // Build tools array (all tools when DB available)
     const tools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
+      ? [CREATE_PLAN_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
       : [SEARCH_WEB_TOOL];
 
     try {
@@ -341,6 +365,24 @@ export class Orchestrator {
           content: m.content,
           updatedAt: m.updatedAt,
         }));
+      }
+      case "request_approval": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as { task_id: string; reason: string };
+        const approval = await createApproval(this.db, {
+          taskId: input.task_id,
+          requestedBy: "orchestrator",
+          reason: input.reason,
+        });
+        this.logger.info(
+          { approvalId: approval.id, taskId: input.task_id },
+          "approval requested",
+        );
+        return {
+          approvalId: approval.id,
+          status: "pending",
+          message: `Approval requested. The user can approve with /approve ${approval.id}`,
+        };
       }
       case "search_web": {
         const input = block.input as { query: string; max_results?: number };

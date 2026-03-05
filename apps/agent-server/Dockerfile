@@ -28,6 +28,7 @@ COPY --from=base /app/packages/shared/package.json packages/shared/
 COPY --from=base /app/packages/shared/dist/ packages/shared/dist/
 COPY --from=base /app/packages/db/package.json packages/db/
 COPY --from=base /app/packages/db/dist/ packages/db/dist/
+COPY --from=base /app/packages/db/drizzle/ packages/db/drizzle/
 COPY --from=base /app/packages/llm/package.json packages/llm/
 COPY --from=base /app/packages/llm/dist/ packages/llm/dist/
 COPY --from=base /app/apps/agent-server/package.json apps/agent-server/

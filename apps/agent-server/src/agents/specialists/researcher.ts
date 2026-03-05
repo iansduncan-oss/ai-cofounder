@@ -1,7 +1,7 @@
-import type { LlmRegistry, LlmTool, LlmToolUseContent } from "@ai-cofounder/llm";
+import type { LlmRegistry, LlmTool, LlmToolUseContent, EmbeddingService } from "@ai-cofounder/llm";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
-import { recallMemories } from "@ai-cofounder/db";
+import { recallMemories, searchMemoriesByVector } from "@ai-cofounder/db";
 import { SpecialistAgent, type SpecialistContext } from "./base.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "../tools/web-search.js";
 import { RECALL_MEMORIES_TOOL } from "../tools/memory-tools.js";
@@ -10,8 +10,8 @@ export class ResearcherAgent extends SpecialistAgent {
   readonly role: AgentRole = "researcher";
   readonly taskCategory = "research" as const;
 
-  constructor(registry: LlmRegistry, db?: Db) {
-    super("researcher", registry, db);
+  constructor(registry: LlmRegistry, db?: Db, embeddingService?: EmbeddingService) {
+    super("researcher", registry, db, embeddingService);
   }
 
   getSystemPrompt(context: SpecialistContext): string {
@@ -45,6 +45,26 @@ Guidelines:
       case "recall_memories": {
         if (!context.userId || !this.db) return { error: "No user context available" };
         const input = block.input as { category?: string; query?: string };
+
+        // Use vector search when query is provided and embedding service is available
+        if (input.query && this.embeddingService) {
+          try {
+            const queryEmbedding = await this.embeddingService.embed(input.query);
+            const results = await searchMemoriesByVector(this.db, queryEmbedding, context.userId, 10);
+            if (results.length > 0) {
+              return results.map((m) => ({
+                key: m.key,
+                category: m.category,
+                content: m.content,
+                distance: m.distance,
+              }));
+            }
+          } catch (err) {
+            this.logger.warn({ err }, "vector search failed, falling back to text search");
+          }
+        }
+
+        // Fallback to ILIKE text search
         const memories = await recallMemories(this.db, context.userId, input);
         return memories.map((m) => ({
           key: m.key,

@@ -1,6 +1,6 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
-import { createLogger } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 
 const logger = createLogger("security");
 
@@ -32,6 +32,35 @@ const BLOCKED_USER_AGENTS = [
 ];
 
 // Paths that are never legitimate — instant 403
+// --- Rate limiter state ---
+
+interface RateLimitRecord {
+  count: number;
+  windowStart: number;
+}
+
+const rateLimitMap = new Map<string, RateLimitRecord>();
+
+function isRateLimited(
+  ip: string,
+  maxRequests: number,
+  windowMs: number,
+): { limited: boolean; remaining: number; resetMs: number } {
+  const now = Date.now();
+  let record = rateLimitMap.get(ip);
+
+  if (!record || now - record.windowStart > windowMs) {
+    record = { count: 0, windowStart: now };
+    rateLimitMap.set(ip, record);
+  }
+
+  record.count += 1;
+  const remaining = Math.max(0, maxRequests - record.count);
+  const resetMs = record.windowStart + windowMs - now;
+
+  return { limited: record.count > maxRequests, remaining, resetMs };
+}
+
 const HONEYPOT_PATHS = [
   "/.env",
   "/.git",
@@ -138,6 +167,19 @@ function startCleanup() {
 export const securityPlugin = fp(async (app: FastifyInstance) => {
   startCleanup();
 
+  const apiSecret = optionalEnv("API_SECRET", "");
+  const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
+  const rateLimitWindowSec = parseInt(optionalEnv("RATE_LIMIT_WINDOW", "60"), 10);
+  const rateLimitWindowMs = rateLimitWindowSec * 1000;
+
+  if (apiSecret) {
+    logger.info("API bearer token auth enabled");
+  }
+  logger.info(
+    { maxRequests: rateLimitMax, windowSec: rateLimitWindowSec },
+    "rate limiting configured",
+  );
+
   app.addHook("onRequest", async (request, reply) => {
     const ip = getClientIp(request);
     const url = request.url.toLowerCase();
@@ -174,6 +216,28 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       reply.code(403).send({ error: "Forbidden" });
       return;
     }
+
+    // 5. Rate limiting on /api/* routes
+    if (url.startsWith("/api/")) {
+      const { limited, remaining, resetMs } = isRateLimited(ip, rateLimitMax, rateLimitWindowMs);
+      reply.header("X-RateLimit-Limit", rateLimitMax);
+      reply.header("X-RateLimit-Remaining", remaining);
+      reply.header("X-RateLimit-Reset", Math.ceil(resetMs / 1000));
+      if (limited) {
+        logger.debug({ ip }, "rate limited");
+        reply.code(429).send({ error: "Too many requests" });
+        return;
+      }
+    }
+
+    // 6. Bearer token auth on /api/* routes (skip public paths and internal requests)
+    if (apiSecret && url.startsWith("/api/") && !isInternalRequest(request)) {
+      const authHeader = request.headers.authorization;
+      if (!authHeader || authHeader !== `Bearer ${apiSecret}`) {
+        reply.code(401).send({ error: "Unauthorized" });
+        return;
+      }
+    }
   });
 
   // Track 404s for rate-limiting
@@ -183,4 +247,13 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       recordHit(ip);
     }
   });
+
+  // Periodic cleanup of rate limit records
+  const rateLimitCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [ip, record] of rateLimitMap) {
+      if (now - record.windowStart > rateLimitWindowMs) rateLimitMap.delete(ip);
+    }
+  }, 60_000);
+  rateLimitCleanupInterval.unref();
 });

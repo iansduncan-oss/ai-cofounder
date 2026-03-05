@@ -5,7 +5,7 @@ import { TaskDispatcher, type TaskProgressCallback } from "../agents/dispatcher.
 const logger = createLogger("execution-routes");
 
 export const executionRoutes: FastifyPluginAsync = async (app) => {
-  const dispatcher = new TaskDispatcher(app.llmRegistry, app.db);
+  const dispatcher = new TaskDispatcher(app.llmRegistry, app.db, app.embeddingService);
 
   // Execute all tasks for a goal
   app.post<{ Params: { id: string }; Body: { userId?: string; webhookUrl?: string } }>(

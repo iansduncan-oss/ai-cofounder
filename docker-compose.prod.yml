@@ -22,6 +22,8 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
       - DISCORD_FOLLOWUP_WEBHOOK_URL=${DISCORD_FOLLOWUP_WEBHOOK_URL:-}
+      - BRIEFING_HOUR=${BRIEFING_HOUR:-9}
+      - BRIEFING_TIMEZONE=${BRIEFING_TIMEZONE:-America/New_York}
     networks:
       - avion_avion_net
     healthcheck:
