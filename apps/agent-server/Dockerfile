@@ -9,7 +9,8 @@ COPY apps/discord-bot/package.json apps/discord-bot/
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY packages/llm/package.json packages/llm/
-RUN npm ci --ignore-scripts --force
+RUN npm ci --ignore-scripts --force \
+    && rm -rf packages/db/node_modules/drizzle-orm
 
 # Copy source and build
 COPY packages/shared/ packages/shared/
