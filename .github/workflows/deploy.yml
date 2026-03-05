@@ -17,46 +17,47 @@ jobs:
     if: github.event.workflow_run.conclusion == 'success'
 
     steps:
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
       - name: Deploy via SSH
         id: deploy
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ian
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script_stop: true
-          script: |
-            set -e
-            cd /opt/ai-cofounder
+        run: |
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ian@avion-stack-01 << 'DEPLOY'
+          set -e
+          cd /opt/ai-cofounder
 
-            echo "==> Pulling latest code..."
-            git fetch origin main
-            git reset --hard origin/main
+          echo "==> Pulling latest code..."
+          git fetch origin main
+          git reset --hard origin/main
 
-            echo "==> Building Docker images..."
-            sudo docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
-            sudo docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
+          echo "==> Building Docker images..."
+          sudo docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
+          sudo docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
 
-            echo "==> Restarting services..."
-            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
+          echo "==> Restarting services..."
+          sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
 
-            echo "==> Starting n8n..."
-            sudo docker compose -f docker-compose.n8n.yml up -d
+          echo "==> Starting n8n..."
+          sudo docker compose -f docker-compose.n8n.yml up -d
 
-            echo "==> Starting Uptime Kuma..."
-            sudo docker compose -f docker-compose.uptimekuma.yml up -d
+          echo "==> Starting Uptime Kuma..."
+          sudo docker compose -f docker-compose.uptimekuma.yml up -d
 
-            echo "==> Restarting monitoring stack..."
-            sudo docker compose -f docker-compose.monitoring.yml up -d
+          echo "==> Restarting monitoring stack..."
+          sudo docker compose -f docker-compose.monitoring.yml up -d
 
-            echo "==> Waiting for health check..."
-            sleep 10
-            curl -sf http://localhost:3100/health || { echo "Health check failed!"; exit 1; }
+          echo "==> Waiting for health check..."
+          sleep 10
+          curl -sf http://localhost:3100/health || { echo "Health check failed!"; exit 1; }
 
-            echo "==> Cleaning up old images..."
-            sudo docker image prune -f
+          echo "==> Cleaning up old images..."
+          sudo docker image prune -f
 
-            echo "==> Deploy complete!"
+          echo "==> Deploy complete!"
+          DEPLOY
 
       - name: Notify Discord — Success
         if: success()
