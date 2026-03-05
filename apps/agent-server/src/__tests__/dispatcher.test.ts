@@ -1,0 +1,258 @@
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+
+beforeAll(() => {
+  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
+  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+});
+
+// --- Controllable DB mocks ---
+const mockGetGoal = vi.fn();
+const mockListTasksByGoal = vi.fn();
+const mockAssignTask = vi.fn().mockResolvedValue({});
+const mockStartTask = vi.fn().mockResolvedValue({});
+const mockCompleteTask = vi.fn().mockResolvedValue({});
+const mockFailTask = vi.fn().mockResolvedValue({});
+const mockUpdateGoalStatus = vi.fn().mockResolvedValue({});
+const mockListPendingApprovals = vi.fn().mockResolvedValue([]);
+
+vi.mock("@ai-cofounder/db", () => ({
+  createDb: vi.fn().mockReturnValue({}),
+  getGoal: mockGetGoal,
+  listTasksByGoal: mockListTasksByGoal,
+  assignTask: mockAssignTask,
+  startTask: mockStartTask,
+  completeTask: mockCompleteTask,
+  failTask: mockFailTask,
+  updateGoalStatus: mockUpdateGoalStatus,
+  listPendingApprovals: mockListPendingApprovals,
+  recallMemories: vi.fn().mockResolvedValue([]),
+}));
+
+const mockComplete = vi.fn().mockResolvedValue({
+  content: [{ type: "text", text: "Agent output" }],
+  model: "test-model",
+  stop_reason: "end_turn",
+  usage: { inputTokens: 10, outputTokens: 20 },
+  provider: "test",
+});
+
+vi.mock("@ai-cofounder/llm", () => {
+  class MockLlmRegistry {
+    complete = mockComplete;
+    completeDirect = mockComplete;
+    register = vi.fn();
+    getProvider = vi.fn();
+    resolveProvider = vi.fn();
+    listProviders = vi.fn().mockReturnValue([]);
+  }
+  return {
+    LlmRegistry: MockLlmRegistry,
+    AnthropicProvider: class {},
+    GroqProvider: class {},
+    OpenRouterProvider: class {},
+    GeminiProvider: class {},
+    createEmbeddingService: vi.fn(),
+  };
+});
+
+vi.mock("../agents/tools/web-search.js", () => ({
+  SEARCH_WEB_TOOL: { name: "search_web", description: "search", input_schema: { type: "object", properties: {} } },
+  executeWebSearch: vi.fn().mockResolvedValue({ results: [] }),
+}));
+
+vi.mock("../agents/tools/memory-tools.js", () => ({
+  RECALL_MEMORIES_TOOL: { name: "recall_memories", description: "recall", input_schema: { type: "object", properties: {} } },
+}));
+
+const { TaskDispatcher } = await import("../agents/dispatcher.js");
+const { LlmRegistry } = await import("@ai-cofounder/llm");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("TaskDispatcher", () => {
+  function createDispatcher() {
+    const registry = new LlmRegistry();
+    const db = {} as any;
+    return new TaskDispatcher(registry, db);
+  }
+
+  describe("runGoal", () => {
+    it("throws when goal not found", async () => {
+      mockGetGoal.mockResolvedValueOnce(null);
+      const dispatcher = createDispatcher();
+
+      await expect(dispatcher.runGoal("bad-id")).rejects.toThrow("Goal not found");
+    });
+
+    it("returns no_tasks when goal has no tasks", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Empty" });
+      mockListTasksByGoal.mockResolvedValueOnce([]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("no_tasks");
+      expect(result.totalTasks).toBe(0);
+    });
+
+    it("executes tasks in order and marks goal completed", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Build it" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Research", assignedAgent: "researcher", orderIndex: 0 },
+        { id: "t-2", title: "Code", assignedAgent: "coder", orderIndex: 1 },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.completedTasks).toBe(2);
+      expect(result.totalTasks).toBe(2);
+      expect(mockAssignTask).toHaveBeenCalledTimes(2);
+      expect(mockStartTask).toHaveBeenCalledTimes(2);
+      expect(mockCompleteTask).toHaveBeenCalledTimes(2);
+      expect(mockUpdateGoalStatus).toHaveBeenCalledWith(expect.anything(), "g-1", "completed");
+    });
+
+    it("handles task failure and continues to next task", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Risky" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Will fail", assignedAgent: "researcher", orderIndex: 0 },
+        { id: "t-2", title: "Will succeed", assignedAgent: "coder", orderIndex: 1 },
+      ]);
+
+      // First task fails, second succeeds
+      mockComplete
+        .mockRejectedValueOnce(new Error("LLM error"))
+        .mockResolvedValueOnce({
+          content: [{ type: "text", text: "Success" }],
+          model: "test-model",
+          stop_reason: "end_turn",
+          usage: { inputTokens: 10, outputTokens: 20 },
+          provider: "test",
+        });
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("in_progress");
+      expect(result.completedTasks).toBe(1);
+      expect(mockFailTask).toHaveBeenCalledWith(expect.anything(), "t-1", "LLM error");
+    });
+
+    it("marks goal cancelled when all tasks fail", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Doomed" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Fail 1", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      mockComplete.mockRejectedValueOnce(new Error("fail"));
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("failed");
+      expect(mockUpdateGoalStatus).toHaveBeenCalledWith(expect.anything(), "g-1", "cancelled");
+    });
+
+    it("skips task with pending approval and stops chain", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Needs Approval" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Blocked", assignedAgent: "coder", orderIndex: 0 },
+        { id: "t-2", title: "After", assignedAgent: "reviewer", orderIndex: 1 },
+      ]);
+      mockListPendingApprovals.mockResolvedValueOnce([
+        { id: "a-1", taskId: "t-1", status: "pending" },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.tasks).toHaveLength(1);
+      expect(result.tasks[0].status).toBe("awaiting_approval");
+      // Should NOT have started any tasks
+      expect(mockAssignTask).not.toHaveBeenCalled();
+    });
+
+    it("defaults to researcher when assignedAgent is null", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Default" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Unassigned", assignedAgent: null, orderIndex: 0 },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.completedTasks).toBe(1);
+      expect(mockAssignTask).toHaveBeenCalledWith(expect.anything(), "t-1", "researcher");
+    });
+
+    it("calls onProgress callback during execution", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Tracked" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Step 1", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      const onProgress = vi.fn();
+      const dispatcher = createDispatcher();
+      await dispatcher.runGoal("g-1", undefined, onProgress);
+
+      // started + completed = 2 calls
+      expect(onProgress).toHaveBeenCalledTimes(2);
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "started", taskId: "t-1" }),
+      );
+      expect(onProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "completed", taskId: "t-1" }),
+      );
+    });
+
+    it("handles unknown agent role gracefully", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Bad Agent" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Mystery", assignedAgent: "wizard", orderIndex: 0 },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.tasks[0].status).toBe("failed");
+      expect(mockFailTask).toHaveBeenCalledWith(
+        expect.anything(),
+        "t-1",
+        "No specialist agent for role: wizard",
+      );
+    });
+  });
+
+  describe("getProgress", () => {
+    it("throws when goal not found", async () => {
+      mockGetGoal.mockResolvedValueOnce(null);
+      const dispatcher = createDispatcher();
+
+      await expect(dispatcher.getProgress("bad-id")).rejects.toThrow("Goal not found");
+    });
+
+    it("returns progress for a goal with tasks", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Goal", status: "active" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Done", status: "completed", assignedAgent: "researcher", output: "ok" },
+        { id: "t-2", title: "Running", status: "running", assignedAgent: "coder", output: null },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const progress = await dispatcher.getProgress("g-1");
+
+      expect(progress.totalTasks).toBe(2);
+      expect(progress.completedTasks).toBe(1);
+      expect(progress.currentTask).toEqual({
+        id: "t-2",
+        title: "Running",
+        agent: "coder",
+        status: "running",
+      });
+    });
+  });
+});

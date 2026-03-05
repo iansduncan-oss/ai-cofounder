@@ -221,15 +221,40 @@ npm run test -w @ai-cofounder/llm   # Run tests for a specific workspace
 
 Tests use Vitest with mocked external dependencies (no real network or database calls). Test files live in `src/__tests__/` directories within each workspace.
 
-## Deployment
+## CI/CD Pipeline
 
-CI/CD via GitHub Actions — push to `main` triggers build and deploy to a Hetzner VPS. Services run via Docker Compose behind Nginx Proxy Manager.
+**CI** (`.github/workflows/ci.yml`) — runs on push to `main` and PRs:
 
-- **Agent Server** → `https://api.aviontechs.com`
-- **Monitoring** → Grafana + Prometheus + Alertmanager (alerts to Discord)
-- **Status** → Uptime Kuma at `https://status.aviontechs.com`
+1. Install dependencies (`npm ci`)
+2. Lint (`npm run lint`)
+3. Build all packages (`npm run build`)
+4. Push schema to test PostgreSQL 16 service container (`npm run db:push`)
+5. Run tests (`npm run test`)
 
-Database backups run nightly via cron (14-day retention).
+**Deploy** (`.github/workflows/deploy.yml`) — triggers on CI success for `main`:
+
+1. Connects to VPS via Tailscale mesh network
+2. Pulls latest code, builds Docker images on VPS
+3. Restarts services via Docker Compose (agent-server, discord-bot, n8n, monitoring, uptime-kuma)
+4. Health check on `http://localhost:3100/health`
+5. Discord webhook notification (success or failure with logs link)
+
+## Production Infrastructure
+
+Deployed on **Hetzner VPS** behind Nginx Proxy Manager with TLS termination.
+
+| Service | URL | Notes |
+| --- | --- | --- |
+| Agent Server | api.aviontechs.com | Fastify, Docker |
+| Discord Bot | — | Connects to agent-server internally |
+| n8n | n8n.aviontechs.com | Workflow automation |
+| Grafana | grafana.aviontechs.com | Prometheus + Alertmanager → Discord |
+| Uptime Kuma | status.aviontechs.com | Status monitoring |
+
+- **Database**: PostgreSQL 16 with pgvector extension for semantic memory
+- **Backups**: Nightly to Hetzner Storage Box (7-day retention) via rsync
+- **Security**: UFW firewall, fail2ban, Docker ports bound to 127.0.0.1
+- **Networking**: Tailscale mesh for SSH access and CI/CD deployment
 
 ## License
 
