@@ -26,6 +26,34 @@ The **Orchestrator** handles conversations via an agentic tool loop (up to 5 rou
 - **Reviewer** — code and output review
 - **Planner** — planning and decomposition
 
+### Semantic Memory
+
+The orchestrator can save and recall user memories with vector search. Memories are stored in PostgreSQL with pgvector embeddings (768-dimensional, via Google's `text-embedding-004` model). Recall uses cosine similarity with an ILIKE fallback when no embeddings are available.
+
+### Proactive Scheduler
+
+A background scheduler sends Discord messages without user prompting:
+
+- **Morning briefings** — LLM-generated daily summaries of active goals and tasks
+- **Stale goal check-ins** — nudges after 24h of inactivity, cold-start notifications at 48h
+- **Approval reminders** — notifications for pending approvals
+
+Requires `DISCORD_FOLLOWUP_WEBHOOK_URL` to be set.
+
+### Orchestrator Tools
+
+The orchestrator's tool loop gives it access to:
+
+| Tool               | Description                                      |
+| ------------------ | ------------------------------------------------ |
+| `create_plan`      | Decompose a request into a goal with ordered tasks |
+| `request_approval` | Request human approval for sensitive actions      |
+| `save_memory`      | Store user memories (with vector embeddings)      |
+| `recall_memories`  | Retrieve memories via vector search or text match |
+| `search_web`       | Execute web searches (requires Tavily API key)    |
+| `trigger_workflow`  | Trigger an n8n outbound workflow                 |
+| `list_workflows`   | List available n8n workflows                      |
+
 ### Multi-LLM Routing
 
 The `LlmRegistry` routes requests by task category with automatic fallback:
@@ -169,6 +197,17 @@ All routes prefixed with the agent server URL (default `http://localhost:3100`).
 | GET    | `/api/memories?userId=` | List memories for a user |
 | DELETE | `/api/memories/:id`     | Delete a memory          |
 
+### n8n Integration
+
+| Method | Path                      | Description                                          |
+| ------ | ------------------------- | ---------------------------------------------------- |
+| POST   | `/api/n8n/webhook`        | Inbound webhook (`?sync=true` for synchronous, requires `x-n8n-secret` header) |
+| GET    | `/api/n8n/workflows`      | List registered workflows (`?direction=inbound\|outbound\|both`) |
+| POST   | `/api/n8n/workflows`      | Register a workflow                                  |
+| GET    | `/api/n8n/workflows/:id`  | Get workflow by ID                                   |
+| PATCH  | `/api/n8n/workflows/:id`  | Update a workflow                                    |
+| DELETE | `/api/n8n/workflows/:id`  | Delete a workflow                                    |
+
 ### Users
 
 | Method | Path                                           | Description                 |
@@ -207,10 +246,14 @@ All routes prefixed with the agent server URL (default `http://localhost:3100`).
 | `HOST`               | No       | `0.0.0.0`               | Agent server host                               |
 | `LOG_LEVEL`          | No       | `info`                  | Pino log level                                  |
 | `API_SECRET`         | No       | —                       | Bearer token for API auth (blank = no auth)     |
-| `RATE_LIMIT_MAX`     | No       | `20`                    | Max requests per rate limit window              |
+| `RATE_LIMIT_MAX`     | No       | `60`                    | Max requests per rate limit window              |
 | `RATE_LIMIT_WINDOW`  | No       | `60`                    | Rate limit window in seconds                    |
+| `RATE_LIMIT_EXPENSIVE_MAX` | No | `10`                    | Tighter limit for LLM endpoints (`/api/agents/run`, `/api/n8n/webhook`, `/api/goals/`) |
 | `TAVILY_API_KEY`     | No       | —                       | Tavily API key for web search tool              |
 | `DAILY_TOKEN_LIMIT`  | No       | `100000`                | Daily LLM token budget                          |
+| `DISCORD_FOLLOWUP_WEBHOOK_URL` | No | —                  | Discord webhook for proactive scheduler messages |
+| `BRIEFING_HOUR`      | No       | `9`                     | Hour (0–23) to send daily briefings             |
+| `BRIEFING_TIMEZONE`  | No       | `UTC`                   | IANA timezone for briefing schedule              |
 
 ## Testing
 
