@@ -1,9 +1,6 @@
 /** Roles an agent can assume in the multi-agent system */
 export type AgentRole = "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
 
-/** Status of an agent run */
-export type AgentRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
-
 /** A message passed between agents or between user and agent */
 export interface AgentMessage {
   id: string;
@@ -13,20 +10,6 @@ export interface AgentMessage {
   content: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;
-}
-
-/** A single agent run (one invocation of an agent) */
-export interface AgentRun {
-  id: string;
-  conversationId: string;
-  agentRole: AgentRole;
-  status: AgentRunStatus;
-  input: string;
-  output?: string;
-  error?: string;
-  parentRunId?: string;
-  startedAt: Date;
-  completedAt?: Date;
 }
 
 /** Conversation between a user and the agent system */

@@ -45,7 +45,7 @@ async function sendWebhook(
 
 /* ── Briefing data gathering ── */
 
-interface BriefingData {
+export interface BriefingData {
   activeGoals: Awaited<ReturnType<typeof listActiveGoals>>;
   recentlyCompleted: Awaited<ReturnType<typeof listRecentlyCompletedGoals>>;
   taskCounts: Record<string, number>;
@@ -53,7 +53,7 @@ interface BriefingData {
   staleGoalCount: number;
 }
 
-async function gatherBriefingData(db: Db): Promise<BriefingData> {
+export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const [activeGoals, recentlyCompleted, taskCounts, pendingApprovals] = await Promise.all([
@@ -72,7 +72,7 @@ async function gatherBriefingData(db: Db): Promise<BriefingData> {
 
 /* ── LLM-powered briefing generation ── */
 
-function buildBriefingPrompt(data: BriefingData): string {
+export function buildBriefingPrompt(data: BriefingData): string {
   const lines: string[] = [];
   lines.push("Generate a concise morning briefing for a solo founder. Be direct, no fluff.");
   lines.push("Use Discord markdown (bold, bullet points). Keep it under 1500 characters.");
@@ -158,7 +158,7 @@ async function generateBriefing(registry: LlmRegistry, data: BriefingData): Prom
   }
 }
 
-function buildFallbackBriefing(data: BriefingData): string {
+export function buildFallbackBriefing(data: BriefingData): string {
   const lines: string[] = [];
   lines.push("**Morning Briefing**\n");
 

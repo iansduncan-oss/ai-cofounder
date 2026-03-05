@@ -13,6 +13,17 @@
   const sendBtn = document.getElementById("send-btn");
   const providerInfo = document.getElementById("provider-info");
 
+  // Persistent user identity (survives page reloads)
+  function getUserId() {
+    let id = localStorage.getItem("voice-ui-user-id");
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem("voice-ui-user-id", id);
+    }
+    return id;
+  }
+  const userId = getUserId();
+
   // State
   let conversationId = null;
   let isListening = false;
@@ -122,6 +133,7 @@
       const payload = {
         message: text,
         platform: "voice",
+        userId: userId,
       };
       if (conversationId) {
         payload.conversationId = conversationId;

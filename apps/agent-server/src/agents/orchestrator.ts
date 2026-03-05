@@ -19,10 +19,14 @@ import {
   recallMemories,
   searchMemoriesByVector,
   createApproval,
+  getN8nWorkflowByName,
+  listN8nWorkflows,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
+import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
+import type { N8nService } from "../services/n8n.js";
 
 /* ── Result types ── */
 
@@ -146,17 +150,20 @@ export class Orchestrator {
   private registry: LlmRegistry;
   private taskCategory: TaskCategory;
   private embeddingService?: EmbeddingService;
+  private n8nService?: N8nService;
 
   constructor(
     registry: LlmRegistry,
     db?: Db,
     taskCategory: TaskCategory = "conversation",
     embeddingService?: EmbeddingService,
+    n8nService?: N8nService,
   ) {
     this.registry = registry;
     this.db = db;
     this.taskCategory = taskCategory;
     this.embeddingService = embeddingService;
+    this.n8nService = n8nService;
   }
 
   async run(
@@ -200,6 +207,10 @@ export class Orchestrator {
     const tools: LlmTool[] = this.db
       ? [CREATE_PLAN_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
       : [SEARCH_WEB_TOOL];
+
+    if (this.n8nService && this.db) {
+      tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
+    }
 
     try {
       let totalInputTokens = 0;
@@ -307,7 +318,7 @@ export class Orchestrator {
     switch (block.name) {
       case "create_plan": {
         if (!this.db) return { error: "Database not available" };
-        return this.persistPlan(conversationId, block.input as unknown as CreatePlanInput);
+        return this.persistPlan(conversationId, block.input as unknown as CreatePlanInput, userId);
       }
       case "save_memory": {
         if (!userId || !this.db) return { error: "No user context available" };
@@ -388,6 +399,25 @@ export class Orchestrator {
         const input = block.input as { query: string; max_results?: number };
         return executeWebSearch(input.query, input.max_results);
       }
+      case "trigger_workflow": {
+        if (!this.n8nService || !this.db) return { error: "n8n integration not available" };
+        const input = block.input as { workflow_name: string; payload: Record<string, unknown> };
+        const workflow = await getN8nWorkflowByName(this.db, input.workflow_name);
+        if (!workflow) return { error: `Workflow "${input.workflow_name}" not found` };
+        if (workflow.direction === "inbound") {
+          return { error: `Workflow "${input.workflow_name}" is inbound-only and cannot be triggered` };
+        }
+        return this.n8nService.trigger(workflow.webhookUrl, workflow.name, input.payload);
+      }
+      case "list_workflows": {
+        if (!this.db) return { error: "Database not available" };
+        const workflows = await listN8nWorkflows(this.db, "outbound");
+        return workflows.map((w) => ({
+          name: w.name,
+          description: w.description,
+          inputSchema: w.inputSchema,
+        }));
+      }
       default:
         return { error: `Unknown tool: ${block.name}` };
     }
@@ -405,7 +435,7 @@ export class Orchestrator {
     return trimmed;
   }
 
-  private async persistPlan(conversationId: string, input: CreatePlanInput): Promise<PlanResult> {
+  private async persistPlan(conversationId: string, input: CreatePlanInput, userId?: string): Promise<PlanResult> {
     const db = this.db!;
 
     const goal = await createGoal(db, {
@@ -413,6 +443,7 @@ export class Orchestrator {
       title: input.goal_title,
       description: input.goal_description,
       priority: input.goal_priority,
+      createdBy: userId,
     });
 
     await updateGoalStatus(db, goal.id, "active");

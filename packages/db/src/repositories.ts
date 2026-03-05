@@ -10,6 +10,7 @@ import {
   channelConversations,
   memories,
   prompts,
+  n8nWorkflows,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -71,6 +72,10 @@ export async function upsertChannelConversation(
     .values({ channelId, conversationId, platform })
     .returning();
   return created;
+}
+
+export async function deleteChannelConversation(db: Db, channelId: string) {
+  await db.delete(channelConversations).where(eq(channelConversations.channelId, channelId));
 }
 
 /* ──────────────── Conversations ──────────────────────────── */
@@ -530,4 +535,89 @@ export async function createPromptVersion(
     })
     .returning();
   return created;
+}
+
+/* ────────────────── n8n Workflows ─────────────────────── */
+
+type WorkflowDirection = "inbound" | "outbound" | "both";
+
+export async function createN8nWorkflow(
+  db: Db,
+  data: {
+    name: string;
+    description?: string;
+    webhookUrl: string;
+    direction?: WorkflowDirection;
+    eventType?: string;
+    inputSchema?: Record<string, unknown>;
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [workflow] = await db.insert(n8nWorkflows).values(data).returning();
+  return workflow;
+}
+
+export async function updateN8nWorkflow(
+  db: Db,
+  id: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    webhookUrl: string;
+    direction: WorkflowDirection;
+    eventType: string;
+    inputSchema: Record<string, unknown>;
+    isActive: boolean;
+    metadata: Record<string, unknown>;
+  }>,
+) {
+  const [updated] = await db
+    .update(n8nWorkflows)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(n8nWorkflows.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function getN8nWorkflow(db: Db, id: string) {
+  const rows = await db.select().from(n8nWorkflows).where(eq(n8nWorkflows.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getN8nWorkflowByName(db: Db, name: string) {
+  const rows = await db
+    .select()
+    .from(n8nWorkflows)
+    .where(and(eq(n8nWorkflows.name, name), eq(n8nWorkflows.isActive, true)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listN8nWorkflows(db: Db, direction?: WorkflowDirection) {
+  const conditions = [eq(n8nWorkflows.isActive, true)];
+  if (direction) {
+    conditions.push(
+      or(eq(n8nWorkflows.direction, direction), eq(n8nWorkflows.direction, "both"))!,
+    );
+  }
+  return db
+    .select()
+    .from(n8nWorkflows)
+    .where(and(...conditions))
+    .orderBy(asc(n8nWorkflows.name));
+}
+
+export async function findN8nWorkflowByEvent(db: Db, eventType: string) {
+  const rows = await db
+    .select()
+    .from(n8nWorkflows)
+    .where(and(eq(n8nWorkflows.eventType, eventType), eq(n8nWorkflows.isActive, true)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function deleteN8nWorkflow(db: Db, id: string) {
+  const [deleted] = await db.delete(n8nWorkflows).where(eq(n8nWorkflows.id, id)).returning();
+  return deleted ?? null;
 }

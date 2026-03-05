@@ -305,9 +305,7 @@ async function handleClear(interaction: ChatInputCommandInteraction): Promise<vo
   try {
     // Remove the channel-conversation mapping so next /ask starts fresh
     await fetch(`${AGENT_SERVER_URL}/api/channels/${interaction.channelId}/conversation`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ conversationId: null, platform: "discord" }),
+      method: "DELETE",
     });
 
     const embed = new EmbedBuilder()

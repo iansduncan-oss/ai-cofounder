@@ -229,7 +229,7 @@ describe("Specialist Agents", () => {
       const registry = new LlmRegistry();
       const agent = new ReviewerAgent(registry);
       expect(agent.role).toBe("reviewer");
-      expect(agent.taskCategory).toBe("simple");
+      expect(agent.taskCategory).toBe("conversation");
     });
 
     it("has no tools", () => {

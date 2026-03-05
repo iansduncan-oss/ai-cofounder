@@ -34,6 +34,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.db,
     "conversation",
     app.embeddingService,
+    app.n8nService,
   );
 
   app.post<{ Body: RunBody }>("/run", { schema: { body: RunBody } }, async (request, _reply) => {

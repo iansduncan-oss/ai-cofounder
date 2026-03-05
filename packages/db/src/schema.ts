@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   integer,
+  boolean,
   customType,
 } from "drizzle-orm/pg-core";
 
@@ -27,14 +28,6 @@ export const agentRoleEnum = pgEnum("agent_role", [
   "coder",
   "reviewer",
   "planner",
-]);
-
-export const agentRunStatusEnum = pgEnum("agent_run_status", [
-  "pending",
-  "running",
-  "completed",
-  "failed",
-  "cancelled",
 ]);
 
 export const users = pgTable("users", {
@@ -67,21 +60,6 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const agentRuns = pgTable("agent_runs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id),
-  agentRole: agentRoleEnum("agent_role").notNull(),
-  status: agentRunStatusEnum("status").notNull().default("pending"),
-  input: text("input").notNull(),
-  output: text("output"),
-  error: text("error"),
-  parentRunId: uuid("parent_run_id"),
-  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-});
-
 /* ── Channel ↔ Conversation mapping (Discord bot persistence) ── */
 
 export const channelConversations = pgTable("channel_conversations", {
@@ -110,6 +88,8 @@ export const taskStatusEnum = pgEnum("task_status", [
 ]);
 
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
+
+export const workflowDirectionEnum = pgEnum("workflow_direction", ["inbound", "outbound", "both"]);
 
 /* ── Goals ── */
 
@@ -202,4 +182,20 @@ export const approvals = pgTable("approvals", {
   decidedBy: uuid("decided_by").references(() => users.id),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── n8n Workflow Registry ── */
+
+export const n8nWorkflows = pgTable("n8n_workflows", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  webhookUrl: text("webhook_url").notNull(),
+  direction: workflowDirectionEnum("direction").notNull().default("outbound"),
+  eventType: text("event_type"),
+  inputSchema: jsonb("input_schema"),
+  isActive: boolean("is_active").notNull().default(true),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

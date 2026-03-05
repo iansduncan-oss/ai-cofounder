@@ -5,7 +5,7 @@ import { SpecialistAgent, type SpecialistContext } from "./base.js";
 
 export class ReviewerAgent extends SpecialistAgent {
   readonly role: AgentRole = "reviewer";
-  readonly taskCategory = "simple" as const;
+  readonly taskCategory = "conversation" as const;
 
   constructor(registry: LlmRegistry, db?: Db) {
     super("reviewer", registry, db);

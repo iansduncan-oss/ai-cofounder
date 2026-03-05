@@ -11,8 +11,8 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 - **apps/agent-server** — Fastify server, multi-agent orchestration (port 3100)
 - **apps/discord-bot** — Discord bot with `/ask` and `/status` slash commands, calls agent-server
 - **apps/n8n** — n8n workflow automation (Docker-based)
-- **packages/shared** — Types (AgentMessage, AgentRun, Conversation), pino logger, env config helpers
-- **packages/db** — Drizzle ORM schema (users, conversations, messages, agent_runs) + postgres.js client
+- **packages/shared** — Types (AgentMessage, Conversation, Goal, Task), pino logger, env config helpers
+- **packages/db** — Drizzle ORM schema (users, conversations, messages, goals, tasks, memories, etc.) + postgres.js client
 
 ## Commands
 

@@ -70,9 +70,17 @@ vi.mock("@ai-cofounder/db", () => ({
   recallMemories: vi.fn().mockResolvedValue([]),
   searchMemoriesByVector: vi.fn().mockResolvedValue([]),
   getConversation: vi.fn(),
+  createN8nWorkflow: vi.fn(),
+  updateN8nWorkflow: vi.fn(),
+  getN8nWorkflow: vi.fn(),
+  getN8nWorkflowByName: vi.fn(),
+  listN8nWorkflows: vi.fn().mockResolvedValue([]),
+  deleteN8nWorkflow: vi.fn(),
+  findN8nWorkflowByEvent: vi.fn(),
   goals: {},
   channelConversations: {},
   prompts: {},
+  n8nWorkflows: {},
 }));
 
 vi.mock("@ai-cofounder/llm", () => {

@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { getChannelConversation, upsertChannelConversation } from "@ai-cofounder/db";
+import { getChannelConversation, upsertChannelConversation, deleteChannelConversation } from "@ai-cofounder/db";
 
 export const channelRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/channels/:channelId/conversation
@@ -21,5 +21,12 @@ export const channelRoutes: FastifyPluginAsync = async (app) => {
     const { conversationId, platform } = request.body;
     const record = await upsertChannelConversation(app.db, channelId, conversationId, platform);
     return { conversationId: record.conversationId };
+  });
+
+  // DELETE /api/channels/:channelId/conversation
+  app.delete<{ Params: { channelId: string } }>("/:channelId/conversation", async (request) => {
+    const { channelId } = request.params;
+    await deleteChannelConversation(app.db, channelId);
+    return { ok: true };
   });
 };

@@ -26,6 +26,8 @@ import { memoryRoutes } from "./routes/memories.js";
 import { executionRoutes } from "./routes/execution.js";
 import { userRoutes } from "./routes/users.js";
 import { promptRoutes } from "./routes/prompts.js";
+import { n8nRoutes } from "./routes/n8n.js";
+import { createN8nService, type N8nService } from "./services/n8n.js";
 
 /** Create and configure the LLM registry with all available providers */
 export function createLlmRegistry(): LlmRegistry {
@@ -78,6 +80,10 @@ export function buildServer(registry?: LlmRegistry) {
   const embeddingService = geminiKey ? createEmbeddingService(geminiKey) : undefined;
   app.decorate("embeddingService", embeddingService);
 
+  // Create n8n service for workflow automation
+  const n8nService = createN8nService();
+  app.decorate("n8nService", n8nService);
+
   // Register routes
   app.register(healthRoutes);
   app.register(agentRoutes, { prefix: "/api/agents" });
@@ -88,6 +94,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(memoryRoutes, { prefix: "/api/memories" });
   app.register(userRoutes, { prefix: "/api/users" });
   app.register(promptRoutes, { prefix: "/api/prompts" });
+  app.register(n8nRoutes, { prefix: "/api/n8n" });
   app.register(executionRoutes, { prefix: "/api/goals" });
 
   // Serve voice UI static files at /voice/
@@ -119,5 +126,6 @@ declare module "fastify" {
   interface FastifyInstance {
     llmRegistry: LlmRegistry;
     embeddingService?: EmbeddingService;
+    n8nService: N8nService;
   }
 }
