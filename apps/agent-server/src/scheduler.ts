@@ -277,11 +277,15 @@ async function runGoalCheckIn(config: SchedulerConfig): Promise<void> {
 
 /* ── Entry point ── */
 
-export function startScheduler(db: Db, registry: LlmRegistry): void {
+export interface SchedulerHandle {
+  stop(): void;
+}
+
+export function startScheduler(db: Db, registry: LlmRegistry): SchedulerHandle | undefined {
   const webhookUrl = optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
   if (!webhookUrl) {
     logger.info("DISCORD_FOLLOWUP_WEBHOOK_URL not set, scheduler disabled");
-    return;
+    return undefined;
   }
 
   const briefingHour = parseInt(optionalEnv("BRIEFING_HOUR", "9"), 10);
@@ -309,6 +313,14 @@ export function startScheduler(db: Db, registry: LlmRegistry): void {
   };
 
   // First check after 1 minute (let server warm up)
-  setTimeout(check, 60 * 1000);
-  setInterval(check, CHECK_INTERVAL_MS);
+  const delayTimer = setTimeout(check, 60 * 1000);
+  const intervalTimer = setInterval(check, CHECK_INTERVAL_MS);
+
+  return {
+    stop() {
+      clearTimeout(delayTimer);
+      clearInterval(intervalTimer);
+      logger.info("scheduler stopped");
+    },
+  };
 }

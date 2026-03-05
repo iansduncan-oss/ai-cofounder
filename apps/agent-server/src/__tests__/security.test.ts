@@ -223,10 +223,10 @@ describe("Security Plugin", () => {
       expect(res.headers["x-ratelimit-reset"]).toBeDefined();
     });
 
-    it("returns 429 after exceeding rate limit", async () => {
-      // Override env for a low limit
-      const origMax = process.env.RATE_LIMIT_MAX;
-      process.env.RATE_LIMIT_MAX = "3";
+    it("returns 429 after exceeding rate limit on expensive endpoint", async () => {
+      // Override env for a low limit (agents/run uses expensive bucket)
+      const origMax = process.env.RATE_LIMIT_EXPENSIVE_MAX;
+      process.env.RATE_LIMIT_EXPENSIVE_MAX = "3";
 
       const { app } = buildServer();
       const ip = uniqueIp();
@@ -243,7 +243,7 @@ describe("Security Plugin", () => {
       }
 
       await app.close();
-      process.env.RATE_LIMIT_MAX = origMax;
+      process.env.RATE_LIMIT_EXPENSIVE_MAX = origMax;
 
       // First 3 should pass, 4th and 5th should be 429
       expect(results.filter((s) => s === 429).length).toBeGreaterThanOrEqual(2);

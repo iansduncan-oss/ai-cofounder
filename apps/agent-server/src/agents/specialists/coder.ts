@@ -60,7 +60,7 @@ You have a review_code tool — use it to self-review your code before finalizin
       const { code, language } = block.input as { code: string; language: string };
 
       // Use a fast model to review the code
-      const reviewResponse = await this.registry.complete("simple", {
+      const reviewResponse = await this.registry.complete("conversation", {
         system:
           "You are a code reviewer. Identify bugs, security issues, missing error handling, and style problems. Be concise — list only real issues, not style preferences. If the code looks good, say so.",
         messages: [

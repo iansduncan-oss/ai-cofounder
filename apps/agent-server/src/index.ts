@@ -32,7 +32,17 @@ async function main() {
   logger.info({ port, host }, "agent-server started");
 
   // Start background scheduler for proactive follow-ups
-  startScheduler(app.db, app.llmRegistry);
+  const scheduler = startScheduler(app.db, app.llmRegistry);
+
+  // Graceful shutdown
+  const shutdown = async () => {
+    logger.info("shutting down...");
+    scheduler?.stop();
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 main().catch((err) => {

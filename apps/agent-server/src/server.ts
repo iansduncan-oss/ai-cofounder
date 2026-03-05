@@ -84,6 +84,18 @@ export function buildServer(registry?: LlmRegistry) {
   const n8nService = createN8nService();
   app.decorate("n8nService", n8nService);
 
+  // Global error handler — normalize all error responses
+  app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
+    const statusCode = error.statusCode ?? 500;
+    if (statusCode >= 500) {
+      logger.error({ err: error }, "unhandled server error");
+    }
+    reply.status(statusCode).send({
+      error: statusCode >= 500 ? "Internal Server Error" : error.message,
+      statusCode,
+    });
+  });
+
   // Register routes
   app.register(healthRoutes);
   app.register(agentRoutes, { prefix: "/api/agents" });

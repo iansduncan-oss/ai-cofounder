@@ -74,7 +74,7 @@ export abstract class SpecialistAgent {
     let provider = "";
 
     // Agentic tool-use loop (max 3 rounds for specialists)
-    let response = await this.registry.complete(this.taskCategory, {
+    let response = await this.completeWithRetry(this.taskCategory, {
       system: systemPrompt,
       messages,
       tools: tools.length > 0 ? tools : undefined,
@@ -108,7 +108,7 @@ export abstract class SpecialistAgent {
       messages.push({ role: "assistant", content: response.content });
       messages.push({ role: "user", content: toolResults });
 
-      response = await this.registry.complete(this.taskCategory, {
+      response = await this.completeWithRetry(this.taskCategory, {
         system: systemPrompt,
         messages,
         tools: tools.length > 0 ? tools : undefined,
@@ -144,6 +144,24 @@ export abstract class SpecialistAgent {
       provider,
       usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
     };
+  }
+
+  /** Call registry.complete with a single retry on transient failures. */
+  protected async completeWithRetry(
+    ...args: Parameters<LlmRegistry["complete"]>
+  ): ReturnType<LlmRegistry["complete"]> {
+    try {
+      return await this.registry.complete(...args);
+    } catch (err) {
+      const isTransient =
+        err instanceof Error &&
+        (/rate.?limit|429|timeout|econnreset|socket hang up|503|overloaded/i.test(err.message));
+      if (!isTransient) throw err;
+
+      this.logger.warn({ err }, "transient LLM failure, retrying in 2s");
+      await new Promise((r) => setTimeout(r, 2000));
+      return this.registry.complete(...args);
+    }
   }
 
   protected async executeTool(

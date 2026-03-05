@@ -31,7 +31,9 @@ const BLOCKED_USER_AGENTS = [
   "libwww-perl",
 ];
 
-// Paths that are never legitimate — instant 403
+// Paths that trigger tighter rate limits (expensive LLM calls)
+const EXPENSIVE_PATHS = ["/api/agents/run", "/api/n8n/webhook", "/api/goals/"];
+
 // --- Rate limiter state ---
 
 interface RateLimitRecord {
@@ -39,27 +41,34 @@ interface RateLimitRecord {
   windowStart: number;
 }
 
-const rateLimitMap = new Map<string, RateLimitRecord>();
+function createRateLimitBucket() {
+  const map = new Map<string, RateLimitRecord>();
+  return {
+    map,
+    check(
+      ip: string,
+      maxRequests: number,
+      windowMs: number,
+    ): { limited: boolean; remaining: number; resetMs: number } {
+      const now = Date.now();
+      let record = map.get(ip);
 
-function isRateLimited(
-  ip: string,
-  maxRequests: number,
-  windowMs: number,
-): { limited: boolean; remaining: number; resetMs: number } {
-  const now = Date.now();
-  let record = rateLimitMap.get(ip);
+      if (!record || now - record.windowStart > windowMs) {
+        record = { count: 0, windowStart: now };
+        map.set(ip, record);
+      }
 
-  if (!record || now - record.windowStart > windowMs) {
-    record = { count: 0, windowStart: now };
-    rateLimitMap.set(ip, record);
-  }
+      record.count += 1;
+      const remaining = Math.max(0, maxRequests - record.count);
+      const resetMs = record.windowStart + windowMs - now;
 
-  record.count += 1;
-  const remaining = Math.max(0, maxRequests - record.count);
-  const resetMs = record.windowStart + windowMs - now;
-
-  return { limited: record.count > maxRequests, remaining, resetMs };
+      return { limited: record.count > maxRequests, remaining, resetMs };
+    },
+  };
 }
+
+const generalBucket = createRateLimitBucket();
+const expensiveBucket = createRateLimitBucket();
 
 const HONEYPOT_PATHS = [
   "/.env",
@@ -151,7 +160,7 @@ function recordHit(ip: string): boolean {
 }
 
 // Periodic cleanup of stale entries
-function startCleanup() {
+function startCleanup(): NodeJS.Timeout {
   const interval = setInterval(() => {
     const now = Date.now();
     for (const [ip, record] of ipHits) {
@@ -162,21 +171,24 @@ function startCleanup() {
     }
   }, 60_000);
   interval.unref();
+  return interval;
 }
 
 export const securityPlugin = fp(async (app: FastifyInstance) => {
-  startCleanup();
+  const banCleanupInterval = startCleanup();
 
   const apiSecret = optionalEnv("API_SECRET", "");
   const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
   const rateLimitWindowSec = parseInt(optionalEnv("RATE_LIMIT_WINDOW", "60"), 10);
   const rateLimitWindowMs = rateLimitWindowSec * 1000;
+  // Expensive endpoints get a tighter limit (default: 10 per window)
+  const expensiveLimitMax = parseInt(optionalEnv("RATE_LIMIT_EXPENSIVE_MAX", "10"), 10);
 
   if (apiSecret) {
     logger.info("API bearer token auth enabled");
   }
   logger.info(
-    { maxRequests: rateLimitMax, windowSec: rateLimitWindowSec },
+    { maxRequests: rateLimitMax, expensiveMax: expensiveLimitMax, windowSec: rateLimitWindowSec },
     "rate limiting configured",
   );
 
@@ -217,14 +229,17 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       return;
     }
 
-    // 5. Rate limiting on /api/* routes
+    // 5. Rate limiting on /api/* routes (tighter for expensive endpoints)
     if (url.startsWith("/api/")) {
-      const { limited, remaining, resetMs } = isRateLimited(ip, rateLimitMax, rateLimitWindowMs);
-      reply.header("X-RateLimit-Limit", rateLimitMax);
+      const isExpensive = EXPENSIVE_PATHS.some((p) => url.startsWith(p));
+      const bucket = isExpensive ? expensiveBucket : generalBucket;
+      const limit = isExpensive ? expensiveLimitMax : rateLimitMax;
+      const { limited, remaining, resetMs } = bucket.check(ip, limit, rateLimitWindowMs);
+      reply.header("X-RateLimit-Limit", limit);
       reply.header("X-RateLimit-Remaining", remaining);
       reply.header("X-RateLimit-Reset", Math.ceil(resetMs / 1000));
       if (limited) {
-        logger.debug({ ip }, "rate limited");
+        logger.debug({ ip, expensive: isExpensive }, "rate limited");
         reply.code(429).send({ error: "Too many requests" });
         return;
       }
@@ -251,9 +266,17 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   // Periodic cleanup of rate limit records
   const rateLimitCleanupInterval = setInterval(() => {
     const now = Date.now();
-    for (const [ip, record] of rateLimitMap) {
-      if (now - record.windowStart > rateLimitWindowMs) rateLimitMap.delete(ip);
+    for (const bucket of [generalBucket.map, expensiveBucket.map]) {
+      for (const [ip, record] of bucket) {
+        if (now - record.windowStart > rateLimitWindowMs) bucket.delete(ip);
+      }
     }
   }, 60_000);
   rateLimitCleanupInterval.unref();
+
+  // Clean up intervals on server close
+  app.addHook("onClose", async () => {
+    clearInterval(banCleanupInterval);
+    clearInterval(rateLimitCleanupInterval);
+  });
 });
