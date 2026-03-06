@@ -29,6 +29,9 @@ async function main() {
   // Initialize sandbox service (checks Docker availability)
   await app.sandboxService.init();
 
+  // Initialize workspace service (creates workspace directory)
+  await app.workspaceService.init();
+
   const port = parseInt(optionalEnv("PORT", "3100"), 10);
   const host = optionalEnv("HOST", "0.0.0.0");
 
@@ -36,7 +39,7 @@ async function main() {
   logger.info({ port, host }, "agent-server started");
 
   // Start background scheduler for proactive follow-ups
-  const scheduler = startScheduler(app.db, app.llmRegistry, app.embeddingService, app.sandboxService);
+  const scheduler = startScheduler(app.db, app.llmRegistry, app.embeddingService, app.sandboxService, app.workspaceService);
 
   // Graceful shutdown
   const shutdown = async () => {

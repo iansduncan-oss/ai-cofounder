@@ -31,7 +31,9 @@ import { usageRoutes } from "./routes/usage.js";
 import { eventRoutes } from "./routes/events.js";
 import { scheduleRoutes } from "./routes/schedules.js";
 import { webhookRoutes } from "./routes/webhooks.js";
+import { workspaceRoutes } from "./routes/workspace.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
+import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
 import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox";
 
 /** Create and configure the LLM registry with all available providers */
@@ -93,6 +95,10 @@ export function buildServer(registry?: LlmRegistry) {
   const sandboxService = createSandboxService();
   app.decorate("sandboxService", sandboxService);
 
+  // Create workspace service for file system and git access
+  const workspaceService = createWorkspaceService();
+  app.decorate("workspaceService", workspaceService);
+
   // Global error handler — normalize all error responses
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
@@ -121,6 +127,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(eventRoutes, { prefix: "/api/events" });
   app.register(scheduleRoutes, { prefix: "/api/schedules" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
+  app.register(workspaceRoutes, { prefix: "/api/workspace" });
 
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
@@ -153,5 +160,6 @@ declare module "fastify" {
     embeddingService?: EmbeddingService;
     n8nService: N8nService;
     sandboxService: SandboxService;
+    workspaceService: WorkspaceService;
   }
 }

@@ -36,7 +36,22 @@ import {
   LIST_SCHEDULES_TOOL,
   DELETE_SCHEDULE_TOOL,
 } from "./tools/schedule-tools.js";
+import {
+  READ_FILE_TOOL,
+  WRITE_FILE_TOOL,
+  LIST_DIRECTORY_TOOL,
+} from "./tools/filesystem-tools.js";
+import {
+  GIT_CLONE_TOOL,
+  GIT_STATUS_TOOL,
+  GIT_DIFF_TOOL,
+  GIT_ADD_TOOL,
+  GIT_COMMIT_TOOL,
+  GIT_PULL_TOOL,
+  GIT_LOG_TOOL,
+} from "./tools/git-tools.js";
 import type { N8nService } from "../services/n8n.js";
+import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 
 /* ── Result types ── */
@@ -193,6 +208,7 @@ export class Orchestrator {
   private embeddingService?: EmbeddingService;
   private n8nService?: N8nService;
   private sandboxService?: SandboxService;
+  private workspaceService?: WorkspaceService;
 
   constructor(
     registry: LlmRegistry,
@@ -201,6 +217,7 @@ export class Orchestrator {
     embeddingService?: EmbeddingService,
     n8nService?: N8nService,
     sandboxService?: SandboxService,
+    workspaceService?: WorkspaceService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -208,6 +225,7 @@ export class Orchestrator {
     this.embeddingService = embeddingService;
     this.n8nService = n8nService;
     this.sandboxService = sandboxService;
+    this.workspaceService = workspaceService;
   }
 
   async run(
@@ -262,6 +280,11 @@ export class Orchestrator {
 
     if (this.db) {
       tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
+    }
+
+    if (this.workspaceService) {
+      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
+      tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
     }
 
     try {
@@ -550,6 +573,75 @@ export class Orchestrator {
           timedOut: result.timedOut,
           language: result.language,
         };
+      }
+      case "read_file": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { path: string };
+        try {
+          const content = await this.workspaceService.readFile(input.path);
+          return { path: input.path, content };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      }
+      case "write_file": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { path: string; content: string };
+        try {
+          await this.workspaceService.writeFile(input.path, input.content);
+          return { written: true, path: input.path };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      }
+      case "list_directory": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { path?: string };
+        try {
+          const entries = await this.workspaceService.listDirectory(input.path);
+          return { path: input.path ?? ".", entries };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      }
+      case "git_clone": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_url: string; directory_name?: string };
+        const result = await this.workspaceService.gitClone(input.repo_url, input.directory_name);
+        return { ...result, repoUrl: input.repo_url };
+      }
+      case "git_status": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string };
+        return this.workspaceService.gitStatus(input.repo_dir);
+      }
+      case "git_diff": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; staged?: boolean };
+        return this.workspaceService.gitDiff(input.repo_dir, input.staged);
+      }
+      case "git_add": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; paths: string[] };
+        return this.workspaceService.gitAdd(input.repo_dir, input.paths);
+      }
+      case "git_commit": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; message: string };
+        return this.workspaceService.gitCommit(input.repo_dir, input.message);
+      }
+      case "git_pull": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; remote?: string; branch?: string };
+        return this.workspaceService.gitPull(input.repo_dir, input.remote, input.branch);
+      }
+      case "git_log": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; max_count?: number };
+        return this.workspaceService.gitLog(input.repo_dir, input.max_count);
       }
       default:
         return { error: `Unknown tool: ${block.name}` };
