@@ -3,7 +3,7 @@ import { getUsageSummary } from "@ai-cofounder/db";
 
 export const usageRoutes: FastifyPluginAsync = async (app) => {
   /** GET /api/usage?period=today|week|month|all */
-  app.get<{ Querystring: { period?: string } }>("/", async (request) => {
+  app.get<{ Querystring: { period?: string } }>("/", { schema: { tags: ["usage"] } }, async (request) => {
     const period = (request.query.period ?? "today") as string;
 
     const now = new Date();

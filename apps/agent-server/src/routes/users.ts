@@ -4,6 +4,7 @@ import { findUserByPlatform } from "@ai-cofounder/db";
 export const userRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { platform: string; externalId: string } }>(
     "/by-platform/:platform/:externalId",
+    { schema: { tags: ["users"] } },
     async (request, reply) => {
       const { platform, externalId } = request.params;
       const user = await findUserByPlatform(app.db, platform, externalId);

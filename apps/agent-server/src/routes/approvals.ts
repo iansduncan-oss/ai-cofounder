@@ -19,7 +19,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create an approval request */
   app.post<{ Body: typeof CreateApprovalBody.static }>(
     "/",
-    { schema: { body: CreateApprovalBody } },
+    { schema: { tags: ["approvals"], body: CreateApprovalBody } },
     async (request, reply) => {
       const approval = await createApproval(app.db, request.body);
       notifyApprovalCreated({
@@ -35,7 +35,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* GET /pending — list pending approvals */
   app.get<{ Querystring: typeof ListPendingQuery.static }>(
     "/pending",
-    { schema: { querystring: ListPendingQuery } },
+    { schema: { tags: ["approvals"], querystring: ListPendingQuery } },
     async (request) => {
       const limit = request.query.limit ?? 50;
       return listPendingApprovals(app.db, limit);
@@ -45,7 +45,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* GET /:id — get a single approval */
   app.get<{ Params: typeof IdParams.static }>(
     "/:id",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["approvals"], params: IdParams } },
     async (request, reply) => {
       const approval = await getApproval(app.db, request.params.id);
       if (!approval) return reply.status(404).send({ error: "Approval not found" });
@@ -56,7 +56,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* GET / — list approvals for a task */
   app.get<{ Querystring: typeof TaskIdQuery.static }>(
     "/",
-    { schema: { querystring: TaskIdQuery } },
+    { schema: { tags: ["approvals"], querystring: TaskIdQuery } },
     async (request) => {
       return listApprovalsByTask(app.db, request.query.taskId);
     },
@@ -68,7 +68,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
     Body: typeof ResolveApprovalBody.static;
   }>(
     "/:id/resolve",
-    { schema: { params: IdParams, body: ResolveApprovalBody } },
+    { schema: { tags: ["approvals"], params: IdParams, body: ResolveApprovalBody } },
     async (request, reply) => {
       const approval = await resolveApproval(
         app.db,

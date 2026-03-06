@@ -20,6 +20,7 @@ import { ResearcherAgent } from "./specialists/researcher.js";
 import { CoderAgent } from "./specialists/coder.js";
 import { ReviewerAgent } from "./specialists/reviewer.js";
 import { PlannerAgent } from "./specialists/planner.js";
+import type { NotificationService } from "../services/notifications.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -58,6 +59,7 @@ export class TaskDispatcher {
     private db: Db,
     embeddingService?: EmbeddingService,
     sandboxService?: SandboxService,
+    private notificationService?: NotificationService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -236,6 +238,21 @@ export class TaskDispatcher {
 
         this.logger.error({ taskId: task.id, err }, "task failed");
 
+        if (this.notificationService) {
+          this.notificationService
+            .notifyTaskFailed({
+              goalId,
+              goalTitle: goal.title,
+              taskId: task.id,
+              taskTitle: task.title,
+              agent: agentRole,
+              error: errorMsg,
+            })
+            .catch(() => {
+              /* notification failures are non-fatal */
+            });
+        }
+
         if (onProgress) {
           try {
             await onProgress({
@@ -290,6 +307,22 @@ export class TaskDispatcher {
       this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId).catch((err) => {
         this.logger.warn({ err, goalId }, "self-improvement analysis failed (non-fatal)");
       });
+    }
+
+    // Notify goal completion/failure
+    if (this.notificationService) {
+      this.notificationService
+        .notifyGoalCompleted({
+          goalId,
+          goalTitle: goal.title,
+          status: goalStatus,
+          completedTasks: completedCount,
+          totalTasks: tasks.length,
+          tasks: taskResults.map((t) => ({ title: t.title, agent: t.agent, status: t.status })),
+        })
+        .catch(() => {
+          /* notification failures are non-fatal */
+        });
     }
 
     return {

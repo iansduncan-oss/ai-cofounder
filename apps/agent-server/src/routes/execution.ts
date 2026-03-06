@@ -5,11 +5,18 @@ import { TaskDispatcher, type TaskProgressCallback } from "../agents/dispatcher.
 const logger = createLogger("execution-routes");
 
 export const executionRoutes: FastifyPluginAsync = async (app) => {
-  const dispatcher = new TaskDispatcher(app.llmRegistry, app.db, app.embeddingService, app.sandboxService);
+  const dispatcher = new TaskDispatcher(
+    app.llmRegistry,
+    app.db,
+    app.embeddingService,
+    app.sandboxService,
+    app.notificationService,
+  );
 
   // Execute all tasks for a goal
   app.post<{ Params: { id: string }; Body: { userId?: string; webhookUrl?: string } }>(
     "/:id/execute",
+    { schema: { tags: ["execution"] } },
     async (request, reply) => {
       const { id } = request.params;
       const { userId, webhookUrl } = request.body ?? {};
@@ -66,6 +73,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
   // Stream execution progress via SSE
   app.get<{ Params: { id: string }; Querystring: { userId?: string } }>(
     "/:id/execute/stream",
+    { schema: { tags: ["execution"] } },
     async (request, reply) => {
       const { id } = request.params;
       const { userId } = request.query;
@@ -98,7 +106,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // Get execution progress for a goal
-  app.get<{ Params: { id: string } }>("/:id/progress", async (request, reply) => {
+  app.get<{ Params: { id: string } }>("/:id/progress", { schema: { tags: ["execution"] } }, async (request, reply) => {
     const { id } = request.params;
 
     try {

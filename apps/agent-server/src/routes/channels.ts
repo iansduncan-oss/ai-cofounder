@@ -3,7 +3,7 @@ import { getChannelConversation, upsertChannelConversation, deleteChannelConvers
 
 export const channelRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/channels/:channelId/conversation
-  app.get<{ Params: { channelId: string } }>("/:channelId/conversation", async (request, reply) => {
+  app.get<{ Params: { channelId: string } }>("/:channelId/conversation", { schema: { tags: ["channels"] } }, async (request, reply) => {
     const { channelId } = request.params;
     const record = await getChannelConversation(app.db, channelId);
     if (!record) {
@@ -16,7 +16,7 @@ export const channelRoutes: FastifyPluginAsync = async (app) => {
   app.put<{
     Params: { channelId: string };
     Body: { conversationId: string; platform?: string };
-  }>("/:channelId/conversation", async (request) => {
+  }>("/:channelId/conversation", { schema: { tags: ["channels"] } }, async (request) => {
     const { channelId } = request.params;
     const { conversationId, platform } = request.body;
     const record = await upsertChannelConversation(app.db, channelId, conversationId, platform);
@@ -24,7 +24,7 @@ export const channelRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // DELETE /api/channels/:channelId/conversation
-  app.delete<{ Params: { channelId: string } }>("/:channelId/conversation", async (request) => {
+  app.delete<{ Params: { channelId: string } }>("/:channelId/conversation", { schema: { tags: ["channels"] } }, async (request) => {
     const { channelId } = request.params;
     await deleteChannelConversation(app.db, channelId);
     return { ok: true };

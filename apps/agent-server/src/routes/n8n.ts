@@ -27,7 +27,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       metadata?: Record<string, unknown>;
     };
     Querystring: { sync?: string };
-  }>("/webhook", async (request, reply) => {
+  }>("/webhook", { schema: { tags: ["n8n"] } }, async (request, reply) => {
     const secret = optionalEnv("N8N_SHARED_SECRET", "");
     if (secret) {
       const provided = request.headers["x-n8n-secret"];
@@ -125,7 +125,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
 
   /* ── Workflow CRUD ── */
 
-  app.get("/workflows", async (_request, _reply) => {
+  app.get("/workflows", { schema: { tags: ["n8n"] } }, async (_request, _reply) => {
     const direction = (_request.query as { direction?: string }).direction as
       | "inbound"
       | "outbound"
@@ -144,7 +144,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       inputSchema?: Record<string, unknown>;
       metadata?: Record<string, unknown>;
     };
-  }>("/workflows", async (request, reply) => {
+  }>("/workflows", { schema: { tags: ["n8n"] } }, async (request, reply) => {
     const { name, description, webhookUrl, direction, eventType, inputSchema, metadata } =
       request.body;
     if (!name || !webhookUrl) {
@@ -162,7 +162,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
     return reply.status(201).send(workflow);
   });
 
-  app.get<{ Params: { id: string } }>("/workflows/:id", async (request, reply) => {
+  app.get<{ Params: { id: string } }>("/workflows/:id", { schema: { tags: ["n8n"] } }, async (request, reply) => {
     const workflow = await getN8nWorkflow(app.db, request.params.id);
     if (!workflow) return reply.status(404).send({ error: "Workflow not found" });
     return workflow;
@@ -180,13 +180,13 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       isActive: boolean;
       metadata: Record<string, unknown>;
     }>;
-  }>("/workflows/:id", async (request, reply) => {
+  }>("/workflows/:id", { schema: { tags: ["n8n"] } }, async (request, reply) => {
     const updated = await updateN8nWorkflow(app.db, request.params.id, request.body);
     if (!updated) return reply.status(404).send({ error: "Workflow not found" });
     return updated;
   });
 
-  app.delete<{ Params: { id: string } }>("/workflows/:id", async (request, reply) => {
+  app.delete<{ Params: { id: string } }>("/workflows/:id", { schema: { tags: ["n8n"] } }, async (request, reply) => {
     const deleted = await deleteN8nWorkflow(app.db, request.params.id);
     if (!deleted) return reply.status(404).send({ error: "Workflow not found" });
     return { deleted: true };

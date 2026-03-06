@@ -23,7 +23,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a task */
   app.post<{ Body: typeof CreateTaskBody.static }>(
     "/",
-    { schema: { body: CreateTaskBody } },
+    { schema: { tags: ["tasks"], body: CreateTaskBody } },
     async (request, reply) => {
       const task = await createTask(app.db, request.body);
       return reply.status(201).send(task);
@@ -33,7 +33,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   /* GET /pending — list pending tasks */
   app.get<{ Querystring: typeof ListPendingQuery.static }>(
     "/pending",
-    { schema: { querystring: ListPendingQuery } },
+    { schema: { tags: ["tasks"], querystring: ListPendingQuery } },
     async (request) => {
       const limit = request.query.limit ?? 50;
       return listPendingTasks(app.db, limit);
@@ -43,7 +43,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   /* GET /:id — get a single task */
   app.get<{ Params: typeof IdParams.static }>(
     "/:id",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["tasks"], params: IdParams } },
     async (request, reply) => {
       const task = await getTask(app.db, request.params.id);
       if (!task) return reply.status(404).send({ error: "Task not found" });
@@ -54,7 +54,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   /* GET / — list tasks for a goal */
   app.get<{ Querystring: typeof GoalIdQuery.static }>(
     "/",
-    { schema: { querystring: GoalIdQuery } },
+    { schema: { tags: ["tasks"], querystring: GoalIdQuery } },
     async (request) => {
       return listTasksByGoal(app.db, request.query.goalId);
     },
@@ -66,7 +66,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     Body: typeof AssignTaskBody.static;
   }>(
     "/:id/assign",
-    { schema: { params: IdParams, body: AssignTaskBody } },
+    { schema: { tags: ["tasks"], params: IdParams, body: AssignTaskBody } },
     async (request, reply) => {
       const task = await assignTask(app.db, request.params.id, request.body.agent);
       if (!task) return reply.status(404).send({ error: "Task not found" });
@@ -77,7 +77,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   /* PATCH /:id/start — mark task as running */
   app.patch<{ Params: typeof IdParams.static }>(
     "/:id/start",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["tasks"], params: IdParams } },
     async (request, reply) => {
       const task = await startTask(app.db, request.params.id);
       if (!task) return reply.status(404).send({ error: "Task not found" });
@@ -91,7 +91,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     Body: typeof CompleteTaskBody.static;
   }>(
     "/:id/complete",
-    { schema: { params: IdParams, body: CompleteTaskBody } },
+    { schema: { tags: ["tasks"], params: IdParams, body: CompleteTaskBody } },
     async (request, reply) => {
       const task = await completeTask(app.db, request.params.id, request.body.result);
       if (!task) return reply.status(404).send({ error: "Task not found" });
@@ -103,7 +103,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   app.patch<{
     Params: typeof IdParams.static;
     Body: typeof FailTaskBody.static;
-  }>("/:id/fail", { schema: { params: IdParams, body: FailTaskBody } }, async (request, reply) => {
+  }>("/:id/fail", { schema: { tags: ["tasks"], params: IdParams, body: FailTaskBody } }, async (request, reply) => {
     const task = await failTask(app.db, request.params.id, request.body.error);
     if (!task) return reply.status(404).send({ error: "Task not found" });
     return task;

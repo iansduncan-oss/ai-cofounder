@@ -6,7 +6,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
   app.post<{ Body: typeof CreateGoalBody.static }>(
     "/",
-    { schema: { body: CreateGoalBody } },
+    { schema: { tags: ["goals"], body: CreateGoalBody } },
     async (request, reply) => {
       const goal = await createGoal(app.db, request.body);
       return reply.status(201).send(goal);
@@ -16,7 +16,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* GET /:id — get a single goal */
   app.get<{ Params: typeof IdParams.static }>(
     "/:id",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["goals"], params: IdParams } },
     async (request, reply) => {
       const goal = await getGoal(app.db, request.params.id);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });
@@ -27,7 +27,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* GET / — list goals for a conversation */
   app.get<{ Querystring: typeof ConversationIdQuery.static }>(
     "/",
-    { schema: { querystring: ConversationIdQuery } },
+    { schema: { tags: ["goals"], querystring: ConversationIdQuery } },
     async (request) => {
       return listGoalsByConversation(app.db, request.query.conversationId);
     },
@@ -39,7 +39,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     Body: typeof UpdateGoalStatusBody.static;
   }>(
     "/:id/status",
-    { schema: { params: IdParams, body: UpdateGoalStatusBody } },
+    { schema: { tags: ["goals"], params: IdParams, body: UpdateGoalStatusBody } },
     async (request, reply) => {
       const goal = await updateGoalStatus(app.db, request.params.id, request.body.status);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });

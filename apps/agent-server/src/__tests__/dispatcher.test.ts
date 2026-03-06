@@ -64,18 +64,35 @@ vi.mock("../agents/tools/memory-tools.js", () => ({
   RECALL_MEMORIES_TOOL: { name: "recall_memories", description: "recall", input_schema: { type: "object", properties: {} } },
 }));
 
+vi.mock("../services/notifications.js", () => ({
+  NotificationService: class {
+    notifyGoalCompleted = vi.fn().mockResolvedValue(undefined);
+    notifyTaskFailed = vi.fn().mockResolvedValue(undefined);
+    notifyGoalProgress = vi.fn().mockResolvedValue(undefined);
+    notifyApprovalCreated = vi.fn().mockResolvedValue(undefined);
+    isConfigured = vi.fn().mockReturnValue(true);
+  },
+}));
+
 const { TaskDispatcher } = await import("../agents/dispatcher.js");
 const { LlmRegistry } = await import("@ai-cofounder/llm");
+const { NotificationService } = await import("../services/notifications.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("TaskDispatcher", () => {
-  function createDispatcher() {
+  function createDispatcher(notificationService?: InstanceType<typeof NotificationService>) {
     const registry = new LlmRegistry();
     const db = {} as any;
-    return new TaskDispatcher(registry, db);
+    return new TaskDispatcher(
+      registry,
+      db,
+      undefined,
+      undefined,
+      notificationService,
+    );
   }
 
   describe("runGoal", () => {
@@ -224,6 +241,69 @@ describe("TaskDispatcher", () => {
         "t-1",
         "No specialist agent for role: wizard",
       );
+    });
+  });
+
+  describe("notifications", () => {
+    it("calls notifyGoalCompleted after successful execution", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Build it" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Research", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      const ns = new NotificationService();
+      const dispatcher = createDispatcher(ns);
+      await dispatcher.runGoal("g-1");
+
+      // Wait for fire-and-forget promise to settle
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(ns.notifyGoalCompleted).toHaveBeenCalledWith(
+        expect.objectContaining({
+          goalId: "g-1",
+          goalTitle: "Build it",
+          status: "completed",
+          completedTasks: 1,
+          totalTasks: 1,
+        }),
+      );
+    });
+
+    it("calls notifyTaskFailed when a task fails", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Risky" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Will fail", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+      mockComplete.mockRejectedValueOnce(new Error("LLM error"));
+
+      const ns = new NotificationService();
+      const dispatcher = createDispatcher(ns);
+      await dispatcher.runGoal("g-1");
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(ns.notifyTaskFailed).toHaveBeenCalledWith(
+        expect.objectContaining({
+          goalId: "g-1",
+          goalTitle: "Risky",
+          taskId: "t-1",
+          taskTitle: "Will fail",
+          agent: "researcher",
+          error: "LLM error",
+        }),
+      );
+    });
+
+    it("works fine without notification service", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "No notifications" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Step", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      const dispatcher = createDispatcher(); // no notification service
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
     });
   });
 

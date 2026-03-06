@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { setupTestEnv, mockLlmModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
-  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
-  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  setupTestEnv();
 });
 
 const mockComplete = vi.fn();
@@ -14,24 +14,7 @@ vi.mock("@ai-cofounder/db", () => ({
   ]),
 }));
 
-vi.mock("@ai-cofounder/llm", () => {
-  class MockLlmRegistry {
-    complete = mockComplete;
-    completeDirect = mockComplete;
-    register = vi.fn();
-    getProvider = vi.fn();
-    resolveProvider = vi.fn();
-    listProviders = vi.fn().mockReturnValue([]);
-  }
-  return {
-    LlmRegistry: MockLlmRegistry,
-    AnthropicProvider: class {},
-    GroqProvider: class {},
-    OpenRouterProvider: class {},
-    GeminiProvider: class {},
-    createEmbeddingService: vi.fn(),
-  };
-});
+vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 
 vi.mock("../agents/tools/web-search.js", () => ({
   SEARCH_WEB_TOOL: {

@@ -36,6 +36,7 @@ jobs:
           echo "==> Building Docker images..."
           sudo docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
           sudo docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
+          sudo docker build -t ai-cofounder-slack-bot:latest -f apps/slack-bot/Dockerfile .
 
           echo "==> Restarting services..."
           sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
