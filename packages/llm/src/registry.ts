@@ -7,6 +7,28 @@ interface ModelRoute {
   model: string;
 }
 
+export interface ProviderHealth {
+  provider: string;
+  available: boolean;
+  totalRequests: number;
+  successCount: number;
+  errorCount: number;
+  avgLatencyMs: number;
+  recentErrors: Array<{ time: string; message: string }>;
+  lastSuccessAt?: string;
+  lastErrorAt?: string;
+}
+
+interface ProviderStats {
+  totalRequests: number;
+  successCount: number;
+  errorCount: number;
+  totalLatencyMs: number;
+  recentErrors: Array<{ time: Date; message: string }>;
+  lastSuccessAt?: Date;
+  lastErrorAt?: Date;
+}
+
 /**
  * Task-based model routing with fallback chains.
  *
@@ -43,9 +65,57 @@ export class LlmRegistry {
   private providers = new Map<string, LlmProvider>();
   private routes: Record<TaskCategory, ModelRoute[]>;
   private logger = createLogger("llm-registry");
+  private stats = new Map<string, ProviderStats>();
 
   constructor(routes?: Record<TaskCategory, ModelRoute[]>) {
     this.routes = routes ?? DEFAULT_ROUTES;
+  }
+
+  private getStats(provider: string): ProviderStats {
+    let s = this.stats.get(provider);
+    if (!s) {
+      s = { totalRequests: 0, successCount: 0, errorCount: 0, totalLatencyMs: 0, recentErrors: [] };
+      this.stats.set(provider, s);
+    }
+    return s;
+  }
+
+  private recordSuccess(provider: string, latencyMs: number): void {
+    const s = this.getStats(provider);
+    s.totalRequests++;
+    s.successCount++;
+    s.totalLatencyMs += latencyMs;
+    s.lastSuccessAt = new Date();
+  }
+
+  private recordError(provider: string, message: string): void {
+    const s = this.getStats(provider);
+    s.totalRequests++;
+    s.errorCount++;
+    s.lastErrorAt = new Date();
+    s.recentErrors.push({ time: new Date(), message });
+    // Keep only last 10 errors
+    if (s.recentErrors.length > 10) s.recentErrors.shift();
+  }
+
+  /** Get health status for all registered providers */
+  getProviderHealth(): ProviderHealth[] {
+    return Array.from(this.providers.values()).map((p) => {
+      const s = this.stats.get(p.name) ?? {
+        totalRequests: 0, successCount: 0, errorCount: 0, totalLatencyMs: 0, recentErrors: [],
+      };
+      return {
+        provider: p.name,
+        available: p.available,
+        totalRequests: s.totalRequests,
+        successCount: s.successCount,
+        errorCount: s.errorCount,
+        avgLatencyMs: s.successCount > 0 ? Math.round(s.totalLatencyMs / s.successCount) : 0,
+        recentErrors: s.recentErrors.map((e) => ({ time: e.time.toISOString(), message: e.message })),
+        lastSuccessAt: s.lastSuccessAt?.toISOString(),
+        lastErrorAt: s.lastErrorAt?.toISOString(),
+      };
+    });
   }
 
   register(provider: LlmProvider): void {
@@ -90,10 +160,14 @@ export class LlmRegistry {
           "attempting completion",
         );
 
+        const start = Date.now();
         const response = await provider.complete({
           ...request,
           model: route.model,
         });
+        const latencyMs = Date.now() - start;
+
+        this.recordSuccess(route.provider, latencyMs);
 
         this.logger.info(
           {
@@ -102,12 +176,14 @@ export class LlmRegistry {
             model: response.model,
             inputTokens: response.usage.inputTokens,
             outputTokens: response.usage.outputTokens,
+            latencyMs,
           },
           "completion succeeded",
         );
 
         return { ...response, provider: route.provider };
       } catch (err) {
+        this.recordError(route.provider, err instanceof Error ? err.message : String(err));
         this.logger.warn(
           { task, provider: route.provider, model: route.model, err },
           "provider failed, trying next",

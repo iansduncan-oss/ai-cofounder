@@ -1,0 +1,20 @@
+{
+  "name": "@ai-cofounder/sandbox",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ai-cofounder/shared": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3"
+  }
+}

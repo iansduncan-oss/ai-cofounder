@@ -280,6 +280,82 @@ describe("Specialist Agents", () => {
     });
   });
 
+  describe("completeWithRetry", () => {
+    it("retries on transient 429 error and succeeds", async () => {
+      mockComplete
+        .mockRejectedValueOnce(new Error("rate limit exceeded (429)"))
+        .mockResolvedValueOnce(mockTextResponse("Recovered"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+      const result = await agent.execute(makeContext());
+
+      expect(result.output).toBe("Recovered");
+      // 1st call fails, retry succeeds
+      expect(mockComplete).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on timeout error", async () => {
+      mockComplete
+        .mockRejectedValueOnce(new Error("Request timeout"))
+        .mockResolvedValueOnce(mockTextResponse("Recovered from timeout"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+      const result = await agent.execute(makeContext());
+
+      expect(result.output).toBe("Recovered from timeout");
+      expect(mockComplete).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on 503 overloaded error", async () => {
+      mockComplete
+        .mockRejectedValueOnce(new Error("503 Service Unavailable: overloaded"))
+        .mockResolvedValueOnce(mockTextResponse("Back online"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+      const result = await agent.execute(makeContext());
+
+      expect(result.output).toBe("Back online");
+      expect(mockComplete).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not retry on non-transient errors", async () => {
+      mockComplete.mockRejectedValueOnce(new Error("Invalid API key"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+
+      await expect(agent.execute(makeContext())).rejects.toThrow("Invalid API key");
+      expect(mockComplete).toHaveBeenCalledTimes(1);
+    });
+
+    it("throws if retry also fails", async () => {
+      mockComplete
+        .mockRejectedValueOnce(new Error("429 rate limit"))
+        .mockRejectedValueOnce(new Error("429 rate limit again"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+
+      await expect(agent.execute(makeContext())).rejects.toThrow("429 rate limit again");
+      expect(mockComplete).toHaveBeenCalledTimes(2);
+    });
+
+    it("retries on ECONNRESET error", async () => {
+      mockComplete
+        .mockRejectedValueOnce(new Error("ECONNRESET"))
+        .mockResolvedValueOnce(mockTextResponse("Reconnected"));
+
+      const registry = new LlmRegistry();
+      const agent = new ResearcherAgent(registry);
+      const result = await agent.execute(makeContext());
+
+      expect(result.output).toBe("Reconnected");
+    });
+  });
+
   describe("System prompt includes goal title", () => {
     it("researcher includes goal context", () => {
       const registry = new LlmRegistry();

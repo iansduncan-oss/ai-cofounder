@@ -15,6 +15,41 @@
       "when": 1772725067573,
       "tag": "0001_solid_mongu",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772726000000,
+      "tag": "0005_add_code_executions",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772741400000,
+      "tag": "0006_add_llm_usage",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772742000000,
+      "tag": "0007_add_schedules_events_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772742600000,
+      "tag": "0008_add_memory_importance",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1772772400000,
+      "tag": "0009_add_milestones",
+      "breakpoints": true
     }
   ]
 }

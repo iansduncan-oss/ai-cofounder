@@ -20,4 +20,15 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
       };
     }
   });
+
+  /** GET /health/providers — LLM provider health status */
+  app.get("/health/providers", async () => {
+    const providers = app.llmRegistry.getProviderHealth();
+    const allAvailable = providers.every((p) => p.available);
+    return {
+      status: allAvailable ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      providers,
+    };
+  });
 };

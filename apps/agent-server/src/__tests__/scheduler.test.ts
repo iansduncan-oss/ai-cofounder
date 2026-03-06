@@ -247,5 +247,34 @@ describe("Scheduler", () => {
 
       process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
     });
+
+    it("returns a SchedulerHandle with stop() when URL is set", () => {
+      const origUrl = process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
+      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = "https://discord.com/api/webhooks/test";
+
+      const registry = new LlmRegistry();
+      const db = {} as any;
+
+      const handle = startScheduler(db, registry);
+      expect(handle).toBeDefined();
+      expect(typeof handle!.stop).toBe("function");
+
+      // Clean up timers
+      handle!.stop();
+      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
+    });
+
+    it("returns undefined when URL is empty string", () => {
+      const origUrl = process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
+      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = "";
+
+      const registry = new LlmRegistry();
+      const db = {} as any;
+
+      const handle = startScheduler(db, registry);
+      expect(handle).toBeUndefined();
+
+      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
+    });
   });
 });

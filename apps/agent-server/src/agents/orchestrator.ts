@@ -21,12 +21,23 @@ import {
   createApproval,
   getN8nWorkflowByName,
   listN8nWorkflows,
+  saveCodeExecution,
+  createSchedule,
+  listSchedules,
+  deleteSchedule,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
+import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
+import {
+  CREATE_SCHEDULE_TOOL,
+  LIST_SCHEDULES_TOOL,
+  DELETE_SCHEDULE_TOOL,
+} from "./tools/schedule-tools.js";
 import type { N8nService } from "../services/n8n.js";
+import type { SandboxService } from "@ai-cofounder/sandbox";
 
 /* ── Result types ── */
 
@@ -129,6 +140,36 @@ const REQUEST_APPROVAL_TOOL: LlmTool = {
   },
 };
 
+const CREATE_MILESTONE_TOOL: LlmTool = {
+  name: "create_milestone",
+  description:
+    "Create a milestone that groups related goals into a phased plan with dependencies. " +
+    "Use this for complex multi-step projects that span multiple goals. " +
+    "After creating a milestone, use create_plan to add goals to it.",
+  input_schema: {
+    type: "object",
+    properties: {
+      title: {
+        type: "string",
+        description: "Milestone title describing the overall objective",
+      },
+      description: {
+        type: "string",
+        description: "Full description of what this milestone achieves",
+      },
+      order_index: {
+        type: "number",
+        description: "Order in the overall project plan (0-based)",
+      },
+      due_date: {
+        type: "string",
+        description: "Optional target date in ISO-8601 format",
+      },
+    },
+    required: ["title", "description"],
+  },
+};
+
 /* ── Internal types ── */
 
 interface CreatePlanInput {
@@ -151,6 +192,7 @@ export class Orchestrator {
   private taskCategory: TaskCategory;
   private embeddingService?: EmbeddingService;
   private n8nService?: N8nService;
+  private sandboxService?: SandboxService;
 
   constructor(
     registry: LlmRegistry,
@@ -158,12 +200,14 @@ export class Orchestrator {
     taskCategory: TaskCategory = "conversation",
     embeddingService?: EmbeddingService,
     n8nService?: N8nService,
+    sandboxService?: SandboxService,
   ) {
     this.registry = registry;
     this.db = db;
     this.taskCategory = taskCategory;
     this.embeddingService = embeddingService;
     this.n8nService = n8nService;
+    this.sandboxService = sandboxService;
   }
 
   async run(
@@ -205,11 +249,19 @@ export class Orchestrator {
 
     // Build tools array (all tools when DB available)
     const tools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
+      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
       : [SEARCH_WEB_TOOL];
 
     if (this.n8nService && this.db) {
       tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
+    }
+
+    if (this.sandboxService?.available) {
+      tools.push(EXECUTE_CODE_TOOL);
+    }
+
+    if (this.db) {
+      tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
     }
 
     try {
@@ -417,6 +469,87 @@ export class Orchestrator {
           description: w.description,
           inputSchema: w.inputSchema,
         }));
+      }
+      case "create_schedule": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as { cron_expression: string; action_prompt: string; description?: string };
+        try {
+          const { CronExpressionParser } = await import("cron-parser");
+          const interval = CronExpressionParser.parse(input.cron_expression);
+          const nextRunAt = interval.next().toDate();
+          const schedule = await createSchedule(this.db, {
+            cronExpression: input.cron_expression,
+            actionPrompt: input.action_prompt,
+            description: input.description,
+            userId,
+            enabled: true,
+            nextRunAt,
+          });
+          return {
+            scheduleId: schedule.id,
+            cronExpression: schedule.cronExpression,
+            nextRunAt: nextRunAt.toISOString(),
+            message: `Schedule created: ${input.description ?? input.action_prompt}`,
+          };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: `Invalid cron expression: ${msg}` };
+        }
+      }
+      case "list_schedules": {
+        if (!this.db) return { error: "Database not available" };
+        const allSchedules = await listSchedules(this.db, userId);
+        return allSchedules.map((s) => ({
+          id: s.id,
+          cronExpression: s.cronExpression,
+          actionPrompt: s.actionPrompt,
+          description: s.description,
+          enabled: s.enabled,
+          lastRunAt: s.lastRunAt,
+          nextRunAt: s.nextRunAt,
+        }));
+      }
+      case "delete_schedule": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as { schedule_id: string };
+        const deleted = await deleteSchedule(this.db, input.schedule_id);
+        if (!deleted) return { error: "Schedule not found" };
+        return { deleted: true, scheduleId: input.schedule_id };
+      }
+      case "execute_code": {
+        if (!this.sandboxService?.available) return { error: "Sandbox execution not available" };
+        const input = block.input as { code: string; language: string; timeout_ms?: number };
+        const timeoutMs = Math.min(input.timeout_ms ?? 30_000, 60_000);
+        const result = await this.sandboxService.execute({
+          code: input.code,
+          language: input.language as "typescript" | "javascript" | "python" | "bash",
+          timeoutMs,
+        });
+        // Persist execution result if DB is available
+        if (this.db) {
+          try {
+            const { hashCode } = await import("@ai-cofounder/sandbox");
+            await saveCodeExecution(this.db, {
+              language: input.language,
+              codeHash: hashCode(input.code),
+              stdout: result.stdout,
+              stderr: result.stderr,
+              exitCode: result.exitCode,
+              durationMs: result.durationMs,
+              timedOut: result.timedOut,
+            });
+          } catch (err) {
+            this.logger.warn({ err }, "failed to persist code execution result");
+          }
+        }
+        return {
+          stdout: result.stdout,
+          stderr: result.stderr,
+          exitCode: result.exitCode,
+          durationMs: result.durationMs,
+          timedOut: result.timedOut,
+          language: result.language,
+        };
       }
       default:
         return { error: `Unknown tool: ${block.name}` };

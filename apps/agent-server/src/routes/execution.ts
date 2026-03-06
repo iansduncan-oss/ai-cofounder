@@ -5,7 +5,7 @@ import { TaskDispatcher, type TaskProgressCallback } from "../agents/dispatcher.
 const logger = createLogger("execution-routes");
 
 export const executionRoutes: FastifyPluginAsync = async (app) => {
-  const dispatcher = new TaskDispatcher(app.llmRegistry, app.db, app.embeddingService);
+  const dispatcher = new TaskDispatcher(app.llmRegistry, app.db, app.embeddingService, app.sandboxService);
 
   // Execute all tasks for a goal
   app.post<{ Params: { id: string }; Body: { userId?: string; webhookUrl?: string } }>(
@@ -59,6 +59,40 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
           return reply.status(404).send({ error: err.message });
         }
         throw err;
+      }
+    },
+  );
+
+  // Stream execution progress via SSE
+  app.get<{ Params: { id: string }; Querystring: { userId?: string } }>(
+    "/:id/execute/stream",
+    async (request, reply) => {
+      const { id } = request.params;
+      const { userId } = request.query;
+
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      const send = (event: string, data: unknown) => {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      };
+
+      const onProgress: TaskProgressCallback = async (event) => {
+        send("progress", event);
+      };
+
+      try {
+        send("started", { goalId: id });
+        const result = await dispatcher.runGoal(id, userId, onProgress);
+        send("completed", result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        send("error", { error: message });
+      } finally {
+        reply.raw.end();
       }
     },
   );

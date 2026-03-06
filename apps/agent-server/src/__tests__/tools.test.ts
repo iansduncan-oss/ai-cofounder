@@ -26,6 +26,7 @@ const { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } = await import(
 const { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } = await import(
   "../agents/tools/n8n-tools.js"
 );
+const { EXECUTE_CODE_TOOL } = await import("../agents/tools/sandbox-tools.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -371,6 +372,51 @@ describe("LIST_N8N_WORKFLOWS_TOOL", () => {
   });
 });
 
+// ─── Sandbox Tool Definition ────────────────────────────────────────────────
+
+describe("EXECUTE_CODE_TOOL", () => {
+  it("has the correct name", () => {
+    expect(EXECUTE_CODE_TOOL.name).toBe("execute_code");
+  });
+
+  it("has a non-empty description", () => {
+    expect(EXECUTE_CODE_TOOL.description).toBeTruthy();
+    expect(EXECUTE_CODE_TOOL.description.length).toBeGreaterThan(20);
+  });
+
+  it("has type 'object' input_schema", () => {
+    expect(EXECUTE_CODE_TOOL.input_schema.type).toBe("object");
+  });
+
+  it("requires code and language", () => {
+    expect(EXECUTE_CODE_TOOL.input_schema.required).toEqual(
+      expect.arrayContaining(["code", "language"]),
+    );
+  });
+
+  it("defines code as a string property", () => {
+    const codeProp = EXECUTE_CODE_TOOL.input_schema.properties.code;
+    expect(codeProp).toBeDefined();
+    expect(codeProp.type).toBe("string");
+  });
+
+  it("defines language with valid enum values", () => {
+    const langProp = EXECUTE_CODE_TOOL.input_schema.properties.language;
+    expect(langProp).toBeDefined();
+    expect(langProp.type).toBe("string");
+    expect(langProp.enum).toEqual(
+      expect.arrayContaining(["typescript", "javascript", "python", "bash"]),
+    );
+  });
+
+  it("defines timeout_ms as optional number", () => {
+    const timeoutProp = EXECUTE_CODE_TOOL.input_schema.properties.timeout_ms;
+    expect(timeoutProp).toBeDefined();
+    expect(timeoutProp.type).toBe("number");
+    expect(EXECUTE_CODE_TOOL.input_schema.required).not.toContain("timeout_ms");
+  });
+});
+
 // ─── Cross-tool consistency ─────────────────────────────────────────────────
 
 describe("tool definitions consistency", () => {
@@ -380,6 +426,7 @@ describe("tool definitions consistency", () => {
     RECALL_MEMORIES_TOOL,
     TRIGGER_N8N_WORKFLOW_TOOL,
     LIST_N8N_WORKFLOWS_TOOL,
+    EXECUTE_CODE_TOOL,
   ];
 
   it("all tools have unique names", () => {

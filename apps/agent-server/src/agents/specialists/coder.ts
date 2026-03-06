@@ -1,17 +1,25 @@
 import type { LlmRegistry, LlmTool, LlmToolUseContent } from "@ai-cofounder/llm";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
+import { saveCodeExecution } from "@ai-cofounder/db";
+import type { SandboxService } from "@ai-cofounder/sandbox";
+import { hashCode } from "@ai-cofounder/sandbox";
 import { SpecialistAgent, type SpecialistContext } from "./base.js";
+import { EXECUTE_CODE_TOOL } from "../tools/sandbox-tools.js";
 
 export class CoderAgent extends SpecialistAgent {
   readonly role: AgentRole = "coder";
   readonly taskCategory = "code" as const;
 
-  constructor(registry: LlmRegistry, db?: Db) {
+  private sandboxService?: SandboxService;
+
+  constructor(registry: LlmRegistry, db?: Db, sandboxService?: SandboxService) {
     super("coder", registry, db);
+    this.sandboxService = sandboxService;
   }
 
   getSystemPrompt(context: SpecialistContext): string {
+    const hasExecute = this.sandboxService?.available;
     return `You are a coding specialist agent working on a larger goal: "${context.goalTitle}".
 
 Your job is to produce high-quality code, configurations, or technical documentation as specified by the task.
@@ -25,11 +33,11 @@ Guidelines:
 - Consider edge cases and security implications
 - If the task involves modifying existing code, clearly indicate what changes to make and where
 
-You have a review_code tool — use it to self-review your code before finalizing your output.`;
+You have a review_code tool — use it to self-review your code before finalizing your output.${hasExecute ? "\nYou have an execute_code tool — use it to test your code in a sandbox before delivering it." : ""}`;
   }
 
   getTools(): LlmTool[] {
-    return [
+    const tools: LlmTool[] = [
       {
         name: "review_code",
         description:
@@ -50,11 +58,17 @@ You have a review_code tool — use it to self-review your code before finalizin
         },
       },
     ];
+
+    if (this.sandboxService?.available) {
+      tools.push(EXECUTE_CODE_TOOL);
+    }
+
+    return tools;
   }
 
   protected override async executeTool(
     block: LlmToolUseContent,
-    _context: SpecialistContext,
+    context: SpecialistContext,
   ): Promise<unknown> {
     if (block.name === "review_code") {
       const { code, language } = block.input as { code: string; language: string };
@@ -78,6 +92,43 @@ You have a review_code tool — use it to self-review your code before finalizin
         .join("\n");
 
       return { review: text };
+    }
+
+    if (block.name === "execute_code") {
+      if (!this.sandboxService?.available) return { error: "Sandbox execution not available" };
+      const input = block.input as { code: string; language: string; timeout_ms?: number };
+      const timeoutMs = Math.min(input.timeout_ms ?? 30_000, 60_000);
+      const result = await this.sandboxService.execute({
+        code: input.code,
+        language: input.language as "typescript" | "javascript" | "python" | "bash",
+        timeoutMs,
+        taskId: context.taskId,
+      });
+      // Persist execution result
+      if (this.db) {
+        try {
+          await saveCodeExecution(this.db, {
+            taskId: context.taskId,
+            language: input.language,
+            codeHash: hashCode(input.code),
+            stdout: result.stdout,
+            stderr: result.stderr,
+            exitCode: result.exitCode,
+            durationMs: result.durationMs,
+            timedOut: result.timedOut,
+          });
+        } catch (err) {
+          this.logger.warn({ err }, "failed to persist code execution result");
+        }
+      }
+      return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+        durationMs: result.durationMs,
+        timedOut: result.timedOut,
+        language: result.language,
+      };
     }
 
     return { error: `Unknown tool: ${block.name}` };

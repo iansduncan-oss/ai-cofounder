@@ -11,6 +11,12 @@ import {
   memories,
   prompts,
   n8nWorkflows,
+  codeExecutions,
+  llmUsage,
+  schedules,
+  events,
+  workSessions,
+  milestones,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -314,6 +320,8 @@ export async function saveMemory(
     embedding?: number[];
   },
 ) {
+  const importance = computeImportance(data.category, data.content);
+
   // Upsert: if same userId + key exists, update
   const existing = await db
     .select()
@@ -328,6 +336,7 @@ export async function saveMemory(
         content: data.content,
         category: data.category,
         source: data.source,
+        importance,
         ...(data.embedding ? { embedding: data.embedding } : {}),
         updatedAt: new Date(),
       })
@@ -336,7 +345,7 @@ export async function saveMemory(
     return updated;
   }
 
-  const [created] = await db.insert(memories).values(data).returning();
+  const [created] = await db.insert(memories).values({ ...data, importance }).returning();
   return created;
 }
 
@@ -362,7 +371,7 @@ export async function recallMemories(
     .select()
     .from(memories)
     .where(and(...conditions))
-    .orderBy(desc(memories.updatedAt))
+    .orderBy(desc(memories.importance), desc(memories.updatedAt))
     .limit(limit);
 }
 
@@ -406,6 +415,63 @@ export async function listMemoriesByUser(db: Db, userId: string) {
 export async function deleteMemory(db: Db, id: string) {
   const [deleted] = await db.delete(memories).where(eq(memories.id, id)).returning();
   return deleted ?? null;
+}
+
+/** Compute importance score for a memory (0-100) based on category and content */
+export function computeImportance(category: string, content: string): number {
+  // Base score by category
+  const categoryScores: Record<string, number> = {
+    decisions: 80,
+    goals: 75,
+    projects: 70,
+    technical: 65,
+    business: 65,
+    preferences: 60,
+    user_info: 55,
+    other: 40,
+  };
+  let score = categoryScores[category] ?? 50;
+
+  // Boost for longer, more detailed content
+  if (content.length > 200) score += 10;
+  else if (content.length > 50) score += 5;
+
+  return Math.min(100, Math.max(0, score));
+}
+
+/** Record that a memory was accessed (for recall ranking) */
+export async function touchMemory(db: Db, id: string) {
+  const [updated] = await db
+    .update(memories)
+    .set({
+      accessCount: sql`${memories.accessCount} + 1`,
+      lastAccessedAt: new Date(),
+    })
+    .where(eq(memories.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+/** Decay importance of old, unused memories. Call periodically (e.g. daily). */
+export async function decayMemoryImportance(db: Db, userId: string, decayAmount = 2) {
+  // Only decay memories that haven't been accessed in 7+ days and have importance > 10
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  await db
+    .update(memories)
+    .set({
+      importance: sql`GREATEST(10, ${memories.importance} - ${decayAmount})`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(memories.userId, userId),
+        sql`${memories.importance} > 10`,
+        or(
+          sql`${memories.lastAccessedAt} < ${cutoff.toISOString()}`,
+          sql`${memories.lastAccessedAt} IS NULL`,
+        )!,
+      ),
+    );
 }
 
 /* ────────────────── Briefing Queries ─────────────────────── */
@@ -619,5 +685,386 @@ export async function findN8nWorkflowByEvent(db: Db, eventType: string) {
 
 export async function deleteN8nWorkflow(db: Db, id: string) {
   const [deleted] = await db.delete(n8nWorkflows).where(eq(n8nWorkflows.id, id)).returning();
+  return deleted ?? null;
+}
+
+/* ────────────────────── Code Executions ────────────────────── */
+
+export async function saveCodeExecution(
+  db: Db,
+  data: {
+    taskId?: string;
+    language: string;
+    codeHash: string;
+    stdout: string;
+    stderr: string;
+    exitCode: number;
+    durationMs: number;
+    timedOut?: boolean;
+  },
+) {
+  const [execution] = await db
+    .insert(codeExecutions)
+    .values({
+      taskId: data.taskId,
+      language: data.language,
+      codeHash: data.codeHash,
+      stdout: data.stdout,
+      stderr: data.stderr,
+      exitCode: data.exitCode,
+      durationMs: data.durationMs,
+      timedOut: data.timedOut ?? false,
+    })
+    .returning();
+  return execution;
+}
+
+export async function listCodeExecutionsByTask(db: Db, taskId: string) {
+  return db
+    .select()
+    .from(codeExecutions)
+    .where(eq(codeExecutions.taskId, taskId))
+    .orderBy(desc(codeExecutions.createdAt));
+}
+
+/* ────────────────── LLM Usage Tracking ─────────────────── */
+
+/** Per-model pricing in microdollars per token ($0.000001 = 1 microdollar) */
+const PRICING: Record<string, { input: number; output: number }> = {
+  // Anthropic
+  "claude-opus-4-20250901": { input: 15_000, output: 75_000 }, // $15/$75 per MTok
+  "claude-sonnet-4-20250514": { input: 3_000, output: 15_000 }, // $3/$15 per MTok
+  // Groq (free tier)
+  "llama-3.1-8b-instant": { input: 0, output: 0 },
+  "llama-3.3-70b-versatile": { input: 0, output: 0 },
+  // Gemini
+  "gemini-2.5-pro": { input: 1_250, output: 10_000 }, // $1.25/$10 per MTok
+  "gemini-2.5-flash": { input: 150, output: 600 }, // $0.15/$0.60 per MTok
+  // OpenRouter free models
+  "meta-llama/llama-3.3-70b-instruct:free": { input: 0, output: 0 },
+};
+
+function estimateCostMicros(model: string, inputTokens: number, outputTokens: number): number {
+  const price = PRICING[model];
+  if (!price) return 0;
+  // pricing is per million tokens, so divide by 1_000_000
+  return Math.round((inputTokens * price.input + outputTokens * price.output) / 1_000_000);
+}
+
+export async function recordLlmUsage(
+  db: Db,
+  data: {
+    provider: string;
+    model: string;
+    taskCategory: string;
+    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
+    inputTokens: number;
+    outputTokens: number;
+    goalId?: string;
+    taskId?: string;
+    conversationId?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const costMicros = estimateCostMicros(data.model, data.inputTokens, data.outputTokens);
+  const [record] = await db
+    .insert(llmUsage)
+    .values({
+      ...data,
+      estimatedCostUsd: costMicros,
+    })
+    .returning();
+  return record;
+}
+
+export interface UsageSummary {
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCostUsd: number; // in dollars
+  byProvider: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
+  byModel: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
+  byAgent: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
+  requestCount: number;
+}
+
+export async function getUsageSummary(
+  db: Db,
+  options?: { since?: Date; until?: Date },
+): Promise<UsageSummary> {
+  const conditions = [];
+  if (options?.since) {
+    conditions.push(sql`${llmUsage.createdAt} >= ${options.since.toISOString()}`);
+  }
+  if (options?.until) {
+    conditions.push(sql`${llmUsage.createdAt} < ${options.until.toISOString()}`);
+  }
+
+  const rows = await db
+    .select()
+    .from(llmUsage)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(llmUsage.createdAt));
+
+  const summary: UsageSummary = {
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCostUsd: 0,
+    byProvider: {},
+    byModel: {},
+    byAgent: {},
+    requestCount: rows.length,
+  };
+
+  for (const row of rows) {
+    const costUsd = (row.estimatedCostUsd ?? 0) / 1_000_000;
+    summary.totalInputTokens += row.inputTokens;
+    summary.totalOutputTokens += row.outputTokens;
+    summary.totalCostUsd += costUsd;
+
+    // By provider
+    const prov = summary.byProvider[row.provider] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    prov.inputTokens += row.inputTokens;
+    prov.outputTokens += row.outputTokens;
+    prov.costUsd += costUsd;
+    prov.requests++;
+
+    // By model
+    const mod = summary.byModel[row.model] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    mod.inputTokens += row.inputTokens;
+    mod.outputTokens += row.outputTokens;
+    mod.costUsd += costUsd;
+    mod.requests++;
+
+    // By agent
+    const agent = row.agentRole ?? "unknown";
+    const ag = summary.byAgent[agent] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    ag.inputTokens += row.inputTokens;
+    ag.outputTokens += row.outputTokens;
+    ag.costUsd += costUsd;
+    ag.requests++;
+  }
+
+  // Round dollar amounts
+  summary.totalCostUsd = Math.round(summary.totalCostUsd * 1_000_000) / 1_000_000;
+
+  return summary;
+}
+
+/* ────────────────────── Schedules ────────────────────── */
+
+export async function createSchedule(
+  db: Db,
+  data: {
+    userId?: string;
+    cronExpression: string;
+    actionPrompt: string;
+    description?: string;
+    enabled?: boolean;
+    nextRunAt?: Date;
+  },
+) {
+  const [schedule] = await db
+    .insert(schedules)
+    .values(data)
+    .returning();
+  return schedule;
+}
+
+export async function listSchedules(db: Db, userId?: string) {
+  if (userId) {
+    return db.select().from(schedules).where(eq(schedules.userId, userId)).orderBy(asc(schedules.createdAt));
+  }
+  return db.select().from(schedules).orderBy(asc(schedules.createdAt));
+}
+
+export async function listEnabledSchedules(db: Db) {
+  return db.select().from(schedules).where(eq(schedules.enabled, true)).orderBy(asc(schedules.nextRunAt));
+}
+
+export async function getSchedule(db: Db, id: string) {
+  const rows = await db.select().from(schedules).where(eq(schedules.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function updateScheduleLastRun(db: Db, id: string, lastRunAt: Date, nextRunAt: Date) {
+  const [updated] = await db
+    .update(schedules)
+    .set({ lastRunAt, nextRunAt, updatedAt: new Date() })
+    .where(eq(schedules.id, id))
+    .returning();
+  return updated;
+}
+
+export async function deleteSchedule(db: Db, id: string) {
+  const [deleted] = await db.delete(schedules).where(eq(schedules.id, id)).returning();
+  return deleted ?? null;
+}
+
+export async function toggleSchedule(db: Db, id: string, enabled: boolean) {
+  const [updated] = await db
+    .update(schedules)
+    .set({ enabled, updatedAt: new Date() })
+    .where(eq(schedules.id, id))
+    .returning();
+  return updated;
+}
+
+/* ────────────────────── Events ────────────────────── */
+
+export async function createEvent(
+  db: Db,
+  data: { source: string; type: string; payload: unknown },
+) {
+  const [event] = await db.insert(events).values(data).returning();
+  return event;
+}
+
+export async function markEventProcessed(db: Db, id: string, result?: string) {
+  const [updated] = await db
+    .update(events)
+    .set({ processed: true, result })
+    .where(eq(events.id, id))
+    .returning();
+  return updated;
+}
+
+export async function listUnprocessedEvents(db: Db, limit = 20) {
+  return db
+    .select()
+    .from(events)
+    .where(eq(events.processed, false))
+    .orderBy(asc(events.createdAt))
+    .limit(limit);
+}
+
+/* ────────────────────── Work Sessions ────────────────────── */
+
+export async function createWorkSession(
+  db: Db,
+  data: {
+    trigger: string;
+    scheduleId?: string;
+    eventId?: string;
+    context?: unknown;
+  },
+) {
+  const [session] = await db.insert(workSessions).values(data).returning();
+  return session;
+}
+
+export async function completeWorkSession(
+  db: Db,
+  id: string,
+  data: {
+    tokensUsed: number;
+    durationMs: number;
+    actionsTaken?: unknown;
+    status: string;
+    summary?: string;
+  },
+) {
+  const [updated] = await db
+    .update(workSessions)
+    .set({ ...data, completedAt: new Date() })
+    .where(eq(workSessions.id, id))
+    .returning();
+  return updated;
+}
+
+export async function listRecentWorkSessions(db: Db, limit = 10) {
+  return db
+    .select()
+    .from(workSessions)
+    .orderBy(desc(workSessions.createdAt))
+    .limit(limit);
+}
+
+/* ────────────────────── Milestones ──────────────────────── */
+
+type MilestoneStatus = "planned" | "in_progress" | "completed" | "cancelled";
+
+export async function createMilestone(
+  db: Db,
+  data: {
+    conversationId: string;
+    title: string;
+    description?: string;
+    orderIndex?: number;
+    dueDate?: Date;
+    createdBy?: string;
+  },
+) {
+  const [milestone] = await db
+    .insert(milestones)
+    .values({
+      conversationId: data.conversationId,
+      title: data.title,
+      description: data.description,
+      orderIndex: data.orderIndex ?? 0,
+      dueDate: data.dueDate,
+      createdBy: data.createdBy,
+    })
+    .returning();
+  return milestone;
+}
+
+export async function getMilestone(db: Db, id: string) {
+  const rows = await db.select().from(milestones).where(eq(milestones.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listMilestonesByConversation(db: Db, conversationId: string) {
+  return db
+    .select()
+    .from(milestones)
+    .where(eq(milestones.conversationId, conversationId))
+    .orderBy(asc(milestones.orderIndex));
+}
+
+export async function updateMilestoneStatus(db: Db, id: string, status: MilestoneStatus) {
+  const values: Record<string, unknown> = {
+    status,
+    updatedAt: new Date(),
+  };
+  if (status === "completed") values.completedAt = new Date();
+
+  const [updated] = await db.update(milestones).set(values).where(eq(milestones.id, id)).returning();
+  return updated ?? null;
+}
+
+export async function getMilestoneProgress(db: Db, milestoneId: string) {
+  const milestoneGoals = await db
+    .select()
+    .from(goals)
+    .where(eq(goals.milestoneId, milestoneId))
+    .orderBy(asc(goals.createdAt));
+
+  const total = milestoneGoals.length;
+  const completed = milestoneGoals.filter((g) => g.status === "completed").length;
+  const active = milestoneGoals.filter((g) => g.status === "active").length;
+
+  return {
+    total,
+    completed,
+    active,
+    pending: total - completed - active,
+    percentComplete: total > 0 ? Math.round((completed / total) * 100) : 0,
+    goals: milestoneGoals,
+  };
+}
+
+export async function assignGoalToMilestone(db: Db, goalId: string, milestoneId: string) {
+  const [updated] = await db
+    .update(goals)
+    .set({ milestoneId, updatedAt: new Date() })
+    .where(eq(goals.id, goalId))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deleteMilestone(db: Db, id: string) {
+  // Unlink goals first
+  await db.update(goals).set({ milestoneId: null }).where(eq(goals.milestoneId, id));
+  const [deleted] = await db.delete(milestones).where(eq(milestones.id, id)).returning();
   return deleted ?? null;
 }

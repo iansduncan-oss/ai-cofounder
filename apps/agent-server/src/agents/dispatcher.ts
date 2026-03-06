@@ -1,4 +1,5 @@
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
+import type { SandboxService } from "@ai-cofounder/sandbox";
 import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
@@ -11,6 +12,8 @@ import {
   failTask,
   updateGoalStatus,
   listPendingApprovals,
+  recordLlmUsage,
+  saveMemory,
 } from "@ai-cofounder/db";
 import type { SpecialistAgent, SpecialistContext } from "./specialists/base.js";
 import { ResearcherAgent } from "./specialists/researcher.js";
@@ -54,10 +57,11 @@ export class TaskDispatcher {
     private registry: LlmRegistry,
     private db: Db,
     embeddingService?: EmbeddingService,
+    sandboxService?: SandboxService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
-      ["coder", new CoderAgent(registry, db)],
+      ["coder", new CoderAgent(registry, db, sandboxService)],
       ["reviewer", new ReviewerAgent(registry, db)],
       ["planner", new PlannerAgent(registry, db)],
     ]);
@@ -164,6 +168,23 @@ export class TaskDispatcher {
         const result = await specialist.execute(context);
 
         await completeTask(this.db, task.id, result.output);
+
+        // Record LLM usage for cost tracking
+        try {
+          await recordLlmUsage(this.db, {
+            provider: result.provider,
+            model: result.model,
+            taskCategory: specialist.taskCategory,
+            agentRole: agentRole as "researcher" | "coder" | "reviewer" | "planner",
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            goalId,
+            taskId: task.id,
+          });
+        } catch {
+          /* usage tracking failures are non-fatal */
+        }
+
         previousOutputs.push(result.output);
         completedCount++;
 
@@ -264,6 +285,13 @@ export class TaskDispatcher {
       "goal execution finished",
     );
 
+    // Post-execution self-improvement: analyze and store learnings
+    if (userId) {
+      this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId).catch((err) => {
+        this.logger.warn({ err, goalId }, "self-improvement analysis failed (non-fatal)");
+      });
+    }
+
     return {
       goalId,
       goalTitle: goal.title,
@@ -272,6 +300,61 @@ export class TaskDispatcher {
       completedTasks: completedCount,
       tasks: taskResults,
     };
+  }
+
+  /** Analyze execution results and store learnings as memories */
+  private async analyzeExecution(
+    goalId: string,
+    goalTitle: string,
+    status: string,
+    taskResults: DispatcherProgress["tasks"],
+    userId: string,
+  ): Promise<void> {
+    const failed = taskResults.filter((t) => t.status === "failed");
+    const succeeded = taskResults.filter((t) => t.status === "completed");
+
+    // Only store learnings when there's something notable
+    if (failed.length === 0 && succeeded.length <= 1) return;
+
+    const parts: string[] = [`Goal "${goalTitle}" ${status}.`];
+    parts.push(`${succeeded.length}/${taskResults.length} tasks succeeded.`);
+
+    if (failed.length > 0) {
+      const failSummary = failed
+        .map((t) => `- ${t.title} (${t.agent}): ${(t.output ?? "unknown error").slice(0, 100)}`)
+        .join("\n");
+      parts.push(`Failed tasks:\n${failSummary}`);
+    }
+
+    // Identify which agent roles performed well or poorly
+    const roleStats = new Map<string, { success: number; fail: number }>();
+    for (const t of taskResults) {
+      const stats = roleStats.get(t.agent) ?? { success: 0, fail: 0 };
+      if (t.status === "completed") stats.success++;
+      else if (t.status === "failed") stats.fail++;
+      roleStats.set(t.agent, stats);
+    }
+
+    const roleInsights = Array.from(roleStats.entries())
+      .filter(([, s]) => s.fail > 0)
+      .map(([role, s]) => `${role}: ${s.success} ok, ${s.fail} failed`);
+
+    if (roleInsights.length > 0) {
+      parts.push(`Agent performance: ${roleInsights.join("; ")}`);
+    }
+
+    const content = parts.join(" ");
+    const key = `execution-${goalId.slice(0, 8)}-${Date.now()}`;
+
+    await saveMemory(this.db, {
+      userId,
+      category: "technical",
+      key,
+      content,
+      source: `goal-execution:${goalId}`,
+    });
+
+    this.logger.info({ goalId, key }, "execution analysis saved as memory");
   }
 
   /** Get current progress for a goal */

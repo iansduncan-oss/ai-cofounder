@@ -25,6 +25,10 @@ async function main() {
   }
 
   const { app, logger } = buildServer();
+
+  // Initialize sandbox service (checks Docker availability)
+  await app.sandboxService.init();
+
   const port = parseInt(optionalEnv("PORT", "3100"), 10);
   const host = optionalEnv("HOST", "0.0.0.0");
 
@@ -32,7 +36,7 @@ async function main() {
   logger.info({ port, host }, "agent-server started");
 
   // Start background scheduler for proactive follow-ups
-  const scheduler = startScheduler(app.db, app.llmRegistry);
+  const scheduler = startScheduler(app.db, app.llmRegistry, app.embeddingService, app.sandboxService);
 
   // Graceful shutdown
   const shutdown = async () => {

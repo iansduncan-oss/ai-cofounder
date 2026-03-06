@@ -7,6 +7,7 @@ import {
   createConversation,
   getConversationMessages,
   createMessage,
+  recordLlmUsage,
 } from "@ai-cofounder/db";
 
 const RunBody = Type.Object({
@@ -35,6 +36,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     "conversation",
     app.embeddingService,
     app.n8nService,
+    app.sandboxService,
   );
 
   app.post<{ Body: RunBody }>("/run", { schema: { body: RunBody } }, async (request, _reply) => {
@@ -93,6 +95,23 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           ? { usage: result.usage, model: result.model, provider: result.provider }
           : undefined,
       });
+    }
+
+    // Record LLM usage for cost tracking
+    if (result.usage && result.model) {
+      try {
+        await recordLlmUsage(app.db, {
+          provider: result.provider ?? "unknown",
+          model: result.model,
+          taskCategory: "conversation",
+          agentRole: "orchestrator",
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          conversationId: result.conversationId,
+        });
+      } catch {
+        /* usage tracking failures are non-fatal */
+      }
     }
 
     return result;

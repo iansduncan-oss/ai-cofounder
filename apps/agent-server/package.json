@@ -12,11 +12,13 @@
   "dependencies": {
     "@ai-cofounder/db": "*",
     "@ai-cofounder/llm": "*",
+    "@ai-cofounder/sandbox": "*",
     "@ai-cofounder/shared": "*",
-    "drizzle-orm": "^0.45.1",
     "@fastify/cors": "^11.2.0",
     "@fastify/static": "^9.0.0",
     "@sinclair/typebox": "^0.34.48",
+    "cron-parser": "^5.5.0",
+    "drizzle-orm": "^0.45.1",
     "fastify": "^5.7.4",
     "fastify-plugin": "^5.1.0",
     "prom-client": "^15.1.3"

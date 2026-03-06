@@ -5,12 +5,18 @@ import {
   listRecentlyCompletedGoals,
   countTasksByStatus,
   listPendingApprovals,
+  listEnabledSchedules,
+  updateScheduleLastRun,
 } from "@ai-cofounder/db";
-import type { LlmRegistry } from "@ai-cofounder/llm";
+import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
+import type { SandboxService } from "@ai-cofounder/sandbox";
+import { CronExpressionParser } from "cron-parser";
+import { runAutonomousSession } from "./autonomous-session.js";
 
 const logger = createLogger("scheduler");
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const SCHEDULE_CHECK_INTERVAL_MS = 60 * 1000; // 1 minute
 const STALE_THRESHOLD_HOURS = 24;
 
 interface SchedulerConfig {
@@ -21,6 +27,8 @@ interface SchedulerConfig {
   briefingHour: number;
   /** Timezone offset string like "America/New_York", used for display only */
   timezone: string;
+  embeddingService?: EmbeddingService;
+  sandboxService?: SandboxService;
 }
 
 /* ── Discord webhook helpers ── */
@@ -275,13 +283,70 @@ async function runGoalCheckIn(config: SchedulerConfig): Promise<void> {
   }
 }
 
+/* ── Schedule evaluation ── */
+
+async function runScheduleCheck(config: SchedulerConfig): Promise<void> {
+  const now = new Date();
+  let enabledSchedules;
+  try {
+    enabledSchedules = await listEnabledSchedules(config.db);
+  } catch (err) {
+    logger.error({ err }, "failed to list enabled schedules");
+    return;
+  }
+
+  for (const schedule of enabledSchedules) {
+    // Check if this schedule is due
+    if (schedule.nextRunAt && schedule.nextRunAt > now) {
+      continue;
+    }
+
+    logger.info(
+      { scheduleId: schedule.id, cron: schedule.cronExpression },
+      "schedule due, triggering autonomous session",
+    );
+
+    try {
+      // Calculate next run time
+      const interval = CronExpressionParser.parse(schedule.cronExpression);
+      const nextRunAt = interval.next().toDate();
+
+      // Update last/next run immediately to prevent duplicate triggers
+      await updateScheduleLastRun(config.db, schedule.id, now, nextRunAt);
+
+      // Run the autonomous session (fire-and-forget to not block other schedules)
+      runAutonomousSession(
+        config.db,
+        config.registry,
+        config.embeddingService,
+        config.sandboxService,
+        {
+          trigger: "schedule",
+          scheduleId: schedule.id,
+          prompt: schedule.actionPrompt,
+          webhookUrl: config.webhookUrl,
+        },
+      ).catch((err) => {
+        logger.error({ err, scheduleId: schedule.id }, "scheduled session failed");
+      });
+    } catch (err) {
+      logger.error({ err, scheduleId: schedule.id }, "failed to process schedule");
+    }
+  }
+}
+
 /* ── Entry point ── */
 
 export interface SchedulerHandle {
   stop(): void;
 }
 
-export function startScheduler(db: Db, registry: LlmRegistry): SchedulerHandle | undefined {
+export function startScheduler(
+  db: Db,
+  registry: LlmRegistry,
+  embeddingService?: EmbeddingService,
+  sandboxService?: SandboxService,
+): SchedulerHandle | undefined {
   const webhookUrl = optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
   if (!webhookUrl) {
     logger.info("DISCORD_FOLLOWUP_WEBHOOK_URL not set, scheduler disabled");
@@ -291,7 +356,15 @@ export function startScheduler(db: Db, registry: LlmRegistry): SchedulerHandle |
   const briefingHour = parseInt(optionalEnv("BRIEFING_HOUR", "9"), 10);
   const timezone = optionalEnv("BRIEFING_TIMEZONE", "UTC");
 
-  const config: SchedulerConfig = { db, registry, webhookUrl, briefingHour, timezone };
+  const config: SchedulerConfig = {
+    db,
+    registry,
+    webhookUrl,
+    briefingHour,
+    timezone,
+    embeddingService,
+    sandboxService,
+  };
 
   logger.info(
     { briefingHour, timezone, checkIntervalMs: CHECK_INTERVAL_MS },
@@ -312,14 +385,29 @@ export function startScheduler(db: Db, registry: LlmRegistry): SchedulerHandle |
     }
   };
 
+  // Schedule evaluation loop (every minute)
+  const scheduleCheck = async () => {
+    try {
+      await runScheduleCheck(config);
+    } catch (err) {
+      logger.error({ err }, "schedule check failed");
+    }
+  };
+
   // First check after 1 minute (let server warm up)
   const delayTimer = setTimeout(check, 60 * 1000);
   const intervalTimer = setInterval(check, CHECK_INTERVAL_MS);
+
+  // Schedule check starts after 30s, runs every minute
+  const scheduleDelayTimer = setTimeout(scheduleCheck, 30 * 1000);
+  const scheduleIntervalTimer = setInterval(scheduleCheck, SCHEDULE_CHECK_INTERVAL_MS);
 
   return {
     stop() {
       clearTimeout(delayTimer);
       clearInterval(intervalTimer);
+      clearTimeout(scheduleDelayTimer);
+      clearInterval(scheduleIntervalTimer);
       logger.info("scheduler stopped");
     },
   };

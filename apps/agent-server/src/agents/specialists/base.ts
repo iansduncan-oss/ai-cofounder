@@ -11,6 +11,7 @@ import type {
 import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
+import { trace, SpanStatusCode } from "@opentelemetry/api";
 
 export interface SpecialistContext {
   taskId: string;
@@ -48,6 +49,24 @@ export abstract class SpecialistAgent {
   abstract getTools(): LlmTool[];
 
   async execute(context: SpecialistContext): Promise<SpecialistResult> {
+    const tracer = trace.getTracer("ai-cofounder");
+    return tracer.startActiveSpan(`specialist.${this.role}`, async (span) => {
+      span.setAttribute("agent.role", this.role);
+      span.setAttribute("task.id", context.taskId);
+      span.setAttribute("task.title", context.taskTitle);
+
+      try {
+        return await this._executeInner(context);
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  private async _executeInner(context: SpecialistContext): Promise<SpecialistResult> {
     this.logger.info(
       { taskId: context.taskId, taskTitle: context.taskTitle },
       "specialist execution started",
@@ -148,6 +167,28 @@ export abstract class SpecialistAgent {
 
   /** Call registry.complete with a single retry on transient failures. */
   protected async completeWithRetry(
+    ...args: Parameters<LlmRegistry["complete"]>
+  ): ReturnType<LlmRegistry["complete"]> {
+    const tracer = trace.getTracer("ai-cofounder");
+    return tracer.startActiveSpan(`llm.complete.${args[0]}`, async (span) => {
+      span.setAttribute("llm.task_category", args[0]);
+      try {
+        const result = await this._completeWithRetryInner(...args);
+        span.setAttribute("llm.model", result.model);
+        span.setAttribute("llm.provider", result.provider);
+        span.setAttribute("llm.input_tokens", result.usage.inputTokens);
+        span.setAttribute("llm.output_tokens", result.usage.outputTokens);
+        return result;
+      } catch (err) {
+        span.setStatus({ code: SpanStatusCode.ERROR, message: String(err) });
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  private async _completeWithRetryInner(
     ...args: Parameters<LlmRegistry["complete"]>
   ): ReturnType<LlmRegistry["complete"]> {
     try {

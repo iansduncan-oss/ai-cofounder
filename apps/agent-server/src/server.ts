@@ -27,7 +27,12 @@ import { executionRoutes } from "./routes/execution.js";
 import { userRoutes } from "./routes/users.js";
 import { promptRoutes } from "./routes/prompts.js";
 import { n8nRoutes } from "./routes/n8n.js";
+import { usageRoutes } from "./routes/usage.js";
+import { eventRoutes } from "./routes/events.js";
+import { scheduleRoutes } from "./routes/schedules.js";
+import { webhookRoutes } from "./routes/webhooks.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
+import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox";
 
 /** Create and configure the LLM registry with all available providers */
 export function createLlmRegistry(): LlmRegistry {
@@ -84,6 +89,10 @@ export function buildServer(registry?: LlmRegistry) {
   const n8nService = createN8nService();
   app.decorate("n8nService", n8nService);
 
+  // Create sandbox service for code execution
+  const sandboxService = createSandboxService();
+  app.decorate("sandboxService", sandboxService);
+
   // Global error handler — normalize all error responses
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
@@ -108,6 +117,10 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(promptRoutes, { prefix: "/api/prompts" });
   app.register(n8nRoutes, { prefix: "/api/n8n" });
   app.register(executionRoutes, { prefix: "/api/goals" });
+  app.register(usageRoutes, { prefix: "/api/usage" });
+  app.register(eventRoutes, { prefix: "/api/events" });
+  app.register(scheduleRoutes, { prefix: "/api/schedules" });
+  app.register(webhookRoutes, { prefix: "/api/webhooks" });
 
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
@@ -139,5 +152,6 @@ declare module "fastify" {
     llmRegistry: LlmRegistry;
     embeddingService?: EmbeddingService;
     n8nService: N8nService;
+    sandboxService: SandboxService;
   }
 }

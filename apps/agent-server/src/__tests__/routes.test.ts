@@ -668,4 +668,53 @@ describe("Execution routes", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().status).toBe("no_tasks");
   });
+
+  it("POST /api/goals/:id/execute — executes tasks and returns completed", async () => {
+    mockGetGoal.mockResolvedValue({ id: UUID, title: "Build Feature", status: "draft" });
+    mockListTasksByGoal.mockResolvedValueOnce([
+      { id: "t-1", title: "Research", assignedAgent: "researcher", description: "Research stuff", orderIndex: 0, status: "pending" },
+    ]);
+    mockListPendingApprovals.mockResolvedValue([]);
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/goals/${UUID}/execute`,
+      payload: {},
+      headers,
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.goalTitle).toBe("Build Feature");
+    expect(body.totalTasks).toBe(1);
+    expect(body.tasks).toHaveLength(1);
+    expect(body.tasks[0].agent).toBe("researcher");
+  });
+
+  it("GET /api/goals/:id/progress — returns progress for existing goal", async () => {
+    mockGetGoal.mockResolvedValueOnce({ id: UUID, title: "Build Feature", status: "active" });
+    mockListTasksByGoal.mockResolvedValueOnce([
+      { id: "t-1", title: "Research", assignedAgent: "researcher", status: "completed", output: "Done" },
+      { id: "t-2", title: "Code", assignedAgent: "coder", status: "running", output: null },
+    ]);
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/goals/${UUID}/progress`,
+      headers,
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.goalTitle).toBe("Build Feature");
+    expect(body.totalTasks).toBe(2);
+    expect(body.completedTasks).toBe(1);
+    expect(body.currentTask).toBeDefined();
+    expect(body.currentTask.title).toBe("Code");
+    expect(body.tasks).toHaveLength(2);
+  });
 });
