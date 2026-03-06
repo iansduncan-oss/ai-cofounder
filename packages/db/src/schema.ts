@@ -193,7 +193,7 @@ export const prompts = pgTable("prompts", {
   name: text("name").notNull(),
   version: integer("version").notNull().default(1),
   content: text("content").notNull(),
-  isActive: integer("is_active").notNull().default(1), // 1 = active, 0 = inactive
+  isActive: boolean("is_active").notNull().default(true),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -240,9 +240,9 @@ export const llmUsage = pgTable("llm_usage", {
   inputTokens: integer("input_tokens").notNull(),
   outputTokens: integer("output_tokens").notNull(),
   estimatedCostUsd: integer("estimated_cost_usd_micros").notNull().default(0), // cost in microdollars ($0.000001)
-  goalId: uuid("goal_id"),
-  taskId: uuid("task_id"),
-  conversationId: uuid("conversation_id"),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

@@ -50,6 +50,20 @@
       "when": 1772772400000,
       "tag": "0009_add_milestones",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772776000000,
+      "tag": "0010_add_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772777000000,
+      "tag": "0011_add_constraints",
+      "breakpoints": true
     }
   ]
 }

@@ -64,20 +64,15 @@ export async function upsertChannelConversation(
   conversationId: string,
   platform = "discord",
 ) {
-  const existing = await getChannelConversation(db, channelId);
-  if (existing) {
-    const [updated] = await db
-      .update(channelConversations)
-      .set({ conversationId, updatedAt: new Date() })
-      .where(eq(channelConversations.channelId, channelId))
-      .returning();
-    return updated;
-  }
-  const [created] = await db
+  const [result] = await db
     .insert(channelConversations)
     .values({ channelId, conversationId, platform })
+    .onConflictDoUpdate({
+      target: channelConversations.channelId,
+      set: { conversationId, updatedAt: new Date() },
+    })
     .returning();
-  return created;
+  return result;
 }
 
 export async function deleteChannelConversation(db: Db, channelId: string) {
@@ -132,6 +127,7 @@ export async function createGoal(
     priority?: "low" | "medium" | "high" | "critical";
     createdBy?: string;
     metadata?: Record<string, unknown>;
+    milestoneId?: string;
   },
 ) {
   const [goal] = await db.insert(goals).values(data).returning();
@@ -474,6 +470,26 @@ export async function decayMemoryImportance(db: Db, userId: string, decayAmount 
     );
 }
 
+/** Decay importance of all old, unused memories across all users. Call periodically (e.g. daily). */
+export async function decayAllMemoryImportance(db: Db, decayAmount = 2) {
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  await db
+    .update(memories)
+    .set({
+      importance: sql`GREATEST(10, ${memories.importance} - ${decayAmount})`,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        sql`${memories.importance} > 10`,
+        or(
+          sql`${memories.lastAccessedAt} < ${cutoff.toISOString()}`,
+          sql`${memories.lastAccessedAt} IS NULL`,
+        )!,
+      ),
+    );
+}
+
 /* ────────────────── Briefing Queries ─────────────────────── */
 
 export interface GoalSummary {
@@ -496,24 +512,16 @@ export async function listActiveGoals(db: Db): Promise<GoalSummary[]> {
       priority: goals.priority,
       createdAt: goals.createdAt,
       updatedAt: goals.updatedAt,
+      taskCount: sql<number>`count(${tasks.id})::int`.as("task_count"),
+      completedTaskCount: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`.as("completed_task_count"),
     })
     .from(goals)
+    .leftJoin(tasks, eq(tasks.goalId, goals.id))
     .where(eq(goals.status, "active"))
+    .groupBy(goals.id)
     .orderBy(desc(goals.updatedAt));
 
-  const result: GoalSummary[] = [];
-  for (const goal of rows) {
-    const goalTasks = await db
-      .select({ status: tasks.status })
-      .from(tasks)
-      .where(eq(tasks.goalId, goal.id));
-    result.push({
-      ...goal,
-      taskCount: goalTasks.length,
-      completedTaskCount: goalTasks.filter((t) => t.status === "completed").length,
-    });
-  }
-  return result;
+  return rows;
 }
 
 export async function listRecentlyCompletedGoals(db: Db, since: Date) {
@@ -553,7 +561,7 @@ export async function getActivePrompt(db: Db, name: string) {
   const rows = await db
     .select()
     .from(prompts)
-    .where(and(eq(prompts.name, name), eq(prompts.isActive, 1)))
+    .where(and(eq(prompts.name, name), eq(prompts.isActive, true)))
     .orderBy(desc(prompts.version))
     .limit(1);
   return rows[0] ?? null;
@@ -587,7 +595,7 @@ export async function createPromptVersion(
   const nextVersion = existing.length > 0 ? existing[0].version + 1 : 1;
 
   // Deactivate previous versions
-  await db.update(prompts).set({ isActive: 0 }).where(eq(prompts.name, data.name));
+  await db.update(prompts).set({ isActive: false }).where(eq(prompts.name, data.name));
 
   // Insert new active version
   const [created] = await db
@@ -596,7 +604,7 @@ export async function createPromptVersion(
       name: data.name,
       version: nextVersion,
       content: data.content,
-      isActive: 1,
+      isActive: true,
       metadata: data.metadata,
     })
     .returning();
@@ -785,6 +793,18 @@ export interface UsageSummary {
   byModel: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
   byAgent: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
   requestCount: number;
+}
+
+export async function getTodayTokenTotal(db: Db): Promise<number> {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const rows = await db
+    .select({
+      total: sql<number>`coalesce(sum(${llmUsage.inputTokens} + ${llmUsage.outputTokens}), 0)::int`,
+    })
+    .from(llmUsage)
+    .where(sql`${llmUsage.createdAt} >= ${todayStart.toISOString()}`);
+  return rows[0]?.total ?? 0;
 }
 
 export async function getUsageSummary(

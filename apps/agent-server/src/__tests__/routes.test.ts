@@ -548,7 +548,7 @@ describe("Prompt routes", () => {
       name: "system",
       version: 2,
       content: "You are an AI cofounder",
-      isActive: 1,
+      isActive: true,
     });
 
     const { app } = buildServer();
@@ -599,7 +599,7 @@ describe("Prompt routes", () => {
       name: "system",
       version: 3,
       content: "new prompt",
-      isActive: 1,
+      isActive: true,
     });
 
     const { app } = buildServer();

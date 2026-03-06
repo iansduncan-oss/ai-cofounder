@@ -412,31 +412,22 @@ describe("Channel Conversations", () => {
       expect(db.insert).toHaveBeenCalled();
     });
 
-    it("updates existing channel conversation", async () => {
+    it("updates existing channel conversation via upsert", async () => {
       const updatedConv = { ...fakeChannelConv, conversationId: "conv-2" };
-      const selectProxy = new Proxy({} as Record<string, unknown>, {
-        get(_, prop) {
-          if (prop === "then") {
-            return (resolve: (v: unknown) => void) => resolve([fakeChannelConv]);
-          }
-          return vi.fn().mockReturnValue(selectProxy);
-        },
-      });
-      const updateProxy = new Proxy({} as Record<string, unknown>, {
+      const insertProxy = new Proxy({} as Record<string, unknown>, {
         get(_, prop) {
           if (prop === "then") {
             return (resolve: (v: unknown) => void) => resolve([updatedConv]);
           }
-          return vi.fn().mockReturnValue(updateProxy);
+          return vi.fn().mockReturnValue(insertProxy);
         },
       });
 
-      (db.select as ReturnType<typeof vi.fn>).mockReturnValue(selectProxy);
-      (db.update as ReturnType<typeof vi.fn>).mockReturnValue(updateProxy);
+      (db.insert as ReturnType<typeof vi.fn>).mockReturnValue(insertProxy);
 
       const result = await upsertChannelConversation(db, "ch-123", "conv-2");
       expect(result).toEqual(updatedConv);
-      expect(db.update).toHaveBeenCalled();
+      expect(db.insert).toHaveBeenCalled();
     });
 
     it("defaults platform to discord", async () => {
@@ -672,31 +663,19 @@ describe("Goals", () => {
 
   describe("listActiveGoals", () => {
     it("returns active goals with task counts", async () => {
-      // First call: select active goals; subsequent calls: select tasks per goal
-      const activeGoal = { ...fakeGoal, status: "active" as const };
-      const goalTasks = [
-        { status: "completed" },
-        { status: "running" },
-        { status: "pending" },
-      ];
+      // Single JOIN+GROUP BY query returns pre-aggregated results
+      const joinResult = [{
+        id: "goal-1",
+        title: "Test Goal",
+        status: "active" as const,
+        priority: "medium" as const,
+        createdAt: NOW,
+        updatedAt: NOW,
+        taskCount: 3,
+        completedTaskCount: 1,
+      }];
 
-      let callIndex = 0;
-      const makeProxy = (data: unknown) =>
-        new Proxy({} as Record<string, unknown>, {
-          get(_, prop) {
-            if (prop === "then") {
-              return (resolve: (v: unknown) => void) => resolve(data);
-            }
-            return vi.fn().mockReturnValue(makeProxy(data));
-          },
-        });
-
-      // First select returns active goals, second returns tasks
-      (db.select as ReturnType<typeof vi.fn>).mockImplementation(() => {
-        callIndex++;
-        if (callIndex === 1) return makeProxy([activeGoal]);
-        return makeProxy(goalTasks);
-      });
+      setMockResult(joinResult);
 
       const result = await listActiveGoals(db);
       expect(result).toHaveLength(1);

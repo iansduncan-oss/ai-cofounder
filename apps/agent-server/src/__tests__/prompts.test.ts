@@ -110,7 +110,7 @@ describe("buildSystemPrompt", () => {
     it("uses DB content when available for core_personality", async () => {
       mockGetActivePrompt.mockImplementation(async (_db: any, name: string) => {
         if (name === "core_personality") {
-          return { content: "Custom core personality from DB.", version: 2, isActive: 1 };
+          return { content: "Custom core personality from DB.", version: 2, isActive: true };
         }
         return null;
       });
@@ -125,7 +125,7 @@ describe("buildSystemPrompt", () => {
     it("uses DB content when available for capabilities", async () => {
       mockGetActivePrompt.mockImplementation(async (_db: any, name: string) => {
         if (name === "capabilities") {
-          return { content: "## Custom Capabilities\n- Do everything", version: 1, isActive: 1 };
+          return { content: "## Custom Capabilities\n- Do everything", version: 1, isActive: true };
         }
         return null;
       });
@@ -141,7 +141,7 @@ describe("buildSystemPrompt", () => {
     it("uses DB content when available for behavioral_guidelines", async () => {
       mockGetActivePrompt.mockImplementation(async (_db: any, name: string) => {
         if (name === "behavioral_guidelines") {
-          return { content: "## Custom Guidelines\n- Be nice", version: 3, isActive: 1 };
+          return { content: "## Custom Guidelines\n- Be nice", version: 3, isActive: true };
         }
         return null;
       });
@@ -161,7 +161,7 @@ describe("buildSystemPrompt", () => {
           capabilities: "DB Capabilities.",
           behavioral_guidelines: "DB Guidelines.",
         };
-        return map[name] ? { content: map[name], version: 1, isActive: 1 } : null;
+        return map[name] ? { content: map[name], version: 1, isActive: true } : null;
       });
 
       const prompt = await buildSystemPrompt(undefined, mockDb);
@@ -188,7 +188,7 @@ describe("buildSystemPrompt", () => {
     it("combines DB prompts with memory context", async () => {
       mockGetActivePrompt.mockImplementation(async (_db: any, name: string) => {
         if (name === "core_personality") {
-          return { content: "DB personality override.", version: 1, isActive: 1 };
+          return { content: "DB personality override.", version: 1, isActive: true };
         }
         return null;
       });
@@ -218,7 +218,7 @@ describe("buildSystemPrompt", () => {
           capabilities: "Caps section.",
           behavioral_guidelines: "Guide section.",
         };
-        return map[name] ? { content: map[name], version: 1, isActive: 1 } : null;
+        return map[name] ? { content: map[name], version: 1, isActive: true } : null;
       });
 
       const prompt = await buildSystemPrompt("memory data", mockDb);
