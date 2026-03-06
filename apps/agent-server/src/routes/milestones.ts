@@ -12,8 +12,8 @@ import {
 
 const CreateMilestoneBody = Type.Object({
   conversationId: Type.String({ format: "uuid" }),
-  title: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
+  title: Type.String({ minLength: 1, maxLength: 200 }),
+  description: Type.Optional(Type.String({ maxLength: 4000 })),
   orderIndex: Type.Optional(Type.Number()),
   dueDate: Type.Optional(Type.String({ format: "date-time" })),
   createdBy: Type.Optional(Type.String({ format: "uuid" })),
@@ -35,7 +35,7 @@ const AssignGoalBody = Type.Object({
 export const milestoneRoutes: FastifyPluginAsync = async (app) => {
   app.post<{ Body: typeof CreateMilestoneBody.static }>(
     "/",
-    { schema: { body: CreateMilestoneBody } },
+    { schema: { tags: ["milestones"], body: CreateMilestoneBody } },
     async (request, reply) => {
       const data = {
         ...request.body,
@@ -46,7 +46,7 @@ export const milestoneRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.get<{ Params: { id: string } }>("/:id", async (request, reply) => {
+  app.get<{ Params: { id: string } }>("/:id", { schema: { tags: ["milestones"] } }, async (request, reply) => {
     const milestone = await getMilestone(app.db, request.params.id);
     if (!milestone) return reply.status(404).send({ error: "Milestone not found" });
     return milestone;
@@ -54,6 +54,7 @@ export const milestoneRoutes: FastifyPluginAsync = async (app) => {
 
   app.get<{ Params: { conversationId: string } }>(
     "/conversation/:conversationId",
+    { schema: { tags: ["milestones"] } },
     async (request) => {
       return listMilestonesByConversation(app.db, request.params.conversationId);
     },
@@ -61,7 +62,7 @@ export const milestoneRoutes: FastifyPluginAsync = async (app) => {
 
   app.patch<{ Params: { id: string }; Body: typeof StatusBody.static }>(
     "/:id/status",
-    { schema: { body: StatusBody } },
+    { schema: { tags: ["milestones"], body: StatusBody } },
     async (request, reply) => {
       const updated = await updateMilestoneStatus(app.db, request.params.id, request.body.status);
       if (!updated) return reply.status(404).send({ error: "Milestone not found" });
@@ -69,13 +70,13 @@ export const milestoneRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.get<{ Params: { id: string } }>("/:id/progress", async (request) => {
+  app.get<{ Params: { id: string } }>("/:id/progress", { schema: { tags: ["milestones"] } }, async (request) => {
     return getMilestoneProgress(app.db, request.params.id);
   });
 
   app.post<{ Params: { id: string }; Body: typeof AssignGoalBody.static }>(
     "/:id/goals",
-    { schema: { body: AssignGoalBody } },
+    { schema: { tags: ["milestones"], body: AssignGoalBody } },
     async (request, reply) => {
       const updated = await assignGoalToMilestone(app.db, request.body.goalId, request.params.id);
       if (!updated) return reply.status(404).send({ error: "Goal not found" });
@@ -83,7 +84,7 @@ export const milestoneRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  app.delete<{ Params: { id: string } }>("/:id", async (request, reply) => {
+  app.delete<{ Params: { id: string } }>("/:id", { schema: { tags: ["milestones"] } }, async (request, reply) => {
     const deleted = await deleteMilestone(app.db, request.params.id);
     if (!deleted) return reply.status(404).send({ error: "Milestone not found" });
     return { status: "deleted", id: deleted.id };

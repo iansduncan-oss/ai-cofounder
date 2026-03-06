@@ -28,7 +28,13 @@ const {
   GIT_COMMIT_TOOL,
   GIT_PULL_TOOL,
   GIT_LOG_TOOL,
+  GIT_BRANCH_TOOL,
+  GIT_CHECKOUT_TOOL,
+  GIT_PUSH_TOOL,
 } = await import("../agents/tools/git-tools.js");
+
+const { RUN_TESTS_TOOL } = await import("../agents/tools/workspace-tools.js");
+const { CREATE_PR_TOOL } = await import("../agents/tools/github-tools.js");
 
 describe("Filesystem Tool Definitions", () => {
   describe("READ_FILE_TOOL", () => {
@@ -179,6 +185,112 @@ describe("Git Tool Definitions", () => {
     it("has optional max_count number", () => {
       expect(GIT_LOG_TOOL.input_schema.properties.max_count.type).toBe("number");
       expect(GIT_LOG_TOOL.input_schema.required).not.toContain("max_count");
+    });
+  });
+
+  describe("GIT_BRANCH_TOOL", () => {
+    it("has the correct name", () => {
+      expect(GIT_BRANCH_TOOL.name).toBe("git_branch");
+    });
+
+    it("requires repo_dir", () => {
+      expect(GIT_BRANCH_TOOL.input_schema.required).toContain("repo_dir");
+    });
+
+    it("has optional name string", () => {
+      expect(GIT_BRANCH_TOOL.input_schema.properties.name.type).toBe("string");
+      expect(GIT_BRANCH_TOOL.input_schema.required).not.toContain("name");
+    });
+  });
+
+  describe("GIT_CHECKOUT_TOOL", () => {
+    it("has the correct name", () => {
+      expect(GIT_CHECKOUT_TOOL.name).toBe("git_checkout");
+    });
+
+    it("requires repo_dir and branch", () => {
+      expect(GIT_CHECKOUT_TOOL.input_schema.required).toContain("repo_dir");
+      expect(GIT_CHECKOUT_TOOL.input_schema.required).toContain("branch");
+    });
+
+    it("has optional create boolean", () => {
+      expect(GIT_CHECKOUT_TOOL.input_schema.properties.create.type).toBe("boolean");
+      expect(GIT_CHECKOUT_TOOL.input_schema.required).not.toContain("create");
+    });
+  });
+
+  describe("GIT_PUSH_TOOL", () => {
+    it("has the correct name", () => {
+      expect(GIT_PUSH_TOOL.name).toBe("git_push");
+    });
+
+    it("requires repo_dir", () => {
+      expect(GIT_PUSH_TOOL.input_schema.required).toContain("repo_dir");
+    });
+
+    it("has optional remote string", () => {
+      expect(GIT_PUSH_TOOL.input_schema.properties.remote.type).toBe("string");
+      expect(GIT_PUSH_TOOL.input_schema.required).not.toContain("remote");
+    });
+
+    it("has optional branch string", () => {
+      expect(GIT_PUSH_TOOL.input_schema.properties.branch.type).toBe("string");
+      expect(GIT_PUSH_TOOL.input_schema.required).not.toContain("branch");
+    });
+  });
+});
+
+describe("Workspace Tool Definitions", () => {
+  describe("RUN_TESTS_TOOL", () => {
+    it("has the correct name", () => {
+      expect(RUN_TESTS_TOOL.name).toBe("run_tests");
+    });
+
+    it("has a non-empty description", () => {
+      expect(RUN_TESTS_TOOL.description.length).toBeGreaterThan(20);
+    });
+
+    it("requires repo_dir", () => {
+      expect(RUN_TESTS_TOOL.input_schema.required).toContain("repo_dir");
+    });
+
+    it("has optional command string", () => {
+      expect(RUN_TESTS_TOOL.input_schema.properties.command.type).toBe("string");
+      expect(RUN_TESTS_TOOL.input_schema.required).not.toContain("command");
+    });
+
+    it("has optional timeout_ms number", () => {
+      expect(RUN_TESTS_TOOL.input_schema.properties.timeout_ms.type).toBe("number");
+      expect(RUN_TESTS_TOOL.input_schema.required).not.toContain("timeout_ms");
+    });
+  });
+});
+
+describe("GitHub Tool Definitions", () => {
+  describe("CREATE_PR_TOOL", () => {
+    it("has the correct name", () => {
+      expect(CREATE_PR_TOOL.name).toBe("create_pr");
+    });
+
+    it("has a non-empty description", () => {
+      expect(CREATE_PR_TOOL.description.length).toBeGreaterThan(20);
+    });
+
+    it("requires owner, repo, title, and head", () => {
+      expect(CREATE_PR_TOOL.input_schema.required).toContain("owner");
+      expect(CREATE_PR_TOOL.input_schema.required).toContain("repo");
+      expect(CREATE_PR_TOOL.input_schema.required).toContain("title");
+      expect(CREATE_PR_TOOL.input_schema.required).toContain("head");
+    });
+
+    it("has optional base string", () => {
+      expect(CREATE_PR_TOOL.input_schema.properties.base.type).toBe("string");
+      expect(CREATE_PR_TOOL.input_schema.required).not.toContain("base");
+    });
+
+    it("has optional body string", () => {
+      expect(CREATE_PR_TOOL.input_schema.properties.body.type).toBe("string");
+      expect(CREATE_PR_TOOL.input_schema.required).not.toContain("body");
     });
   });
 });

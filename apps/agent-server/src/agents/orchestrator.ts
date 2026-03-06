@@ -25,6 +25,8 @@ import {
   createSchedule,
   listSchedules,
   deleteSchedule,
+  createMilestone,
+  touchMemory,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
@@ -49,10 +51,17 @@ import {
   GIT_COMMIT_TOOL,
   GIT_PULL_TOOL,
   GIT_LOG_TOOL,
+  GIT_BRANCH_TOOL,
+  GIT_CHECKOUT_TOOL,
+  GIT_PUSH_TOOL,
 } from "./tools/git-tools.js";
+import { RUN_TESTS_TOOL } from "./tools/workspace-tools.js";
+import { CREATE_PR_TOOL, executeCreatePr } from "./tools/github-tools.js";
+import type { CreatePrInput } from "./tools/github-tools.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
+import { notifyApprovalCreated } from "../services/notifications.js";
 
 /* ── Result types ── */
 
@@ -127,6 +136,10 @@ const CREATE_PLAN_TOOL: LlmTool = {
         },
         description: "Ordered list of tasks to complete the goal",
       },
+      milestone_id: {
+        type: "string",
+        description: "Optional milestone ID to associate this goal with (from create_milestone)",
+      },
     },
     required: ["goal_title", "goal_description", "goal_priority", "tasks"],
   },
@@ -191,6 +204,7 @@ interface CreatePlanInput {
   goal_title: string;
   goal_description: string;
   goal_priority: "low" | "medium" | "high" | "critical";
+  milestone_id?: string;
   tasks: Array<{
     title: string;
     description: string;
@@ -285,6 +299,7 @@ export class Orchestrator {
     if (this.workspaceService) {
       tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
       tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
+      tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
     }
 
     try {
@@ -395,6 +410,29 @@ export class Orchestrator {
         if (!this.db) return { error: "Database not available" };
         return this.persistPlan(conversationId, block.input as unknown as CreatePlanInput, userId);
       }
+      case "create_milestone": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as {
+          title: string;
+          description: string;
+          order_index?: number;
+          due_date?: string;
+        };
+        const milestone = await createMilestone(this.db, {
+          conversationId,
+          title: input.title,
+          description: input.description,
+          orderIndex: input.order_index ?? 0,
+          dueDate: input.due_date ? new Date(input.due_date) : undefined,
+          createdBy: userId,
+        });
+        this.logger.info({ milestoneId: milestone.id }, "milestone created");
+        return {
+          milestoneId: milestone.id,
+          title: milestone.title,
+          message: `Milestone created. Use create_plan with milestone_id="${milestone.id}" to add goals to it.`,
+        };
+      }
       case "save_memory": {
         if (!userId || !this.db) return { error: "No user context available" };
         const input = block.input as {
@@ -430,6 +468,10 @@ export class Orchestrator {
             const queryEmbedding = await this.embeddingService.embed(input.query);
             const results = await searchMemoriesByVector(this.db, queryEmbedding, userId, 10);
             if (results.length > 0) {
+              // Touch recalled memories async (non-fatal)
+              for (const m of results) {
+                touchMemory(this.db!, m.id).catch(() => {});
+              }
               return results.map((m) => ({
                 key: m.key,
                 category: m.category,
@@ -445,6 +487,10 @@ export class Orchestrator {
 
         // Fallback to ILIKE text search
         const memories = await recallMemories(this.db, userId, input);
+        // Touch recalled memories async (non-fatal)
+        for (const m of memories) {
+          touchMemory(this.db!, m.id).catch(() => {});
+        }
         return memories.map((m) => ({
           key: m.key,
           category: m.category,
@@ -464,6 +510,13 @@ export class Orchestrator {
           { approvalId: approval.id, taskId: input.task_id },
           "approval requested",
         );
+        // Send proactive Slack notification (async, non-fatal)
+        notifyApprovalCreated({
+          approvalId: approval.id,
+          taskId: input.task_id,
+          reason: input.reason,
+          requestedBy: "orchestrator",
+        }).catch(() => {});
         return {
           approvalId: approval.id,
           status: "pending",
@@ -643,6 +696,31 @@ export class Orchestrator {
         const input = block.input as { repo_dir: string; max_count?: number };
         return this.workspaceService.gitLog(input.repo_dir, input.max_count);
       }
+      case "git_branch": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; name?: string };
+        return this.workspaceService.gitBranch(input.repo_dir, input.name);
+      }
+      case "git_checkout": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; branch: string; create?: boolean };
+        return this.workspaceService.gitCheckout(input.repo_dir, input.branch, input.create);
+      }
+      case "git_push": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; remote?: string; branch?: string };
+        return this.workspaceService.gitPush(input.repo_dir, input.remote, input.branch);
+      }
+      case "run_tests": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { repo_dir: string; command?: string; timeout_ms?: number };
+        return this.workspaceService.runTests(input.repo_dir, input.command, input.timeout_ms);
+      }
+      case "create_pr": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as unknown as CreatePrInput;
+        return executeCreatePr(input);
+      }
       default:
         return { error: `Unknown tool: ${block.name}` };
     }
@@ -669,6 +747,7 @@ export class Orchestrator {
       description: input.goal_description,
       priority: input.goal_priority,
       createdBy: userId,
+      milestoneId: input.milestone_id,
     });
 
     await updateGoalStatus(db, goal.id, "active");

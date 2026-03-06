@@ -2,6 +2,8 @@ import path from "node:path";
 import fs from "node:fs";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import fastifySwagger from "@fastify/swagger";
+import fastifySwaggerUi from "@fastify/swagger-ui";
 import fastifyStatic from "@fastify/static";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import {
@@ -32,8 +34,13 @@ import { eventRoutes } from "./routes/events.js";
 import { scheduleRoutes } from "./routes/schedules.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
+import { milestoneRoutes } from "./routes/milestones.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
 import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
+import {
+  createNotificationService,
+  type NotificationService,
+} from "./services/notifications.js";
 import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox";
 
 /** Create and configure the LLM registry with all available providers */
@@ -74,6 +81,41 @@ export function buildServer(registry?: LlmRegistry) {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   });
 
+  // OpenAPI spec generation
+  app.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: "AI Cofounder API",
+        description: "Multi-agent orchestration API for AI Cofounder",
+        version: "0.1.0",
+      },
+      servers: [{ url: "http://localhost:3100" }],
+      tags: [
+        { name: "health", description: "Health checks" },
+        { name: "agents", description: "Agent orchestration" },
+        { name: "goals", description: "Goal management" },
+        { name: "tasks", description: "Task management" },
+        { name: "approvals", description: "Approval workflow" },
+        { name: "milestones", description: "Milestone planning" },
+        { name: "memories", description: "Memory management" },
+        { name: "execution", description: "Goal execution" },
+        { name: "workspace", description: "File system and git operations" },
+        { name: "schedules", description: "Scheduled jobs" },
+        { name: "n8n", description: "n8n workflow integration" },
+        { name: "webhooks", description: "Inbound webhooks" },
+        { name: "channels", description: "Channel-conversation mapping" },
+        { name: "users", description: "User management" },
+        { name: "prompts", description: "Prompt versioning" },
+        { name: "usage", description: "Token usage tracking" },
+        { name: "events", description: "Event processing" },
+      ],
+    },
+  });
+
+  app.register(fastifySwaggerUi, {
+    routePrefix: "/docs",
+  });
+
   // Plugins (order matters: security first, then observability)
   app.register(securityPlugin);
   app.register(observabilityPlugin);
@@ -98,6 +140,10 @@ export function buildServer(registry?: LlmRegistry) {
   // Create workspace service for file system and git access
   const workspaceService = createWorkspaceService();
   app.decorate("workspaceService", workspaceService);
+
+  // Create notification service for proactive alerts
+  const notificationService = createNotificationService();
+  app.decorate("notificationService", notificationService);
 
   // Global error handler — normalize all error responses
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
@@ -128,6 +174,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(scheduleRoutes, { prefix: "/api/schedules" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(workspaceRoutes, { prefix: "/api/workspace" });
+  app.register(milestoneRoutes, { prefix: "/api/milestones" });
 
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
@@ -161,5 +208,6 @@ declare module "fastify" {
     n8nService: N8nService;
     sandboxService: SandboxService;
     workspaceService: WorkspaceService;
+    notificationService: NotificationService;
   }
 }

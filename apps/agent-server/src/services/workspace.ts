@@ -136,6 +136,38 @@ export class WorkspaceService {
     return this.runGit(["log", "--oneline", `-${maxCount}`], fullPath);
   }
 
+  async gitBranch(repoDir: string, name?: string): Promise<GitResult> {
+    const fullPath = this.resolveSafe(repoDir);
+    const args = name ? ["branch", name] : ["branch", "-a"];
+    return this.runGit(args, fullPath);
+  }
+
+  async gitCheckout(repoDir: string, branch: string, create?: boolean): Promise<GitResult> {
+    const fullPath = this.resolveSafe(repoDir);
+    const args = create ? ["checkout", "-b", branch] : ["checkout", branch];
+    return this.runGit(args, fullPath);
+  }
+
+  async gitPush(repoDir: string, remote: string = "origin", branch?: string): Promise<GitResult> {
+    const fullPath = this.resolveSafe(repoDir);
+    const args = branch ? ["push", remote, branch] : ["push", remote];
+    return this.runGit(args, fullPath);
+  }
+
+  async runTests(repoDir: string, command: string = "npm test", timeoutMs: number = 300_000): Promise<GitResult> {
+    const safeCwd = this.resolveSafe(repoDir);
+    const cappedTimeout = Math.min(timeoutMs, 300_000);
+    return new Promise((resolve) => {
+      execFile("sh", ["-c", command], { cwd: safeCwd, timeout: cappedTimeout }, (error, stdout, stderr) => {
+        resolve({
+          stdout: stdout?.toString() ?? "",
+          stderr: stderr?.toString() ?? "",
+          exitCode: error?.code ? (typeof error.code === "number" ? error.code : 1) : 0,
+        });
+      });
+    });
+  }
+
   private repoNameFromUrl(url: string): string {
     const parts = url.replace(/\.git$/, "").split("/");
     return parts[parts.length - 1] || "repo";

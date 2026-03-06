@@ -22,6 +22,11 @@ const GitOperationBody = Type.Object({
     Type.Literal("add"),
     Type.Literal("commit"),
     Type.Literal("log"),
+    Type.Literal("pull"),
+    Type.Literal("branch"),
+    Type.Literal("checkout"),
+    Type.Literal("push"),
+    Type.Literal("run_tests"),
   ]),
   repoUrl: Type.Optional(Type.String()),
   repoDir: Type.Optional(Type.String()),
@@ -30,13 +35,19 @@ const GitOperationBody = Type.Object({
   message: Type.Optional(Type.String()),
   staged: Type.Optional(Type.Boolean()),
   maxCount: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
+  remote: Type.Optional(Type.String()),
+  branch: Type.Optional(Type.String()),
+  name: Type.Optional(Type.String()),
+  create: Type.Optional(Type.Boolean()),
+  command: Type.Optional(Type.String()),
+  timeoutMs: Type.Optional(Type.Integer({ minimum: 1000, maximum: 300000 })),
 });
 
 export const workspaceRoutes: FastifyPluginAsync = async (app) => {
   /* POST /files/read — read a file */
   app.post<{ Body: typeof ReadFileBody.static }>(
     "/files/read",
-    { schema: { body: ReadFileBody } },
+    { schema: { tags: ["workspace"], body: ReadFileBody } },
     async (request, reply) => {
       try {
         const content = await app.workspaceService.readFile(request.body.path);
@@ -52,7 +63,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
   /* POST /files/write — write a file */
   app.post<{ Body: typeof WriteFileBody.static }>(
     "/files/write",
-    { schema: { body: WriteFileBody } },
+    { schema: { tags: ["workspace"], body: WriteFileBody } },
     async (request, reply) => {
       try {
         await app.workspaceService.writeFile(request.body.path, request.body.content);
@@ -68,7 +79,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
   /* GET /tree — list directory */
   app.get<{ Querystring: typeof TreeQuery.static }>(
     "/tree",
-    { schema: { querystring: TreeQuery } },
+    { schema: { tags: ["workspace"], querystring: TreeQuery } },
     async (request, reply) => {
       try {
         const entries = await app.workspaceService.listDirectory(request.query.path);
@@ -84,9 +95,9 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
   /* POST /git — git operations */
   app.post<{ Body: typeof GitOperationBody.static }>(
     "/git",
-    { schema: { body: GitOperationBody } },
+    { schema: { tags: ["workspace"], body: GitOperationBody } },
     async (request, reply) => {
-      const { operation, repoUrl, repoDir, directoryName, paths, message, staged, maxCount } = request.body;
+      const { operation, repoUrl, repoDir, directoryName, paths, message, staged, maxCount, remote, branch, name, create, command, timeoutMs } = request.body;
 
       try {
         switch (operation) {
@@ -117,6 +128,28 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
           case "log": {
             if (!repoDir) return reply.status(400).send({ error: "repoDir is required for log" });
             return app.workspaceService.gitLog(repoDir, maxCount);
+          }
+          case "pull": {
+            if (!repoDir) return reply.status(400).send({ error: "repoDir is required for pull" });
+            return app.workspaceService.gitPull(repoDir, remote, branch);
+          }
+          case "branch": {
+            if (!repoDir) return reply.status(400).send({ error: "repoDir is required for branch" });
+            return app.workspaceService.gitBranch(repoDir, name);
+          }
+          case "checkout": {
+            if (!repoDir || !branch) {
+              return reply.status(400).send({ error: "repoDir and branch are required for checkout" });
+            }
+            return app.workspaceService.gitCheckout(repoDir, branch, create);
+          }
+          case "push": {
+            if (!repoDir) return reply.status(400).send({ error: "repoDir is required for push" });
+            return app.workspaceService.gitPush(repoDir, remote, branch);
+          }
+          case "run_tests": {
+            if (!repoDir) return reply.status(400).send({ error: "repoDir is required for run_tests" });
+            return app.workspaceService.runTests(repoDir, command, timeoutMs);
           }
           default:
             return reply.status(400).send({ error: `Unknown operation: ${operation}` });

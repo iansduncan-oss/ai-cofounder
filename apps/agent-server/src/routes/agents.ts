@@ -8,13 +8,16 @@ import {
   getConversationMessages,
   createMessage,
   recordLlmUsage,
+  getTodayTokenTotal,
 } from "@ai-cofounder/db";
+import { optionalEnv } from "@ai-cofounder/shared";
+import { recordLlmMetrics } from "../plugins/observability.js";
 
 const RunBody = Type.Object({
-  message: Type.String({ minLength: 1 }),
+  message: Type.String({ minLength: 1, maxLength: 32_000 }),
   conversationId: Type.Optional(Type.String()),
   userId: Type.Optional(Type.String()),
-  platform: Type.Optional(Type.String()),
+  platform: Type.Optional(Type.String({ maxLength: 50 })),
   history: Type.Optional(
     Type.Array(
       Type.Object(
@@ -40,7 +43,21 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.workspaceService,
   );
 
-  app.post<{ Body: RunBody }>("/run", { schema: { body: RunBody } }, async (request, _reply) => {
+  const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
+
+  app.post<{ Body: RunBody }>("/run", { schema: { tags: ["agents"], body: RunBody } }, async (request, reply) => {
+    // Enforce daily token limit if configured
+    if (dailyTokenLimit > 0) {
+      const todayTotal = await getTodayTokenTotal(app.db);
+      if (todayTotal >= dailyTokenLimit) {
+        return reply.status(429).send({
+          error: "Daily token limit exceeded",
+          todayTotal,
+          limit: dailyTokenLimit,
+        });
+      }
+    }
+
     const { message, conversationId, userId, platform, history } = request.body;
 
     // Resolve or create conversation
@@ -72,12 +89,14 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }));
     }
 
+    const llmStart = Date.now();
     const result = await orchestrator.run(
       message,
       convId,
       resolvedHistory as AgentMessage[] | undefined,
       dbUserId,
     );
+    const llmDurationMs = Date.now() - llmStart;
 
     // Persist messages to DB
     if (result.conversationId) {
@@ -98,8 +117,17 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    // Record LLM usage for cost tracking
+    // Record LLM usage for cost tracking + Prometheus metrics
     if (result.usage && result.model) {
+      recordLlmMetrics({
+        provider: result.provider ?? "unknown",
+        model: result.model,
+        taskCategory: "conversation",
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        durationMs: llmDurationMs,
+        success: true,
+      });
       try {
         await recordLlmUsage(app.db, {
           provider: result.provider ?? "unknown",

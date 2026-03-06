@@ -14,6 +14,11 @@ const mockGitDiff = vi.fn();
 const mockGitAdd = vi.fn();
 const mockGitCommit = vi.fn();
 const mockGitLog = vi.fn();
+const mockGitPull = vi.fn();
+const mockGitBranch = vi.fn();
+const mockGitCheckout = vi.fn();
+const mockGitPush = vi.fn();
+const mockRunTests = vi.fn();
 
 vi.mock("../services/workspace.js", () => ({
   createWorkspaceService: () => ({
@@ -27,6 +32,11 @@ vi.mock("../services/workspace.js", () => ({
     gitAdd: (...args: unknown[]) => mockGitAdd(...args),
     gitCommit: (...args: unknown[]) => mockGitCommit(...args),
     gitLog: (...args: unknown[]) => mockGitLog(...args),
+    gitPull: (...args: unknown[]) => mockGitPull(...args),
+    gitBranch: (...args: unknown[]) => mockGitBranch(...args),
+    gitCheckout: (...args: unknown[]) => mockGitCheckout(...args),
+    gitPush: (...args: unknown[]) => mockGitPush(...args),
+    runTests: (...args: unknown[]) => mockRunTests(...args),
   }),
   WorkspaceService: class {},
 }));
@@ -358,6 +368,148 @@ describe("Workspace routes", () => {
 
       expect(res.statusCode).toBe(400);
       expect(res.json().error).toContain("message");
+    });
+
+    it("lists branches", async () => {
+      mockGitBranch.mockResolvedValueOnce({ stdout: "* main\n  feature-x\n", stderr: "", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "branch", repoDir: "my-repo" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockGitBranch).toHaveBeenCalledWith("my-repo", undefined);
+    });
+
+    it("creates a branch with name", async () => {
+      mockGitBranch.mockResolvedValueOnce({ stdout: "", stderr: "", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "branch", repoDir: "my-repo", name: "feature-y" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockGitBranch).toHaveBeenCalledWith("my-repo", "feature-y");
+    });
+
+    it("returns 400 when branch missing repoDir", async () => {
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "branch" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("repoDir");
+    });
+
+    it("checks out a branch", async () => {
+      mockGitCheckout.mockResolvedValueOnce({ stdout: "", stderr: "", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "checkout", repoDir: "my-repo", branch: "feature-x" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockGitCheckout).toHaveBeenCalledWith("my-repo", "feature-x", undefined);
+    });
+
+    it("checks out with create flag", async () => {
+      mockGitCheckout.mockResolvedValueOnce({ stdout: "", stderr: "", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "checkout", repoDir: "my-repo", branch: "new-branch", create: true },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockGitCheckout).toHaveBeenCalledWith("my-repo", "new-branch", true);
+    });
+
+    it("returns 400 when checkout missing branch", async () => {
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "checkout", repoDir: "my-repo" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("branch");
+    });
+
+    it("pushes to remote", async () => {
+      mockGitPush.mockResolvedValueOnce({ stdout: "", stderr: "Everything up-to-date", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "push", repoDir: "my-repo", remote: "upstream", branch: "main" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockGitPush).toHaveBeenCalledWith("my-repo", "upstream", "main");
+    });
+
+    it("returns 400 when push missing repoDir", async () => {
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "push" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("repoDir");
+    });
+
+    it("runs tests", async () => {
+      mockRunTests.mockResolvedValueOnce({ stdout: "All tests passed", stderr: "", exitCode: 0 });
+
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "run_tests", repoDir: "my-repo", command: "npm run test" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(200);
+      expect(mockRunTests).toHaveBeenCalledWith("my-repo", "npm run test", undefined);
+    });
+
+    it("returns 400 when run_tests missing repoDir", async () => {
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/workspace/git",
+        payload: { operation: "run_tests" },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error).toContain("repoDir");
     });
   });
 });

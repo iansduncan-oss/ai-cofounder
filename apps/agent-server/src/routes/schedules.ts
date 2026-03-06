@@ -11,9 +11,9 @@ import { CronExpressionParser } from "cron-parser";
 import { IdParams } from "../schemas.js";
 
 const CreateScheduleBody = Type.Object({
-  cronExpression: Type.String({ minLength: 1 }),
-  actionPrompt: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
+  cronExpression: Type.String({ minLength: 1, maxLength: 100 }),
+  actionPrompt: Type.String({ minLength: 1, maxLength: 4000 }),
+  description: Type.Optional(Type.String({ maxLength: 500 })),
   userId: Type.Optional(Type.String({ format: "uuid" })),
 });
 
@@ -25,7 +25,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a schedule */
   app.post<{ Body: typeof CreateScheduleBody.static }>(
     "/",
-    { schema: { body: CreateScheduleBody } },
+    { schema: { tags: ["schedules"], body: CreateScheduleBody } },
     async (request, reply) => {
       const { cronExpression, actionPrompt, description, userId } = request.body;
 
@@ -53,6 +53,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
   /* GET / — list schedules */
   app.get<{ Querystring: { userId?: string } }>(
     "/",
+    { schema: { tags: ["schedules"] } },
     async (request) => {
       return listSchedules(app.db, request.query.userId);
     },
@@ -61,7 +62,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
   /* GET /:id — get a single schedule */
   app.get<{ Params: typeof IdParams.static }>(
     "/:id",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["schedules"], params: IdParams } },
     async (request, reply) => {
       const schedule = await getSchedule(app.db, request.params.id);
       if (!schedule) return reply.status(404).send({ error: "Schedule not found" });
@@ -75,7 +76,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     Body: typeof ToggleScheduleBody.static;
   }>(
     "/:id/toggle",
-    { schema: { params: IdParams, body: ToggleScheduleBody } },
+    { schema: { tags: ["schedules"], params: IdParams, body: ToggleScheduleBody } },
     async (request, reply) => {
       const schedule = await toggleSchedule(app.db, request.params.id, request.body.enabled);
       if (!schedule) return reply.status(404).send({ error: "Schedule not found" });
@@ -86,7 +87,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
   /* DELETE /:id — delete a schedule */
   app.delete<{ Params: typeof IdParams.static }>(
     "/:id",
-    { schema: { params: IdParams } },
+    { schema: { tags: ["schedules"], params: IdParams } },
     async (request, reply) => {
       const deleted = await deleteSchedule(app.db, request.params.id);
       if (!deleted) return reply.status(404).send({ error: "Schedule not found" });

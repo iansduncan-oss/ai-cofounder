@@ -4,8 +4,8 @@ import { createEvent } from "@ai-cofounder/db";
 import { processEvent } from "../events.js";
 
 const InboundEventBody = Type.Object({
-  source: Type.String({ minLength: 1 }),
-  type: Type.String({ minLength: 1 }),
+  source: Type.String({ minLength: 1, maxLength: 100 }),
+  type: Type.String({ minLength: 1, maxLength: 100 }),
   payload: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 
@@ -13,7 +13,7 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
   /* POST /inbound — receive an external event */
   app.post<{ Body: typeof InboundEventBody.static }>(
     "/inbound",
-    { schema: { body: InboundEventBody } },
+    { schema: { tags: ["events"], body: InboundEventBody } },
     async (request, reply) => {
       const { source, type, payload } = request.body;
 

@@ -7,6 +7,7 @@ import {
   listPendingApprovals,
   listEnabledSchedules,
   updateScheduleLastRun,
+  decayAllMemoryImportance,
 } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
@@ -204,6 +205,7 @@ export function buildFallbackBriefing(data: BriefingData): string {
 /* ── Scheduling logic ── */
 
 let lastBriefingDate = "";
+let lastDecayDate = "";
 
 function shouldSendBriefing(briefingHour: number): boolean {
   const now = new Date();
@@ -385,6 +387,18 @@ export function startScheduler(
 
       // Goal check-ins (every hour, but messages are throttled by severity)
       await runGoalCheckIn(config);
+
+      // Memory importance decay (once per day)
+      const todayKey = new Date().toISOString().slice(0, 10);
+      if (lastDecayDate !== todayKey) {
+        try {
+          await decayAllMemoryImportance(config.db);
+          lastDecayDate = todayKey;
+          logger.info("memory importance decay completed");
+        } catch (err) {
+          logger.warn({ err }, "memory decay failed");
+        }
+      }
     } catch (err) {
       logger.error({ err }, "scheduler check failed");
     }

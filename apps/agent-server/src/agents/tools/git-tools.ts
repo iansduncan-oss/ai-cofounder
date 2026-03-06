@@ -147,3 +147,74 @@ export const GIT_LOG_TOOL: LlmTool = {
     required: ["repo_dir"],
   },
 };
+
+export const GIT_BRANCH_TOOL: LlmTool = {
+  name: "git_branch",
+  description:
+    "List or create branches in a git repository in the workspace. " +
+    "Without a name, lists all branches (local and remote). With a name, creates a new branch.",
+  input_schema: {
+    type: "object",
+    properties: {
+      repo_dir: {
+        type: "string",
+        description: "Relative path to the git repository within the workspace",
+      },
+      name: {
+        type: "string",
+        description: "Branch name to create (omit to list all branches)",
+      },
+    },
+    required: ["repo_dir"],
+  },
+};
+
+export const GIT_CHECKOUT_TOOL: LlmTool = {
+  name: "git_checkout",
+  description:
+    "Switch branches in a git repository in the workspace. " +
+    "Set create=true to create a new branch and switch to it (-b flag).",
+  input_schema: {
+    type: "object",
+    properties: {
+      repo_dir: {
+        type: "string",
+        description: "Relative path to the git repository within the workspace",
+      },
+      branch: {
+        type: "string",
+        description: "Branch name to switch to (or create)",
+      },
+      create: {
+        type: "boolean",
+        description: "If true, create the branch before switching (default: false)",
+      },
+    },
+    required: ["repo_dir", "branch"],
+  },
+};
+
+export const GIT_PUSH_TOOL: LlmTool = {
+  name: "git_push",
+  description:
+    "Push commits to a remote in a git repository in the workspace. " +
+    "Pushes to the specified remote (default: origin) and optionally a specific branch.",
+  input_schema: {
+    type: "object",
+    properties: {
+      repo_dir: {
+        type: "string",
+        description: "Relative path to the git repository within the workspace",
+      },
+      remote: {
+        type: "string",
+        description: "Remote name to push to (default: origin)",
+      },
+      branch: {
+        type: "string",
+        description: "Branch to push (default: current branch)",
+      },
+    },
+    required: ["repo_dir"],
+  },
+};

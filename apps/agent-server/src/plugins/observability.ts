@@ -38,6 +38,53 @@ const processUptimeSeconds = new client.Gauge({
   help: "Process uptime in seconds",
 });
 
+// --- LLM Metrics ---
+
+const llmRequestDuration = new client.Histogram({
+  name: "llm_request_duration_seconds",
+  help: "LLM request duration in seconds",
+  labelNames: ["provider", "model", "task_category"] as const,
+  buckets: [0.5, 1, 2, 5, 10, 30, 60],
+});
+
+const llmTokensTotal = new client.Counter({
+  name: "llm_tokens_total",
+  help: "Total LLM tokens used",
+  labelNames: ["provider", "model", "direction"] as const,
+});
+
+const llmRequestsTotal = new client.Counter({
+  name: "llm_requests_total",
+  help: "Total LLM requests",
+  labelNames: ["provider", "model", "task_category", "status"] as const,
+});
+
+const llmCostMicros = new client.Counter({
+  name: "llm_cost_microdollars_total",
+  help: "Estimated LLM cost in microdollars",
+  labelNames: ["provider", "model"] as const,
+});
+
+export function recordLlmMetrics(data: {
+  provider: string;
+  model: string;
+  taskCategory: string;
+  inputTokens: number;
+  outputTokens: number;
+  durationMs: number;
+  estimatedCostMicros?: number;
+  success: boolean;
+}) {
+  const labels = { provider: data.provider, model: data.model, task_category: data.taskCategory };
+  llmRequestDuration.observe(labels, data.durationMs / 1000);
+  llmRequestsTotal.inc({ ...labels, status: data.success ? "success" : "error" });
+  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "input" }, data.inputTokens);
+  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "output" }, data.outputTokens);
+  if (data.estimatedCostMicros) {
+    llmCostMicros.inc({ provider: data.provider, model: data.model }, data.estimatedCostMicros);
+  }
+}
+
 // Rolling averages per route: { sum, count }
 const durationAccumulators = new Map<string, { sum: number; count: number }>();
 

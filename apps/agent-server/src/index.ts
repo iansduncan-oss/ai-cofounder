@@ -3,8 +3,11 @@ import { buildServer } from "./server.js";
 import { optionalEnv, requireEnv, createLogger } from "@ai-cofounder/shared";
 import { runMigrations } from "@ai-cofounder/db";
 import { startScheduler } from "./scheduler.js";
+import { initTracing, shutdownTracing } from "./tracing.js";
 
 async function main() {
+  // Initialize tracing before anything else (must be first)
+  initTracing();
   const startupLogger = createLogger("startup");
 
   // Run pending database migrations before starting the server
@@ -45,6 +48,7 @@ async function main() {
   const shutdown = async () => {
     logger.info("shutting down...");
     scheduler?.stop();
+    await shutdownTracing();
     await app.close();
     process.exit(0);
   };
