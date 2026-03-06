@@ -9,6 +9,7 @@ import {
 } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
+import type { WorkspaceService } from "./services/workspace.js";
 import { Orchestrator } from "./agents/orchestrator.js";
 
 const logger = createLogger("autonomous-session");
@@ -117,6 +118,7 @@ export async function runAutonomousSession(
   registry: LlmRegistry,
   embeddingService?: EmbeddingService,
   sandboxService?: SandboxService,
+  workspaceService?: WorkspaceService,
   options?: SessionOptions,
 ): Promise<SessionResult> {
   const timeBudgetMs = options?.timeBudgetMs ?? parseInt(optionalEnv("SESSION_TIME_BUDGET_MS", "900000"), 10);
@@ -173,6 +175,7 @@ export async function runAutonomousSession(
         embeddingService,
         undefined, // n8nService — not needed in autonomous context
         sandboxService,
+        workspaceService,
       );
 
       const result = await Promise.race([

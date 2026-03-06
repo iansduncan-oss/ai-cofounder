@@ -10,6 +10,7 @@ import {
 } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
+import type { WorkspaceService } from "./services/workspace.js";
 import { CronExpressionParser } from "cron-parser";
 import { runAutonomousSession } from "./autonomous-session.js";
 
@@ -29,6 +30,7 @@ interface SchedulerConfig {
   timezone: string;
   embeddingService?: EmbeddingService;
   sandboxService?: SandboxService;
+  workspaceService?: WorkspaceService;
 }
 
 /* ── Discord webhook helpers ── */
@@ -320,6 +322,7 @@ async function runScheduleCheck(config: SchedulerConfig): Promise<void> {
         config.registry,
         config.embeddingService,
         config.sandboxService,
+        config.workspaceService,
         {
           trigger: "schedule",
           scheduleId: schedule.id,
@@ -346,6 +349,7 @@ export function startScheduler(
   registry: LlmRegistry,
   embeddingService?: EmbeddingService,
   sandboxService?: SandboxService,
+  workspaceService?: WorkspaceService,
 ): SchedulerHandle | undefined {
   const webhookUrl = optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
   if (!webhookUrl) {
@@ -364,6 +368,7 @@ export function startScheduler(
     timezone,
     embeddingService,
     sandboxService,
+    workspaceService,
   };
 
   logger.info(

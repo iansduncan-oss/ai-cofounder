@@ -3,6 +3,7 @@ import type { Db } from "@ai-cofounder/db";
 import { markEventProcessed } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
+import type { WorkspaceService } from "./services/workspace.js";
 import { runAutonomousSession } from "./autonomous-session.js";
 
 const logger = createLogger("events");
@@ -20,6 +21,7 @@ export async function processEvent(
   event: EventRecord,
   embeddingService?: EmbeddingService,
   sandboxService?: SandboxService,
+  workspaceService?: WorkspaceService,
 ): Promise<void> {
   logger.info({ eventId: event.id, source: event.source, type: event.type }, "processing event");
 
@@ -30,7 +32,7 @@ export async function processEvent(
     `**Payload:**\n\`\`\`json\n${JSON.stringify(event.payload, null, 2)}\n\`\`\``;
 
   try {
-    const result = await runAutonomousSession(db, registry, embeddingService, sandboxService, {
+    const result = await runAutonomousSession(db, registry, embeddingService, sandboxService, workspaceService, {
       trigger: "event",
       eventId: event.id,
       prompt,

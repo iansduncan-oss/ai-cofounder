@@ -9,11 +9,14 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 ## Monorepo Structure
 
 - **apps/agent-server** — Fastify server, multi-agent orchestration (port 3100)
-- **apps/discord-bot** — Discord bot with 8 slash commands, calls agent-server
+- **apps/discord-bot** — Discord bot with 8 slash commands, calls agent-server via raw fetch
+- **apps/slack-bot** — Slack bot (Bolt + Socket Mode) with 8 slash commands, uses `@ai-cofounder/api-client`
 - **apps/voice-ui** — Static HTML/CSS/JS voice interface served at `/voice/` by agent-server
 - **apps/n8n** — n8n workflow automation (Docker-based)
 - **packages/db** — Drizzle ORM schema + repositories + migrations, postgres.js client, auto-migrations at startup
 - **packages/llm** — Multi-LLM provider abstraction (Anthropic, Groq, Gemini, OpenRouter) with task-based routing and fallback chains
+- **packages/sandbox** — Docker-based isolated code execution (TS, JS, Python, Bash)
+- **packages/api-client** — Typed fetch-based API client for all agent-server endpoints
 - **packages/shared** — Shared types, pino logger (`createLogger`), env config helpers (`requireEnv`, `optionalEnv`)
 
 ## Commands
@@ -68,10 +71,62 @@ Services available at:
 
 ## Agent System
 
-- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `request_approval`, `save_memory`, `recall_memories`, `search_web`, `trigger_workflow`, `list_workflows`
+- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `create_milestone`, `request_approval`, `save_memory`, `recall_memories`, `search_web`, `trigger_workflow`, `list_workflows`, `execute_code`, `create/list/delete_schedule`, `read_file`, `write_file`, `list_directory`, `git_clone`, `git_status`, `git_diff`, `git_add`, `git_commit`, `git_log`, `git_pull`
 - **Specialist agents** — `ResearcherAgent`, `CoderAgent` (with self-review), `ReviewerAgent`, `PlannerAgent`
 - **Base class** — `SpecialistAgent` with tool loop (max 3 rounds) and `completeWithRetry()` (single retry, 2s backoff on 429/timeout/ECONNRESET/503)
-- **TaskDispatcher** — executes goal tasks in orderIndex, passes outputs as context chain, checks pending approvals before each task
+- **TaskDispatcher** — executes goal tasks in orderIndex, passes outputs as context chain, checks pending approvals before each task, post-execution self-improvement analysis
+
+## Adding New Orchestrator Tools
+
+1. **Define the tool** — Create/update a file in `apps/agent-server/src/agents/tools/` exporting an `LlmTool` constant
+2. **Add service method** — Add the method to the relevant service (e.g., `WorkspaceService`)
+3. **Import in orchestrator** — Import the tool constant in `orchestrator.ts`
+4. **Register conditionally** — Push to the `tools` array if the required service is available
+5. **Handle execution** — Add a `case` in `executeTool()` switch statement
+6. **Add route (optional)** — Create REST endpoint in `apps/agent-server/src/routes/`
+7. **Write tests** — Add tests in `apps/agent-server/src/__tests__/` with proper mocking
+
+## Test Mocking Patterns
+
+Tests must mock three packages before importing the module under test:
+
+```typescript
+// 1. Mock @ai-cofounder/shared
+vi.mock("@ai-cofounder/shared", () => ({
+  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+}));
+
+// 2. Mock @ai-cofounder/db with individual mock fns
+const mockCreateGoal = vi.fn().mockResolvedValue({ id: "goal-1" });
+vi.mock("@ai-cofounder/db", () => ({
+  createGoal: (...args: unknown[]) => mockCreateGoal(...args),
+}));
+
+// 3. Mock @ai-cofounder/llm with MockLlmRegistry
+vi.mock("@ai-cofounder/llm", () => {
+  class MockLlmRegistry {
+    complete = mockComplete;
+    completeDirect = mockComplete;
+    register = vi.fn();
+    getProvider = vi.fn();
+    resolveProvider = vi.fn();
+    listProviders = vi.fn().mockReturnValue([]);
+    getProviderHealth = vi.fn().mockReturnValue([]);
+  }
+  return { LlmRegistry: MockLlmRegistry };
+});
+```
+
+**Critical**: `getProviderHealth = vi.fn().mockReturnValue([])` is required in MockLlmRegistry. Import the module AFTER mocks are set up using dynamic `await import()`.
+
+## Milestones
+
+Multi-step planning via `milestones` table. Goals can be linked to milestones via `goals.milestone_id`. Routes: `POST/GET/PATCH/DELETE /api/milestones`, `GET /:id/progress`, `POST /:id/goals`.
+
+## Workspace & Git Integration
+
+Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path traversal protection via `resolveSafe()`. Tools conditionally added when `workspaceService` is provided to orchestrator constructor.
 
 ## Discord Bot
 
@@ -87,6 +142,10 @@ All 8 commands:
 - `/approve <approval_id>` — resolve a pending approval
 
 Per-channel conversation tracking (in-memory). Slash commands auto-registered on startup via Discord REST API.
+
+## Slack Bot
+
+Same 8 commands as Discord (`/ask`, `/status`, `/goals`, `/tasks`, `/memory`, `/clear`, `/execute`, `/approve`). Uses Bolt framework with Socket Mode (no public URL needed). Channel IDs prefixed with `slack-` to avoid collision. Uses `@ai-cofounder/api-client` (typed) instead of raw fetch. Slack Block Kit formatting. Env: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_APP_TOKEN`.
 
 ## Security & Rate Limiting
 

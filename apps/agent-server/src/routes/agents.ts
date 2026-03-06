@@ -37,6 +37,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.embeddingService,
     app.n8nService,
     app.sandboxService,
+    app.workspaceService,
   );
 
   app.post<{ Body: RunBody }>("/run", { schema: { body: RunBody } }, async (request, _reply) => {

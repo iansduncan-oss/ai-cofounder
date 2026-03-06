@@ -106,7 +106,7 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
       });
 
       // Process asynchronously — don't block the webhook response
-      processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService).catch(
+      processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService, app.workspaceService).catch(
         (err) => {
           logger.error({ err, eventId: event.id }, "background GitHub event processing failed");
         },

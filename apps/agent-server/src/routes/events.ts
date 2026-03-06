@@ -30,6 +30,7 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
         event,
         app.embeddingService,
         app.sandboxService,
+        app.workspaceService,
       ).catch((err) => {
         app.log.error({ err, eventId: event.id }, "background event processing failed");
       });
