@@ -1,0 +1,20 @@
+{
+  "name": "@ai-cofounder/slack-bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "lint": "eslint src/",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.3.0",
+    "@ai-cofounder/shared": "*",
+    "@ai-cofounder/api-client": "*"
+  }
+}

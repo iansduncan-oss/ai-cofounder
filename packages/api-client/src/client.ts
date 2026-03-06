@@ -172,6 +172,33 @@ export class ApiClient {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
   }
 
+  /* ── Channels ── */
+
+  getChannelConversation(channelId: string) {
+    return this.request<{ conversationId: string }>("GET", `/api/channels/${channelId}/conversation`);
+  }
+
+  setChannelConversation(channelId: string, conversationId: string, platform: string) {
+    return this.request<{ conversationId: string }>(
+      "PUT",
+      `/api/channels/${channelId}/conversation`,
+      { conversationId, platform },
+    );
+  }
+
+  deleteChannelConversation(channelId: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/channels/${channelId}/conversation`);
+  }
+
+  /* ── Users ── */
+
+  getUserByPlatform(platform: string, platformId: string) {
+    return this.request<{ id: string; displayName?: string }>(
+      "GET",
+      `/api/users/by-platform/${platform}/${platformId}`,
+    );
+  }
+
   /* ── Usage ── */
 
   getUsage(period: "today" | "week" | "month" | "all" = "today") {
