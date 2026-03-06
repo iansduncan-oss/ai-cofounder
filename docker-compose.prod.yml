@@ -24,6 +24,11 @@ services:
       - DISCORD_FOLLOWUP_WEBHOOK_URL=${DISCORD_FOLLOWUP_WEBHOOK_URL:-}
       - BRIEFING_HOUR=${BRIEFING_HOUR:-9}
       - BRIEFING_TIMEZONE=${BRIEFING_TIMEZONE:-America/New_York}
+      - WORKSPACE_DIR=/data/workspace
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
+      - N8N_SHARED_SECRET=${N8N_SHARED_SECRET:-}
+    volumes:
+      - workspace_data:/data/workspace
     networks:
       - avion_avion_net
     healthcheck:
@@ -48,6 +53,26 @@ services:
         condition: service_healthy
     networks:
       - avion_avion_net
+
+  slack-bot:
+    image: ai-cofounder-slack-bot:latest
+    container_name: ai-cofounder-slack-bot
+    restart: unless-stopped
+    environment:
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+      - AGENT_SERVER_URL=http://agent-server:3100
+      - API_SECRET=${API_SECRET:-}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      agent-server:
+        condition: service_healthy
+    networks:
+      - avion_avion_net
+
+volumes:
+  workspace_data:
 
 networks:
   avion_avion_net:
