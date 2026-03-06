@@ -225,3 +225,46 @@ export async function handleApprove(
     return { type: "error", message: `Failed to approve: ${approvalId}` };
   }
 }
+
+export async function handleReject(
+  client: ApiClient,
+  ctx: CommandContext,
+  approvalId: string,
+): Promise<HandlerResult> {
+  try {
+    await client.resolveApproval(approvalId, {
+      status: "rejected",
+      decision: `Rejected by ${ctx.userName} via ${ctx.platform}`,
+    });
+
+    return { type: "reject", data: { approvalId } };
+  } catch {
+    return { type: "error", message: `Failed to reject: ${approvalId}` };
+  }
+}
+
+export async function handleListApprovals(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const approvals = await client.listPendingApprovals();
+
+    if (approvals.length === 0) {
+      return { type: "info", message: "No pending approvals." };
+    }
+
+    return {
+      type: "approvals",
+      data: {
+        approvals: approvals.map((a) => ({
+          id: a.id,
+          taskId: a.taskId,
+          requestedBy: a.requestedBy,
+          reason: a.reason,
+          createdAt: a.createdAt,
+        })),
+        totalCount: approvals.length,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch pending approvals." };
+  }
+}

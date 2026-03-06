@@ -10,6 +10,8 @@ import {
   handleClear,
   handleExecute,
   handleApprove,
+  handleReject,
+  handleListApprovals,
   truncate,
   STATUS_ICON,
 } from "../handlers.js";
@@ -358,5 +360,93 @@ describe("handleApprove", () => {
       status: "approved",
       decision: "Approved by TestUser via discord",
     });
+  });
+
+  it("returns error on failure", async () => {
+    const client = mockClient({
+      resolveApproval: vi.fn().mockRejectedValue(new Error("Already resolved")),
+    });
+
+    const result = await handleApprove(client, ctx, "appr-1");
+    expect(result.type).toBe("error");
+  });
+});
+
+describe("handleReject", () => {
+  it("rejects approval", async () => {
+    const client = mockClient({
+      resolveApproval: vi.fn().mockResolvedValue({}),
+    });
+
+    const result = await handleReject(client, ctx, "appr-1");
+    expect(result).toEqual({ type: "reject", data: { approvalId: "appr-1" } });
+    expect(client.resolveApproval).toHaveBeenCalledWith("appr-1", {
+      status: "rejected",
+      decision: "Rejected by TestUser via discord",
+    });
+  });
+
+  it("returns error on failure", async () => {
+    const client = mockClient({
+      resolveApproval: vi.fn().mockRejectedValue(new Error("Already resolved")),
+    });
+
+    const result = await handleReject(client, ctx, "appr-1");
+    expect(result.type).toBe("error");
+  });
+});
+
+describe("handleListApprovals", () => {
+  it("returns pending approvals", async () => {
+    const client = mockClient({
+      listPendingApprovals: vi.fn().mockResolvedValue([
+        {
+          id: "a1",
+          taskId: "t1",
+          requestedBy: "orchestrator",
+          status: "pending",
+          reason: "Deploy to prod",
+          createdAt: "2026-03-05T10:00:00Z",
+        },
+        {
+          id: "a2",
+          taskId: "t2",
+          requestedBy: "coder",
+          status: "pending",
+          reason: "Delete user data",
+          createdAt: "2026-03-05T11:00:00Z",
+        },
+      ]),
+    });
+
+    const result = await handleListApprovals(client);
+    expect(result).toEqual({
+      type: "approvals",
+      data: {
+        approvals: [
+          { id: "a1", taskId: "t1", requestedBy: "orchestrator", reason: "Deploy to prod", createdAt: "2026-03-05T10:00:00Z" },
+          { id: "a2", taskId: "t2", requestedBy: "coder", reason: "Delete user data", createdAt: "2026-03-05T11:00:00Z" },
+        ],
+        totalCount: 2,
+      },
+    });
+  });
+
+  it("returns info when no pending approvals", async () => {
+    const client = mockClient({
+      listPendingApprovals: vi.fn().mockResolvedValue([]),
+    });
+
+    const result = await handleListApprovals(client);
+    expect(result).toEqual({ type: "info", message: "No pending approvals." });
+  });
+
+  it("returns error on failure", async () => {
+    const client = mockClient({
+      listPendingApprovals: vi.fn().mockRejectedValue(new Error("Server error")),
+    });
+
+    const result = await handleListApprovals(client);
+    expect(result.type).toBe("error");
   });
 });

@@ -93,7 +93,7 @@ describe("interaction handler", () => {
           }),
         })
         // saveChannelConversationId
-        .mockResolvedValueOnce({ ok: true });
+        .mockResolvedValueOnce({ ok: true, json: () => ({ conversationId: "conv-1" }) });
 
       global.fetch = channelFetch;
 
@@ -108,7 +108,11 @@ describe("interaction handler", () => {
 
     it("replies with error message when fetch fails", async () => {
       (global.fetch as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ ok: false }) // getChannelConversationId
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({ error: "Not found" }),
+        }) // getChannelConversationId
         .mockRejectedValueOnce(new Error("Network error")); // POST /api/agents/run
 
       const interaction = mockInteraction("ask", { message: "Hello" });
@@ -121,8 +125,16 @@ describe("interaction handler", () => {
 
     it("replies with error when server returns non-ok", async () => {
       (global.fetch as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ ok: false }) // getChannelConversationId
-        .mockResolvedValueOnce({ ok: false, status: 500, text: () => "Internal error" });
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+          json: () => Promise.resolve({ error: "Not found" }),
+        }) // getChannelConversationId
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          json: () => Promise.resolve({ error: "Internal error" }),
+        });
 
       const interaction = mockInteraction("ask", { message: "Hello" });
       await handleInteraction(interaction as never);
@@ -171,7 +183,11 @@ describe("interaction handler", () => {
 
   describe("handleGoals", () => {
     it("shows no conversation message when channel has no conversation", async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: "Not found" }),
+      });
 
       const interaction = mockInteraction("goals");
       await handleInteraction(interaction as never);
@@ -261,7 +277,11 @@ describe("interaction handler", () => {
 
   describe("handleMemory", () => {
     it("shows no memories message when user not found", async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ error: "Not found" }),
+      });
 
       const interaction = mockInteraction("memory");
       await handleInteraction(interaction as never);
@@ -300,7 +320,10 @@ describe("interaction handler", () => {
 
   describe("handleClear", () => {
     it("clears conversation and replies with success embed", async () => {
-      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: true });
+      (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: () => ({ deleted: true }),
+      });
 
       const interaction = mockInteraction("clear");
       await handleInteraction(interaction as never);
@@ -352,7 +375,7 @@ describe("interaction handler", () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
         status: 404,
-        text: () => "Goal not found",
+        json: () => Promise.resolve({ error: "Goal not found" }),
       });
 
       const interaction = mockInteraction("execute", { goal_id: "bad-id" });
@@ -389,7 +412,7 @@ describe("interaction handler", () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: false,
         status: 400,
-        text: () => "Already resolved",
+        json: () => Promise.resolve({ error: "Already resolved" }),
       });
 
       const interaction = mockInteraction("approve", { approval_id: "a1" });

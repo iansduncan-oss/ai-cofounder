@@ -18,6 +18,7 @@ const mockClient = {
   runAgent: vi.fn(),
   listGoals: vi.fn(),
   listPendingTasks: vi.fn(),
+  listPendingApprovals: vi.fn(),
   listMemories: vi.fn(),
   executeGoal: vi.fn(),
   resolveApproval: vi.fn(),
@@ -46,11 +47,15 @@ vi.mock("@ai-cofounder/api-client", () => {
 
 // Mock @slack/bolt
 const commandHandlers = new Map<string, (args: Record<string, unknown>) => Promise<void>>();
+const actionHandlers = new Map<string, (args: Record<string, unknown>) => Promise<void>>();
 
 vi.mock("@slack/bolt", () => {
   class MockApp {
     command(name: string, handler: (args: Record<string, unknown>) => Promise<void>) {
       commandHandlers.set(name, handler);
+    }
+    action(actionId: string, handler: (args: Record<string, unknown>) => Promise<void>) {
+      actionHandlers.set(actionId, handler);
     }
     async start() {}
   }
@@ -76,6 +81,7 @@ describe("slack commands", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     commandHandlers.clear();
+    actionHandlers.clear();
     app = new App({ token: "t", signingSecret: "s", appToken: "a", socketMode: true });
     registerCommands(app);
   });
@@ -410,6 +416,152 @@ describe("slack commands", () => {
       const { respond } = await invokeCommand("/approve", "");
 
       expect(respond).toHaveBeenCalledWith(expect.stringContaining("Usage"));
+    });
+  });
+
+  describe("/approvals", () => {
+    it("shows pending approvals with buttons", async () => {
+      mockClient.listPendingApprovals.mockResolvedValueOnce([
+        {
+          id: "a1-uuid-full",
+          taskId: "t1-uuid-full",
+          requestedBy: "orchestrator",
+          status: "pending",
+          reason: "Deploy to production server",
+          createdAt: "2026-03-05T10:00:00Z",
+        },
+      ]);
+
+      const { ack, respond } = await invokeCommand("/approvals");
+
+      expect(ack).toHaveBeenCalled();
+      expect(respond).toHaveBeenCalledWith({
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            type: "header",
+            text: expect.objectContaining({ text: "Pending Approvals" }),
+          }),
+          expect.objectContaining({
+            type: "section",
+            text: expect.objectContaining({
+              text: expect.stringContaining("Deploy to production server"),
+            }),
+          }),
+          expect.objectContaining({
+            type: "actions",
+            elements: expect.arrayContaining([
+              expect.objectContaining({
+                action_id: "approval_approve",
+                value: "a1-uuid-full",
+                style: "primary",
+              }),
+              expect.objectContaining({
+                action_id: "approval_reject",
+                value: "a1-uuid-full",
+                style: "danger",
+              }),
+            ]),
+          }),
+        ]),
+      });
+    });
+
+    it("shows info message when no pending approvals", async () => {
+      mockClient.listPendingApprovals.mockResolvedValueOnce([]);
+
+      const { respond } = await invokeCommand("/approvals");
+
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "No pending approvals." }),
+      );
+    });
+
+    it("handles API error", async () => {
+      mockClient.listPendingApprovals.mockRejectedValueOnce(new Error("Server error"));
+
+      const { respond } = await invokeCommand("/approvals");
+
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to fetch") }),
+      );
+    });
+  });
+
+  describe("interactive button actions", () => {
+    async function invokeAction(actionId: string, approvalId: string) {
+      const handler = actionHandlers.get(actionId);
+      expect(handler).toBeDefined();
+
+      const ack = vi.fn().mockResolvedValue(undefined);
+      const respond = vi.fn().mockResolvedValue(undefined);
+      const action = { value: approvalId };
+      const body = {
+        channel: { id: "C123" },
+        user: { id: "U456", name: "testuser" },
+      };
+
+      await handler!({ action, ack, respond, body });
+      return { ack, respond };
+    }
+
+    it("approves via button click", async () => {
+      mockClient.resolveApproval.mockResolvedValueOnce({ id: "a1", status: "approved" });
+
+      const { ack, respond } = await invokeAction("approval_approve", "a1");
+
+      expect(ack).toHaveBeenCalled();
+      expect(mockClient.resolveApproval).toHaveBeenCalledWith("a1", {
+        status: "approved",
+        decision: "Approved by testuser via slack",
+      });
+      expect(respond).toHaveBeenCalledWith({
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            type: "section",
+            text: expect.objectContaining({ text: expect.stringContaining("approved") }),
+          }),
+        ]),
+      });
+    });
+
+    it("rejects via button click", async () => {
+      mockClient.resolveApproval.mockResolvedValueOnce({ id: "a1", status: "rejected" });
+
+      const { ack, respond } = await invokeAction("approval_reject", "a1");
+
+      expect(ack).toHaveBeenCalled();
+      expect(mockClient.resolveApproval).toHaveBeenCalledWith("a1", {
+        status: "rejected",
+        decision: "Rejected by testuser via slack",
+      });
+      expect(respond).toHaveBeenCalledWith({
+        blocks: expect.arrayContaining([
+          expect.objectContaining({
+            type: "section",
+            text: expect.objectContaining({ text: expect.stringContaining("rejected") }),
+          }),
+        ]),
+      });
+    });
+
+    it("handles approve button error", async () => {
+      mockClient.resolveApproval.mockRejectedValueOnce(new Error("Already resolved"));
+
+      const { respond } = await invokeAction("approval_approve", "a1");
+
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to approve") }),
+      );
+    });
+
+    it("handles reject button error", async () => {
+      mockClient.resolveApproval.mockRejectedValueOnce(new Error("Already resolved"));
+
+      const { respond } = await invokeAction("approval_reject", "a1");
+
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to reject") }),
+      );
     });
   });
 });

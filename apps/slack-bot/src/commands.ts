@@ -9,6 +9,8 @@ import {
   handleClear,
   handleExecute,
   handleApprove,
+  handleReject,
+  handleListApprovals,
   truncate,
   type CommandContext,
   type HandlerResult,
@@ -157,6 +159,58 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       });
       return;
 
+    case "reject":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: `❌ Approval \`${result.data.approvalId}\` rejected.` } },
+        ],
+      });
+      return;
+
+    case "approvals": {
+      const blocks: Record<string, unknown>[] = [
+        { type: "header", text: { type: "plain_text", text: "Pending Approvals" } },
+      ];
+
+      for (const a of result.data.approvals) {
+        blocks.push({
+          type: "section",
+          text: {
+            type: "mrkdwn",
+            text: `*${a.reason}*\nRequested by: \`${a.requestedBy}\` · Task: \`${a.taskId.slice(0, 8)}…\``,
+          },
+        });
+        blocks.push({
+          type: "actions",
+          elements: [
+            {
+              type: "button",
+              text: { type: "plain_text", text: "Approve" },
+              style: "primary",
+              action_id: "approval_approve",
+              value: a.id,
+            },
+            {
+              type: "button",
+              text: { type: "plain_text", text: "Reject" },
+              style: "danger",
+              action_id: "approval_reject",
+              value: a.id,
+            },
+          ],
+        });
+      }
+
+      blocks.push({
+        type: "context",
+        elements: [{ type: "mrkdwn", text: `${result.data.totalCount} pending approval(s)` }],
+      });
+
+      await respond({ ...base, blocks });
+      return;
+    }
+
     case "info":
       await respond({ ...base, text: result.message });
       return;
@@ -225,5 +279,37 @@ export function registerCommands(app: App): void {
     }
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
     await sendSlackResponse(respond, await handleApprove(client, ctx, approvalId));
+  });
+
+  app.command("/approvals", async ({ ack, respond }) => {
+    await ack();
+    await sendSlackResponse(respond, await handleListApprovals(client));
+  });
+
+  // Interactive button handlers
+  app.action("approval_approve", async ({ action, ack, respond, body }) => {
+    await ack();
+    const approvalId = (action as { value: string }).value;
+    const user = body.user as { id: string; name?: string; username?: string };
+    const ctx = makeContext(
+      body.channel?.id ?? "unknown",
+      user.id,
+      user.name ?? user.username ?? "unknown",
+    );
+    const result = await handleApprove(client, ctx, approvalId);
+    await sendSlackResponse(respond, result);
+  });
+
+  app.action("approval_reject", async ({ action, ack, respond, body }) => {
+    await ack();
+    const approvalId = (action as { value: string }).value;
+    const user = body.user as { id: string; name?: string; username?: string };
+    const ctx = makeContext(
+      body.channel?.id ?? "unknown",
+      user.id,
+      user.name ?? user.username ?? "unknown",
+    );
+    const result = await handleReject(client, ctx, approvalId);
+    await sendSlackResponse(respond, result);
   });
 }

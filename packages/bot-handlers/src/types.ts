@@ -58,6 +58,23 @@ export interface ApproveResult {
   approvalId: string;
 }
 
+/** Structured result from reject command */
+export interface RejectResult {
+  approvalId: string;
+}
+
+/** Structured result from approvals list command */
+export interface ApprovalsResult {
+  approvals: Array<{
+    id: string;
+    taskId: string;
+    requestedBy: string;
+    reason: string;
+    createdAt: string;
+  }>;
+  totalCount: number;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
@@ -68,6 +85,8 @@ export type HandlerResult =
   | { type: "clear" }
   | { type: "execute"; data: ExecuteResult }
   | { type: "approve"; data: ApproveResult }
+  | { type: "reject"; data: RejectResult }
+  | { type: "approvals"; data: ApprovalsResult }
   | { type: "info"; message: string }
   | { type: "error"; message: string };
 

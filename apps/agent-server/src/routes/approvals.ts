@@ -13,6 +13,7 @@ import {
   TaskIdQuery,
   ListPendingQuery,
 } from "../schemas.js";
+import { notifyApprovalCreated } from "../services/notifications.js";
 
 export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create an approval request */
@@ -21,6 +22,12 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
     { schema: { body: CreateApprovalBody } },
     async (request, reply) => {
       const approval = await createApproval(app.db, request.body);
+      notifyApprovalCreated({
+        approvalId: approval.id,
+        taskId: request.body.taskId,
+        reason: request.body.reason,
+        requestedBy: request.body.requestedBy,
+      }).catch(() => {});
       return reply.status(201).send(approval);
     },
   );

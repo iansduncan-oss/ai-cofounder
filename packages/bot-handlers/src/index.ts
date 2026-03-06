@@ -7,6 +7,8 @@ export {
   handleClear,
   handleExecute,
   handleApprove,
+  handleReject,
+  handleListApprovals,
   truncate,
   STATUS_ICON,
 } from "./handlers.js";
@@ -20,5 +22,7 @@ export type {
   MemoryResult,
   ExecuteResult,
   ApproveResult,
+  RejectResult,
+  ApprovalsResult,
   HandlerResult,
 } from "./types.js";
