@@ -10,6 +10,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@ai-cofounder/api-client": "*",
+    "@ai-cofounder/bot-handlers": "*",
     "@ai-cofounder/shared": "*",
     "discord.js": "^14.25.1"
   }

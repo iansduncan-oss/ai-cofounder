@@ -1,5 +1,18 @@
 import type { App } from "@slack/bolt";
-import { ApiClient, ApiError } from "@ai-cofounder/api-client";
+import { ApiClient } from "@ai-cofounder/api-client";
+import {
+  handleAsk,
+  handleStatus,
+  handleGoals,
+  handleTasks,
+  handleMemory,
+  handleClear,
+  handleExecute,
+  handleApprove,
+  truncate,
+  type CommandContext,
+  type HandlerResult,
+} from "@ai-cofounder/bot-handlers";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 
 const logger = createLogger("slack-commands");
@@ -11,336 +24,206 @@ function createClient(): ApiClient {
   });
 }
 
-function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  return text.slice(0, max - 3) + "...";
+function makeContext(channelId: string, userId: string, userName: string): CommandContext {
+  return {
+    channelId: `slack-${channelId}`,
+    userId,
+    userName,
+    platform: "slack",
+  };
 }
 
-const STATUS_ICON: Record<string, string> = {
-  draft: "📝",
-  active: "🔵",
-  completed: "✅",
-  cancelled: "❌",
-  failed: "❌",
-  in_progress: "🔵",
-  awaiting_approval: "⏳",
-};
+type RespondFn = (msg: string | Record<string, unknown>) => Promise<unknown>;
+
+async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephemeral = false): Promise<void> {
+  const base = ephemeral ? { response_type: "ephemeral" as const } : {};
+
+  switch (result.type) {
+    case "ask": {
+      const footer = [
+        `Agent: ${result.data.agentRole}`,
+        result.data.model ? `Model: ${result.data.model}` : null,
+        result.data.usage
+          ? `Tokens: ${result.data.usage.inputTokens}→${result.data.usage.outputTokens}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: truncate(result.data.response, 3000) } },
+          { type: "context", elements: [{ type: "mrkdwn", text: footer }] },
+        ],
+      });
+      return;
+    }
+
+    case "status":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "AI Cofounder — System Status" } },
+          {
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: `*Status:* ${result.data.status}` },
+              { type: "mrkdwn", text: `*Uptime:* ${result.data.uptimeMinutes}m` },
+            ],
+          },
+        ],
+      });
+      return;
+
+    case "goals": {
+      const lines = result.data.goals.map((g) => `${g.icon} *${g.title}* (${g.priority})`);
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Goals" } },
+          { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
+        ],
+      });
+      return;
+    }
+
+    case "tasks": {
+      const lines = result.data.tasks.map((t) => `• *${t.title}* → ${t.assignedAgent}`);
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Pending Tasks" } },
+          { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} pending task(s)` }] },
+        ],
+      });
+      return;
+    }
+
+    case "memory": {
+      const sections = result.data.sections.map(
+        (s) => `*${s.category}*\n${s.items.map((i) => `*${i.key}:* ${i.content}`).join("\n")}`,
+      );
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Memories" } },
+          { type: "section", text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} memory(s)` }] },
+        ],
+      });
+      return;
+    }
+
+    case "clear":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: "✅ Conversation cleared. Next `/ask` starts fresh." } },
+        ],
+      });
+      return;
+
+    case "execute": {
+      const taskLines = result.data.tasks.map(
+        (t) => `${t.icon} *${t.title}* (${t.agent}) — ${t.status}`,
+      );
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: `Executing: ${result.data.goalTitle}` } },
+          { type: "section", text: { type: "mrkdwn", text: taskLines.join("\n") } },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `${result.data.completedTasks}/${result.data.totalTasks} tasks completed · Status: ${result.data.status}`,
+              },
+            ],
+          },
+        ],
+      });
+      return;
+    }
+
+    case "approve":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: `✅ Approval \`${result.data.approvalId}\` approved.` } },
+        ],
+      });
+      return;
+
+    case "info":
+      await respond({ ...base, text: result.message });
+      return;
+
+    case "error":
+      await respond({ ...base, text: result.message });
+      return;
+  }
+}
 
 export function registerCommands(app: App): void {
   const client = createClient();
 
   app.command("/ask", async ({ command, ack, respond }) => {
     await ack();
-
-    try {
-      const channelId = `slack-${command.channel_id}`;
-      let conversationId: string | undefined;
-
-      try {
-        const mapping = await client.getChannelConversation(channelId);
-        conversationId = mapping.conversationId;
-      } catch {
-        // No existing conversation — that's fine
-      }
-
-      const result = await client.runAgent({
-        message: command.text,
-        userId: command.user_id,
-        platform: "slack",
-        conversationId,
-      });
-
-      try {
-        await client.setChannelConversation(channelId, result.conversationId, "slack");
-      } catch (err) {
-        logger.warn({ err, channelId }, "failed to persist conversation mapping");
-      }
-
-      const footer = [
-        `Agent: ${result.agentRole}`,
-        result.model ? `Model: ${result.model}` : null,
-        result.usage ? `Tokens: ${result.usage.inputTokens}→${result.usage.outputTokens}` : null,
-      ]
-        .filter(Boolean)
-        .join(" · ");
-
-      await respond({
-        blocks: [
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: truncate(result.response, 3000) },
-          },
-          {
-            type: "context",
-            elements: [{ type: "mrkdwn", text: footer }],
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "ask command failed");
-      await respond("Something went wrong talking to the AI Cofounder. Is the agent server running?");
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    const result = await handleAsk(client, ctx, command.text);
+    await sendSlackResponse(respond, result);
   });
 
   app.command("/status", async ({ ack, respond }) => {
     await ack();
-
-    try {
-      const health = await client.health();
-      const uptimeMinutes = Math.floor(health.uptime / 60);
-
-      await respond({
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: "AI Cofounder — System Status" },
-          },
-          {
-            type: "section",
-            fields: [
-              { type: "mrkdwn", text: `*Status:* ${health.status}` },
-              { type: "mrkdwn", text: `*Uptime:* ${uptimeMinutes}m` },
-            ],
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "status command failed");
-      await respond(`Agent server unreachable at ${optionalEnv("AGENT_SERVER_URL", "http://localhost:3100")}`);
-    }
+    await sendSlackResponse(respond, await handleStatus(client));
   });
 
   app.command("/goals", async ({ command, ack, respond }) => {
     await ack();
-
-    try {
-      const channelId = `slack-${command.channel_id}`;
-      let conversationId: string;
-
-      try {
-        const mapping = await client.getChannelConversation(channelId);
-        conversationId = mapping.conversationId;
-      } catch {
-        await respond("No conversation in this channel yet. Use `/ask` first.");
-        return;
-      }
-
-      const goals = await client.listGoals(conversationId);
-
-      if (goals.length === 0) {
-        await respond("No goals yet for this channel.");
-        return;
-      }
-
-      const lines = goals.map(
-        (g) => `${STATUS_ICON[g.status] ?? "⚪"} *${g.title}* (${g.priority})`,
-      );
-
-      await respond({
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: "Goals" },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: lines.join("\n") },
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "goals command failed");
-      await respond("Failed to fetch goals.");
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleGoals(client, ctx));
   });
 
   app.command("/tasks", async ({ ack, respond }) => {
     await ack();
-
-    try {
-      const tasks = await client.listPendingTasks();
-
-      if (tasks.length === 0) {
-        await respond("No pending tasks.");
-        return;
-      }
-
-      const lines = tasks
-        .slice(0, 15)
-        .map((t) => `• *${t.title}* → ${t.assignedAgent ?? "unassigned"}`);
-
-      await respond({
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: "Pending Tasks" },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: lines.join("\n") },
-          },
-          {
-            type: "context",
-            elements: [{ type: "mrkdwn", text: `${tasks.length} pending task(s)` }],
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "tasks command failed");
-      await respond("Failed to fetch tasks.");
-    }
+    await sendSlackResponse(respond, await handleTasks(client));
   });
 
   app.command("/memory", async ({ command, ack, respond }) => {
     await ack();
-
-    try {
-      let userId: string;
-      try {
-        const user = await client.getUserByPlatform("slack", command.user_id);
-        userId = user.id;
-      } catch {
-        await respond({
-          response_type: "ephemeral",
-          text: "I don't have any memories of you yet. Start a conversation with `/ask` first!",
-        });
-        return;
-      }
-
-      const memories = await client.listMemories(userId);
-
-      if (memories.length === 0) {
-        await respond({
-          response_type: "ephemeral",
-          text: "I know who you are, but I haven't saved any memories yet. Chat with me via `/ask` and I'll start remembering!",
-        });
-        return;
-      }
-
-      const grouped = new Map<string, string[]>();
-      for (const m of memories) {
-        const list = grouped.get(m.category) ?? [];
-        list.push(`*${m.key}:* ${m.content}`);
-        grouped.set(m.category, list);
-      }
-
-      const sections = [...grouped.entries()].map(
-        ([cat, items]) => `*${cat}*\n${items.join("\n")}`,
-      );
-
-      await respond({
-        response_type: "ephemeral",
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: `Memories — ${command.user_name}` },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) },
-          },
-          {
-            type: "context",
-            elements: [{ type: "mrkdwn", text: `${memories.length} memory(s)` }],
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "memory command failed");
-      await respond({ response_type: "ephemeral", text: "Failed to fetch memories." });
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleMemory(client, ctx), true);
   });
 
   app.command("/clear", async ({ command, ack, respond }) => {
     await ack();
-
-    try {
-      const channelId = `slack-${command.channel_id}`;
-      await client.deleteChannelConversation(channelId);
-
-      await respond({
-        blocks: [
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: "✅ Conversation cleared. Next `/ask` starts fresh." },
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err }, "clear command failed");
-      await respond("Failed to clear conversation.");
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleClear(client, ctx));
   });
 
   app.command("/execute", async ({ command, ack, respond }) => {
     await ack();
-
     const goalId = command.text.trim();
     if (!goalId) {
       await respond("Usage: `/execute <goal_id>`");
       return;
     }
-
-    try {
-      const data = await client.executeGoal(goalId, { userId: command.user_id });
-
-      const taskLines = data.tasks.map(
-        (t) => `${STATUS_ICON[t.status] ?? "⚪"} *${t.title}* (${t.agent}) — ${t.status}`,
-      );
-
-      await respond({
-        blocks: [
-          {
-            type: "header",
-            text: { type: "plain_text", text: `Executing: ${data.goalTitle}` },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: taskLines.join("\n") },
-          },
-          {
-            type: "context",
-            elements: [
-              {
-                type: "mrkdwn",
-                text: `${data.completedTasks}/${data.totalTasks} tasks completed · Status: ${data.status}`,
-              },
-            ],
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err, goalId }, "execute command failed");
-      await respond(`Failed to execute goal: ${goalId}`);
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleExecute(client, ctx, goalId));
   });
 
   app.command("/approve", async ({ command, ack, respond }) => {
     await ack();
-
     const approvalId = command.text.trim();
     if (!approvalId) {
       await respond("Usage: `/approve <approval_id>`");
       return;
     }
-
-    try {
-      await client.resolveApproval(approvalId, {
-        status: "approved",
-        decision: `Approved by ${command.user_name} via Slack`,
-      });
-
-      await respond({
-        blocks: [
-          {
-            type: "section",
-            text: { type: "mrkdwn", text: `✅ Approval \`${approvalId}\` approved.` },
-          },
-        ],
-      });
-    } catch (err) {
-      logger.error({ err, approvalId }, "approve command failed");
-      await respond(`Failed to approve: ${approvalId}`);
-    }
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleApprove(client, ctx, approvalId));
   });
 }

@@ -15,6 +15,7 @@
   "dependencies": {
     "@slack/bolt": "^4.3.0",
     "@ai-cofounder/shared": "*",
-    "@ai-cofounder/api-client": "*"
+    "@ai-cofounder/api-client": "*",
+    "@ai-cofounder/bot-handlers": "*"
   }
 }

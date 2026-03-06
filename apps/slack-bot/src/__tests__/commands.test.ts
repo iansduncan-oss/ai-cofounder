@@ -130,7 +130,7 @@ describe("slack commands", () => {
       const { respond } = await invokeCommand("/ask", "Hello");
 
       expect(respond).toHaveBeenCalledWith(
-        expect.stringContaining("Something went wrong"),
+        expect.objectContaining({ text: expect.stringContaining("Something went wrong") }),
       );
     });
 
@@ -184,7 +184,7 @@ describe("slack commands", () => {
       const { respond } = await invokeCommand("/status");
 
       expect(respond).toHaveBeenCalledWith(
-        expect.stringContaining("unreachable"),
+        expect.objectContaining({ text: expect.stringContaining("unreachable") }),
       );
     });
   });
@@ -196,7 +196,7 @@ describe("slack commands", () => {
       const { respond } = await invokeCommand("/goals");
 
       expect(respond).toHaveBeenCalledWith(
-        expect.stringContaining("No conversation"),
+        expect.objectContaining({ text: expect.stringContaining("No conversation") }),
       );
     });
 
@@ -225,7 +225,9 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/goals");
 
-      expect(respond).toHaveBeenCalledWith(expect.stringContaining("No goals"));
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("No goals") }),
+      );
     });
   });
 
@@ -252,7 +254,9 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/tasks");
 
-      expect(respond).toHaveBeenCalledWith("No pending tasks.");
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "No pending tasks." }),
+      );
     });
   });
 
@@ -323,7 +327,9 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/clear");
 
-      expect(respond).toHaveBeenCalledWith(expect.stringContaining("Failed to clear"));
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to clear") }),
+      );
     });
   });
 
@@ -358,7 +364,9 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/execute", "bad-id");
 
-      expect(respond).toHaveBeenCalledWith(expect.stringContaining("Failed to execute goal"));
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to execute goal") }),
+      );
     });
 
     it("shows usage message when no goal_id provided", async () => {
@@ -376,7 +384,7 @@ describe("slack commands", () => {
 
       expect(mockClient.resolveApproval).toHaveBeenCalledWith("a1", {
         status: "approved",
-        decision: "Approved by testuser via Slack",
+        decision: "Approved by testuser via slack",
       });
       expect(respond).toHaveBeenCalledWith({
         blocks: expect.arrayContaining([
@@ -393,7 +401,9 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/approve", "a1");
 
-      expect(respond).toHaveBeenCalledWith(expect.stringContaining("Failed to approve"));
+      expect(respond).toHaveBeenCalledWith(
+        expect.objectContaining({ text: expect.stringContaining("Failed to approve") }),
+      );
     });
 
     it("shows usage message when no approval_id provided", async () => {

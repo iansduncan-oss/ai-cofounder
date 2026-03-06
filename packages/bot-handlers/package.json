@@ -1,0 +1,19 @@
+{
+  "name": "@ai-cofounder/bot-handlers",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@ai-cofounder/api-client": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.3"
+  }
+}
