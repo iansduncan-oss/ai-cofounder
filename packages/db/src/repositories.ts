@@ -1,5 +1,6 @@
 import { eq, and, desc, asc, ilike, or, sql } from "drizzle-orm";
 import type { Db } from "./client.js";
+import type { AgentRole } from "@ai-cofounder/shared";
 import {
   users,
   goals,
@@ -17,6 +18,7 @@ import {
   events,
   workSessions,
   milestones,
+  conversationSummaries,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -98,7 +100,7 @@ export async function createMessage(
   data: {
     conversationId: string;
     role: "user" | "agent" | "system";
-    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger";
+    agentRole?: AgentRole;
     content: string;
     metadata?: Record<string, unknown>;
   },
@@ -107,13 +109,14 @@ export async function createMessage(
   return msg;
 }
 
-export async function getConversationMessages(db: Db, conversationId: string, limit = 50) {
+export async function getConversationMessages(db: Db, conversationId: string, limit = 50, offset = 0) {
   return db
     .select()
     .from(messages)
     .where(eq(messages.conversationId, conversationId))
     .orderBy(desc(messages.createdAt))
-    .limit(limit);
+    .limit(limit)
+    .offset(offset);
 }
 
 /* ────────────────────────── Goals ────────────────────────── */
@@ -199,7 +202,7 @@ export async function listPendingTasks(db: Db, limit = 50) {
 export async function assignTask(
   db: Db,
   id: string,
-  agent: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger",
+  agent: AgentRole,
 ) {
   const [updated] = await db
     .update(tasks)
@@ -765,7 +768,7 @@ export async function recordLlmUsage(
     provider: string;
     model: string;
     taskCategory: string;
-    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger";
+    agentRole?: AgentRole;
     inputTokens: number;
     outputTokens: number;
     goalId?: string;
@@ -1087,4 +1090,38 @@ export async function deleteMilestone(db: Db, id: string) {
   await db.update(goals).set({ milestoneId: null }).where(eq(goals.milestoneId, id));
   const [deleted] = await db.delete(milestones).where(eq(milestones.id, id)).returning();
   return deleted ?? null;
+}
+
+/* ────────────────── Conversation Summaries ──────────────── */
+
+export async function getConversationMessageCount(db: Db, conversationId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId));
+  return rows[0]?.count ?? 0;
+}
+
+export async function saveConversationSummary(
+  db: Db,
+  data: {
+    conversationId: string;
+    summary: string;
+    messageCount: number;
+    fromMessageCreatedAt?: Date;
+    toMessageCreatedAt?: Date;
+  },
+) {
+  const [created] = await db.insert(conversationSummaries).values(data).returning();
+  return created;
+}
+
+export async function getLatestConversationSummary(db: Db, conversationId: string) {
+  const rows = await db
+    .select()
+    .from(conversationSummaries)
+    .where(eq(conversationSummaries.conversationId, conversationId))
+    .orderBy(desc(conversationSummaries.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
 }

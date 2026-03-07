@@ -2,16 +2,23 @@ import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
 import { Orchestrator } from "../agents/orchestrator.js";
+import { summarizeMessages } from "../agents/summarizer.js";
+import type { StreamCallback } from "../agents/stream-events.js";
 import {
   findOrCreateUser,
   createConversation,
   getConversationMessages,
+  getConversationMessageCount,
+  getLatestConversationSummary,
+  saveConversationSummary,
   createMessage,
   recordLlmUsage,
   getTodayTokenTotal,
 } from "@ai-cofounder/db";
-import { optionalEnv } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
+
+const logger = createLogger("agent-routes");
 
 const RunBody = Type.Object({
   message: Type.String({ minLength: 1, maxLength: 32_000 }),
@@ -89,6 +96,56 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }));
     }
 
+    // Lazy conversation summarization for long conversations
+    if (convId && resolvedHistory) {
+      try {
+        const totalMessages = await getConversationMessageCount(app.db, convId);
+        if (totalMessages > 30) {
+          const existingSummary = await getLatestConversationSummary(app.db, convId);
+          const isStale = !existingSummary || existingSummary.messageCount < totalMessages - 10;
+
+          if (isStale) {
+            // Fetch older messages beyond the 50-message window
+            const olderMessages = await getConversationMessages(app.db, convId, 50, 50);
+            if (olderMessages.length > 0) {
+              const olderFormatted = olderMessages.reverse().map((m) => ({
+                role: m.role as "user" | "agent" | "system",
+                content: m.content,
+              }));
+              const summaryText = await summarizeMessages(app.llmRegistry, olderFormatted as AgentMessage[]);
+              await saveConversationSummary(app.db, {
+                conversationId: convId,
+                summary: summaryText,
+                messageCount: totalMessages,
+                fromMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
+                toMessageCreatedAt: olderMessages[0]?.createdAt,
+              });
+
+              // Prepend summary as a synthetic system message at start of history
+              resolvedHistory = [
+                {
+                  role: "system" as const,
+                  content: `[Previous conversation summary]\n${summaryText}`,
+                },
+                ...resolvedHistory,
+              ];
+            }
+          } else {
+            // Use existing summary
+            resolvedHistory = [
+              {
+                role: "system" as const,
+                content: `[Previous conversation summary]\n${existingSummary.summary}`,
+              },
+              ...resolvedHistory,
+            ];
+          }
+        }
+      } catch (err) {
+        logger.warn({ err, convId }, "conversation summarization failed (non-fatal)");
+      }
+    }
+
     const llmStart = Date.now();
     const result = await orchestrator.run(
       message,
@@ -144,5 +201,146 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     return result;
+  });
+
+  // SSE streaming endpoint
+  app.post<{ Body: RunBody }>("/run/stream", { schema: { tags: ["agents"], body: RunBody } }, async (request, reply) => {
+    if (dailyTokenLimit > 0) {
+      const todayTotal = await getTodayTokenTotal(app.db);
+      if (todayTotal >= dailyTokenLimit) {
+        return reply.status(429).send({
+          error: "Daily token limit exceeded",
+          todayTotal,
+          limit: dailyTokenLimit,
+        });
+      }
+    }
+
+    const { message, conversationId, userId, platform, history } = request.body;
+
+    let convId = conversationId;
+    let dbUserId: string | undefined;
+
+    if (userId) {
+      const user = await findOrCreateUser(app.db, userId, platform ?? "unknown");
+      dbUserId = user.id;
+
+      if (!convId) {
+        const conv = await createConversation(app.db, { userId: user.id });
+        convId = conv.id;
+      }
+    }
+
+    let resolvedHistory = history;
+    if (!resolvedHistory && convId) {
+      const dbMessages = await getConversationMessages(app.db, convId, 50);
+      resolvedHistory = dbMessages.reverse().map((m) => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        role: m.role as "user" | "agent" | "system",
+        agentRole: m.agentRole ?? undefined,
+        content: m.content,
+        metadata: m.metadata as Record<string, unknown> | undefined,
+        createdAt: m.createdAt,
+      }));
+    }
+
+    if (convId && resolvedHistory) {
+      try {
+        const totalMessages = await getConversationMessageCount(app.db, convId);
+        if (totalMessages > 30) {
+          const existingSummary = await getLatestConversationSummary(app.db, convId);
+          const isStale = !existingSummary || existingSummary.messageCount < totalMessages - 10;
+
+          if (isStale) {
+            const olderMessages = await getConversationMessages(app.db, convId, 50, 50);
+            if (olderMessages.length > 0) {
+              const olderFormatted = olderMessages.reverse().map((m) => ({
+                role: m.role as "user" | "agent" | "system",
+                content: m.content,
+              }));
+              const summaryText = await summarizeMessages(app.llmRegistry, olderFormatted as AgentMessage[]);
+              await saveConversationSummary(app.db, {
+                conversationId: convId,
+                summary: summaryText,
+                messageCount: totalMessages,
+                fromMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
+                toMessageCreatedAt: olderMessages[0]?.createdAt,
+              });
+
+              resolvedHistory = [
+                { role: "system" as const, content: `[Previous conversation summary]\n${summaryText}` },
+                ...resolvedHistory,
+              ];
+            }
+          } else {
+            resolvedHistory = [
+              { role: "system" as const, content: `[Previous conversation summary]\n${existingSummary.summary}` },
+              ...resolvedHistory,
+            ];
+          }
+        }
+      } catch (err) {
+        logger.warn({ err, convId }, "conversation summarization failed (non-fatal)");
+      }
+    }
+
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+
+    const send = (event: string, data: unknown) => {
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const onEvent: StreamCallback = async (event) => {
+      send(event.type, event.data);
+    };
+
+    try {
+      const result = await orchestrator.runStream(
+        message,
+        onEvent,
+        convId,
+        resolvedHistory as AgentMessage[] | undefined,
+        dbUserId,
+      );
+
+      // Persist messages to DB
+      if (result.conversationId) {
+        const cid = result.conversationId;
+        await createMessage(app.db, { conversationId: cid, role: "user", content: message });
+        await createMessage(app.db, {
+          conversationId: cid,
+          role: "agent",
+          agentRole: "orchestrator",
+          content: result.response,
+          metadata: result.usage
+            ? { usage: result.usage, model: result.model, provider: result.provider }
+            : undefined,
+        });
+      }
+
+      if (result.usage && result.model) {
+        try {
+          await recordLlmUsage(app.db, {
+            provider: result.provider ?? "unknown",
+            model: result.model,
+            taskCategory: "conversation",
+            agentRole: "orchestrator",
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            conversationId: result.conversationId,
+          });
+        } catch { /* non-fatal */ }
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      send("error", { error: errorMsg });
+    } finally {
+      reply.raw.end();
+    }
   });
 };

@@ -121,7 +121,7 @@ You have a review_code tool — use it to self-review your code before finalizin
           this.logger.warn({ err }, "failed to persist code execution result");
         }
       }
-      return {
+      const response: Record<string, unknown> = {
         stdout: result.stdout,
         stderr: result.stderr,
         exitCode: result.exitCode,
@@ -129,6 +129,13 @@ You have a review_code tool — use it to self-review your code before finalizin
         timedOut: result.timedOut,
         language: result.language,
       };
+
+      if (result.exitCode !== 0 || result.timedOut) {
+        response.action_required =
+          "The code execution failed. Analyze the error output, identify the issue, and produce a corrected version.";
+      }
+
+      return response;
     }
 
     return { error: `Unknown tool: ${block.name}` };

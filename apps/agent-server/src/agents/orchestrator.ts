@@ -59,6 +59,7 @@ import {
 import { RUN_TESTS_TOOL } from "./tools/workspace-tools.js";
 import { CREATE_PR_TOOL, executeCreatePr } from "./tools/github-tools.js";
 import type { CreatePrInput } from "./tools/github-tools.js";
+import type { StreamCallback } from "./stream-events.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
@@ -256,10 +257,40 @@ export class Orchestrator {
     let memoryContext = "";
     if (userId && this.db) {
       const userMemories = await recallMemories(this.db, userId, { limit: 20 });
-      if (userMemories.length > 0) {
-        memoryContext = userMemories
-          .map((m) => `- [${m.category}] ${m.key}: ${m.content}`)
-          .join("\n");
+
+      // Auto semantic retrieval: find memories relevant to the current message
+      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
+      if (this.embeddingService) {
+        try {
+          const queryEmbedding = await this.embeddingService.embed(message);
+          const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
+          relevantMemories = vectorResults.map((m) => ({
+            id: m.id,
+            category: m.category,
+            key: m.key,
+            content: m.content,
+          }));
+        } catch (err) {
+          this.logger.warn({ err }, "auto semantic memory retrieval failed (non-fatal)");
+        }
+      }
+
+      // Merge: relevant first, then importance-based (dedupe by ID)
+      const seenIds = new Set(relevantMemories.map((m) => m.id));
+      const generalMemories = userMemories.filter((m) => !seenIds.has(m.id));
+
+      const parts: string[] = [];
+      if (relevantMemories.length > 0) {
+        parts.push("Relevant to this conversation:");
+        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+      }
+      if (generalMemories.length > 0) {
+        if (parts.length > 0) parts.push("");
+        parts.push("General knowledge:");
+        parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+      }
+      if (parts.length > 0) {
+        memoryContext = parts.join("\n");
       }
     }
 
@@ -398,6 +429,150 @@ export class Orchestrator {
     } catch (err) {
       this.logger.error({ conversationId: id, err }, "orchestrator run failed");
       throw err;
+    }
+  }
+
+  async runStream(
+    message: string,
+    onEvent: StreamCallback,
+    conversationId?: string,
+    history?: AgentMessage[],
+    userId?: string,
+  ): Promise<OrchestratorResult> {
+    const id = conversationId ?? crypto.randomUUID();
+
+    await onEvent({ type: "thinking", data: { round: 0, message: "Loading context..." } });
+
+    // Reuse run() setup: memory loading
+    let memoryContext = "";
+    if (userId && this.db) {
+      const userMemories = await recallMemories(this.db, userId, { limit: 20 });
+      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
+      if (this.embeddingService) {
+        try {
+          const queryEmbedding = await this.embeddingService.embed(message);
+          const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
+          relevantMemories = vectorResults.map((m) => ({ id: m.id, category: m.category, key: m.key, content: m.content }));
+        } catch { /* non-fatal */ }
+      }
+      const seenIds = new Set(relevantMemories.map((m) => m.id));
+      const generalMemories = userMemories.filter((m) => !seenIds.has(m.id));
+      const parts: string[] = [];
+      if (relevantMemories.length > 0) {
+        parts.push("Relevant to this conversation:");
+        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+      }
+      if (generalMemories.length > 0) {
+        if (parts.length > 0) parts.push("");
+        parts.push("General knowledge:");
+        parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+      }
+      if (parts.length > 0) memoryContext = parts.join("\n");
+    }
+
+    const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
+    const messages: LlmMessage[] = [];
+    const trimmed = history?.length ? this.trimHistory(history) : [];
+    for (const msg of trimmed) {
+      messages.push({ role: msg.role === "user" ? "user" : "assistant", content: msg.content });
+    }
+    messages.push({ role: "user", content: message });
+
+    const tools: LlmTool[] = this.db
+      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL, BROWSE_WEB_TOOL]
+      : [SEARCH_WEB_TOOL, BROWSE_WEB_TOOL];
+    if (this.n8nService && this.db) tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
+    if (this.sandboxService?.available) tools.push(EXECUTE_CODE_TOOL);
+    if (this.db) tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
+    if (this.workspaceService) {
+      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
+      tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
+      tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
+    }
+
+    try {
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+      let plan: PlanResult | undefined;
+
+      await onEvent({ type: "thinking", data: { round: 1, message: "Generating response..." } });
+
+      let response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096 });
+      totalInputTokens += response.usage.inputTokens;
+      totalOutputTokens += response.usage.outputTokens;
+      const providerName = response.provider;
+
+      const MAX_TOOL_ROUNDS = 5;
+      let round = 0;
+
+      while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
+        round++;
+        const toolResults: LlmToolResultContent[] = [];
+
+        for (const block of response.content) {
+          if (block.type === "tool_use") {
+            const toolInput = block.input as Record<string, unknown>;
+            await onEvent({ type: "tool_call", data: { tool: block.name, input: this.sanitizeToolInput(toolInput) } });
+
+            const result = await this.executeTool(block, id, userId);
+            if (block.name === "create_plan" && result && "goalId" in (result as object)) {
+              plan = result as PlanResult;
+            }
+
+            await onEvent({ type: "tool_result", data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) } });
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+          }
+        }
+
+        messages.push({ role: "assistant", content: response.content });
+        messages.push({ role: "user", content: toolResults });
+
+        await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
+        response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096 });
+        totalInputTokens += response.usage.inputTokens;
+        totalOutputTokens += response.usage.outputTokens;
+      }
+
+      const textBlocks = response.content.filter((b): b is LlmTextContent => b.type === "text").map((b) => b.text);
+      let responseText = textBlocks.join("\n");
+      if (!responseText && plan) responseText = this.buildPlanSummary(plan);
+
+      await onEvent({ type: "text_delta", data: { text: responseText } });
+      await onEvent({ type: "done", data: { response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens } } });
+
+      return { conversationId: id, agentRole: "orchestrator", response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }, plan };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      await onEvent({ type: "error", data: { error: errorMsg } });
+      throw err;
+    }
+  }
+
+  private sanitizeToolInput(input: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (typeof value === "string" && value.length > 200) {
+        sanitized[key] = value.slice(0, 200) + "...";
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    return sanitized;
+  }
+
+  private summarizeToolResult(toolName: string, result: unknown): string {
+    if (!result || typeof result !== "object") return "completed";
+    const r = result as Record<string, unknown>;
+    if (r.error) return `error: ${String(r.error).slice(0, 100)}`;
+    switch (toolName) {
+      case "create_plan": return `Plan created: ${r.goalTitle ?? ""}`;
+      case "search_web": return `Found results`;
+      case "save_memory": return `Saved: ${r.key ?? ""}`;
+      case "recall_memories": return `Recalled ${Array.isArray(result) ? result.length : 0} memories`;
+      case "execute_code": return `Exit code: ${r.exitCode ?? "?"}`;
+      case "read_file": return `Read: ${r.path ?? ""}`;
+      case "write_file": return `Wrote: ${r.path ?? ""}`;
+      default: return "completed";
     }
   }
 
