@@ -75,9 +75,19 @@ export interface ApprovalsResult {
   totalCount: number;
 }
 
+/** Streaming ask result with progressive chunk callback */
+export interface StreamingAskResult {
+  response: string;
+  agentRole: string;
+  model?: string;
+  usage?: { inputTokens: number; outputTokens: number };
+  conversationId: string;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
+  | { type: "ask_streaming"; data: StreamingAskResult }
   | { type: "status"; data: StatusResult }
   | { type: "goals"; data: GoalsResult }
   | { type: "tasks"; data: TasksResult }

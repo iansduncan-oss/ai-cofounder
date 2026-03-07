@@ -2,6 +2,7 @@ import type { App } from "@slack/bolt";
 import { ApiClient } from "@ai-cofounder/api-client";
 import {
   handleAsk,
+  handleAskStreaming,
   handleStatus,
   handleGoals,
   handleTasks,
@@ -41,7 +42,8 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
   const base = ephemeral ? { response_type: "ephemeral" as const } : {};
 
   switch (result.type) {
-    case "ask": {
+    case "ask":
+    case "ask_streaming": {
       const footer = [
         `Agent: ${result.data.agentRole}`,
         result.data.model ? `Model: ${result.data.model}` : null,
@@ -224,11 +226,60 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
 export function registerCommands(app: App): void {
   const client = createClient();
 
-  app.command("/ask", async ({ command, ack, respond }) => {
+  app.command("/ask", async ({ command, ack, respond, client: slackClient }) => {
     await ack();
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
-    const result = await handleAsk(client, ctx, command.text);
-    await sendSlackResponse(respond, result);
+
+    // Post initial thinking message
+    const initial = await slackClient.chat.postMessage({
+      channel: command.channel_id,
+      text: "Thinking...",
+    });
+
+    let lastEditTime = 0;
+    const THROTTLE_MS = 1500;
+    const ts = initial.ts;
+
+    const result = await handleAskStreaming(client, ctx, command.text, async (text) => {
+      const now = Date.now();
+      if (ts && now - lastEditTime >= THROTTLE_MS) {
+        lastEditTime = now;
+        try {
+          await slackClient.chat.update({
+            channel: command.channel_id,
+            ts,
+            text: truncate(text, 3000),
+          });
+        } catch {
+          /* edit failures during streaming are non-fatal */
+        }
+      }
+    });
+
+    // Final update with formatted response
+    if (ts && (result.type === "ask_streaming" || result.type === "ask")) {
+      const footer = [
+        `Agent: ${result.data.agentRole}`,
+        result.data.model ? `Model: ${result.data.model}` : null,
+        result.data.usage
+          ? `Tokens: ${result.data.usage.inputTokens}→${result.data.usage.outputTokens}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      await slackClient.chat.update({
+        channel: command.channel_id,
+        ts,
+        text: truncate(result.data.response, 3000),
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: truncate(result.data.response, 3000) } },
+          { type: "context", elements: [{ type: "mrkdwn", text: footer }] },
+        ],
+      });
+    } else {
+      await sendSlackResponse(respond, result);
+    }
   });
 
   app.command("/status", async ({ ack, respond }) => {
@@ -314,29 +365,56 @@ export function registerCommands(app: App): void {
   });
 
   // Event: app_mention — respond when @mentioned in channels
-  app.event("app_mention", async ({ event, say }) => {
+  app.event("app_mention", async ({ event, say, client: slackClient }) => {
     const text = (event.text ?? "").replace(/<@[A-Z0-9]+>/g, "").trim();
     if (!text) return;
     if (!event.user) return;
 
     const ctx = makeContext(event.channel, event.user, event.user);
-    const result = await handleAsk(client, ctx, text);
-    await sendSlackResponse(say as RespondFn, result);
+    const initial = await slackClient.chat.postMessage({ channel: event.channel, text: "Thinking..." });
+    const ts = initial.ts;
+    let lastEditTime = 0;
+
+    const result = await handleAskStreaming(client, ctx, text, async (chunk) => {
+      const now = Date.now();
+      if (ts && now - lastEditTime >= 1500) {
+        lastEditTime = now;
+        try { await slackClient.chat.update({ channel: event.channel, ts, text: truncate(chunk, 3000) }); } catch { /* non-fatal */ }
+      }
+    });
+
+    if (ts && (result.type === "ask_streaming" || result.type === "ask")) {
+      await slackClient.chat.update({ channel: event.channel, ts, text: truncate(result.data.response, 3000) });
+    } else {
+      await sendSlackResponse(say as RespondFn, result);
+    }
   });
 
   // Event: message — respond to DMs
-  app.event("message", async ({ event, say }) => {
+  app.event("message", async ({ event, say, client: slackClient }) => {
     const msg = event as unknown as Record<string, unknown>;
     if (msg.channel_type !== "im") return;
     if (msg.subtype) return;
     if (!msg.text || !msg.user || !msg.channel) return;
 
-    const ctx = makeContext(
-      msg.channel as string,
-      msg.user as string,
-      msg.user as string,
-    );
-    const result = await handleAsk(client, ctx, msg.text as string);
-    await sendSlackResponse(say as RespondFn, result);
+    const channel = msg.channel as string;
+    const ctx = makeContext(channel, msg.user as string, msg.user as string);
+    const initial = await slackClient.chat.postMessage({ channel, text: "Thinking..." });
+    const ts = initial.ts;
+    let lastEditTime = 0;
+
+    const result = await handleAskStreaming(client, ctx, msg.text as string, async (chunk) => {
+      const now = Date.now();
+      if (ts && now - lastEditTime >= 1500) {
+        lastEditTime = now;
+        try { await slackClient.chat.update({ channel, ts, text: truncate(chunk, 3000) }); } catch { /* non-fatal */ }
+      }
+    });
+
+    if (ts && (result.type === "ask_streaming" || result.type === "ask")) {
+      await slackClient.chat.update({ channel, ts, text: truncate(result.data.response, 3000) });
+    } else {
+      await sendSlackResponse(say as RespondFn, result);
+    }
   });
 }

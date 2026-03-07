@@ -16,6 +16,7 @@ vi.mock("@ai-cofounder/shared", () => ({
 const mockClient = {
   health: vi.fn(),
   runAgent: vi.fn(),
+  streamChat: vi.fn(),
   listGoals: vi.fn(),
   listPendingTasks: vi.fn(),
   listPendingApprovals: vi.fn(),
@@ -91,6 +92,15 @@ describe("slack commands", () => {
     registerCommands(app);
   });
 
+  function mockSlackWebClient() {
+    return {
+      chat: {
+        postMessage: vi.fn().mockResolvedValue({ ts: "1234567890.123456" }),
+        update: vi.fn().mockResolvedValue({}),
+      },
+    };
+  }
+
   async function invokeCommand(name: string, text = "", overrides: Record<string, unknown> = {}) {
     const handler = commandHandlers.get(name);
     expect(handler).toBeDefined();
@@ -98,45 +108,47 @@ describe("slack commands", () => {
     const ack = vi.fn().mockResolvedValue(undefined);
     const respond = vi.fn().mockResolvedValue(undefined);
     const command = mockCommand(text, overrides);
+    const client = mockSlackWebClient();
 
-    await handler!({ command, ack, respond });
-    return { ack, respond, command };
+    await handler!({ command, ack, respond, client });
+    return { ack, respond, command, client };
   }
 
   describe("/ask", () => {
-    it("sends message and responds with blocks", async () => {
+    function fakeStream(response: string, model = "claude-sonnet", convId = "conv-1") {
+      return (async function* () {
+        yield { type: "thinking", data: { round: 1 } };
+        yield { type: "text_delta", data: { text: response } };
+        yield { type: "done", data: { response, model, conversationId: convId, usage: { inputTokens: 10, outputTokens: 20 } } };
+      })();
+    }
+
+    it("sends message and responds with streaming update", async () => {
       mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-1" });
-      mockClient.runAgent.mockResolvedValueOnce({
-        conversationId: "conv-1",
-        agentRole: "orchestrator",
-        response: "Hello from AI",
-        model: "claude-sonnet",
-        usage: { inputTokens: 10, outputTokens: 20 },
-      });
+      mockClient.streamChat.mockReturnValueOnce(fakeStream("Hello from AI"));
       mockClient.setChannelConversation.mockResolvedValueOnce({});
 
-      const { ack, respond } = await invokeCommand("/ask", "Hello");
+      const { ack, client } = await invokeCommand("/ask", "Hello");
 
       expect(ack).toHaveBeenCalled();
-      expect(mockClient.runAgent).toHaveBeenCalledWith({
+      expect(mockClient.streamChat).toHaveBeenCalledWith({
         message: "Hello",
         userId: "U456",
         platform: "slack",
         conversationId: "conv-1",
       });
-      expect(respond).toHaveBeenCalledWith({
-        blocks: expect.arrayContaining([
-          expect.objectContaining({
-            type: "section",
-            text: expect.objectContaining({ text: "Hello from AI" }),
-          }),
-        ]),
-      });
+      // Final update via chat.update with blocks
+      expect(client.chat.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: "C123",
+          text: "Hello from AI",
+        }),
+      );
     });
 
     it("handles error gracefully", async () => {
       mockClient.getChannelConversation.mockRejectedValueOnce(new Error("not found"));
-      mockClient.runAgent.mockRejectedValueOnce(new Error("Network error"));
+      mockClient.streamChat.mockImplementationOnce(() => { throw new Error("Network error"); });
 
       const { respond } = await invokeCommand("/ask", "Hello");
 
@@ -147,24 +159,18 @@ describe("slack commands", () => {
 
     it("works without existing conversation", async () => {
       mockClient.getChannelConversation.mockRejectedValueOnce(new Error("not found"));
-      mockClient.runAgent.mockResolvedValueOnce({
-        conversationId: "conv-new",
-        agentRole: "orchestrator",
-        response: "Hi there",
-        model: "claude-sonnet",
-      });
+      mockClient.streamChat.mockReturnValueOnce(fakeStream("Hi there", "claude-sonnet", "conv-new"));
       mockClient.setChannelConversation.mockResolvedValueOnce({});
 
-      const { respond } = await invokeCommand("/ask", "Hello");
+      const { client } = await invokeCommand("/ask", "Hello");
 
-      expect(mockClient.runAgent).toHaveBeenCalledWith(
+      expect(mockClient.streamChat).toHaveBeenCalledWith(
         expect.objectContaining({ conversationId: undefined }),
       );
-      expect(respond).toHaveBeenCalledWith({
-        blocks: expect.arrayContaining([
-          expect.objectContaining({ type: "section" }),
-        ]),
-      });
+      // Should update the message with the response
+      expect(client.chat.update).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "Hi there" }),
+      );
     });
   });
 
@@ -571,107 +577,116 @@ describe("slack commands", () => {
   });
 
   describe("event: app_mention", () => {
+    function fakeEventStream(response: string) {
+      return (async function* () {
+        yield { type: "thinking", data: { round: 1 } };
+        yield { type: "text_delta", data: { text: response } };
+        yield { type: "done", data: { response, model: "claude-sonnet", conversationId: "conv-1" } };
+      })();
+    }
+
     async function invokeEvent(eventName: string, event: Record<string, unknown>) {
       const handler = eventHandlers.get(eventName);
       expect(handler).toBeDefined();
 
       const say = vi.fn().mockResolvedValue(undefined);
-      await handler!({ event, say });
-      return { say };
+      const client = {
+        chat: {
+          postMessage: vi.fn().mockResolvedValue({ ts: "123.456" }),
+          update: vi.fn().mockResolvedValue({}),
+        },
+      };
+      await handler!({ event, say, client });
+      return { say, client };
     }
 
-    it("strips bot mention and calls runAgent with cleaned text", async () => {
+    it("strips bot mention and calls streamChat with cleaned text", async () => {
       mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-1" });
-      mockClient.runAgent.mockResolvedValueOnce({
-        conversationId: "conv-1",
-        agentRole: "orchestrator",
-        response: "Mention reply",
-        model: "claude-sonnet",
-        usage: { inputTokens: 5, outputTokens: 10 },
-      });
+      mockClient.streamChat.mockReturnValueOnce(fakeEventStream("Mention reply"));
       mockClient.setChannelConversation.mockResolvedValueOnce({});
 
-      const { say } = await invokeEvent("app_mention", {
+      const { client: slackClient } = await invokeEvent("app_mention", {
         text: "<@U0BOT123> what is the status?",
         channel: "C999",
         user: "U456",
       });
 
-      expect(mockClient.runAgent).toHaveBeenCalledWith(
+      expect(mockClient.streamChat).toHaveBeenCalledWith(
         expect.objectContaining({ message: "what is the status?" }),
       );
-      expect(say).toHaveBeenCalledWith(
-        expect.objectContaining({
-          blocks: expect.arrayContaining([
-            expect.objectContaining({
-              type: "section",
-              text: expect.objectContaining({ text: "Mention reply" }),
-            }),
-          ]),
-        }),
+      expect(slackClient.chat.update).toHaveBeenCalledWith(
+        expect.objectContaining({ text: "Mention reply" }),
       );
     });
 
     it("ignores empty text after stripping mention", async () => {
-      const { say } = await invokeEvent("app_mention", {
+      const { client: sc } = await invokeEvent("app_mention", {
         text: "<@U0BOT123>",
         channel: "C999",
         user: "U456",
       });
 
-      expect(mockClient.runAgent).not.toHaveBeenCalled();
-      expect(say).not.toHaveBeenCalled();
+      expect(mockClient.streamChat).not.toHaveBeenCalled();
+      expect(sc.chat.postMessage).not.toHaveBeenCalled();
     });
   });
 
   describe("event: message (DM)", () => {
+    function fakeDmStream(response: string) {
+      return (async function* () {
+        yield { type: "thinking", data: { round: 1 } };
+        yield { type: "text_delta", data: { text: response } };
+        yield { type: "done", data: { response, model: "claude-sonnet", conversationId: "conv-dm" } };
+      })();
+    }
+
     async function invokeEvent(eventName: string, event: Record<string, unknown>) {
       const handler = eventHandlers.get(eventName);
       expect(handler).toBeDefined();
 
       const say = vi.fn().mockResolvedValue(undefined);
-      await handler!({ event, say });
-      return { say };
+      const client = {
+        chat: {
+          postMessage: vi.fn().mockResolvedValue({ ts: "123.456" }),
+          update: vi.fn().mockResolvedValue({}),
+        },
+      };
+      await handler!({ event, say, client });
+      return { say, client };
     }
 
     it("responds to DM messages", async () => {
       mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-dm" });
-      mockClient.runAgent.mockResolvedValueOnce({
-        conversationId: "conv-dm",
-        agentRole: "orchestrator",
-        response: "DM reply",
-        model: "claude-sonnet",
-        usage: { inputTokens: 5, outputTokens: 10 },
-      });
+      mockClient.streamChat.mockReturnValueOnce(fakeDmStream("DM reply"));
       mockClient.setChannelConversation.mockResolvedValueOnce({});
 
-      const { say } = await invokeEvent("message", {
+      const { client } = await invokeEvent("message", {
         text: "hello from DM",
         channel: "D123",
         channel_type: "im",
         user: "U456",
       });
 
-      expect(mockClient.runAgent).toHaveBeenCalledWith(
+      expect(mockClient.streamChat).toHaveBeenCalledWith(
         expect.objectContaining({ message: "hello from DM" }),
       );
-      expect(say).toHaveBeenCalled();
+      expect(client.chat.update).toHaveBeenCalled();
     });
 
     it("ignores non-DM messages", async () => {
-      const { say } = await invokeEvent("message", {
+      const { client } = await invokeEvent("message", {
         text: "channel message",
         channel: "C123",
         channel_type: "channel",
         user: "U456",
       });
 
-      expect(mockClient.runAgent).not.toHaveBeenCalled();
-      expect(say).not.toHaveBeenCalled();
+      expect(mockClient.streamChat).not.toHaveBeenCalled();
+      expect(client.chat.postMessage).not.toHaveBeenCalled();
     });
 
     it("ignores messages with subtypes", async () => {
-      const { say } = await invokeEvent("message", {
+      const { client } = await invokeEvent("message", {
         text: "edited",
         channel: "D123",
         channel_type: "im",
@@ -679,19 +694,19 @@ describe("slack commands", () => {
         subtype: "message_changed",
       });
 
-      expect(mockClient.runAgent).not.toHaveBeenCalled();
-      expect(say).not.toHaveBeenCalled();
+      expect(mockClient.streamChat).not.toHaveBeenCalled();
+      expect(client.chat.postMessage).not.toHaveBeenCalled();
     });
 
     it("ignores messages with no text", async () => {
-      const { say } = await invokeEvent("message", {
+      const { client: c2 } = await invokeEvent("message", {
         channel: "D123",
         channel_type: "im",
         user: "U456",
       });
 
-      expect(mockClient.runAgent).not.toHaveBeenCalled();
-      expect(say).not.toHaveBeenCalled();
+      expect(mockClient.streamChat).not.toHaveBeenCalled();
+      expect(c2.chat.postMessage).not.toHaveBeenCalled();
     });
   });
 });

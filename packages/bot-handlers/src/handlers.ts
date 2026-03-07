@@ -61,6 +61,70 @@ export async function handleAsk(
   }
 }
 
+export async function handleAskStreaming(
+  client: ApiClient,
+  ctx: CommandContext,
+  message: string,
+  onChunk: (text: string) => void | Promise<void>,
+): Promise<HandlerResult> {
+  try {
+    let conversationId: string | undefined;
+    try {
+      const mapping = await client.getChannelConversation(ctx.channelId);
+      conversationId = mapping.conversationId;
+    } catch {
+      // No existing conversation
+    }
+
+    let accumulated = "";
+    let model: string | undefined;
+    let usage: { inputTokens: number; outputTokens: number } | undefined;
+    let resultConversationId = conversationId ?? "";
+
+    const stream = client.streamChat({
+      message,
+      userId: ctx.userId,
+      platform: ctx.platform,
+      conversationId,
+    });
+
+    for await (const event of stream) {
+      if (event.type === "text_delta" && typeof event.data.text === "string") {
+        accumulated += event.data.text;
+        await onChunk(accumulated);
+      } else if (event.type === "done") {
+        if (typeof event.data.response === "string") accumulated = event.data.response;
+        if (typeof event.data.model === "string") model = event.data.model;
+        if (event.data.usage) usage = event.data.usage as { inputTokens: number; outputTokens: number };
+        if (typeof event.data.conversationId === "string") resultConversationId = event.data.conversationId;
+      } else if (event.type === "error") {
+        return { type: "error", message: String(event.data.error ?? "Stream error") };
+      }
+    }
+
+    try {
+      if (resultConversationId) {
+        await client.setChannelConversation(ctx.channelId, resultConversationId, ctx.platform);
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    return {
+      type: "ask_streaming",
+      data: {
+        response: accumulated,
+        agentRole: "orchestrator",
+        model,
+        usage,
+        conversationId: resultConversationId,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Something went wrong talking to the AI Cofounder. Is the agent server running?" };
+  }
+}
+
 export async function handleStatus(client: ApiClient): Promise<HandlerResult> {
   try {
     const health = await client.health();

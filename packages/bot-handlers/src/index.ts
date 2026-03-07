@@ -1,5 +1,6 @@
 export {
   handleAsk,
+  handleAskStreaming,
   handleStatus,
   handleGoals,
   handleTasks,
@@ -16,6 +17,7 @@ export {
 export type {
   CommandContext,
   AskResult,
+  StreamingAskResult,
   StatusResult,
   GoalsResult,
   TasksResult,

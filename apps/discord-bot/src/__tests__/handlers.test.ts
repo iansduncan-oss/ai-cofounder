@@ -76,21 +76,40 @@ describe("interaction handler", () => {
   });
 
   describe("handleAsk", () => {
+    function createSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>) {
+      const text = events
+        .map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`)
+        .join("");
+      const encoder = new TextEncoder();
+      const chunks = [encoder.encode(text)];
+      let index = 0;
+      return {
+        getReader() {
+          return {
+            read() {
+              if (index < chunks.length) return Promise.resolve({ done: false, value: chunks[index++] });
+              return Promise.resolve({ done: true, value: undefined });
+            },
+            releaseLock: vi.fn(),
+          };
+        },
+      };
+    }
+
     it("sends message to agent server and replies with embed", async () => {
       const channelFetch = vi
         .fn()
         // getChannelConversationId
         .mockResolvedValueOnce({ ok: true, json: () => ({ conversationId: "conv-1" }) })
-        // POST /api/agents/run
+        // POST /api/agents/run/stream (streaming endpoint)
         .mockResolvedValueOnce({
           ok: true,
-          json: () => ({
-            conversationId: "conv-1",
-            agentRole: "orchestrator",
-            response: "Hello from AI",
-            model: "claude-sonnet",
-            usage: { inputTokens: 10, outputTokens: 20 },
-          }),
+          status: 200,
+          body: createSSEBody([
+            { event: "thinking", data: { round: 1, message: "Loading..." } },
+            { event: "text_delta", data: { text: "Hello from AI" } },
+            { event: "done", data: { response: "Hello from AI", model: "claude-sonnet", conversationId: "conv-1", usage: { inputTokens: 10, outputTokens: 20 } } },
+          ]),
         })
         // saveChannelConversationId
         .mockResolvedValueOnce({ ok: true, json: () => ({ conversationId: "conv-1" }) });
@@ -102,6 +121,7 @@ describe("interaction handler", () => {
 
       expect(interaction.deferReply).toHaveBeenCalled();
       expect(interaction.editReply).toHaveBeenCalledWith({
+        content: "",
         embeds: [expect.objectContaining({ data: expect.objectContaining({ color: 0x7c3aed }) })],
       });
     });

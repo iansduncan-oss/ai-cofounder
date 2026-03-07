@@ -53,6 +53,9 @@ export type TaskProgressCallback = (event: {
   output?: string;
 }) => void | Promise<void>;
 
+const RETRYABLE_ROLES: Set<AgentRole> = new Set(["coder", "debugger", "doc_writer"]);
+const MAX_RETRIES = 1;
+
 export class TaskDispatcher {
   private logger = createLogger("task-dispatcher");
   private specialists: Map<AgentRole, SpecialistAgent>;
@@ -103,6 +106,7 @@ export class TaskDispatcher {
     const previousOutputs: string[] = [];
     const taskResults: DispatcherProgress["tasks"] = [];
     let completedCount = 0;
+    const retryCounts = new Map<string, number>();
 
     for (const task of tasks) {
       const agentRole = (task.assignedAgent ?? "researcher") as AgentRole;
@@ -266,6 +270,109 @@ export class TaskDispatcher {
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);
+        const retries = retryCounts.get(task.id) ?? 0;
+
+        // Retry retryable roles once with error context
+        if (RETRYABLE_ROLES.has(agentRole) && retries < MAX_RETRIES) {
+          retryCounts.set(task.id, retries + 1);
+          this.logger.info({ taskId: task.id, agent: agentRole, attempt: retries + 2 }, "retrying task");
+
+          const retryContext: SpecialistContext = {
+            ...context,
+            taskDescription: `${context.taskDescription}\n\n[RETRY] Previous attempt failed with error: ${errorMsg}\nPlease try a different approach.`,
+          };
+
+          try {
+            const retryResult = await specialist.execute(retryContext);
+            await completeTask(this.db, task.id, retryResult.output);
+
+            try {
+              await recordLlmUsage(this.db, {
+                provider: retryResult.provider,
+                model: retryResult.model,
+                taskCategory: specialist.taskCategory,
+                agentRole: agentRole as AgentRole,
+                inputTokens: retryResult.usage.inputTokens,
+                outputTokens: retryResult.usage.outputTokens,
+                goalId,
+                taskId: task.id,
+              });
+            } catch { /* usage tracking failures are non-fatal */ }
+
+            previousOutputs.push(retryResult.output);
+            completedCount++;
+
+            taskResults.push({
+              id: task.id,
+              title: task.title,
+              agent: agentRole,
+              status: "completed",
+              output: retryResult.output,
+            });
+
+            this.logger.info({ taskId: task.id, agent: agentRole }, "task succeeded on retry");
+
+            if (onProgress) {
+              try {
+                await onProgress({
+                  goalId,
+                  goalTitle: goal.title,
+                  taskId: task.id,
+                  taskTitle: task.title,
+                  agent: agentRole,
+                  status: "completed",
+                  completedTasks: completedCount,
+                  totalTasks: tasks.length,
+                  output: retryResult.output.slice(0, 500),
+                });
+              } catch { /* notification failures are non-fatal */ }
+            }
+
+            if (this.notificationService) {
+              this.notificationService.notifyGoalProgress({
+                goalId,
+                goalTitle: goal.title,
+                taskTitle: task.title,
+                agent: agentRole,
+                completedTasks: completedCount,
+                totalTasks: tasks.length,
+                status: "completed",
+              }).catch(() => { /* non-fatal */ });
+            }
+
+            continue;
+          } catch (retryErr) {
+            const retryErrorMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+            this.logger.error({ taskId: task.id, err: retryErr }, "task retry also failed");
+            await failTask(this.db, task.id, retryErrorMsg);
+
+            taskResults.push({
+              id: task.id,
+              title: task.title,
+              agent: agentRole,
+              status: "failed",
+              output: retryErrorMsg,
+            });
+
+            if (this.notificationService) {
+              this.notificationService.notifyTaskFailed({
+                goalId, goalTitle: goal.title, taskId: task.id, taskTitle: task.title, agent: agentRole, error: retryErrorMsg,
+              }).catch(() => { /* non-fatal */ });
+            }
+
+            if (onProgress) {
+              try {
+                await onProgress({
+                  goalId, goalTitle: goal.title, taskId: task.id, taskTitle: task.title, agent: agentRole,
+                  status: "failed", completedTasks: completedCount, totalTasks: tasks.length, output: retryErrorMsg,
+                });
+              } catch { /* non-fatal */ }
+            }
+
+            continue;
+          }
+        }
+
         await failTask(this.db, task.id, errorMsg);
 
         taskResults.push({

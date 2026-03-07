@@ -2,6 +2,7 @@ import { type Interaction, type ChatInputCommandInteraction, EmbedBuilder } from
 import { ApiClient } from "@ai-cofounder/api-client";
 import {
   handleAsk,
+  handleAskStreaming,
   handleStatus,
   handleGoals,
   handleTasks,
@@ -40,7 +41,22 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
     case "ask": {
       const message = interaction.options.getString("message", true);
       await interaction.deferReply();
-      const result = await handleAsk(client, ctx, message);
+
+      let lastEditTime = 0;
+      const THROTTLE_MS = 1500;
+
+      const result = await handleAskStreaming(client, ctx, message, async (text) => {
+        const now = Date.now();
+        if (now - lastEditTime >= THROTTLE_MS) {
+          lastEditTime = now;
+          try {
+            await interaction.editReply({ content: truncate(text, 2000) });
+          } catch {
+            /* edit failures during streaming are non-fatal */
+          }
+        }
+      });
+
       await sendDiscordResponse(interaction, result);
       return;
     }
@@ -102,6 +118,25 @@ async function sendDiscordResponse(
         .setDescription(truncate(result.data.response, 4096))
         .setFooter({ text: footer });
       await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "ask_streaming": {
+      const streamFooter = [
+        `Agent: ${result.data.agentRole}`,
+        result.data.model ? `Model: ${result.data.model}` : null,
+        result.data.usage
+          ? `Tokens: ${result.data.usage.inputTokens}→${result.data.usage.outputTokens}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+
+      const streamEmbed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setDescription(truncate(result.data.response, 4096))
+        .setFooter({ text: streamFooter });
+      await interaction.editReply({ content: "", embeds: [streamEmbed] });
       return;
     }
 
