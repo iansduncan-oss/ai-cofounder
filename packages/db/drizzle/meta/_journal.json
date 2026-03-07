@@ -64,6 +64,27 @@
       "when": 1772777000000,
       "tag": "0011_add_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772778000000,
+      "tag": "0012_add_debugger_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772779000000,
+      "tag": "0013_add_doc_writer_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1772780000000,
+      "tag": "0014_add_conversation_summaries",
+      "breakpoints": true
     }
   ]
 }
