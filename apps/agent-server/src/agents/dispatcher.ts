@@ -21,7 +21,9 @@ import { CoderAgent } from "./specialists/coder.js";
 import { ReviewerAgent } from "./specialists/reviewer.js";
 import { PlannerAgent } from "./specialists/planner.js";
 import { DebuggerAgent } from "./specialists/debugger.js";
+import { DocWriterAgent } from "./specialists/doc-writer.js";
 import type { NotificationService } from "../services/notifications.js";
+import type { WorkspaceService } from "../services/workspace.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -61,6 +63,7 @@ export class TaskDispatcher {
     embeddingService?: EmbeddingService,
     sandboxService?: SandboxService,
     private notificationService?: NotificationService,
+    workspaceService?: WorkspaceService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -68,6 +71,7 @@ export class TaskDispatcher {
       ["reviewer", new ReviewerAgent(registry, db)],
       ["planner", new PlannerAgent(registry, db)],
       ["debugger", new DebuggerAgent(registry, db, embeddingService, sandboxService)],
+      ["doc_writer", new DocWriterAgent(registry, db, embeddingService, workspaceService)],
     ]);
   }
 

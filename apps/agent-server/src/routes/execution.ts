@@ -11,6 +11,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
     app.embeddingService,
     app.sandboxService,
     app.notificationService,
+    app.workspaceService,
   );
 
   // Execute all tasks for a goal

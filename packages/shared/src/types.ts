@@ -1,5 +1,5 @@
 /** Roles an agent can assume in the multi-agent system */
-export type AgentRole = "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger";
+export type AgentRole = "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer";
 
 /** A message passed between agents or between user and agent */
 export interface AgentMessage {

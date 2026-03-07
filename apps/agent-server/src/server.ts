@@ -197,6 +197,32 @@ export function buildServer(registry?: LlmRegistry) {
     logger.warn({ tried: candidates }, "voice UI static files not found");
   }
 
+  // Serve dashboard static files at /dashboard/
+  const dashboardCandidates = [
+    path.resolve(process.cwd(), "apps/dashboard/dist"),
+    path.resolve(process.cwd(), "../dashboard/dist"),
+    path.resolve(__dirname, "../../dashboard/dist"),
+    path.resolve(__dirname, "../../../apps/dashboard/dist"),
+  ];
+  const dashboardRoot = dashboardCandidates.find((p) => fs.existsSync(p));
+
+  if (dashboardRoot) {
+    app.register(fastifyStatic, {
+      root: dashboardRoot,
+      prefix: "/dashboard/",
+      decorateReply: false,
+      wildcard: false,
+    });
+    // SPA fallback: serve index.html for client-side routes
+    app.get("/dashboard/*", (_request, reply) => {
+      const filePath = path.join(dashboardRoot, "index.html");
+      reply.type("text/html").send(fs.readFileSync(filePath));
+    });
+    logger.info({ path: dashboardRoot }, "dashboard static files registered at /dashboard/");
+  } else {
+    logger.warn({ tried: dashboardCandidates }, "dashboard static files not found");
+  }
+
   return { app, logger };
 }
 

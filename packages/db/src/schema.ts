@@ -29,6 +29,7 @@ export const agentRoleEnum = pgEnum("agent_role", [
   "reviewer",
   "planner",
   "debugger",
+  "doc_writer",
 ]);
 
 export const users = pgTable("users", {
@@ -291,6 +292,20 @@ export const workSessions = pgTable("work_sessions", {
   summary: text("summary"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+/* ── Conversation Summaries (context window management) ── */
+
+export const conversationSummaries = pgTable("conversation_summaries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id),
+  summary: text("summary").notNull(),
+  messageCount: integer("message_count").notNull().default(0),
+  fromMessageCreatedAt: timestamp("from_message_created_at", { withTimezone: true }),
+  toMessageCreatedAt: timestamp("to_message_created_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ── n8n Workflow Registry ── */

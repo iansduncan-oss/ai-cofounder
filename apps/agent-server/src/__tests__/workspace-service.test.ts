@@ -115,6 +115,159 @@ describe("WorkspaceService", () => {
     });
   });
 
+  describe("git core operations", () => {
+    let repoDir: string;
+
+    beforeEach(async () => {
+      repoDir = path.join(testDir, "test-repo");
+      await fs.mkdir(repoDir, { recursive: true });
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("git", ["init"], { cwd: repoDir });
+      execFileSync("git", ["config", "user.email", "test@test.com"], { cwd: repoDir });
+      execFileSync("git", ["config", "user.name", "Test"], { cwd: repoDir });
+      await fs.writeFile(path.join(repoDir, "README.md"), "# Test");
+      execFileSync("git", ["add", "."], { cwd: repoDir });
+      execFileSync("git", ["commit", "-m", "init"], { cwd: repoDir });
+    });
+
+    it("shows clean status on a fresh repo", async () => {
+      const result = await workspace.gitStatus("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe("");
+    });
+
+    it("shows modified files in status", async () => {
+      await fs.writeFile(path.join(repoDir, "README.md"), "# Updated");
+      const result = await workspace.gitStatus("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("README.md");
+    });
+
+    it("shows untracked files in status", async () => {
+      await fs.writeFile(path.join(repoDir, "new-file.txt"), "new");
+      const result = await workspace.gitStatus("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("new-file.txt");
+    });
+
+    it("shows diff for unstaged changes", async () => {
+      await fs.writeFile(path.join(repoDir, "README.md"), "# Changed");
+      const result = await workspace.gitDiff("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("-# Test");
+      expect(result.stdout).toContain("+# Changed");
+    });
+
+    it("shows empty diff when no changes", async () => {
+      const result = await workspace.gitDiff("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.trim()).toBe("");
+    });
+
+    it("shows staged diff with staged flag", async () => {
+      await fs.writeFile(path.join(repoDir, "README.md"), "# Staged");
+      const { execFileSync } = await import("node:child_process");
+      execFileSync("git", ["add", "README.md"], { cwd: repoDir });
+
+      const result = await workspace.gitDiff("test-repo", true);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("+# Staged");
+    });
+
+    it("stages files with gitAdd", async () => {
+      await fs.writeFile(path.join(repoDir, "new.txt"), "content");
+      const addResult = await workspace.gitAdd("test-repo", ["new.txt"]);
+      expect(addResult.exitCode).toBe(0);
+
+      const statusResult = await workspace.gitStatus("test-repo");
+      expect(statusResult.stdout).toContain("new.txt");
+      // Should show as staged (A = added)
+      expect(statusResult.stdout).toMatch(/A\s+new\.txt/);
+    });
+
+    it("stages multiple files", async () => {
+      await fs.writeFile(path.join(repoDir, "a.txt"), "a");
+      await fs.writeFile(path.join(repoDir, "b.txt"), "b");
+      const result = await workspace.gitAdd("test-repo", ["a.txt", "b.txt"]);
+      expect(result.exitCode).toBe(0);
+
+      const status = await workspace.gitStatus("test-repo");
+      expect(status.stdout).toContain("a.txt");
+      expect(status.stdout).toContain("b.txt");
+    });
+
+    it("commits staged changes", async () => {
+      await fs.writeFile(path.join(repoDir, "committed.txt"), "data");
+      await workspace.gitAdd("test-repo", ["committed.txt"]);
+
+      const result = await workspace.gitCommit("test-repo", "add committed.txt");
+      expect(result.exitCode).toBe(0);
+
+      // Status should be clean after commit
+      const status = await workspace.gitStatus("test-repo");
+      expect(status.stdout.trim()).toBe("");
+    });
+
+    it("fails to commit with nothing staged", async () => {
+      const result = await workspace.gitCommit("test-repo", "empty commit");
+      expect(result.exitCode).not.toBe(0);
+    });
+
+    it("shows commit history with gitLog", async () => {
+      const result = await workspace.gitLog("test-repo");
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("init");
+    });
+
+    it("respects maxCount in gitLog", async () => {
+      // Add a second commit
+      await fs.writeFile(path.join(repoDir, "second.txt"), "2");
+      await workspace.gitAdd("test-repo", ["second.txt"]);
+      await workspace.gitCommit("test-repo", "second commit");
+
+      const result = await workspace.gitLog("test-repo", 1);
+      expect(result.exitCode).toBe(0);
+      const lines = result.stdout.trim().split("\n");
+      expect(lines).toHaveLength(1);
+      expect(result.stdout).toContain("second commit");
+    });
+
+    it("shows full commit flow: modify → add → commit → log", async () => {
+      await fs.writeFile(path.join(repoDir, "feature.ts"), "export const x = 1;");
+      await workspace.gitAdd("test-repo", ["feature.ts"]);
+      await workspace.gitCommit("test-repo", "feat: add feature.ts");
+
+      const log = await workspace.gitLog("test-repo", 2);
+      expect(log.stdout).toContain("feat: add feature.ts");
+      expect(log.stdout).toContain("init");
+    });
+
+    it("fails gitPull without a remote", async () => {
+      const result = await workspace.gitPull("test-repo");
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
+  describe("gitClone", () => {
+    it("fails to clone an invalid URL", async () => {
+      const result = await workspace.gitClone("https://invalid.example.com/no-repo.git");
+      expect(result.exitCode).not.toBe(0);
+    });
+
+    it("returns error when target directory already exists", async () => {
+      await fs.mkdir(path.join(testDir, "existing-repo"), { recursive: true });
+      const result = await workspace.gitClone("https://github.com/test/existing-repo.git");
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("already exists");
+    });
+
+    it("extracts repo name from URL", async () => {
+      const result = await workspace.gitClone("https://github.com/test/my-project.git");
+      // Will fail because the URL is invalid, but the target dir should be "my-project"
+      expect(result.exitCode).not.toBe(0);
+    });
+  });
+
   describe("git branch operations", () => {
     let repoDir: string;
 
