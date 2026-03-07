@@ -31,6 +31,7 @@ import {
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
+import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
 import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
 import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
 import {
@@ -281,8 +282,8 @@ export class Orchestrator {
 
     // Build tools array (all tools when DB available)
     const tools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL]
-      : [SEARCH_WEB_TOOL];
+      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL, BROWSE_WEB_TOOL]
+      : [SEARCH_WEB_TOOL, BROWSE_WEB_TOOL];
 
     if (this.n8nService && this.db) {
       tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
@@ -526,6 +527,10 @@ export class Orchestrator {
       case "search_web": {
         const input = block.input as { query: string; max_results?: number };
         return executeWebSearch(input.query, input.max_results);
+      }
+      case "browse_web": {
+        const input = block.input as { url: string; max_length?: number };
+        return executeBrowseWeb(input.url, input.max_length);
       }
       case "trigger_workflow": {
         if (!this.n8nService || !this.db) return { error: "n8n integration not available" };

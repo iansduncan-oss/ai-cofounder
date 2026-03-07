@@ -35,6 +35,7 @@ const {
 
 const { RUN_TESTS_TOOL } = await import("../agents/tools/workspace-tools.js");
 const { CREATE_PR_TOOL } = await import("../agents/tools/github-tools.js");
+const { BROWSE_WEB_TOOL } = await import("../agents/tools/browse-web.js");
 
 describe("Filesystem Tool Definitions", () => {
   describe("READ_FILE_TOOL", () => {
@@ -291,6 +292,31 @@ describe("GitHub Tool Definitions", () => {
     it("has optional body string", () => {
       expect(CREATE_PR_TOOL.input_schema.properties.body.type).toBe("string");
       expect(CREATE_PR_TOOL.input_schema.required).not.toContain("body");
+    });
+  });
+});
+
+describe("Browse Web Tool Definition", () => {
+  describe("BROWSE_WEB_TOOL", () => {
+    it("has the correct name", () => {
+      expect(BROWSE_WEB_TOOL.name).toBe("browse_web");
+    });
+
+    it("has a non-empty description", () => {
+      expect(BROWSE_WEB_TOOL.description.length).toBeGreaterThan(20);
+    });
+
+    it("requires url", () => {
+      expect(BROWSE_WEB_TOOL.input_schema.required).toContain("url");
+    });
+
+    it("defines url as string", () => {
+      expect(BROWSE_WEB_TOOL.input_schema.properties.url.type).toBe("string");
+    });
+
+    it("has optional max_length number", () => {
+      expect(BROWSE_WEB_TOOL.input_schema.properties.max_length.type).toBe("number");
+      expect(BROWSE_WEB_TOOL.input_schema.required).not.toContain("max_length");
     });
   });
 });

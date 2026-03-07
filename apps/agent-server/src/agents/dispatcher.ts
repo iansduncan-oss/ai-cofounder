@@ -20,6 +20,7 @@ import { ResearcherAgent } from "./specialists/researcher.js";
 import { CoderAgent } from "./specialists/coder.js";
 import { ReviewerAgent } from "./specialists/reviewer.js";
 import { PlannerAgent } from "./specialists/planner.js";
+import { DebuggerAgent } from "./specialists/debugger.js";
 import type { NotificationService } from "../services/notifications.js";
 
 export interface DispatcherProgress {
@@ -66,6 +67,7 @@ export class TaskDispatcher {
       ["coder", new CoderAgent(registry, db, sandboxService)],
       ["reviewer", new ReviewerAgent(registry, db)],
       ["planner", new PlannerAgent(registry, db)],
+      ["debugger", new DebuggerAgent(registry, db, embeddingService, sandboxService)],
     ]);
   }
 
@@ -157,6 +159,23 @@ export class TaskDispatcher {
         }
       }
 
+      // Push proactive notification for task started
+      if (this.notificationService) {
+        this.notificationService
+          .notifyGoalProgress({
+            goalId,
+            goalTitle: goal.title,
+            taskTitle: task.title,
+            agent: agentRole,
+            completedTasks: completedCount,
+            totalTasks: tasks.length,
+            status: "started",
+          })
+          .catch(() => {
+            /* notification failures are non-fatal */
+          });
+      }
+
       const context: SpecialistContext = {
         taskId: task.id,
         taskTitle: task.title,
@@ -177,7 +196,7 @@ export class TaskDispatcher {
             provider: result.provider,
             model: result.model,
             taskCategory: specialist.taskCategory,
-            agentRole: agentRole as "researcher" | "coder" | "reviewer" | "planner",
+            agentRole: agentRole as AgentRole,
             inputTokens: result.usage.inputTokens,
             outputTokens: result.usage.outputTokens,
             goalId,
@@ -223,6 +242,23 @@ export class TaskDispatcher {
           } catch {
             /* notification failures are non-fatal */
           }
+        }
+
+        // Push proactive notification for task completed
+        if (this.notificationService) {
+          this.notificationService
+            .notifyGoalProgress({
+              goalId,
+              goalTitle: goal.title,
+              taskTitle: task.title,
+              agent: agentRole,
+              completedTasks: completedCount,
+              totalTasks: tasks.length,
+              status: "completed",
+            })
+            .catch(() => {
+              /* notification failures are non-fatal */
+            });
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : String(err);

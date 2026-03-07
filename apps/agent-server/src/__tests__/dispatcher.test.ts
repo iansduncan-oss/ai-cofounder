@@ -26,6 +26,10 @@ vi.mock("@ai-cofounder/db", () => ({
   updateGoalStatus: mockUpdateGoalStatus,
   listPendingApprovals: mockListPendingApprovals,
   recallMemories: vi.fn().mockResolvedValue([]),
+  searchMemoriesByVector: vi.fn().mockResolvedValue([]),
+  saveMemory: vi.fn().mockResolvedValue({}),
+  recordLlmUsage: vi.fn().mockResolvedValue({}),
+  saveCodeExecution: vi.fn().mockResolvedValue({}),
 }));
 
 const mockComplete = vi.fn().mockResolvedValue({
@@ -44,6 +48,7 @@ vi.mock("@ai-cofounder/llm", () => {
     getProvider = vi.fn();
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
+    getProviderHealth = vi.fn().mockReturnValue([]);
   }
   return {
     LlmRegistry: MockLlmRegistry,
@@ -64,6 +69,14 @@ vi.mock("../agents/tools/memory-tools.js", () => ({
   RECALL_MEMORIES_TOOL: { name: "recall_memories", description: "recall", input_schema: { type: "object", properties: {} } },
 }));
 
+vi.mock("../agents/tools/sandbox-tools.js", () => ({
+  EXECUTE_CODE_TOOL: {
+    name: "execute_code",
+    description: "execute",
+    input_schema: { type: "object", properties: { code: { type: "string" }, language: { type: "string" } }, required: ["code", "language"] },
+  },
+}));
+
 vi.mock("../services/notifications.js", () => ({
   NotificationService: class {
     notifyGoalCompleted = vi.fn().mockResolvedValue(undefined);
@@ -82,7 +95,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe("TaskDispatcher", () => {
+describe("TaskDispatcher", { timeout: 15_000 }, () => {
   function createDispatcher(notificationService?: InstanceType<typeof NotificationService>) {
     const registry = new LlmRegistry();
     const db = {} as any;
@@ -304,6 +317,54 @@ describe("TaskDispatcher", () => {
       const result = await dispatcher.runGoal("g-1");
 
       expect(result.status).toBe("completed");
+    });
+
+    it("calls notifyGoalProgress for task started and completed", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Tracked Goal" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Research", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      const ns = new NotificationService();
+      const dispatcher = createDispatcher(ns);
+      await dispatcher.runGoal("g-1");
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Should have been called twice: started + completed
+      expect(ns.notifyGoalProgress).toHaveBeenCalledTimes(2);
+      expect(ns.notifyGoalProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          goalId: "g-1",
+          goalTitle: "Tracked Goal",
+          taskTitle: "Research",
+          agent: "researcher",
+          status: "started",
+        }),
+      );
+      expect(ns.notifyGoalProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          goalId: "g-1",
+          goalTitle: "Tracked Goal",
+          taskTitle: "Research",
+          agent: "researcher",
+          status: "completed",
+        }),
+      );
+    });
+
+    it("dispatches tasks to debugger agent", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Debug Issue" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Investigate crash", assignedAgent: "debugger", orderIndex: 0 },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.completedTasks).toBe(1);
+      expect(result.tasks[0].agent).toBe("debugger");
+      expect(mockAssignTask).toHaveBeenCalledWith(expect.anything(), "t-1", "debugger");
     });
   });
 

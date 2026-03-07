@@ -98,7 +98,7 @@ export async function createMessage(
   data: {
     conversationId: string;
     role: "user" | "agent" | "system";
-    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
+    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger";
     content: string;
     metadata?: Record<string, unknown>;
   },
@@ -199,7 +199,7 @@ export async function listPendingTasks(db: Db, limit = 50) {
 export async function assignTask(
   db: Db,
   id: string,
-  agent: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner",
+  agent: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger",
 ) {
   const [updated] = await db
     .update(tasks)
@@ -765,7 +765,7 @@ export async function recordLlmUsage(
     provider: string;
     model: string;
     taskCategory: string;
-    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
+    agentRole?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger";
     inputTokens: number;
     outputTokens: number;
     goalId?: string;
