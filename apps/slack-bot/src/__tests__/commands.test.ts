@@ -48,6 +48,7 @@ vi.mock("@ai-cofounder/api-client", () => {
 // Mock @slack/bolt
 const commandHandlers = new Map<string, (args: Record<string, unknown>) => Promise<void>>();
 const actionHandlers = new Map<string, (args: Record<string, unknown>) => Promise<void>>();
+const eventHandlers = new Map<string, (args: Record<string, unknown>) => Promise<void>>();
 
 vi.mock("@slack/bolt", () => {
   class MockApp {
@@ -56,6 +57,9 @@ vi.mock("@slack/bolt", () => {
     }
     action(actionId: string, handler: (args: Record<string, unknown>) => Promise<void>) {
       actionHandlers.set(actionId, handler);
+    }
+    event(eventName: string, handler: (args: Record<string, unknown>) => Promise<void>) {
+      eventHandlers.set(eventName, handler);
     }
     async start() {}
   }
@@ -82,6 +86,7 @@ describe("slack commands", () => {
     vi.clearAllMocks();
     commandHandlers.clear();
     actionHandlers.clear();
+    eventHandlers.clear();
     app = new App({ token: "t", signingSecret: "s", appToken: "a", socketMode: true });
     registerCommands(app);
   });
@@ -562,6 +567,131 @@ describe("slack commands", () => {
       expect(respond).toHaveBeenCalledWith(
         expect.objectContaining({ text: expect.stringContaining("Failed to reject") }),
       );
+    });
+  });
+
+  describe("event: app_mention", () => {
+    async function invokeEvent(eventName: string, event: Record<string, unknown>) {
+      const handler = eventHandlers.get(eventName);
+      expect(handler).toBeDefined();
+
+      const say = vi.fn().mockResolvedValue(undefined);
+      await handler!({ event, say });
+      return { say };
+    }
+
+    it("strips bot mention and calls runAgent with cleaned text", async () => {
+      mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-1" });
+      mockClient.runAgent.mockResolvedValueOnce({
+        conversationId: "conv-1",
+        agentRole: "orchestrator",
+        response: "Mention reply",
+        model: "claude-sonnet",
+        usage: { inputTokens: 5, outputTokens: 10 },
+      });
+      mockClient.setChannelConversation.mockResolvedValueOnce({});
+
+      const { say } = await invokeEvent("app_mention", {
+        text: "<@U0BOT123> what is the status?",
+        channel: "C999",
+        user: "U456",
+      });
+
+      expect(mockClient.runAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "what is the status?" }),
+      );
+      expect(say).toHaveBeenCalledWith(
+        expect.objectContaining({
+          blocks: expect.arrayContaining([
+            expect.objectContaining({
+              type: "section",
+              text: expect.objectContaining({ text: "Mention reply" }),
+            }),
+          ]),
+        }),
+      );
+    });
+
+    it("ignores empty text after stripping mention", async () => {
+      const { say } = await invokeEvent("app_mention", {
+        text: "<@U0BOT123>",
+        channel: "C999",
+        user: "U456",
+      });
+
+      expect(mockClient.runAgent).not.toHaveBeenCalled();
+      expect(say).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("event: message (DM)", () => {
+    async function invokeEvent(eventName: string, event: Record<string, unknown>) {
+      const handler = eventHandlers.get(eventName);
+      expect(handler).toBeDefined();
+
+      const say = vi.fn().mockResolvedValue(undefined);
+      await handler!({ event, say });
+      return { say };
+    }
+
+    it("responds to DM messages", async () => {
+      mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-dm" });
+      mockClient.runAgent.mockResolvedValueOnce({
+        conversationId: "conv-dm",
+        agentRole: "orchestrator",
+        response: "DM reply",
+        model: "claude-sonnet",
+        usage: { inputTokens: 5, outputTokens: 10 },
+      });
+      mockClient.setChannelConversation.mockResolvedValueOnce({});
+
+      const { say } = await invokeEvent("message", {
+        text: "hello from DM",
+        channel: "D123",
+        channel_type: "im",
+        user: "U456",
+      });
+
+      expect(mockClient.runAgent).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "hello from DM" }),
+      );
+      expect(say).toHaveBeenCalled();
+    });
+
+    it("ignores non-DM messages", async () => {
+      const { say } = await invokeEvent("message", {
+        text: "channel message",
+        channel: "C123",
+        channel_type: "channel",
+        user: "U456",
+      });
+
+      expect(mockClient.runAgent).not.toHaveBeenCalled();
+      expect(say).not.toHaveBeenCalled();
+    });
+
+    it("ignores messages with subtypes", async () => {
+      const { say } = await invokeEvent("message", {
+        text: "edited",
+        channel: "D123",
+        channel_type: "im",
+        user: "U456",
+        subtype: "message_changed",
+      });
+
+      expect(mockClient.runAgent).not.toHaveBeenCalled();
+      expect(say).not.toHaveBeenCalled();
+    });
+
+    it("ignores messages with no text", async () => {
+      const { say } = await invokeEvent("message", {
+        channel: "D123",
+        channel_type: "im",
+        user: "U456",
+      });
+
+      expect(mockClient.runAgent).not.toHaveBeenCalled();
+      expect(say).not.toHaveBeenCalled();
     });
   });
 });

@@ -312,4 +312,31 @@ export function registerCommands(app: App): void {
     const result = await handleReject(client, ctx, approvalId);
     await sendSlackResponse(respond, result);
   });
+
+  // Event: app_mention — respond when @mentioned in channels
+  app.event("app_mention", async ({ event, say }) => {
+    const text = (event.text ?? "").replace(/<@[A-Z0-9]+>/g, "").trim();
+    if (!text) return;
+    if (!event.user) return;
+
+    const ctx = makeContext(event.channel, event.user, event.user);
+    const result = await handleAsk(client, ctx, text);
+    await sendSlackResponse(say as RespondFn, result);
+  });
+
+  // Event: message — respond to DMs
+  app.event("message", async ({ event, say }) => {
+    const msg = event as unknown as Record<string, unknown>;
+    if (msg.channel_type !== "im") return;
+    if (msg.subtype) return;
+    if (!msg.text || !msg.user || !msg.channel) return;
+
+    const ctx = makeContext(
+      msg.channel as string,
+      msg.user as string,
+      msg.user as string,
+    );
+    const result = await handleAsk(client, ctx, msg.text as string);
+    await sendSlackResponse(say as RespondFn, result);
+  });
 }
