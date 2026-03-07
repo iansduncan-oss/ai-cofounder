@@ -7,13 +7,23 @@ import {
   MessageSquare,
   Settings,
   Search,
+  Brain,
+  Milestone,
+  Activity,
+  BarChart3,
+  FolderOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const commands = [
   { label: "Overview", to: "/dashboard", icon: LayoutDashboard },
   { label: "Goals", to: "/dashboard/goals", icon: Target },
+  { label: "Milestones", to: "/dashboard/milestones", icon: Milestone },
   { label: "Approvals", to: "/dashboard/approvals", icon: ShieldCheck },
+  { label: "Activity", to: "/dashboard/activity", icon: Activity },
+  { label: "Memories", to: "/dashboard/memories", icon: Brain },
+  { label: "Workspace", to: "/dashboard/workspace", icon: FolderOpen },
+  { label: "Usage", to: "/dashboard/usage", icon: BarChart3 },
   { label: "Chat", to: "/dashboard/chat", icon: MessageSquare },
   { label: "Settings", to: "/dashboard/settings", icon: Settings },
 ];

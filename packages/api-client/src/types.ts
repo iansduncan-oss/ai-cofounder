@@ -104,6 +104,51 @@ export interface ExecutionProgress {
   tasks: Array<{ id: string; title: string; agent: string; status: string; output?: string }>;
 }
 
+/* ── Streaming ── */
+
+export type StreamEventType = "thinking" | "tool_call" | "tool_result" | "text_delta" | "done" | "error";
+
+export interface StreamEvent {
+  type: StreamEventType;
+  data: Record<string, unknown>;
+}
+
+export type MilestoneStatus = "planned" | "in_progress" | "completed" | "cancelled";
+
+export interface Milestone {
+  id: string;
+  conversationId: string;
+  title: string;
+  description?: string;
+  status: MilestoneStatus;
+  orderIndex: number;
+  dueDate?: string;
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MilestoneProgress {
+  milestoneId: string;
+  totalGoals: number;
+  completedGoals: number;
+  totalTasks: number;
+  completedTasks: number;
+  percentComplete: number;
+}
+
+export interface FileEntry {
+  name: string;
+  type: "file" | "directory";
+  size?: number;
+  permissions?: string;
+}
+
+export interface DirectoryListing {
+  path: string;
+  entries: FileEntry[];
+}
+
 export interface UsageSummary {
   period: string;
   totalInputTokens: number;

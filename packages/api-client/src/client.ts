@@ -6,11 +6,17 @@ import type {
   AgentRole,
   Approval,
   Memory,
+  Milestone,
+  MilestoneStatus,
+  MilestoneProgress,
+  DirectoryListing,
   HealthResponse,
   ProviderHealth,
   AgentRunResult,
   ExecutionProgress,
   UsageSummary,
+  StreamEvent,
+  StreamEventType,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -172,6 +178,49 @@ export class ApiClient {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
   }
 
+  /* ── Milestones ── */
+
+  createMilestone(data: {
+    conversationId: string;
+    title: string;
+    description?: string;
+    orderIndex?: number;
+    dueDate?: string;
+    createdBy?: string;
+  }) {
+    return this.request<Milestone>("POST", "/api/milestones", data);
+  }
+
+  getMilestone(id: string) {
+    return this.request<Milestone>("GET", `/api/milestones/${id}`);
+  }
+
+  listMilestones(conversationId: string) {
+    return this.request<Milestone[]>("GET", `/api/milestones/conversation/${conversationId}`);
+  }
+
+  updateMilestoneStatus(id: string, status: MilestoneStatus) {
+    return this.request<Milestone>("PATCH", `/api/milestones/${id}/status`, { status });
+  }
+
+  getMilestoneProgress(id: string) {
+    return this.request<MilestoneProgress>("GET", `/api/milestones/${id}/progress`);
+  }
+
+  deleteMilestone(id: string) {
+    return this.request<{ status: string; id: string }>("DELETE", `/api/milestones/${id}`);
+  }
+
+  /* ── Workspace ── */
+
+  listDirectory(path = ".") {
+    return this.request<DirectoryListing>("GET", `/api/workspace/tree?path=${encodeURIComponent(path)}`);
+  }
+
+  readFile(path: string) {
+    return this.request<{ path: string; content: string }>("POST", "/api/workspace/files/read", { path });
+  }
+
   /* ── Channels ── */
 
   getChannelConversation(channelId: string) {
@@ -203,6 +252,57 @@ export class ApiClient {
 
   getUsage(period: "today" | "week" | "month" | "all" = "today") {
     return this.request<UsageSummary>("GET", `/api/usage?period=${period}`);
+  }
+
+  /* ── Streaming ── */
+
+  async *streamChat(data: {
+    message: string;
+    conversationId?: string;
+    userId?: string;
+    platform?: string;
+    history?: Array<{ role: "user" | "agent" | "system"; content: string }>;
+  }): AsyncGenerator<StreamEvent> {
+    const res = await fetch(`${this.baseUrl}/api/agents/run/stream`, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, (errorBody as { error?: string }).error ?? res.statusText);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new ApiError(0, "No response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7);
+          } else if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            yield { type: currentEvent as StreamEventType, data };
+            currentEvent = "";
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
 
