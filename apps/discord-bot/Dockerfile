@@ -5,10 +5,14 @@ WORKDIR /app
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/discord-bot/package.json apps/discord-bot/
 COPY packages/shared/package.json packages/shared/
+COPY packages/api-client/package.json packages/api-client/
+COPY packages/bot-handlers/package.json packages/bot-handlers/
 RUN npm ci --ignore-scripts --force
 
 # Copy source and build
 COPY packages/shared/ packages/shared/
+COPY packages/api-client/ packages/api-client/
+COPY packages/bot-handlers/ packages/bot-handlers/
 COPY apps/discord-bot/ apps/discord-bot/
 RUN npx turbo run build --filter=@ai-cofounder/discord-bot
 
@@ -19,6 +23,10 @@ WORKDIR /app
 COPY --from=base /app/package.json /app/package-lock.json /app/turbo.json ./
 COPY --from=base /app/packages/shared/package.json packages/shared/
 COPY --from=base /app/packages/shared/dist/ packages/shared/dist/
+COPY --from=base /app/packages/api-client/package.json packages/api-client/
+COPY --from=base /app/packages/api-client/dist/ packages/api-client/dist/
+COPY --from=base /app/packages/bot-handlers/package.json packages/bot-handlers/
+COPY --from=base /app/packages/bot-handlers/dist/ packages/bot-handlers/dist/
 COPY --from=base /app/apps/discord-bot/package.json apps/discord-bot/
 COPY --from=base /app/apps/discord-bot/dist/ apps/discord-bot/dist/
 
