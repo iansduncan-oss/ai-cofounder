@@ -28,6 +28,9 @@ RUN rm -rf packages/*/node_modules/drizzle-orm \
 FROM node:24-alpine
 WORKDIR /app
 
+# Install Docker CLI for sandbox code execution
+RUN apk add --no-cache docker-cli
+
 COPY --from=base /app/package.json /app/package-lock.json /app/turbo.json ./
 COPY --from=base /app/packages/shared/package.json packages/shared/
 COPY --from=base /app/packages/shared/dist/ packages/shared/dist/
@@ -40,6 +43,7 @@ COPY --from=base /app/packages/sandbox/package.json packages/sandbox/
 COPY --from=base /app/packages/sandbox/dist/ packages/sandbox/dist/
 COPY --from=base /app/apps/agent-server/package.json apps/agent-server/
 COPY --from=base /app/apps/agent-server/dist/ apps/agent-server/dist/
+COPY apps/voice-ui/public/ apps/voice-ui/public/
 
 RUN npm ci --omit=dev --ignore-scripts --force
 
