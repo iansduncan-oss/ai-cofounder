@@ -139,7 +139,7 @@
         payload.conversationId = conversationId;
       }
 
-      const res = await fetch(API_URL + "/api/agents/run", {
+      const res = await fetch(API_URL + "/voice/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

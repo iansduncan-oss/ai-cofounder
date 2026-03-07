@@ -48,16 +48,20 @@ vi.mock("@ai-cofounder/shared", () => ({
 }));
 
 function mockInteraction(commandName: string, options: Record<string, string> = {}) {
+  const mockMessage = { startThread: vi.fn().mockResolvedValue({}) };
   return {
     isChatInputCommand: () => true,
     commandName,
     channelId: "test-channel-123",
-    user: { id: "user-123", username: "testuser" },
+    user: { id: `user-${Math.random().toString(36).slice(2)}`, username: "testuser" },
     options: {
       getString: (name: string, _required?: boolean) => options[name] ?? null,
+      getSubcommand: () => options._subcommand ?? null,
     },
     deferReply: vi.fn().mockResolvedValue(undefined),
     editReply: vi.fn().mockResolvedValue(undefined),
+    reply: vi.fn().mockResolvedValue(undefined),
+    fetchReply: vi.fn().mockResolvedValue(mockMessage),
   };
 }
 
@@ -222,10 +226,13 @@ describe("interaction handler", () => {
         .mockResolvedValueOnce({ ok: true, json: () => ({ conversationId: "conv-1" }) })
         .mockResolvedValueOnce({
           ok: true,
-          json: () => [
-            { id: "g1", title: "Build MVP", status: "active", priority: "high" },
-            { id: "g2", title: "Deploy", status: "draft", priority: "medium" },
-          ],
+          json: () => ({
+            data: [
+              { id: "g1", title: "Build MVP", status: "active", priority: "high" },
+              { id: "g2", title: "Deploy", status: "draft", priority: "medium" },
+            ],
+            total: 2, limit: 50, offset: 0,
+          }),
         });
 
       const interaction = mockInteraction("goals");
@@ -243,7 +250,7 @@ describe("interaction handler", () => {
     it("shows empty message when no goals exist", async () => {
       (global.fetch as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce({ ok: true, json: () => ({ conversationId: "conv-1" }) })
-        .mockResolvedValueOnce({ ok: true, json: () => [] });
+        .mockResolvedValueOnce({ ok: true, json: () => ({ data: [], total: 0, limit: 50, offset: 0 }) });
 
       const interaction = mockInteraction("goals");
       await handleInteraction(interaction as never);
@@ -317,10 +324,13 @@ describe("interaction handler", () => {
         .mockResolvedValueOnce({ ok: true, json: () => ({ id: "u1", displayName: "Test" }) })
         .mockResolvedValueOnce({
           ok: true,
-          json: () => [
-            { category: "preferences", key: "language", content: "TypeScript" },
-            { category: "preferences", key: "framework", content: "Fastify" },
-          ],
+          json: () => ({
+            data: [
+              { category: "preferences", key: "language", content: "TypeScript" },
+              { category: "preferences", key: "framework", content: "Fastify" },
+            ],
+            total: 2, limit: 50, offset: 0,
+          }),
         });
 
       const interaction = mockInteraction("memory");

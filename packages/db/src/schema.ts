@@ -308,6 +308,34 @@ export const conversationSummaries = pgTable("conversation_summaries", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Provider Health (persisted LLM provider stats) ── */
+
+export const providerHealth = pgTable("provider_health", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  providerName: text("provider_name").notNull().unique(),
+  modelId: text("model_id"),
+  requestCount: integer("request_count").notNull().default(0),
+  successCount: integer("success_count").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0),
+  avgLatencyMs: integer("avg_latency_ms").notNull().default(0),
+  lastErrorMessage: text("last_error_message"),
+  lastErrorAt: timestamp("last_error_at", { withTimezone: true }),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Tool Execution Stats (per-tool timing) ── */
+
+export const toolExecutions = pgTable("tool_executions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  toolName: text("tool_name").notNull(),
+  durationMs: integer("duration_ms").notNull(),
+  success: boolean("success").notNull(),
+  errorMessage: text("error_message"),
+  requestId: text("request_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── n8n Workflow Registry ── */
 
 export const n8nWorkflows = pgTable("n8n_workflows", {

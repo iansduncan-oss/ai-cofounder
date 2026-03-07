@@ -229,9 +229,9 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       return;
     }
 
-    // 5. Rate limiting on /api/* routes (tighter for expensive endpoints)
-    if (url.startsWith("/api/")) {
-      const isExpensive = EXPENSIVE_PATHS.some((p) => url.startsWith(p));
+    // 5. Rate limiting on /api/* and /voice/chat routes (tighter for expensive endpoints)
+    if (url.startsWith("/api/") || url === "/voice/chat") {
+      const isExpensive = EXPENSIVE_PATHS.some((p) => url.startsWith(p)) || url === "/voice/chat";
       const bucket = isExpensive ? expensiveBucket : generalBucket;
       const limit = isExpensive ? expensiveLimitMax : rateLimitMax;
       const { limited, remaining, resetMs } = bucket.check(ip, limit, rateLimitWindowMs);

@@ -150,7 +150,8 @@ export async function handleGoals(client: ApiClient, ctx: CommandContext): Promi
       return { type: "info", message: "No conversation in this channel yet. Use `/ask` first." };
     }
 
-    const goals = await client.listGoals(conversationId);
+    const result = await client.listGoals(conversationId);
+    const goals = result.data;
 
     if (goals.length === 0) {
       return { type: "info", message: "No goals yet for this channel." };
@@ -208,7 +209,8 @@ export async function handleMemory(
       return { type: "info", message: "I don't have any memories of you yet. Start a conversation with `/ask` first!" };
     }
 
-    const memories = await client.listMemories(userId);
+    const result = await client.listMemories(userId);
+    const memories = result.data;
 
     if (memories.length === 0) {
       return {
@@ -304,6 +306,79 @@ export async function handleReject(
     return { type: "reject", data: { approvalId } };
   } catch {
     return { type: "error", message: `Failed to reject: ${approvalId}` };
+  }
+}
+
+const COMMAND_LIST = [
+  { name: "/ask", description: "Ask the AI Cofounder a question" },
+  { name: "/status", description: "Check system health and uptime" },
+  { name: "/goals", description: "List goals for this channel" },
+  { name: "/tasks", description: "List pending tasks" },
+  { name: "/memory", description: "Show your stored memories" },
+  { name: "/clear", description: "Clear conversation in this channel" },
+  { name: "/execute", description: "Execute a goal by ID" },
+  { name: "/approve", description: "Approve a pending approval" },
+  { name: "/schedule", description: "List or create scheduled tasks" },
+  { name: "/help", description: "Show this help message" },
+];
+
+export function handleHelp(): HandlerResult {
+  return {
+    type: "help",
+    data: { commands: COMMAND_LIST },
+  };
+}
+
+export async function handleScheduleList(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const schedules = await client.listSchedules();
+
+    if (schedules.length === 0) {
+      return { type: "info", message: "No schedules configured. Use `/schedule create <cron> <task>` to create one." };
+    }
+
+    return {
+      type: "schedule_list",
+      data: {
+        schedules: schedules.map((s) => ({
+          id: s.id,
+          cronExpression: s.cronExpression,
+          description: s.description ?? s.actionPrompt,
+          enabled: s.enabled,
+          nextRunAt: s.nextRunAt,
+        })),
+        totalCount: schedules.length,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch schedules." };
+  }
+}
+
+export async function handleScheduleCreate(
+  client: ApiClient,
+  cronExpression: string,
+  actionPrompt: string,
+  userId?: string,
+): Promise<HandlerResult> {
+  try {
+    const schedule = await client.createSchedule({
+      cronExpression,
+      actionPrompt,
+      description: actionPrompt,
+      userId,
+    });
+
+    return {
+      type: "schedule_create",
+      data: {
+        id: schedule.id,
+        cronExpression: schedule.cronExpression,
+        description: schedule.description,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to create schedule. Check that your cron expression is valid." };
   }
 }
 

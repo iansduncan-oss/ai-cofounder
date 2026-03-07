@@ -33,6 +33,8 @@ vi.mock("@ai-cofounder/db", () => ({
   getN8nWorkflowByName: (...args: unknown[]) => mockGetN8nWorkflowByName(...args),
   listN8nWorkflows: (...args: unknown[]) => mockListN8nWorkflows(...args),
   getActivePrompt: vi.fn().mockResolvedValue(null),
+  touchMemory: vi.fn().mockResolvedValue(undefined),
+  recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {

@@ -11,6 +11,7 @@ export type {
   Approval,
   Memory,
   Milestone,
+  Schedule,
   MilestoneProgress,
   FileEntry,
   DirectoryListing,
@@ -21,4 +22,10 @@ export type {
   UsageSummary,
   StreamEvent,
   StreamEventType,
+  PaginationParams,
+  PaginatedResponse,
+  Event,
+  GoalSummary,
+  DashboardSummary,
+  BriefingResponse,
 } from "./types.js";

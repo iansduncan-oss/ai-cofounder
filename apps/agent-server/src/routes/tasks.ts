@@ -3,6 +3,7 @@ import {
   createTask,
   getTask,
   listTasksByGoal,
+  countTasksByGoal,
   listPendingTasks,
   assignTask,
   startTask,
@@ -17,6 +18,7 @@ import {
   CompleteTaskBody,
   FailTaskBody,
   ListPendingQuery,
+  TaskListQuery,
 } from "../schemas.js";
 
 export const taskRoutes: FastifyPluginAsync = async (app) => {
@@ -51,12 +53,18 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  /* GET / — list tasks for a goal */
-  app.get<{ Querystring: typeof GoalIdQuery.static }>(
+  /* GET / — list tasks for a goal (paginated) */
+  app.get<{ Querystring: typeof TaskListQuery.static }>(
     "/",
-    { schema: { tags: ["tasks"], querystring: GoalIdQuery } },
+    { schema: { tags: ["tasks"], querystring: TaskListQuery } },
     async (request) => {
-      return listTasksByGoal(app.db, request.query.goalId);
+      const limit = Math.min(request.query.limit ?? 50, 200);
+      const offset = request.query.offset ?? 0;
+      const [data, total] = await Promise.all([
+        listTasksByGoal(app.db, request.query.goalId, { limit, offset }),
+        countTasksByGoal(app.db, request.query.goalId),
+      ]);
+      return { data, total, limit, offset };
     },
   );
 

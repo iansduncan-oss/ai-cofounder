@@ -149,6 +149,19 @@ export interface DirectoryListing {
   entries: FileEntry[];
 }
 
+export interface Schedule {
+  id: string;
+  cronExpression: string;
+  actionPrompt: string;
+  description?: string;
+  userId?: string;
+  enabled: boolean;
+  lastRunAt?: string;
+  nextRunAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UsageSummary {
   period: string;
   totalInputTokens: number;
@@ -158,4 +171,78 @@ export interface UsageSummary {
   byModel: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
   byAgent: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
   requestCount: number;
+}
+
+/* ── Pagination ── */
+
+export interface PaginationParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+/* ── Events ── */
+
+export interface Event {
+  id: string;
+  source: string;
+  type: string;
+  payload: unknown;
+  processed: boolean;
+  result?: string;
+  createdAt: string;
+}
+
+/* ── Briefing ── */
+
+export interface BriefingResponse {
+  sent: boolean;
+  briefing: string;
+  data?: {
+    activeGoals: Array<{ title: string; priority: string; progress: string }>;
+    completedYesterday: Array<{ title: string }>;
+    taskBreakdown: Record<string, number>;
+    costsSinceYesterday: { totalCostUsd: number; requestCount: number };
+    upcomingSchedules: Array<{ description: string; nextRunAt: string | null }>;
+    recentSessions: Array<{ trigger: string; status: string; summary: string | null }>;
+  };
+}
+
+/* ── Dashboard ── */
+
+export interface GoalSummary {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
+export interface DashboardSummary {
+  goals: {
+    activeCount: number;
+    recent: GoalSummary[];
+  };
+  tasks: {
+    pendingCount: number;
+    runningCount: number;
+    completedCount: number;
+    failedCount: number;
+  };
+  providerHealth: ProviderHealth[];
+  costs: {
+    today: number;
+    week: number;
+    month: number;
+  };
+  recentEvents: Event[];
 }

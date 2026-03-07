@@ -152,6 +152,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       convId,
       resolvedHistory as AgentMessage[] | undefined,
       dbUserId,
+      (request as unknown as Record<string, unknown>).requestId as string | undefined,
     );
     const llmDurationMs = Date.now() - llmStart;
 
@@ -306,6 +307,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         convId,
         resolvedHistory as AgentMessage[] | undefined,
         dbUserId,
+        (request as unknown as Record<string, unknown>).requestId as string | undefined,
       );
 
       // Persist messages to DB

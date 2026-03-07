@@ -1,7 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
-import { createEvent } from "@ai-cofounder/db";
+import { createEvent, listEvents, countEvents } from "@ai-cofounder/db";
 import { processEvent } from "../events.js";
+import { PaginationQuery } from "../schemas.js";
 
 const InboundEventBody = Type.Object({
   source: Type.String({ minLength: 1, maxLength: 100 }),
@@ -10,6 +11,21 @@ const InboundEventBody = Type.Object({
 });
 
 export const eventRoutes: FastifyPluginAsync = async (app) => {
+  /* GET / — list events (paginated) */
+  app.get<{ Querystring: typeof PaginationQuery.static }>(
+    "/",
+    { schema: { tags: ["events"], querystring: PaginationQuery } },
+    async (request) => {
+      const limit = Math.min(request.query.limit ?? 50, 200);
+      const offset = request.query.offset ?? 0;
+      const [data, total] = await Promise.all([
+        listEvents(app.db, { limit, offset }),
+        countEvents(app.db),
+      ]);
+      return { data, total, limit, offset };
+    },
+  );
+
   /* POST /inbound — receive an external event */
   app.post<{ Body: typeof InboundEventBody.static }>(
     "/inbound",

@@ -8,6 +8,8 @@ import { memoryCommand } from "./memory.js";
 import { clearCommand } from "./clear.js";
 import { executeCommand } from "./execute.js";
 import { approveCommand } from "./approve.js";
+import { helpCommand } from "./help.js";
+import { scheduleCommand } from "./schedule.js";
 
 const logger = createLogger("discord-commands");
 
@@ -20,6 +22,8 @@ const commands = [
   clearCommand.toJSON(),
   executeCommand.toJSON(),
   approveCommand.toJSON(),
+  helpCommand.toJSON(),
+  scheduleCommand.toJSON(),
 ];
 
 export async function registerCommands(token: string, clientId: string): Promise<void> {

@@ -6,12 +6,16 @@ beforeAll(() => {
 });
 
 const mockCreateEvent = vi.fn();
+const mockListEvents = vi.fn().mockResolvedValue([]);
+const mockCountEvents = vi.fn().mockResolvedValue(0);
 
 vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
   createEvent: (...args: unknown[]) => mockCreateEvent(...args),
+  listEvents: (...args: unknown[]) => mockListEvents(...args),
+  countEvents: (...args: unknown[]) => mockCountEvents(...args),
   // Required by transitive imports
   markEventProcessed: vi.fn(),
   listUnprocessedEvents: vi.fn().mockResolvedValue([]),
@@ -27,10 +31,12 @@ vi.mock("@ai-cofounder/db", () => ({
   getGoal: vi.fn(),
   createGoal: vi.fn().mockResolvedValue({ id: "g-1", title: "Test" }),
   listGoalsByConversation: vi.fn().mockResolvedValue([]),
+  countGoalsByConversation: vi.fn().mockResolvedValue(0),
   updateGoalStatus: vi.fn(),
   getTask: vi.fn(),
   createTask: vi.fn().mockResolvedValue({ id: "t-1" }),
   listTasksByGoal: vi.fn().mockResolvedValue([]),
+  countTasksByGoal: vi.fn().mockResolvedValue(0),
   listPendingTasks: vi.fn().mockResolvedValue([]),
   assignTask: vi.fn(),
   startTask: vi.fn(),
@@ -42,6 +48,7 @@ vi.mock("@ai-cofounder/db", () => ({
   listApprovalsByTask: vi.fn().mockResolvedValue([]),
   resolveApproval: vi.fn(),
   listMemoriesByUser: vi.fn().mockResolvedValue([]),
+  countMemoriesByUser: vi.fn().mockResolvedValue(0),
   deleteMemory: vi.fn(),
   getChannelConversation: vi.fn(),
   upsertChannelConversation: vi.fn(),
@@ -194,5 +201,46 @@ describe("Event routes", () => {
     await app.close();
 
     expect(res.statusCode).toBe(400);
+  });
+
+  it("GET /api/events — lists events (paginated)", async () => {
+    mockListEvents.mockResolvedValueOnce([
+      { id: "evt-1", source: "github", type: "push", payload: {}, processed: true, createdAt: new Date() },
+      { id: "evt-2", source: "cron", type: "tick", payload: {}, processed: false, createdAt: new Date() },
+    ]);
+    mockCountEvents.mockResolvedValueOnce(42);
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/events?limit=10&offset=5",
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data).toHaveLength(2);
+    expect(body.total).toBe(42);
+    expect(body.limit).toBe(10);
+    expect(body.offset).toBe(5);
+  });
+
+  it("GET /api/events — uses defaults without params", async () => {
+    mockListEvents.mockResolvedValueOnce([]);
+    mockCountEvents.mockResolvedValueOnce(0);
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/events",
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.data).toHaveLength(0);
+    expect(body.total).toBe(0);
+    expect(body.limit).toBe(50);
+    expect(body.offset).toBe(0);
   });
 });

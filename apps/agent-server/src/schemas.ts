@@ -91,6 +91,20 @@ export const ListPendingQuery = Type.Object({
 });
 export type ListPendingQuery = Static<typeof ListPendingQuery>;
 
+/* ────────────────────────── Pagination ────────────────────────── */
+
+export const PaginationQuery = Type.Object({
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200, default: 50 })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
+});
+export type PaginationQuery = Static<typeof PaginationQuery>;
+
+export const GoalListQuery = Type.Intersect([ConversationIdQuery, PaginationQuery]);
+export type GoalListQuery = Static<typeof GoalListQuery>;
+
+export const TaskListQuery = Type.Intersect([GoalIdQuery, PaginationQuery]);
+export type TaskListQuery = Static<typeof TaskListQuery>;
+
 /* ────────────────────────── Approvals ────────────────────── */
 
 export const CreateApprovalBody = Type.Object({

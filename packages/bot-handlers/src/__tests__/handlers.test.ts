@@ -12,6 +12,9 @@ import {
   handleApprove,
   handleReject,
   handleListApprovals,
+  handleHelp,
+  handleScheduleList,
+  handleScheduleCreate,
   truncate,
   STATUS_ICON,
 } from "../handlers.js";
@@ -46,6 +49,10 @@ function mockClient(overrides: Partial<ApiClient> = {}): ApiClient {
     deleteChannelConversation: vi.fn(),
     getUserByPlatform: vi.fn(),
     getUsage: vi.fn(),
+    createSchedule: vi.fn(),
+    listSchedules: vi.fn(),
+    deleteSchedule: vi.fn(),
+    toggleSchedule: vi.fn(),
     ...overrides,
   } as unknown as ApiClient;
 }
@@ -165,10 +172,13 @@ describe("handleGoals", () => {
   it("returns goals with icons", async () => {
     const client = mockClient({
       getChannelConversation: vi.fn().mockResolvedValue({ conversationId: "conv-1" }),
-      listGoals: vi.fn().mockResolvedValue([
-        { title: "Build MVP", status: "active", priority: "high" },
-        { title: "Write tests", status: "completed", priority: "medium" },
-      ]),
+      listGoals: vi.fn().mockResolvedValue({
+        data: [
+          { title: "Build MVP", status: "active", priority: "high" },
+          { title: "Write tests", status: "completed", priority: "medium" },
+        ],
+        total: 2, limit: 50, offset: 0,
+      }),
     });
 
     const result = await handleGoals(client, ctx);
@@ -195,7 +205,7 @@ describe("handleGoals", () => {
   it("returns info when no goals", async () => {
     const client = mockClient({
       getChannelConversation: vi.fn().mockResolvedValue({ conversationId: "conv-1" }),
-      listGoals: vi.fn().mockResolvedValue([]),
+      listGoals: vi.fn().mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 }),
     });
 
     const result = await handleGoals(client, ctx);
@@ -255,11 +265,14 @@ describe("handleMemory", () => {
   it("returns grouped memories", async () => {
     const client = mockClient({
       getUserByPlatform: vi.fn().mockResolvedValue({ id: "db-user-1" }),
-      listMemories: vi.fn().mockResolvedValue([
-        { category: "preferences", key: "language", content: "TypeScript" },
-        { category: "preferences", key: "editor", content: "VS Code" },
-        { category: "company", key: "name", content: "Acme Corp" },
-      ]),
+      listMemories: vi.fn().mockResolvedValue({
+        data: [
+          { category: "preferences", key: "language", content: "TypeScript" },
+          { category: "preferences", key: "editor", content: "VS Code" },
+          { category: "company", key: "name", content: "Acme Corp" },
+        ],
+        total: 3, limit: 50, offset: 0,
+      }),
     });
 
     const result = await handleMemory(client, ctx);
@@ -296,7 +309,7 @@ describe("handleMemory", () => {
   it("returns info when no memories", async () => {
     const client = mockClient({
       getUserByPlatform: vi.fn().mockResolvedValue({ id: "db-user-1" }),
-      listMemories: vi.fn().mockResolvedValue([]),
+      listMemories: vi.fn().mockResolvedValue({ data: [], total: 0, limit: 50, offset: 0 }),
     });
 
     const result = await handleMemory(client, ctx);
@@ -447,6 +460,145 @@ describe("handleListApprovals", () => {
     });
 
     const result = await handleListApprovals(client);
+    expect(result.type).toBe("error");
+  });
+});
+
+describe("handleHelp", () => {
+  it("returns list of commands", () => {
+    const result = handleHelp();
+    expect(result.type).toBe("help");
+    if (result.type === "help") {
+      expect(result.data.commands.length).toBeGreaterThan(0);
+      expect(result.data.commands[0]).toHaveProperty("name");
+      expect(result.data.commands[0]).toHaveProperty("description");
+    }
+  });
+
+  it("includes /ask and /help in command list", () => {
+    const result = handleHelp();
+    if (result.type === "help") {
+      const names = result.data.commands.map((c) => c.name);
+      expect(names).toContain("/ask");
+      expect(names).toContain("/help");
+      expect(names).toContain("/schedule");
+    }
+  });
+});
+
+describe("handleScheduleList", () => {
+  it("returns schedules", async () => {
+    const client = mockClient({
+      listSchedules: vi.fn().mockResolvedValue([
+        {
+          id: "sched-1",
+          cronExpression: "0 9 * * 1-5",
+          actionPrompt: "Daily standup",
+          description: "Run daily standup",
+          enabled: true,
+          nextRunAt: "2026-03-07T09:00:00Z",
+          createdAt: "2026-03-05T10:00:00Z",
+          updatedAt: "2026-03-05T10:00:00Z",
+        },
+      ]),
+    });
+
+    const result = await handleScheduleList(client);
+    expect(result).toEqual({
+      type: "schedule_list",
+      data: {
+        schedules: [
+          {
+            id: "sched-1",
+            cronExpression: "0 9 * * 1-5",
+            description: "Run daily standup",
+            enabled: true,
+            nextRunAt: "2026-03-07T09:00:00Z",
+          },
+        ],
+        totalCount: 1,
+      },
+    });
+  });
+
+  it("uses actionPrompt as fallback description", async () => {
+    const client = mockClient({
+      listSchedules: vi.fn().mockResolvedValue([
+        {
+          id: "sched-1",
+          cronExpression: "0 9 * * *",
+          actionPrompt: "Check emails",
+          enabled: true,
+          nextRunAt: "2026-03-07T09:00:00Z",
+          createdAt: "2026-03-05T10:00:00Z",
+          updatedAt: "2026-03-05T10:00:00Z",
+        },
+      ]),
+    });
+
+    const result = await handleScheduleList(client);
+    if (result.type === "schedule_list") {
+      expect(result.data.schedules[0].description).toBe("Check emails");
+    }
+  });
+
+  it("returns info when no schedules", async () => {
+    const client = mockClient({
+      listSchedules: vi.fn().mockResolvedValue([]),
+    });
+
+    const result = await handleScheduleList(client);
+    expect(result.type).toBe("info");
+  });
+
+  it("returns error on failure", async () => {
+    const client = mockClient({
+      listSchedules: vi.fn().mockRejectedValue(new Error("Server error")),
+    });
+
+    const result = await handleScheduleList(client);
+    expect(result.type).toBe("error");
+  });
+});
+
+describe("handleScheduleCreate", () => {
+  it("creates a schedule", async () => {
+    const client = mockClient({
+      createSchedule: vi.fn().mockResolvedValue({
+        id: "sched-new",
+        cronExpression: "0 9 * * 1-5",
+        actionPrompt: "Review PRs",
+        description: "Review PRs",
+        enabled: true,
+        nextRunAt: "2026-03-07T09:00:00Z",
+        createdAt: "2026-03-06T10:00:00Z",
+        updatedAt: "2026-03-06T10:00:00Z",
+      }),
+    });
+
+    const result = await handleScheduleCreate(client, "0 9 * * 1-5", "Review PRs", "user-1");
+    expect(result).toEqual({
+      type: "schedule_create",
+      data: {
+        id: "sched-new",
+        cronExpression: "0 9 * * 1-5",
+        description: "Review PRs",
+      },
+    });
+    expect(client.createSchedule).toHaveBeenCalledWith({
+      cronExpression: "0 9 * * 1-5",
+      actionPrompt: "Review PRs",
+      description: "Review PRs",
+      userId: "user-1",
+    });
+  });
+
+  it("returns error on failure", async () => {
+    const client = mockClient({
+      createSchedule: vi.fn().mockRejectedValue(new Error("Invalid cron")),
+    });
+
+    const result = await handleScheduleCreate(client, "bad", "test");
     expect(result.type).toBe("error");
   });
 });

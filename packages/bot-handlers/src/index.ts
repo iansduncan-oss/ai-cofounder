@@ -10,9 +10,14 @@ export {
   handleApprove,
   handleReject,
   handleListApprovals,
+  handleHelp,
+  handleScheduleList,
+  handleScheduleCreate,
   truncate,
   STATUS_ICON,
 } from "./handlers.js";
+
+export { checkCooldown, clearCooldowns } from "./cooldown.js";
 
 export type {
   CommandContext,
@@ -26,5 +31,8 @@ export type {
   ApproveResult,
   RejectResult,
   ApprovalsResult,
+  HelpResult,
+  ScheduleListResult,
+  ScheduleCreateResult,
   HandlerResult,
 } from "./types.js";

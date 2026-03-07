@@ -27,6 +27,10 @@ const mockClient = {
   setChannelConversation: vi.fn(),
   deleteChannelConversation: vi.fn(),
   getUserByPlatform: vi.fn(),
+  createSchedule: vi.fn(),
+  listSchedules: vi.fn(),
+  deleteSchedule: vi.fn(),
+  toggleSchedule: vi.fn(),
 };
 
 vi.mock("@ai-cofounder/api-client", () => {
@@ -68,6 +72,7 @@ vi.mock("@slack/bolt", () => {
 });
 
 import { App } from "@slack/bolt";
+import { clearCooldowns } from "@ai-cofounder/bot-handlers";
 import { registerCommands } from "../commands.js";
 
 function mockCommand(text = "", overrides: Record<string, unknown> = {}) {
@@ -85,6 +90,7 @@ describe("slack commands", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearCooldowns();
     commandHandlers.clear();
     actionHandlers.clear();
     eventHandlers.clear();
@@ -219,10 +225,13 @@ describe("slack commands", () => {
 
     it("shows goals list", async () => {
       mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-1" });
-      mockClient.listGoals.mockResolvedValueOnce([
-        { id: "g1", title: "Build MVP", status: "active", priority: "high" },
-        { id: "g2", title: "Deploy", status: "draft", priority: "medium" },
-      ]);
+      mockClient.listGoals.mockResolvedValueOnce({
+        data: [
+          { id: "g1", title: "Build MVP", status: "active", priority: "high" },
+          { id: "g2", title: "Deploy", status: "draft", priority: "medium" },
+        ],
+        total: 2, limit: 50, offset: 0,
+      });
 
       const { respond } = await invokeCommand("/goals");
 
@@ -238,7 +247,7 @@ describe("slack commands", () => {
 
     it("shows empty message when no goals", async () => {
       mockClient.getChannelConversation.mockResolvedValueOnce({ conversationId: "conv-1" });
-      mockClient.listGoals.mockResolvedValueOnce([]);
+      mockClient.listGoals.mockResolvedValueOnce({ data: [], total: 0, limit: 50, offset: 0 });
 
       const { respond } = await invokeCommand("/goals");
 
@@ -291,10 +300,13 @@ describe("slack commands", () => {
 
     it("shows memories grouped by category", async () => {
       mockClient.getUserByPlatform.mockResolvedValueOnce({ id: "u1", displayName: "Test" });
-      mockClient.listMemories.mockResolvedValueOnce([
-        { category: "preferences", key: "language", content: "TypeScript" },
-        { category: "preferences", key: "framework", content: "Fastify" },
-      ]);
+      mockClient.listMemories.mockResolvedValueOnce({
+        data: [
+          { category: "preferences", key: "language", content: "TypeScript" },
+          { category: "preferences", key: "framework", content: "Fastify" },
+        ],
+        total: 2, limit: 50, offset: 0,
+      });
 
       const { respond } = await invokeCommand("/memory");
 
@@ -311,7 +323,7 @@ describe("slack commands", () => {
 
     it("shows empty memories message when user exists but has none", async () => {
       mockClient.getUserByPlatform.mockResolvedValueOnce({ id: "u1" });
-      mockClient.listMemories.mockResolvedValueOnce([]);
+      mockClient.listMemories.mockResolvedValueOnce({ data: [], total: 0, limit: 50, offset: 0 });
 
       const { respond } = await invokeCommand("/memory");
 

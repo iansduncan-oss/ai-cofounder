@@ -65,6 +65,26 @@ const llmCostMicros = new client.Counter({
   labelNames: ["provider", "model"] as const,
 });
 
+// --- Tool Execution Metrics ---
+
+const toolExecutionDuration = new client.Histogram({
+  name: "tool_execution_duration_seconds",
+  help: "Tool execution duration in seconds",
+  labelNames: ["tool_name", "status"] as const,
+  buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
+});
+
+export function recordToolMetrics(data: {
+  toolName: string;
+  durationMs: number;
+  success: boolean;
+}) {
+  toolExecutionDuration.observe(
+    { tool_name: data.toolName, status: data.success ? "success" : "error" },
+    data.durationMs / 1000,
+  );
+}
+
 export function recordLlmMetrics(data: {
   provider: string;
   model: string;
@@ -166,11 +186,15 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
       httpErrorsTotal.inc({ method, route: normalizedRoute });
     }
 
-    // Duration
+    // Duration — skip /metrics and /health to avoid noise
+    const skipDuration =
+      normalizedRoute === "/metrics" ||
+      normalizedRoute === "/health" ||
+      normalizedRoute.startsWith("/health/");
     const startTime = (request as unknown as Record<string, unknown>).__startTime as
       | bigint
       | undefined;
-    if (startTime) {
+    if (startTime && !skipDuration) {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       recordDuration(normalizedRoute, durationMs);
     }

@@ -13,7 +13,7 @@ export type {
 
 export type { LlmProvider } from "./provider.js";
 
-export { LlmRegistry, type ProviderHealth } from "./registry.js";
+export { LlmRegistry, type ProviderHealth, type ProviderStatsSnapshot } from "./registry.js";
 
 export { AnthropicProvider } from "./providers/anthropic.js";
 export { OpenAICompatibleProvider } from "./providers/openai-compatible.js";

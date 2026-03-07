@@ -10,10 +10,12 @@ beforeAll(() => {
 const mockGetGoal = vi.fn();
 const mockCreateGoal = vi.fn();
 const mockListGoalsByConversation = vi.fn().mockResolvedValue([]);
+const mockCountGoalsByConversation = vi.fn().mockResolvedValue(0);
 const mockUpdateGoalStatus = vi.fn();
 const mockGetTask = vi.fn();
 const mockCreateTask = vi.fn();
 const mockListTasksByGoal = vi.fn().mockResolvedValue([]);
+const mockCountTasksByGoal = vi.fn().mockResolvedValue(0);
 const mockListPendingTasks = vi.fn().mockResolvedValue([]);
 const mockAssignTask = vi.fn();
 const mockStartTask = vi.fn();
@@ -25,6 +27,7 @@ const mockListPendingApprovals = vi.fn().mockResolvedValue([]);
 const mockListApprovalsByTask = vi.fn().mockResolvedValue([]);
 const mockResolveApproval = vi.fn();
 const mockListMemoriesByUser = vi.fn().mockResolvedValue([]);
+const mockCountMemoriesByUser = vi.fn().mockResolvedValue(0);
 const mockDeleteMemory = vi.fn();
 const mockGetChannelConversation = vi.fn();
 const mockUpsertChannelConversation = vi.fn();
@@ -44,10 +47,12 @@ vi.mock("@ai-cofounder/db", () => ({
   getGoal: mockGetGoal,
   createGoal: mockCreateGoal,
   listGoalsByConversation: mockListGoalsByConversation,
+  countGoalsByConversation: mockCountGoalsByConversation,
   updateGoalStatus: mockUpdateGoalStatus,
   getTask: mockGetTask,
   createTask: mockCreateTask,
   listTasksByGoal: mockListTasksByGoal,
+  countTasksByGoal: mockCountTasksByGoal,
   listPendingTasks: mockListPendingTasks,
   assignTask: mockAssignTask,
   startTask: mockStartTask,
@@ -59,6 +64,7 @@ vi.mock("@ai-cofounder/db", () => ({
   listApprovalsByTask: mockListApprovalsByTask,
   resolveApproval: mockResolveApproval,
   listMemoriesByUser: mockListMemoriesByUser,
+  countMemoriesByUser: mockCountMemoriesByUser,
   deleteMemory: mockDeleteMemory,
   getChannelConversation: mockGetChannelConversation,
   upsertChannelConversation: mockUpsertChannelConversation,
@@ -161,10 +167,11 @@ describe("Goal routes", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("GET /api/goals?conversationId — lists goals", async () => {
+  it("GET /api/goals?conversationId — lists goals (paginated)", async () => {
     mockListGoalsByConversation.mockResolvedValueOnce([
       { id: UUID, title: "Goal 1" },
     ]);
+    mockCountGoalsByConversation.mockResolvedValueOnce(1);
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -174,7 +181,34 @@ describe("Goal routes", () => {
     await app.close();
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toHaveLength(1);
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.total).toBe(1);
+    expect(body.limit).toBe(50);
+    expect(body.offset).toBe(0);
+  });
+
+  it("GET /api/goals?conversationId&limit&offset — respects pagination params", async () => {
+    mockListGoalsByConversation.mockResolvedValueOnce([]);
+    mockCountGoalsByConversation.mockResolvedValueOnce(25);
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: `/api/goals?conversationId=${UUID}&limit=10&offset=20`,
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.limit).toBe(10);
+    expect(body.offset).toBe(20);
+    expect(body.total).toBe(25);
+    expect(mockListGoalsByConversation).toHaveBeenCalledWith(
+      expect.anything(),
+      UUID,
+      { limit: 10, offset: 20 },
+    );
   });
 
   it("PATCH /api/goals/:id/status — updates status", async () => {
@@ -452,10 +486,11 @@ describe("Channel routes", () => {
 /* ──────────────────── Memory Routes ──────────────────── */
 
 describe("Memory routes", () => {
-  it("GET /api/memories?userId — lists memories", async () => {
+  it("GET /api/memories?userId — lists memories (paginated)", async () => {
     mockListMemoriesByUser.mockResolvedValueOnce([
       { id: UUID, key: "pref", content: "likes coffee" },
     ]);
+    mockCountMemoriesByUser.mockResolvedValueOnce(1);
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -465,7 +500,11 @@ describe("Memory routes", () => {
     await app.close();
 
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toHaveLength(1);
+    const body = res.json();
+    expect(body.data).toHaveLength(1);
+    expect(body.total).toBe(1);
+    expect(body.limit).toBe(50);
+    expect(body.offset).toBe(0);
   });
 
   it("GET /api/memories — 400 without userId", async () => {

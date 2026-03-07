@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, ilike, or, sql } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, lte } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import {
@@ -19,6 +19,8 @@ import {
   workSessions,
   milestones,
   conversationSummaries,
+  providerHealth,
+  toolExecutions,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -142,12 +144,30 @@ export async function getGoal(db: Db, id: string) {
   return rows[0] ?? null;
 }
 
-export async function listGoalsByConversation(db: Db, conversationId: string) {
-  return db
+export async function listGoalsByConversation(
+  db: Db,
+  conversationId: string,
+  options?: { limit?: number; offset?: number },
+) {
+  let query = db
     .select()
     .from(goals)
     .where(eq(goals.conversationId, conversationId))
-    .orderBy(desc(goals.createdAt));
+    .orderBy(desc(goals.createdAt))
+    .$dynamic();
+
+  if (options?.limit != null) query = query.limit(options.limit);
+  if (options?.offset != null) query = query.offset(options.offset);
+
+  return query;
+}
+
+export async function countGoalsByConversation(db: Db, conversationId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(goals)
+    .where(eq(goals.conversationId, conversationId));
+  return rows[0]?.count ?? 0;
 }
 
 export async function updateGoalStatus(
@@ -186,8 +206,30 @@ export async function getTask(db: Db, id: string) {
   return rows[0] ?? null;
 }
 
-export async function listTasksByGoal(db: Db, goalId: string) {
-  return db.select().from(tasks).where(eq(tasks.goalId, goalId)).orderBy(asc(tasks.orderIndex));
+export async function listTasksByGoal(
+  db: Db,
+  goalId: string,
+  options?: { limit?: number; offset?: number },
+) {
+  let query = db
+    .select()
+    .from(tasks)
+    .where(eq(tasks.goalId, goalId))
+    .orderBy(asc(tasks.orderIndex))
+    .$dynamic();
+
+  if (options?.limit != null) query = query.limit(options.limit);
+  if (options?.offset != null) query = query.offset(options.offset);
+
+  return query;
+}
+
+export async function countTasksByGoal(db: Db, goalId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(tasks)
+    .where(eq(tasks.goalId, goalId));
+  return rows[0]?.count ?? 0;
 }
 
 export async function listPendingTasks(db: Db, limit = 50) {
@@ -403,12 +445,30 @@ export async function searchMemoriesByVector(
   }>;
 }
 
-export async function listMemoriesByUser(db: Db, userId: string) {
-  return db
+export async function listMemoriesByUser(
+  db: Db,
+  userId: string,
+  options?: { limit?: number; offset?: number },
+) {
+  let query = db
     .select()
     .from(memories)
     .where(eq(memories.userId, userId))
-    .orderBy(desc(memories.updatedAt));
+    .orderBy(desc(memories.updatedAt))
+    .$dynamic();
+
+  if (options?.limit != null) query = query.limit(options.limit);
+  if (options?.offset != null) query = query.offset(options.offset);
+
+  return query;
+}
+
+export async function countMemoriesByUser(db: Db, userId: string): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(memories)
+    .where(eq(memories.userId, userId));
+  return rows[0]?.count ?? 0;
 }
 
 export async function deleteMemory(db: Db, id: string) {
@@ -951,6 +1011,29 @@ export async function markEventProcessed(db: Db, id: string, result?: string) {
   return updated;
 }
 
+export async function listEvents(
+  db: Db,
+  options?: { limit?: number; offset?: number },
+) {
+  let query = db
+    .select()
+    .from(events)
+    .orderBy(desc(events.createdAt))
+    .$dynamic();
+
+  if (options?.limit != null) query = query.limit(options.limit);
+  if (options?.offset != null) query = query.offset(options.offset);
+
+  return query;
+}
+
+export async function countEvents(db: Db): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(events);
+  return rows[0]?.count ?? 0;
+}
+
 export async function listUnprocessedEvents(db: Db, limit = 20) {
   return db
     .select()
@@ -1124,4 +1207,212 @@ export async function getLatestConversationSummary(db: Db, conversationId: strin
     .orderBy(desc(conversationSummaries.createdAt))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/* ────────────────── Provider Health ──────────────────────── */
+
+export async function upsertProviderHealth(
+  db: Db,
+  data: {
+    providerName: string;
+    modelId?: string;
+    requestCount: number;
+    successCount: number;
+    errorCount: number;
+    avgLatencyMs: number;
+    lastErrorMessage?: string;
+    lastErrorAt?: Date;
+    lastSuccessAt?: Date;
+  },
+) {
+  const [result] = await db
+    .insert(providerHealth)
+    .values({ ...data, updatedAt: new Date() })
+    .onConflictDoUpdate({
+      target: providerHealth.providerName,
+      set: {
+        requestCount: sql`${providerHealth.requestCount} + ${data.requestCount}`,
+        successCount: sql`${providerHealth.successCount} + ${data.successCount}`,
+        errorCount: sql`${providerHealth.errorCount} + ${data.errorCount}`,
+        avgLatencyMs: data.avgLatencyMs,
+        lastErrorMessage: data.lastErrorMessage,
+        lastErrorAt: data.lastErrorAt,
+        lastSuccessAt: data.lastSuccessAt,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return result;
+}
+
+export async function getProviderHealthRecords(db: Db) {
+  return db.select().from(providerHealth).orderBy(asc(providerHealth.providerName));
+}
+
+export async function getProviderHealthHistory(db: Db, providerName?: string) {
+  if (providerName) {
+    return db
+      .select()
+      .from(providerHealth)
+      .where(eq(providerHealth.providerName, providerName))
+      .orderBy(desc(providerHealth.updatedAt));
+  }
+  return db.select().from(providerHealth).orderBy(desc(providerHealth.updatedAt));
+}
+
+/* ────────────────── Tool Executions ──────────────────────── */
+
+export async function recordToolExecution(
+  db: Db,
+  data: {
+    toolName: string;
+    durationMs: number;
+    success: boolean;
+    errorMessage?: string;
+    requestId?: string;
+  },
+) {
+  const [record] = await db.insert(toolExecutions).values(data).returning();
+  return record;
+}
+
+export async function getToolStats(db: Db) {
+  const rows = await db
+    .select({
+      toolName: toolExecutions.toolName,
+      totalExecutions: sql<number>`count(*)::int`,
+      successCount: sql<number>`count(case when ${toolExecutions.success} then 1 end)::int`,
+      errorCount: sql<number>`count(case when not ${toolExecutions.success} then 1 end)::int`,
+      avgDurationMs: sql<number>`round(avg(${toolExecutions.durationMs}))::int`,
+      p95DurationMs: sql<number>`round(percentile_cont(0.95) within group (order by ${toolExecutions.durationMs}))::int`,
+      maxDurationMs: sql<number>`max(${toolExecutions.durationMs})::int`,
+    })
+    .from(toolExecutions)
+    .groupBy(toolExecutions.toolName)
+    .orderBy(asc(toolExecutions.toolName));
+  return rows;
+}
+
+/* ────────────────── Decision Log ──────────────── */
+
+export async function listDecisions(
+  db: Db,
+  userId: string,
+  options?: { query?: string; limit?: number; offset?: number },
+) {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const conditions = [
+    eq(memories.userId, userId),
+    eq(memories.category, "decisions" as MemoryCategory),
+  ];
+
+  if (options?.query) {
+    conditions.push(
+      or(ilike(memories.key, `%${options.query}%`), ilike(memories.content, `%${options.query}%`))!,
+    );
+  }
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select()
+      .from(memories)
+      .where(and(...conditions))
+      .orderBy(desc(memories.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(memories)
+      .where(and(...conditions)),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+/* ────────────────── Conversation Search ──────────────── */
+
+export async function searchMessages(
+  db: Db,
+  query: string,
+  options?: {
+    conversationId?: string;
+    role?: "user" | "agent" | "system";
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const conditions = [ilike(messages.content, `%${query}%`)];
+
+  if (options?.conversationId) {
+    conditions.push(eq(messages.conversationId, options.conversationId));
+  }
+  if (options?.role) {
+    conditions.push(eq(messages.role, options.role));
+  }
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select({
+        id: messages.id,
+        conversationId: messages.conversationId,
+        role: messages.role,
+        agentRole: messages.agentRole,
+        content: messages.content,
+        createdAt: messages.createdAt,
+      })
+      .from(messages)
+      .where(and(...conditions))
+      .orderBy(desc(messages.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(messages)
+      .where(and(...conditions)),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+export async function listConversationsByUser(
+  db: Db,
+  userId: string,
+  options?: { limit?: number; offset?: number },
+) {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.userId, userId))
+      .orderBy(desc(conversations.updatedAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(conversations)
+      .where(eq(conversations.userId, userId)),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+/* ────────────────── Due Schedules ──────────────── */
+
+export async function listDueSchedules(db: Db) {
+  return db
+    .select()
+    .from(schedules)
+    .where(
+      and(
+        eq(schedules.enabled, true),
+        lte(schedules.nextRunAt, new Date()),
+      ),
+    )
+    .orderBy(asc(schedules.nextRunAt));
 }

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createGoal, getGoal, listGoalsByConversation, updateGoalStatus } from "@ai-cofounder/db";
-import { CreateGoalBody, UpdateGoalStatusBody, IdParams, ConversationIdQuery } from "../schemas.js";
+import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus } from "@ai-cofounder/db";
+import { CreateGoalBody, UpdateGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
@@ -24,12 +24,18 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  /* GET / — list goals for a conversation */
-  app.get<{ Querystring: typeof ConversationIdQuery.static }>(
+  /* GET / — list goals for a conversation (paginated) */
+  app.get<{ Querystring: typeof GoalListQuery.static }>(
     "/",
-    { schema: { tags: ["goals"], querystring: ConversationIdQuery } },
+    { schema: { tags: ["goals"], querystring: GoalListQuery } },
     async (request) => {
-      return listGoalsByConversation(app.db, request.query.conversationId);
+      const limit = Math.min(request.query.limit ?? 50, 200);
+      const offset = request.query.offset ?? 0;
+      const [data, total] = await Promise.all([
+        listGoalsByConversation(app.db, request.query.conversationId, { limit, offset }),
+        countGoalsByConversation(app.db, request.query.conversationId),
+      ]);
+      return { data, total, limit, offset };
     },
   );
 

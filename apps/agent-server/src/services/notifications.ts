@@ -285,6 +285,34 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
+  /** Send a daily briefing to configured channels */
+  async sendBriefing(text: string): Promise<void> {
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(this.slackChannel, text, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "Daily Briefing" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text },
+          },
+        ])
+      : Promise.resolve();
+
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: "Daily Briefing",
+            description: text.slice(0, 4000),
+            color: 0x5865f2, // blurple
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
   private async sendSlack(
     channel: string,
     text: string,

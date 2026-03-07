@@ -27,8 +27,10 @@ import {
   deleteSchedule,
   createMilestone,
   touchMemory,
+  recordToolExecution,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
+import { recordToolMetrics } from "../plugins/observability.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
@@ -225,6 +227,7 @@ export class Orchestrator {
   private n8nService?: N8nService;
   private sandboxService?: SandboxService;
   private workspaceService?: WorkspaceService;
+  private requestId?: string;
 
   constructor(
     registry: LlmRegistry,
@@ -249,7 +252,9 @@ export class Orchestrator {
     conversationId?: string,
     history?: AgentMessage[],
     userId?: string,
+    requestId?: string,
   ): Promise<OrchestratorResult> {
+    this.requestId = requestId;
     const id = conversationId ?? crypto.randomUUID();
     this.logger.info({ conversationId: id }, "orchestrator run started");
 
@@ -438,7 +443,9 @@ export class Orchestrator {
     conversationId?: string,
     history?: AgentMessage[],
     userId?: string,
+    requestId?: string,
   ): Promise<OrchestratorResult> {
+    this.requestId = requestId;
     const id = conversationId ?? crypto.randomUUID();
 
     await onEvent({ type: "thinking", data: { round: 0, message: "Loading context..." } });
@@ -577,6 +584,42 @@ export class Orchestrator {
   }
 
   private async executeTool(
+    block: LlmToolUseContent,
+    conversationId: string,
+    userId?: string,
+  ): Promise<unknown> {
+    const startTime = Date.now();
+    let success = true;
+    try {
+      const result = await this.executeToolInner(block, conversationId, userId);
+      if (result && typeof result === "object" && "error" in (result as Record<string, unknown>)) {
+        success = false;
+      }
+      return result;
+    } catch (err) {
+      success = false;
+      throw err;
+    } finally {
+      const durationMs = Date.now() - startTime;
+      recordToolMetrics({ toolName: block.name, durationMs, success });
+      if (this.db) {
+        recordToolExecution(this.db, {
+          toolName: block.name,
+          durationMs,
+          success,
+          errorMessage: success ? undefined : "tool returned error",
+          requestId: this.requestId,
+        }).catch((err) => {
+          this.logger.warn({ err, tool: block.name }, "failed to persist tool execution (non-fatal)");
+        });
+      }
+      if (durationMs > 5000) {
+        this.logger.warn({ tool: block.name, durationMs }, "slow tool execution");
+      }
+    }
+  }
+
+  private async executeToolInner(
     block: LlmToolUseContent,
     conversationId: string,
     userId?: string,

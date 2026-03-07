@@ -84,6 +84,30 @@ export interface StreamingAskResult {
   conversationId: string;
 }
 
+/** Structured result from help command */
+export interface HelpResult {
+  commands: Array<{ name: string; description: string }>;
+}
+
+/** Structured result from schedule list command */
+export interface ScheduleListResult {
+  schedules: Array<{
+    id: string;
+    cronExpression: string;
+    description?: string;
+    enabled: boolean;
+    nextRunAt: string;
+  }>;
+  totalCount: number;
+}
+
+/** Structured result from schedule create command */
+export interface ScheduleCreateResult {
+  id: string;
+  cronExpression: string;
+  description?: string;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
@@ -97,6 +121,9 @@ export type HandlerResult =
   | { type: "approve"; data: ApproveResult }
   | { type: "reject"; data: RejectResult }
   | { type: "approvals"; data: ApprovalsResult }
+  | { type: "help"; data: HelpResult }
+  | { type: "schedule_list"; data: ScheduleListResult }
+  | { type: "schedule_create"; data: ScheduleCreateResult }
   | { type: "info"; message: string }
   | { type: "error"; message: string };
 

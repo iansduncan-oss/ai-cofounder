@@ -35,6 +35,10 @@ import { scheduleRoutes } from "./routes/schedules.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { workspaceRoutes } from "./routes/workspace.js";
 import { milestoneRoutes } from "./routes/milestones.js";
+import { dashboardRoutes } from "./routes/dashboard.js";
+import { conversationRoutes } from "./routes/conversations.js";
+import { decisionRoutes } from "./routes/decisions.js";
+import { voiceRoutes } from "./routes/voice.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
 import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
 import {
@@ -42,6 +46,11 @@ import {
   type NotificationService,
 } from "./services/notifications.js";
 import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox";
+import {
+  upsertProviderHealth,
+  getProviderHealthRecords,
+} from "@ai-cofounder/db";
+import { startScheduler } from "./services/scheduler.js";
 
 /** Create and configure the LLM registry with all available providers */
 export function createLlmRegistry(): LlmRegistry {
@@ -69,9 +78,13 @@ export function buildServer(registry?: LlmRegistry) {
     trustProxy: true, // required behind reverse proxy for correct IP detection
   });
 
-  // Attach our structured logger to the request lifecycle
-  app.addHook("onRequest", async (request) => {
-    logger.info({ method: request.method, url: request.url }, "request");
+  // Request tracing: generate x-request-id if not present, attach to logger context
+  app.addHook("onRequest", async (request, reply) => {
+    const requestId =
+      (request.headers["x-request-id"] as string) ?? crypto.randomUUID();
+    (request as unknown as Record<string, unknown>).requestId = requestId;
+    reply.header("x-request-id", requestId);
+    logger.info({ method: request.method, url: request.url, requestId }, "request");
   });
 
   // CORS — restrict origins in production, allow same-origin for voice UI
@@ -108,6 +121,9 @@ export function buildServer(registry?: LlmRegistry) {
         { name: "prompts", description: "Prompt versioning" },
         { name: "usage", description: "Token usage tracking" },
         { name: "events", description: "Event processing" },
+        { name: "conversations", description: "Conversation and message search" },
+        { name: "decisions", description: "Decision log" },
+        { name: "dashboard", description: "Dashboard summary" },
       ],
     },
   });
@@ -145,6 +161,74 @@ export function buildServer(registry?: LlmRegistry) {
   const notificationService = createNotificationService();
   app.decorate("notificationService", notificationService);
 
+  // Seed LLM provider health from DB on startup, flush periodically
+  let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
+  app.addHook("onReady", async () => {
+    try {
+      const records = await getProviderHealthRecords(app.db);
+      if (records.length > 0) {
+        llmRegistry.seedStats(
+          records.map((r) => ({
+            providerName: r.providerName,
+            requestCount: r.requestCount,
+            successCount: r.successCount,
+            errorCount: r.errorCount,
+            avgLatencyMs: r.avgLatencyMs,
+            lastErrorMessage: r.lastErrorMessage ?? undefined,
+            lastErrorAt: r.lastErrorAt ?? undefined,
+            lastSuccessAt: r.lastSuccessAt ?? undefined,
+          })),
+        );
+        logger.info({ count: records.length }, "seeded provider health from DB");
+      }
+    } catch (err) {
+      logger.warn({ err }, "failed to seed provider health from DB (non-fatal)");
+    }
+
+    // Start the scheduler daemon for cron jobs
+    const scheduler = startScheduler({
+      db: app.db,
+      llmRegistry,
+      embeddingService,
+      n8nService,
+      sandboxService,
+      workspaceService,
+      notificationService,
+      pollIntervalMs: 60_000,
+      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "8")),
+      briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
+    });
+    app.addHook("onClose", async () => scheduler.stop());
+    logger.info("scheduler daemon started");
+
+    // Flush every 60 seconds
+    healthFlushInterval = setInterval(async () => {
+      try {
+        const snapshots = llmRegistry.getStatsSnapshots();
+        for (const snap of snapshots) {
+          await upsertProviderHealth(app.db, snap);
+        }
+      } catch (err) {
+        logger.warn({ err }, "failed to flush provider health to DB");
+      }
+    }, 60_000);
+    healthFlushInterval.unref();
+  });
+
+  // Flush health stats on shutdown
+  app.addHook("onClose", async () => {
+    if (healthFlushInterval) clearInterval(healthFlushInterval);
+    try {
+      const snapshots = llmRegistry.getStatsSnapshots();
+      for (const snap of snapshots) {
+        await upsertProviderHealth(app.db, snap);
+      }
+      logger.info("flushed provider health to DB on shutdown");
+    } catch {
+      // DB may already be closed
+    }
+  });
+
   // Global error handler — normalize all error responses
   app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
@@ -175,6 +259,10 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(workspaceRoutes, { prefix: "/api/workspace" });
   app.register(milestoneRoutes, { prefix: "/api/milestones" });
+  app.register(dashboardRoutes, { prefix: "/api/dashboard" });
+  app.register(conversationRoutes, { prefix: "/api/conversations" });
+  app.register(decisionRoutes, { prefix: "/api/decisions" });
+  app.register(voiceRoutes, { prefix: "/voice" });
 
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir

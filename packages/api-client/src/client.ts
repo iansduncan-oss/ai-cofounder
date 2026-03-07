@@ -2,10 +2,12 @@ import type {
   Goal,
   GoalStatus,
   GoalPriority,
+  Schedule,
   Task,
   AgentRole,
   Approval,
   Memory,
+  Event,
   Milestone,
   MilestoneStatus,
   MilestoneProgress,
@@ -17,6 +19,10 @@ import type {
   UsageSummary,
   StreamEvent,
   StreamEventType,
+  PaginationParams,
+  PaginatedResponse,
+  DashboardSummary,
+  BriefingResponse,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -92,8 +98,11 @@ export class ApiClient {
     return this.request<Goal>("GET", `/api/goals/${id}`);
   }
 
-  listGoals(conversationId: string) {
-    return this.request<Goal[]>("GET", `/api/goals?conversationId=${conversationId}`);
+  listGoals(conversationId: string, pagination?: PaginationParams) {
+    const params = new URLSearchParams({ conversationId });
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    return this.request<PaginatedResponse<Goal>>("GET", `/api/goals?${params}`);
   }
 
   updateGoalStatus(id: string, status: GoalStatus) {
@@ -116,8 +125,11 @@ export class ApiClient {
     return this.request<Task>("GET", `/api/tasks/${id}`);
   }
 
-  listTasks(goalId: string) {
-    return this.request<Task[]>("GET", `/api/tasks?goalId=${goalId}`);
+  listTasks(goalId: string, pagination?: PaginationParams) {
+    const params = new URLSearchParams({ goalId });
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    return this.request<PaginatedResponse<Task>>("GET", `/api/tasks?${params}`);
   }
 
   listPendingTasks(limit = 50) {
@@ -170,8 +182,11 @@ export class ApiClient {
 
   /* ── Memories ── */
 
-  listMemories(userId: string) {
-    return this.request<Memory[]>("GET", `/api/memories?userId=${userId}`);
+  listMemories(userId: string, pagination?: PaginationParams) {
+    const params = new URLSearchParams({ userId });
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    return this.request<PaginatedResponse<Memory>>("GET", `/api/memories?${params}`);
   }
 
   deleteMemory(id: string) {
@@ -211,6 +226,30 @@ export class ApiClient {
     return this.request<{ status: string; id: string }>("DELETE", `/api/milestones/${id}`);
   }
 
+  /* ── Schedules ── */
+
+  createSchedule(data: {
+    cronExpression: string;
+    actionPrompt: string;
+    description?: string;
+    userId?: string;
+  }) {
+    return this.request<Schedule>("POST", "/api/schedules", data);
+  }
+
+  listSchedules(userId?: string) {
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return this.request<Schedule[]>("GET", `/api/schedules${query}`);
+  }
+
+  deleteSchedule(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/schedules/${id}`);
+  }
+
+  toggleSchedule(id: string, enabled: boolean) {
+    return this.request<Schedule>("PATCH", `/api/schedules/${id}/toggle`, { enabled });
+  }
+
   /* ── Workspace ── */
 
   listDirectory(path = ".") {
@@ -248,10 +287,33 @@ export class ApiClient {
     );
   }
 
+  /* ── Events ── */
+
+  listEvents(pagination?: PaginationParams) {
+    const params = new URLSearchParams();
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    const qs = params.toString();
+    return this.request<PaginatedResponse<Event>>("GET", `/api/events${qs ? `?${qs}` : ""}`);
+  }
+
   /* ── Usage ── */
 
   getUsage(period: "today" | "week" | "month" | "all" = "today") {
     return this.request<UsageSummary>("GET", `/api/usage?period=${period}`);
+  }
+
+  /* ── Dashboard ── */
+
+  getDashboardSummary() {
+    return this.request<DashboardSummary>("GET", "/api/dashboard/summary");
+  }
+
+  /* ── Briefing ── */
+
+  getBriefing(send = false) {
+    const query = send ? "?send=true" : "";
+    return this.request<BriefingResponse>("GET", `/api/briefing${query}`);
   }
 
   /* ── Streaming ── */

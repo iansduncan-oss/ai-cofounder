@@ -10,6 +10,10 @@ import {
   handleClear,
   handleExecute,
   handleApprove,
+  handleHelp,
+  handleScheduleList,
+  handleScheduleCreate,
+  checkCooldown,
   truncate,
   type CommandContext,
   type HandlerResult,
@@ -36,8 +40,21 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
   if (!interaction.isChatInputCommand()) return;
 
   const ctx = makeContext(interaction);
+  const commandName = interaction.commandName;
 
-  switch (interaction.commandName) {
+  // Cooldown check (skip for help — it's free)
+  if (commandName !== "help") {
+    const remaining = checkCooldown(ctx.userId, commandName);
+    if (remaining !== null) {
+      await interaction.reply({
+        content: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before using \`/${commandName}\` again.`,
+        ephemeral: true,
+      });
+      return;
+    }
+  }
+
+  switch (commandName) {
     case "ask": {
       const message = interaction.options.getString("message", true);
       await interaction.deferReply();
@@ -56,6 +73,17 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
           }
         }
       });
+
+      // Create a thread from the reply for longer conversations
+      const reply = await interaction.fetchReply();
+      try {
+        await reply.startThread({
+          name: truncate(message, 90),
+          autoArchiveDuration: 60,
+        });
+      } catch {
+        /* Thread creation is best-effort — may fail in threads or DMs */
+      }
 
       await sendDiscordResponse(interaction, result);
       return;
@@ -92,8 +120,29 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       await sendDiscordResponse(interaction, await handleApprove(client, ctx, approvalId));
       return;
     }
+    case "help": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, handleHelp());
+      return;
+    }
+    case "schedule": {
+      const sub = interaction.options.getSubcommand();
+      await interaction.deferReply();
+
+      if (sub === "list") {
+        await sendDiscordResponse(interaction, await handleScheduleList(client));
+      } else if (sub === "create") {
+        const cron = interaction.options.getString("cron", true);
+        const task = interaction.options.getString("task", true);
+        await sendDiscordResponse(
+          interaction,
+          await handleScheduleCreate(client, cron, task, ctx.userId),
+        );
+      }
+      return;
+    }
     default:
-      logger.warn({ command: interaction.commandName }, "unknown command");
+      logger.warn({ command: commandName }, "unknown command");
   }
 }
 
@@ -107,11 +156,11 @@ async function sendDiscordResponse(
         `Agent: ${result.data.agentRole}`,
         result.data.model ? `Model: ${result.data.model}` : null,
         result.data.usage
-          ? `Tokens: ${result.data.usage.inputTokens}→${result.data.usage.outputTokens}`
+          ? `Tokens: ${result.data.usage.inputTokens}\u2192${result.data.usage.outputTokens}`
           : null,
       ]
         .filter(Boolean)
-        .join(" · ");
+        .join(" \u00b7 ");
 
       const embed = new EmbedBuilder()
         .setColor(0x7c3aed)
@@ -126,11 +175,11 @@ async function sendDiscordResponse(
         `Agent: ${result.data.agentRole}`,
         result.data.model ? `Model: ${result.data.model}` : null,
         result.data.usage
-          ? `Tokens: ${result.data.usage.inputTokens}→${result.data.usage.outputTokens}`
+          ? `Tokens: ${result.data.usage.inputTokens}\u2192${result.data.usage.outputTokens}`
           : null,
       ]
         .filter(Boolean)
-        .join(" · ");
+        .join(" \u00b7 ");
 
       const streamEmbed = new EmbedBuilder()
         .setColor(0x7c3aed)
@@ -143,7 +192,7 @@ async function sendDiscordResponse(
     case "status": {
       const embed = new EmbedBuilder()
         .setColor(0x22c55e)
-        .setTitle("AI Cofounder — System Status")
+        .setTitle("AI Cofounder \u2014 System Status")
         .addFields(
           { name: "Status", value: result.data.status, inline: true },
           { name: "Uptime", value: `${result.data.uptimeMinutes}m`, inline: true },
@@ -166,7 +215,7 @@ async function sendDiscordResponse(
 
     case "tasks": {
       const lines = result.data.tasks.map(
-        (t) => `• **${t.title}** → ${t.assignedAgent}`,
+        (t) => `\u2022 **${t.title}** \u2192 ${t.assignedAgent}`,
       );
       const embed = new EmbedBuilder()
         .setColor(0xf59e0b)
@@ -201,7 +250,7 @@ async function sendDiscordResponse(
 
     case "execute": {
       const taskLines = result.data.tasks.map(
-        (t) => `${t.icon} **${t.title}** (${t.agent}) — ${t.status}`,
+        (t) => `${t.icon} **${t.title}** (${t.agent}) \u2014 ${t.status}`,
       );
       const color =
         result.data.status === "completed"
@@ -214,7 +263,7 @@ async function sendDiscordResponse(
         .setTitle(`Executing: ${result.data.goalTitle}`)
         .setDescription(taskLines.join("\n"))
         .setFooter({
-          text: `${result.data.completedTasks}/${result.data.totalTasks} tasks completed · Status: ${result.data.status}`,
+          text: `${result.data.completedTasks}/${result.data.totalTasks} tasks completed \u00b7 Status: ${result.data.status}`,
         });
       await interaction.editReply({ embeds: [embed] });
       return;
@@ -224,6 +273,41 @@ async function sendDiscordResponse(
       const embed = new EmbedBuilder()
         .setColor(0x22c55e)
         .setDescription(`Approval \`${result.data.approvalId}\` approved.`);
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "help": {
+      const lines = result.data.commands.map(
+        (c) => `**${c.name}** \u2014 ${c.description}`,
+      );
+      const embed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle("AI Cofounder \u2014 Commands")
+        .setDescription(lines.join("\n"));
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "schedule_list": {
+      const lines = result.data.schedules.map(
+        (s) => `${s.enabled ? "\u2705" : "\u23f8\ufe0f"} \`${s.cronExpression}\` \u2014 ${s.description ?? "No description"}\n  Next: ${s.nextRunAt}`,
+      );
+      const embed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle("Schedules")
+        .setDescription(lines.join("\n\n"))
+        .setFooter({ text: `${result.data.totalCount} schedule(s)` });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "schedule_create": {
+      const embed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setTitle("Schedule Created")
+        .setDescription(`\`${result.data.cronExpression}\` \u2014 ${result.data.description ?? "No description"}`)
+        .setFooter({ text: `ID: ${result.data.id}` });
       await interaction.editReply({ embeds: [embed] });
       return;
     }

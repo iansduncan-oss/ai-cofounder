@@ -19,6 +19,17 @@ export interface ProviderHealth {
   lastErrorAt?: string;
 }
 
+export interface ProviderStatsSnapshot {
+  providerName: string;
+  requestCount: number;
+  successCount: number;
+  errorCount: number;
+  avgLatencyMs: number;
+  lastErrorMessage?: string;
+  lastErrorAt?: Date;
+  lastSuccessAt?: Date;
+}
+
 interface ProviderStats {
   totalRequests: number;
   successCount: number;
@@ -218,5 +229,40 @@ export class LlmRegistry {
       available: p.available,
       defaultModel: p.defaultModel,
     }));
+  }
+
+  /** Export current stats as snapshots for DB persistence */
+  getStatsSnapshots(): ProviderStatsSnapshot[] {
+    return Array.from(this.stats.entries()).map(([providerName, s]) => ({
+      providerName,
+      requestCount: s.totalRequests,
+      successCount: s.successCount,
+      errorCount: s.errorCount,
+      avgLatencyMs: s.successCount > 0 ? Math.round(s.totalLatencyMs / s.successCount) : 0,
+      lastErrorMessage: s.recentErrors.length > 0
+        ? s.recentErrors[s.recentErrors.length - 1].message
+        : undefined,
+      lastErrorAt: s.lastErrorAt,
+      lastSuccessAt: s.lastSuccessAt,
+    }));
+  }
+
+  /** Seed in-memory stats from persisted data (call on startup) */
+  seedStats(snapshots: ProviderStatsSnapshot[]): void {
+    for (const snap of snapshots) {
+      const existing = this.stats.get(snap.providerName);
+      if (!existing || existing.totalRequests === 0) {
+        this.stats.set(snap.providerName, {
+          totalRequests: snap.requestCount,
+          successCount: snap.successCount,
+          errorCount: snap.errorCount,
+          totalLatencyMs: snap.avgLatencyMs * snap.successCount,
+          recentErrors: [],
+          lastSuccessAt: snap.lastSuccessAt,
+          lastErrorAt: snap.lastErrorAt,
+        });
+        this.logger.info({ provider: snap.providerName, requests: snap.requestCount }, "seeded stats from DB");
+      }
+    }
   }
 }
