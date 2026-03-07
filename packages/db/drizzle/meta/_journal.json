@@ -19,68 +19,89 @@
     {
       "idx": 2,
       "version": "7",
+      "when": 1772725200000,
+      "tag": "0002_add_memory_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1772725400000,
+      "tag": "0003_add_n8n_workflows",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1772725600000,
+      "tag": "0004_drop_agent_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
       "when": 1772726000000,
       "tag": "0005_add_code_executions",
       "breakpoints": true
     },
     {
-      "idx": 3,
+      "idx": 6,
       "version": "7",
       "when": 1772741400000,
       "tag": "0006_add_llm_usage",
       "breakpoints": true
     },
     {
-      "idx": 4,
+      "idx": 7,
       "version": "7",
       "when": 1772742000000,
       "tag": "0007_add_schedules_events_sessions",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 8,
       "version": "7",
       "when": 1772742600000,
       "tag": "0008_add_memory_importance",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 9,
       "version": "7",
       "when": 1772772400000,
       "tag": "0009_add_milestones",
       "breakpoints": true
     },
     {
-      "idx": 7,
+      "idx": 10,
       "version": "7",
       "when": 1772776000000,
       "tag": "0010_add_indexes",
       "breakpoints": true
     },
     {
-      "idx": 8,
+      "idx": 11,
       "version": "7",
       "when": 1772777000000,
       "tag": "0011_add_constraints",
       "breakpoints": true
     },
     {
-      "idx": 9,
+      "idx": 12,
       "version": "7",
       "when": 1772778000000,
       "tag": "0012_add_debugger_role",
       "breakpoints": true
     },
     {
-      "idx": 10,
+      "idx": 13,
       "version": "7",
       "when": 1772779000000,
       "tag": "0013_add_doc_writer_role",
       "breakpoints": true
     },
     {
-      "idx": 11,
+      "idx": 14,
       "version": "7",
       "when": 1772780000000,
       "tag": "0014_add_conversation_summaries",
