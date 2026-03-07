@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useGoals } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
@@ -10,12 +11,14 @@ import { RelativeTime } from "@/components/common/relative-time";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Target, Search, AlertTriangle, MessageSquare } from "lucide-react";
+import { Target, Search, AlertTriangle, MessageSquare, Plus } from "lucide-react";
+import { CreateGoalDialog } from "@/components/goals/create-goal-dialog";
 import type { GoalStatus, GoalPriority } from "@ai-cofounder/api-client";
 
 export function GoalsPage() {
   usePageTitle("Goals");
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showCreate, setShowCreate] = useState(false);
 
   const conversationId = searchParams.get("conversationId") || "default";
   const statusFilter = (searchParams.get("status") || "all") as GoalStatus | "all";
@@ -53,7 +56,16 @@ export function GoalsPage() {
 
   return (
     <div>
-      <PageHeader title="Goals" description="Track and manage agent goals" />
+      <PageHeader
+        title="Goals"
+        description="Track and manage agent goals"
+        actions={
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            New Goal
+          </Button>
+        }
+      />
 
       <div className="mb-4 flex flex-wrap gap-3">
         <div className="relative">
@@ -155,6 +167,12 @@ export function GoalsPage() {
           }
         />
       )}
+
+      <CreateGoalDialog
+        open={showCreate}
+        onClose={() => setShowCreate(false)}
+        defaultConversationId={conversationId}
+      />
     </div>
   );
 }

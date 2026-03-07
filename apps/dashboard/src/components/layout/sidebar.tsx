@@ -10,18 +10,31 @@ import {
   X,
   Sun,
   Moon,
+  Brain,
+  Milestone,
+  Activity,
+  BarChart3,
+  FolderOpen,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
+import { useAuth } from "@/components/auth/auth-guard";
+import { NotificationBell } from "@/components/common/notification-bell";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
   { to: "/dashboard/goals", icon: Target, label: "Goals" },
   { to: "/dashboard/approvals", icon: ShieldCheck, label: "Approvals" },
   { to: "/dashboard/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/dashboard/memories", icon: Brain, label: "Memories" },
+  { to: "/dashboard/milestones", icon: Milestone, label: "Milestones" },
+  { to: "/dashboard/activity", icon: Activity, label: "Activity" },
+  { to: "/dashboard/usage", icon: BarChart3, label: "Usage" },
+  { to: "/dashboard/workspace", icon: FolderOpen, label: "Workspace" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -29,6 +42,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const { theme, toggleTheme } = useTheme();
+  const { isAuthenticated, logout } = useAuth();
 
   const { data: health } = useQuery({
     queryKey: queryKeys.health.status,
@@ -111,17 +125,29 @@ export function Sidebar() {
               {health?.status === "ok" ? "System healthy" : "Checking..."}
             </span>
           </div>
-          <button
-            onClick={toggleTheme}
-            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-3.5 w-3.5" />
-            ) : (
-              <Moon className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={toggleTheme}
+              className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            >
+              {theme === "dark" ? (
+                <Sun className="h-3.5 w-3.5" />
+              ) : (
+                <Moon className="h-3.5 w-3.5" />
+              )}
+            </button>
+            {isAuthenticated && (
+              <button
+                onClick={logout}
+                className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-destructive transition-colors"
+                aria-label="Sign out"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
             )}
-          </button>
+          </div>
         </div>
         <div className="text-[10px] text-muted-foreground">
           <kbd className="rounded border bg-muted px-1 py-0.5">⌘K</kbd> Quick nav

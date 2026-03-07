@@ -20,7 +20,6 @@ import {
 } from "lucide-react";
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
@@ -173,9 +172,8 @@ export function MemoriesPage() {
 
       <Dialog
         open={!!deleteTarget}
-        onOpenChange={() => setDeleteTarget(null)}
+        onClose={() => setDeleteTarget(null)}
       >
-        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete memory?</DialogTitle>
             <DialogDescription>
@@ -198,7 +196,6 @@ export function MemoriesPage() {
               Delete
             </Button>
           </DialogFooter>
-        </DialogContent>
       </Dialog>
     </div>
   );

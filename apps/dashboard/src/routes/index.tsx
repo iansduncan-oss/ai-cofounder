@@ -20,8 +20,30 @@ const ChatPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("./settings").then((m) => ({ default: m.SettingsPage })),
 );
+const MemoriesPage = lazy(() =>
+  import("./memories").then((m) => ({ default: m.MemoriesPage })),
+);
+const MilestonesPage = lazy(() =>
+  import("./milestones").then((m) => ({ default: m.MilestonesPage })),
+);
+const ActivityPage = lazy(() =>
+  import("./activity").then((m) => ({ default: m.ActivityPage })),
+);
+const UsagePage = lazy(() =>
+  import("./usage").then((m) => ({ default: m.UsagePage })),
+);
+const WorkspacePage = lazy(() =>
+  import("./workspace").then((m) => ({ default: m.WorkspacePage })),
+);
+const LoginPage = lazy(() =>
+  import("./login").then((m) => ({ default: m.LoginPage })),
+);
 
 export const router = createBrowserRouter([
+  {
+    path: "/dashboard/login",
+    element: <LoginPage />,
+  },
   {
     path: "/dashboard",
     element: <App />,
@@ -31,6 +53,11 @@ export const router = createBrowserRouter([
       { path: "goals/:id", element: <GoalDetailPage /> },
       { path: "approvals", element: <ApprovalsPage /> },
       { path: "chat", element: <ChatPage /> },
+      { path: "memories", element: <MemoriesPage /> },
+      { path: "milestones", element: <MilestonesPage /> },
+      { path: "activity", element: <ActivityPage /> },
+      { path: "usage", element: <UsagePage /> },
+      { path: "workspace", element: <WorkspacePage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },
