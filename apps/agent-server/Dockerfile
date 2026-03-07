@@ -5,11 +5,13 @@ WORKDIR /app
 # so npm ci lockfile resolution matches the full monorepo structure
 COPY package.json package-lock.json turbo.json tsconfig.base.json ./
 COPY apps/agent-server/package.json apps/agent-server/
+COPY apps/dashboard/package.json apps/dashboard/
 COPY apps/discord-bot/package.json apps/discord-bot/
 COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY packages/llm/package.json packages/llm/
 COPY packages/sandbox/package.json packages/sandbox/
+COPY packages/api-client/package.json packages/api-client/
 RUN npm ci --ignore-scripts --force
 
 # Copy source and build
@@ -17,9 +19,11 @@ COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/
 COPY packages/llm/ packages/llm/
 COPY packages/sandbox/ packages/sandbox/
+COPY packages/api-client/ packages/api-client/
 COPY apps/agent-server/ apps/agent-server/
+COPY apps/dashboard/ apps/dashboard/
 RUN rm -rf packages/*/node_modules/drizzle-orm \
-    && npx turbo run build --filter=@ai-cofounder/agent-server
+    && npx turbo run build --filter=@ai-cofounder/agent-server --filter=@ai-cofounder/dashboard
 
 # Production stage
 FROM node:24-alpine
@@ -37,6 +41,7 @@ COPY --from=base /app/packages/sandbox/package.json packages/sandbox/
 COPY --from=base /app/packages/sandbox/dist/ packages/sandbox/dist/
 COPY --from=base /app/apps/agent-server/package.json apps/agent-server/
 COPY --from=base /app/apps/agent-server/dist/ apps/agent-server/dist/
+COPY --from=base /app/apps/dashboard/dist/ apps/dashboard/dist/
 
 RUN npm ci --omit=dev --ignore-scripts --force
 
