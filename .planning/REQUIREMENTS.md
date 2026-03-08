@@ -93,13 +93,49 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmapper) | | |
+| QUEUE-01 | Phase 1 | Pending |
+| QUEUE-02 | Phase 1 | Pending |
+| QUEUE-03 | Phase 1 | Pending |
+| QUEUE-04 | Phase 1 | Pending |
+| QUEUE-05 | Phase 1 | Pending |
+| QUEUE-06 | Phase 1 | Pending |
+| QUEUE-07 | Phase 1 | Pending |
+| QUEUE-08 | Phase 1 | Pending |
+| QUEUE-09 | Phase 1 | Pending |
+| QUEUE-12 | Phase 1 | Pending |
+| QUEUE-13 | Phase 1 | Pending |
+| QUEUE-10 | Phase 2 | Pending |
+| QUEUE-11 | Phase 2 | Pending |
+| AUTH-01 | Phase 3 | Pending |
+| AUTH-02 | Phase 3 | Pending |
+| AUTH-03 | Phase 3 | Pending |
+| AUTH-04 | Phase 3 | Pending |
+| AUTH-05 | Phase 3 | Pending |
+| AUTH-06 | Phase 3 | Pending |
+| AUTH-07 | Phase 3 | Pending |
+| AUTH-08 | Phase 3 | Pending |
+| AUTH-09 | Phase 3 | Pending |
+| AUTH-10 | Phase 3 | Pending |
+| TEST-01 | Phase 4 | Pending |
+| TEST-02 | Phase 4 | Pending |
+| TEST-03 | Phase 4 | Pending |
+| TEST-04 | Phase 4 | Pending |
+| TEST-05 | Phase 4 | Pending |
+| TEST-06 | Phase 4 | Pending |
+| QWIN-01 | Phase 4 | Pending |
+| QWIN-02 | Phase 4 | Pending |
+| QWIN-03 | Phase 4 | Pending |
+| QWIN-04 | Phase 4 | Pending |
+| QWIN-05 | Phase 4 | Pending |
+| QWIN-06 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- v1 requirements: 35 total
+- Mapped to phases: 35
+- Unmapped: 0
+
+Note: The original count of "25 total" was incorrect — a recount of the defined requirements yields 35 (QUEUE 1-13 = 13, AUTH 1-10 = 10, TEST 1-6 = 6, QWIN 1-6 = 6).
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after initial definition*
+*Last updated: 2026-03-07 after roadmap creation — traceability populated, coverage 35/35*
