@@ -60,11 +60,11 @@ Plans:
   3. Logging out clears the refresh cookie and immediately invalidates access to protected routes
   4. All Discord and Slack bot commands continue working without any changes after JWT middleware is applied
   5. The admin account is auto-created on first server startup from ADMIN_EMAIL + ADMIN_PASSWORD env vars
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 03-01: JWT plugin, auth routes (login, refresh, logout), admin seed, bcrypt hashing
-- [ ] 03-02: Route protection (onRequest hook on API routes, bot endpoint isolation), dashboard login UI + token management
+- [ ] 03-01-PLAN.md — Auth foundation: admin_users DB table, @fastify/jwt + @fastify/cookie plugin, login/refresh/logout routes, admin seed, auth tests
+- [ ] 03-02-PLAN.md — Route protection via JWT guard plugin, server route restructuring, dashboard login UI + in-memory token management + silent refresh
 
 ### Phase 4: Tests & Quick Wins
 **Goal**: The goal lifecycle is covered by E2E integration tests and the API surface is complete with utility features
@@ -99,3 +99,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 *Roadmap created: 2026-03-07*
 *Phase 1 planned: 2026-03-07*
 *Phase 2 planned: 2026-03-08*
+*Phase 3 planned: 2026-03-08*
