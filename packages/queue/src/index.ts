@@ -1,6 +1,20 @@
 // Connection
 export { getRedisConnection, resetRedisConnection } from "./connection.js";
 
+// Pub/Sub (Redis pub/sub for real-time agent progress events)
+export {
+  RedisPubSub,
+  createSubscriber,
+  goalChannel,
+  historyKey,
+  CHANNEL_PREFIX,
+  HISTORY_PREFIX,
+  HISTORY_TTL_SECONDS,
+  type AgentProgressEvent,
+  type AgentLifecycleEvent,
+  type AgentEvent,
+} from "./pubsub.js";
+
 // Queues & job types
 export {
   QUEUE_NAMES,
