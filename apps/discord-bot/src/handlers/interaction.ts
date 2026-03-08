@@ -9,6 +9,7 @@ import {
   handleMemory,
   handleClear,
   handleExecute,
+  handleExecuteStreaming,
   handleApprove,
   handleHelp,
   handleScheduleList,
@@ -111,7 +112,15 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
     case "execute": {
       const goalId = interaction.options.getString("goal_id", true);
       await interaction.deferReply();
-      await sendDiscordResponse(interaction, await handleExecute(client, ctx, goalId));
+      let lastUpdate = 0;
+      const result = await handleExecuteStreaming(client, ctx, goalId, async (text) => {
+        const now = Date.now();
+        if (now - lastUpdate > 2000) { // throttle to every 2s
+          lastUpdate = now;
+          try { await interaction.editReply({ content: truncate(text, 2000) }); } catch { /* non-fatal */ }
+        }
+      });
+      await sendDiscordResponse(interaction, result);
       return;
     }
     case "approve": {

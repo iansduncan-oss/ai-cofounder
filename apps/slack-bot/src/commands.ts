@@ -9,6 +9,7 @@ import {
   handleMemory,
   handleClear,
   handleExecute,
+  handleExecuteStreaming,
   handleApprove,
   handleReject,
   handleListApprovals,
@@ -404,7 +405,15 @@ export function registerCommands(app: App): void {
       return;
     }
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
-    await sendSlackResponse(respond, await handleExecute(client, ctx, goalId));
+    let lastUpdate = 0;
+    const result = await handleExecuteStreaming(client, ctx, goalId, async (text) => {
+      const now = Date.now();
+      if (now - lastUpdate > 2000) {
+        lastUpdate = now;
+        try { await respond({ response_type: "in_channel", text: truncate(text, 3000), replace_original: true }); } catch { /* non-fatal */ }
+      }
+    });
+    await sendSlackResponse(respond, result);
   });
 
   app.command("/approve", async ({ command, ack, respond }) => {
