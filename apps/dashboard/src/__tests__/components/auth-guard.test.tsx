@@ -1,9 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { setAccessToken } from "@/hooks/use-auth";
 
-function renderWithRouter(token: string | null) {
-  if (token) localStorage.setItem("ai-cofounder-token", token);
+function renderWithRouter() {
   return render(
     <MemoryRouter initialEntries={["/dashboard"]}>
       <Routes>
@@ -22,14 +22,21 @@ function renderWithRouter(token: string | null) {
 }
 
 describe("AuthGuard", () => {
+  afterEach(() => {
+    // Reset in-memory token after each test
+    setAccessToken(null);
+  });
+
   it("renders children when authenticated", () => {
-    renderWithRouter("test-secret");
+    setAccessToken("valid-jwt-token");
+    renderWithRouter();
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
     expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });
 
   it("redirects to login when no token", () => {
-    renderWithRouter(null);
+    setAccessToken(null);
+    renderWithRouter();
     expect(screen.getByText("Login Page")).toBeInTheDocument();
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });

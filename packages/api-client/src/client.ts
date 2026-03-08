@@ -38,12 +38,19 @@ import type {
 
 export interface ClientOptions {
   baseUrl: string;
+  /** Static API secret for bot clients (Discord/Slack). Mutually exclusive with getToken. */
   apiSecret?: string;
+  /** Dynamic token getter for dashboard clients using in-memory JWT storage. */
+  getToken?: () => string | null;
+  /** Called on 401 response — attempt silent token refresh. Return new token or null. */
+  onUnauthorized?: () => Promise<string | null>;
 }
 
 export class ApiClient {
   private baseUrl: string;
   private headers: Record<string, string>;
+  private getToken?: () => string | null;
+  private onUnauthorized?: () => Promise<string | null>;
 
   constructor(options: ClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -51,14 +58,45 @@ export class ApiClient {
     if (options.apiSecret) {
       this.headers["Authorization"] = `Bearer ${options.apiSecret}`;
     }
+    this.getToken = options.getToken;
+    this.onUnauthorized = options.onUnauthorized;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+    // Build request-specific headers — include dynamic token if available
+    const requestHeaders: Record<string, string> = { ...this.headers };
+    const dynamicToken = this.getToken?.();
+    if (dynamicToken) {
+      requestHeaders["Authorization"] = `Bearer ${dynamicToken}`;
+    }
+
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: this.headers,
+      headers: requestHeaders,
+      credentials: "include",
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    // On 401 with onUnauthorized handler: attempt silent refresh and retry once
+    if (res.status === 401 && this.onUnauthorized) {
+      const newToken = await this.onUnauthorized();
+      if (newToken) {
+        const retryHeaders: Record<string, string> = { ...this.headers };
+        retryHeaders["Authorization"] = `Bearer ${newToken}`;
+        const retryRes = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          headers: retryHeaders,
+          credentials: "include",
+          body: body ? JSON.stringify(body) : undefined,
+        });
+        if (!retryRes.ok) {
+          const errorBody = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
+          throw new ApiError(retryRes.status, (errorBody as { error?: string }).error ?? retryRes.statusText);
+        }
+        return retryRes.json() as Promise<T>;
+      }
+      throw new ApiError(401, "Session expired");
+    }
 
     if (!res.ok) {
       const errorBody = await res.json().catch(() => ({ error: res.statusText }));
@@ -432,9 +470,13 @@ export class ApiClient {
 
   async *streamExecute(goalId: string, userId?: string): AsyncGenerator<StreamEvent> {
     const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    const streamHeaders: Record<string, string> = { ...this.headers };
+    const dynamicToken = this.getToken?.();
+    if (dynamicToken) streamHeaders["Authorization"] = `Bearer ${dynamicToken}`;
     const res = await fetch(`${this.baseUrl}/api/goals/${goalId}/execute/stream${params}`, {
       method: "GET",
-      headers: this.headers,
+      headers: streamHeaders,
+      credentials: "include",
     });
 
     if (!res.ok) {
@@ -480,9 +522,13 @@ export class ApiClient {
     platform?: string;
     history?: Array<{ role: "user" | "agent" | "system"; content: string }>;
   }): AsyncGenerator<StreamEvent> {
+    const streamHeaders: Record<string, string> = { ...this.headers };
+    const dynamicToken = this.getToken?.();
+    if (dynamicToken) streamHeaders["Authorization"] = `Bearer ${dynamicToken}`;
     const res = await fetch(`${this.baseUrl}/api/agents/run/stream`, {
       method: "POST",
-      headers: this.headers,
+      headers: streamHeaders,
+      credentials: "include",
       body: JSON.stringify(data),
     });
 

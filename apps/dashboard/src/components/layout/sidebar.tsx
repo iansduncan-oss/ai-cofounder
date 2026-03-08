@@ -25,7 +25,7 @@ import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
-import { useAuth } from "@/components/auth/auth-guard";
+import { useAuth } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/common/notification-bell";
 
 const navItems = [

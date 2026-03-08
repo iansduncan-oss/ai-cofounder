@@ -4,37 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useAuth } from "@/hooks/use-auth";
 import { AlertTriangle, LogIn } from "lucide-react";
 
 export function LoginPage() {
   usePageTitle("Login");
   const navigate = useNavigate();
-  const [secret, setSecret] = useState("");
+  const { login } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!secret.trim()) return;
+    if (!email.trim() || !password.trim()) return;
 
     setLoading(true);
     setError("");
 
     try {
-      // Validate the secret against the health endpoint
-      const baseUrl = import.meta.env.VITE_API_URL || "";
-      const res = await fetch(`${baseUrl}/health`, {
-        headers: { Authorization: `Bearer ${secret.trim()}` },
-      });
-
-      if (res.ok) {
-        localStorage.setItem("ai-cofounder-token", secret.trim());
-        navigate("/dashboard");
-      } else {
-        setError("Invalid API secret");
-      }
+      await login(email.trim(), password);
+      navigate("/dashboard");
     } catch {
-      setError("Unable to connect to server");
+      setError("Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -49,18 +42,26 @@ export function LoginPage() {
           </div>
           <CardTitle>AI Cofounder</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Enter your API secret to access the dashboard
+            Sign in to access the dashboard
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Input
-                type="password"
-                placeholder="API Secret"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 autoFocus
+              />
+            </div>
+            <div>
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
             </div>
             {error && (
@@ -72,7 +73,7 @@ export function LoginPage() {
             <Button
               type="submit"
               className="w-full"
-              disabled={!secret.trim() || loading}
+              disabled={!email.trim() || !password.trim() || loading}
             >
               <LogIn className="mr-2 h-4 w-4" />
               {loading ? "Signing in..." : "Sign In"}
