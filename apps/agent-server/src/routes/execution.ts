@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
-import { TaskDispatcher, type TaskProgressCallback } from "../agents/dispatcher.js";
+import { getGoal, updateGoalMetadata } from "@ai-cofounder/db";
+import { enqueueAgentTask } from "@ai-cofounder/queue";
+import { TaskDispatcher } from "../agents/dispatcher.js";
 import { VerificationService } from "../services/verification.js";
 
 const logger = createLogger("execution-routes");
@@ -24,64 +26,50 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
     verificationService,
   );
 
-  // Execute all tasks for a goal
-  app.post<{ Params: { id: string }; Body: { userId?: string; webhookUrl?: string } }>(
+  // Execute all tasks for a goal — non-blocking: enqueues to BullMQ and returns 202
+  app.post<{
+    Params: { id: string };
+    Body: { userId?: string; webhookUrl?: string; priority?: "critical" | "high" | "normal" | "low" };
+  }>(
     "/:id/execute",
     { schema: { tags: ["execution"] } },
     async (request, reply) => {
       const { id } = request.params;
-      const { userId, webhookUrl } = request.body ?? {};
+      const { userId, webhookUrl, priority } = request.body ?? {};
 
-      let onProgress: TaskProgressCallback | undefined;
-      if (webhookUrl) {
-        onProgress = async (event) => {
-          try {
-            const statusIcon =
-              event.status === "completed"
-                ? "\u2705"
-                : event.status === "failed"
-                  ? "\u274c"
-                  : "\ud83d\udd35";
-            await fetch(webhookUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                embeds: [
-                  {
-                    title: `${statusIcon} Task ${event.status}: ${event.taskTitle}`,
-                    description: event.output ? event.output.slice(0, 2048) : undefined,
-                    color:
-                      event.status === "completed"
-                        ? 2278400
-                        : event.status === "failed"
-                          ? 15548997
-                          : 8158332,
-                    footer: {
-                      text: `${event.completedTasks}/${event.totalTasks} tasks · Agent: ${event.agent} · Goal: ${event.goalTitle}`,
-                    },
-                  },
-                ],
-              }),
-            });
-          } catch (err) {
-            logger.warn({ err }, "failed to send progress webhook");
-          }
-        };
+      // Look up the goal to validate it exists
+      const goal = await getGoal(app.db, id);
+      if (!goal) {
+        return reply.status(404).send({ error: `Goal not found: ${id}` });
       }
 
-      try {
-        const progress = await dispatcher.runGoal(id, userId, onProgress);
-        return progress;
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("not found")) {
-          return reply.status(404).send({ error: err.message });
-        }
-        throw err;
-      }
+      // Enqueue job to BullMQ — returns immediately with jobId
+      const jobId = await enqueueAgentTask({
+        goalId: id,
+        prompt: goal.description ?? goal.title,
+        userId,
+        priority,
+      });
+
+      // Store jobId (and optional webhookUrl) in goal metadata for later status lookup
+      await updateGoalMetadata(app.db, id, {
+        queueJobId: jobId,
+        ...(webhookUrl ? { webhookUrl } : {}),
+      });
+
+      logger.info({ goalId: id, jobId, userId }, "Goal execution enqueued");
+
+      return reply.status(202).send({
+        jobId,
+        status: "queued",
+        goalId: id,
+      });
     },
   );
 
   // Stream execution progress via SSE
+  // NOTE: This endpoint still uses in-process execution for now.
+  // Phase 2 will bridge events from the worker via Redis pub/sub.
   app.get<{ Params: { id: string }; Querystring: { userId?: string } }>(
     "/:id/execute/stream",
     { schema: { tags: ["execution"] } },
@@ -99,13 +87,9 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
         reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
 
-      const onProgress: TaskProgressCallback = async (event) => {
-        send("progress", event);
-      };
-
       try {
         send("started", { goalId: id });
-        const result = await dispatcher.runGoal(id, userId, onProgress);
+        const result = await dispatcher.runGoal(id, userId);
         send("completed", result);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

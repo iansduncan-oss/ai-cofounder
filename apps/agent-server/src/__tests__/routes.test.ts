@@ -46,6 +46,7 @@ vi.mock("@ai-cofounder/db", () => ({
   getConversationMessages: vi.fn().mockResolvedValue([]),
   createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
   getGoal: mockGetGoal,
+  updateGoalMetadata: (...args: unknown[]) => mockUpdateGoalMetadata(...args),
   createGoal: mockCreateGoal,
   listGoalsByConversation: mockListGoalsByConversation,
   countGoalsByConversation: mockCountGoalsByConversation,
@@ -124,6 +125,18 @@ vi.mock("@ai-cofounder/db", () => ({
   schedules: {},
   events: {},
   workSessions: {},
+}));
+
+const mockEnqueueAgentTask = vi.fn().mockResolvedValue("job-abc");
+const mockUpdateGoalMetadata = vi.fn().mockResolvedValue({});
+
+vi.mock("@ai-cofounder/queue", () => ({
+  getRedisConnection: vi.fn().mockReturnValue({}),
+  startWorkers: vi.fn(),
+  stopWorkers: vi.fn().mockResolvedValue(undefined),
+  closeAllQueues: vi.fn().mockResolvedValue(undefined),
+  setupRecurringJobs: vi.fn().mockResolvedValue(undefined),
+  enqueueAgentTask: (...args: unknown[]) => mockEnqueueAgentTask(...args),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -729,32 +742,32 @@ describe("Execution routes", () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it("POST /api/goals/:id/execute — returns no_tasks for empty goal", async () => {
-    mockGetGoal.mockResolvedValueOnce({ id: UUID, title: "Empty Goal" });
-    mockListTasksByGoal.mockResolvedValueOnce([]);
+  it("POST /api/goals/:id/execute — returns 202 with jobId when goal found", async () => {
+    mockGetGoal.mockResolvedValueOnce({ id: UUID, title: "Build Feature", description: "Build it", metadata: {} });
+    mockEnqueueAgentTask.mockResolvedValueOnce("job-abc");
 
     const { app } = buildServer();
     const res = await app.inject({
       method: "POST",
       url: `/api/goals/${UUID}/execute`,
-      payload: {},
+      payload: { userId: "u-1" },
       headers,
     });
     await app.close();
 
-    expect(res.statusCode).toBe(200);
-    expect(res.json().status).toBe("no_tasks");
+    expect(res.statusCode).toBe(202);
+    const body = res.json();
+    expect(body.jobId).toBe("job-abc");
+    expect(body.status).toBe("queued");
+    expect(body.goalId).toBe(UUID);
   });
 
-  it("POST /api/goals/:id/execute — executes tasks and returns completed", async () => {
-    mockGetGoal.mockResolvedValue({ id: UUID, title: "Build Feature", status: "draft" });
-    mockListTasksByGoal.mockResolvedValueOnce([
-      { id: "t-1", title: "Research", assignedAgent: "researcher", description: "Research stuff", orderIndex: 0, status: "pending" },
-    ]);
-    mockListPendingApprovals.mockResolvedValue([]);
+  it("POST /api/goals/:id/execute — enqueues job and stores jobId in metadata", async () => {
+    mockGetGoal.mockResolvedValueOnce({ id: UUID, title: "Build Feature", description: "Build it", metadata: {} });
+    mockEnqueueAgentTask.mockResolvedValueOnce("job-xyz");
 
     const { app } = buildServer();
-    const res = await app.inject({
+    await app.inject({
       method: "POST",
       url: `/api/goals/${UUID}/execute`,
       payload: {},
@@ -762,12 +775,12 @@ describe("Execution routes", () => {
     });
     await app.close();
 
-    expect(res.statusCode).toBe(200);
-    const body = res.json();
-    expect(body.goalTitle).toBe("Build Feature");
-    expect(body.totalTasks).toBe(1);
-    expect(body.tasks).toHaveLength(1);
-    expect(body.tasks[0].agent).toBe("researcher");
+    expect(mockEnqueueAgentTask).toHaveBeenCalledWith(expect.objectContaining({ goalId: UUID }));
+    expect(mockUpdateGoalMetadata).toHaveBeenCalledWith(
+      expect.anything(),
+      UUID,
+      expect.objectContaining({ queueJobId: "job-xyz" }),
+    );
   });
 
   it("GET /api/goals/:id/progress — returns progress for existing goal", async () => {

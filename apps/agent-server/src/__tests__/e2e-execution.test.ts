@@ -26,6 +26,8 @@ const mockGetUsageSummary = vi.fn().mockResolvedValue({
   requestCount: 1,
 });
 
+const mockUpdateGoalMetadata = vi.fn().mockResolvedValue({});
+
 vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
@@ -39,6 +41,7 @@ vi.mock("@ai-cofounder/db", () => ({
   createTask: vi.fn(),
   listGoalsByConversation: vi.fn().mockResolvedValue([]),
   updateGoalStatus: mockUpdateGoalStatus,
+  updateGoalMetadata: (...args: unknown[]) => mockUpdateGoalMetadata(...args),
   getTask: vi.fn(),
   listTasksByGoal: mockListTasksByGoal,
   listPendingTasks: vi.fn().mockResolvedValue([]),
@@ -60,6 +63,7 @@ vi.mock("@ai-cofounder/db", () => ({
   upsertChannelConversation: vi.fn(),
   findUserByPlatform: vi.fn(),
   getActivePrompt: vi.fn(),
+  getActivePersona: vi.fn().mockResolvedValue(null),
   listPromptVersions: vi.fn().mockResolvedValue([]),
   createPromptVersion: vi.fn(),
   getConversation: vi.fn(),
@@ -78,6 +82,18 @@ vi.mock("@ai-cofounder/db", () => ({
   channelConversations: {},
   prompts: {},
   n8nWorkflows: {},
+}));
+
+// Mock @ai-cofounder/queue — execution route uses enqueueAgentTask
+const mockEnqueueAgentTask = vi.fn().mockResolvedValue("job-e2e-123");
+
+vi.mock("@ai-cofounder/queue", () => ({
+  getRedisConnection: vi.fn().mockReturnValue({}),
+  startWorkers: vi.fn(),
+  stopWorkers: vi.fn().mockResolvedValue(undefined),
+  closeAllQueues: vi.fn().mockResolvedValue(undefined),
+  setupRecurringJobs: vi.fn().mockResolvedValue(undefined),
+  enqueueAgentTask: (...args: unknown[]) => mockEnqueueAgentTask(...args),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -118,40 +134,20 @@ beforeEach(() => {
   mockListPendingApprovals.mockResolvedValue([]);
 });
 
-describe("E2E goal execution flow", () => {
-  it("executes a goal with two tasks end-to-end", async () => {
-    // Set up: goal with two tasks (researcher → coder)
-    mockGetGoal.mockResolvedValue({
+describe("E2E goal execution flow — queue-backed", () => {
+  // NOTE: Since Phase 1, POST /:id/execute enqueues to BullMQ and returns 202 immediately.
+  // The worker process (worker.ts) picks up and runs the job asynchronously.
+  // These E2E tests verify the non-blocking HTTP behavior.
+
+  it("enqueues goal execution and returns 202 with jobId", async () => {
+    mockGetGoal.mockResolvedValueOnce({
       id: GOAL_ID,
       title: "Build Feature",
+      description: "Build the feature",
       status: "active",
+      metadata: {},
     });
-
-    const tasks = [
-      {
-        id: "task-1",
-        goalId: GOAL_ID,
-        title: "Research best practices",
-        description: "Research the best approach",
-        assignedAgent: "researcher",
-        orderIndex: 0,
-        status: "pending",
-      },
-      {
-        id: "task-2",
-        goalId: GOAL_ID,
-        title: "Implement solution",
-        description: "Write the code",
-        assignedAgent: "coder",
-        orderIndex: 1,
-        status: "pending",
-      },
-    ];
-    mockListTasksByGoal.mockResolvedValue(tasks);
-    mockAssignTask.mockResolvedValue({});
-    mockStartTask.mockResolvedValue({});
-    mockCompleteTask.mockResolvedValue({});
-    mockUpdateGoalStatus.mockResolvedValue({});
+    mockEnqueueAgentTask.mockResolvedValueOnce("job-e2e-123");
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -161,48 +157,27 @@ describe("E2E goal execution flow", () => {
     });
     await app.close();
 
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(202);
     const body = res.json();
-    expect(body.status).toBe("completed");
-    expect(body.totalTasks).toBe(2);
-    expect(body.completedTasks).toBe(2);
-    expect(body.tasks).toHaveLength(2);
-    expect(body.tasks[0].status).toBe("completed");
-    expect(body.tasks[1].status).toBe("completed");
+    expect(body.jobId).toBe("job-e2e-123");
+    expect(body.status).toBe("queued");
+    expect(body.goalId).toBe(GOAL_ID);
 
-    // Verify task lifecycle calls
-    expect(mockAssignTask).toHaveBeenCalledTimes(2);
-    expect(mockStartTask).toHaveBeenCalledTimes(2);
-    expect(mockCompleteTask).toHaveBeenCalledTimes(2);
-    expect(mockUpdateGoalStatus).toHaveBeenCalledWith(expect.anything(), GOAL_ID, "completed");
+    // Verify enqueue was called with correct args
+    expect(mockEnqueueAgentTask).toHaveBeenCalledWith(
+      expect.objectContaining({ goalId: GOAL_ID }),
+    );
 
-    // Verify LLM usage was recorded for each task
-    expect(mockRecordLlmUsage).toHaveBeenCalledTimes(2);
+    // Verify jobId stored in metadata for later status lookup
+    expect(mockUpdateGoalMetadata).toHaveBeenCalledWith(
+      expect.anything(),
+      GOAL_ID,
+      expect.objectContaining({ queueJobId: "job-e2e-123" }),
+    );
   });
 
-  it("stops execution when a task requires approval", async () => {
-    mockGetGoal.mockResolvedValue({
-      id: GOAL_ID,
-      title: "Deploy App",
-      status: "active",
-    });
-
-    const tasks = [
-      {
-        id: "task-1",
-        goalId: GOAL_ID,
-        title: "Deploy to production",
-        description: "Deploy the app",
-        assignedAgent: "coder",
-        orderIndex: 0,
-        status: "pending",
-      },
-    ];
-    mockListTasksByGoal.mockResolvedValue(tasks);
-    mockListPendingApprovals.mockResolvedValue([
-      { id: "approval-1", taskId: "task-1", status: "pending" },
-    ]);
-    mockUpdateGoalStatus.mockResolvedValue({});
+  it("returns 404 when goal not found", async () => {
+    mockGetGoal.mockResolvedValueOnce(null);
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -212,59 +187,30 @@ describe("E2E goal execution flow", () => {
     });
     await app.close();
 
-    const body = res.json();
-    expect(body.completedTasks).toBe(0);
-    expect(body.tasks[0].status).toBe("awaiting_approval");
-    expect(mockAssignTask).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(404);
+    expect(mockEnqueueAgentTask).not.toHaveBeenCalled();
   });
 
-  it("records partial completion when a task fails", async () => {
-    mockGetGoal.mockResolvedValue({
+  it("passes userId and priority to enqueueAgentTask", async () => {
+    mockGetGoal.mockResolvedValueOnce({
       id: GOAL_ID,
-      title: "Build Feature",
+      title: "Urgent Goal",
+      description: "Do this ASAP",
       status: "active",
+      metadata: {},
     });
 
-    // First task succeeds, second is a role that doesn't exist
-    const tasks = [
-      {
-        id: "task-1",
-        goalId: GOAL_ID,
-        title: "Research",
-        description: "Do research",
-        assignedAgent: "researcher",
-        orderIndex: 0,
-        status: "pending",
-      },
-      {
-        id: "task-2",
-        goalId: GOAL_ID,
-        title: "Unknown agent task",
-        description: "This has an unknown agent",
-        assignedAgent: null,
-        orderIndex: 1,
-        status: "pending",
-      },
-    ];
-    mockListTasksByGoal.mockResolvedValue(tasks);
-    mockAssignTask.mockResolvedValue({});
-    mockStartTask.mockResolvedValue({});
-    mockCompleteTask.mockResolvedValue({});
-    mockFailTask.mockResolvedValue({});
-    mockUpdateGoalStatus.mockResolvedValue({});
-
     const { app } = buildServer();
-    const res = await app.inject({
+    await app.inject({
       method: "POST",
       url: `/api/goals/${GOAL_ID}/execute`,
-      payload: {},
+      payload: { userId: "user-123", priority: "high" },
     });
     await app.close();
 
-    const body = res.json();
-    // First task completed, second failed (no specialist for null role → "researcher" fallback, but should still work)
-    expect(body.totalTasks).toBe(2);
-    expect(body.completedTasks).toBeGreaterThanOrEqual(1);
+    expect(mockEnqueueAgentTask).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-123", priority: "high" }),
+    );
   });
 });
 
