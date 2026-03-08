@@ -49,6 +49,7 @@ export interface Task {
   status: TaskStatus;
   assignedAgent?: AgentRole;
   orderIndex: number;
+  parallelGroup?: number | null;
   input?: string;
   output?: string;
   error?: string;

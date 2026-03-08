@@ -45,6 +45,8 @@ import {
   READ_FILE_TOOL,
   WRITE_FILE_TOOL,
   LIST_DIRECTORY_TOOL,
+  DELETE_FILE_TOOL,
+  DELETE_DIRECTORY_TOOL,
 } from "./tools/filesystem-tools.js";
 import {
   GIT_CLONE_TOOL,
@@ -77,6 +79,7 @@ export interface PlanResult {
     title: string;
     assignedAgent: AgentRole;
     orderIndex: number;
+    parallelGroup?: number | null;
   }>;
 }
 
@@ -134,6 +137,13 @@ const CREATE_PLAN_TOOL: LlmTool = {
                 "Which specialist agent should handle this task: " +
                 "researcher (gather info), coder (write/edit code), " +
                 "reviewer (critique/validate), planner (break down further)",
+            },
+          },
+            parallel_group: {
+              type: "integer",
+              description:
+                "Optional group number for parallel execution. Tasks with the same group run concurrently. " +
+                "Groups execute sequentially (0 before 1 before 2). Omit to run sequentially.",
             },
           },
           required: ["title", "description", "assigned_agent"],
@@ -213,6 +223,7 @@ interface CreatePlanInput {
     title: string;
     description: string;
     assigned_agent: "researcher" | "coder" | "reviewer" | "planner";
+    parallel_group?: number;
   }>;
 }
 
@@ -334,7 +345,7 @@ export class Orchestrator {
     }
 
     if (this.workspaceService) {
-      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
+      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL, DELETE_FILE_TOOL, DELETE_DIRECTORY_TOOL);
       tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
       tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
     }
@@ -492,7 +503,7 @@ export class Orchestrator {
     if (this.sandboxService?.available) tools.push(EXECUTE_CODE_TOOL);
     if (this.db) tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
     if (this.workspaceService) {
-      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
+      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL, DELETE_FILE_TOOL, DELETE_DIRECTORY_TOOL);
       tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
       tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
     }
@@ -821,12 +832,13 @@ export class Orchestrator {
       }
       case "execute_code": {
         if (!this.sandboxService?.available) return { error: "Sandbox execution not available" };
-        const input = block.input as { code: string; language: string; timeout_ms?: number };
+        const input = block.input as { code: string; language: string; timeout_ms?: number; dependencies?: string[] };
         const timeoutMs = Math.min(input.timeout_ms ?? 30_000, 60_000);
         const result = await this.sandboxService.execute({
           code: input.code,
           language: input.language as "typescript" | "javascript" | "python" | "bash",
           timeoutMs,
+          dependencies: input.dependencies,
         });
         // Persist execution result if DB is available
         if (this.db) {
@@ -887,10 +899,32 @@ export class Orchestrator {
           return { error: msg };
         }
       }
+      case "delete_file": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { path: string };
+        try {
+          await this.workspaceService.deleteFile(input.path);
+          return { deleted: true, path: input.path };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      }
+      case "delete_directory": {
+        if (!this.workspaceService) return { error: "Workspace not available" };
+        const input = block.input as { path: string; force?: boolean };
+        try {
+          await this.workspaceService.deleteDirectory(input.path, input.force);
+          return { deleted: true, path: input.path };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { error: msg };
+        }
+      }
       case "git_clone": {
         if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_url: string; directory_name?: string };
-        const result = await this.workspaceService.gitClone(input.repo_url, input.directory_name);
+        const input = block.input as { repo_url: string; directory_name?: string; depth?: number };
+        const result = await this.workspaceService.gitClone(input.repo_url, input.directory_name, input.depth);
         return { ...result, repoUrl: input.repo_url };
       }
       case "git_status": {
@@ -989,6 +1023,7 @@ export class Orchestrator {
         description: t.description,
         assignedAgent: t.assigned_agent,
         orderIndex: i,
+        parallelGroup: t.parallel_group,
         input: t.description,
       });
 
@@ -997,6 +1032,7 @@ export class Orchestrator {
         title: task.title,
         assignedAgent: task.assignedAgent as AgentRole,
         orderIndex: task.orderIndex,
+        parallelGroup: task.parallelGroup,
       });
     }
 

@@ -39,7 +39,22 @@ const RunBody = Type.Object({
 });
 type RunBody = Static<typeof RunBody>;
 
+const AGENT_ROLES = [
+  { role: "orchestrator", description: "Main coordinator — plans, delegates, executes tools" },
+  { role: "researcher", description: "Web search, information gathering, memory recall" },
+  { role: "coder", description: "Code generation with self-review" },
+  { role: "reviewer", description: "Code review and quality checks" },
+  { role: "planner", description: "Task decomposition and planning" },
+  { role: "debugger", description: "Error analysis, log tracing, fix proposals" },
+  { role: "doc_writer", description: "Documentation generation" },
+  { role: "verifier", description: "Goal completion verification" },
+] as const;
+
 export const agentRoutes: FastifyPluginAsync = async (app) => {
+  /* GET /roles — list available agent roles */
+  app.get("/roles", { schema: { tags: ["agents"] } }, async () => {
+    return AGENT_ROLES;
+  });
   const orchestrator = new Orchestrator(
     app.llmRegistry,
     app.db,

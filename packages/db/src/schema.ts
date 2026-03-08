@@ -150,6 +150,7 @@ export const tasks = pgTable("tasks", {
   status: taskStatusEnum("status").notNull().default("pending"),
   assignedAgent: agentRoleEnum("assigned_agent"),
   orderIndex: integer("order_index").notNull().default(0),
+  parallelGroup: integer("parallel_group"),
   input: text("input"),
   output: text("output"),
   error: text("error"),

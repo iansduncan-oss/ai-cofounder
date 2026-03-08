@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 
@@ -43,7 +44,74 @@ const GitOperationBody = Type.Object({
   timeoutMs: Type.Optional(Type.Integer({ minimum: 1000, maximum: 300000 })),
 });
 
+const DeleteFileBody = Type.Object({
+  path: Type.String({ minLength: 1 }),
+});
+
+const DeleteDirectoryBody = Type.Object({
+  path: Type.String({ minLength: 1 }),
+  force: Type.Optional(Type.Boolean()),
+});
+
 export const workspaceRoutes: FastifyPluginAsync = async (app) => {
+  /* GET /usage — workspace disk usage */
+  app.get(
+    "/usage",
+    { schema: { tags: ["workspace"] } },
+    async () => {
+      const rootDir = app.workspaceService.rootDir;
+      return new Promise<{ path: string; totalBytes: number; totalHuman: string }>((resolve, reject) => {
+        execFile("du", ["-sb", rootDir], { timeout: 10_000 }, (error, stdout) => {
+          if (error) {
+            // Fallback: return 0 if du fails (e.g. dir doesn't exist yet)
+            return resolve({ path: rootDir, totalBytes: 0, totalHuman: "0B" });
+          }
+          const bytes = parseInt(stdout.split("\t")[0], 10) || 0;
+          const units = ["B", "KB", "MB", "GB"];
+          let size = bytes;
+          let unitIdx = 0;
+          while (size >= 1024 && unitIdx < units.length - 1) {
+            size /= 1024;
+            unitIdx++;
+          }
+          const totalHuman = `${size.toFixed(unitIdx === 0 ? 0 : 1)}${units[unitIdx]}`;
+          resolve({ path: rootDir, totalBytes: bytes, totalHuman });
+        });
+      });
+    },
+  );
+
+  /* POST /files/delete — delete a file */
+  app.post<{ Body: typeof DeleteFileBody.static }>(
+    "/files/delete",
+    { schema: { tags: ["workspace"], body: DeleteFileBody } },
+    async (request, reply) => {
+      try {
+        await app.workspaceService.deleteFile(request.body.path);
+        return { deleted: true, path: request.body.path };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const status = msg.includes("traversal") ? 403 : 404;
+        return reply.status(status).send({ error: msg });
+      }
+    },
+  );
+
+  /* POST /directories/delete — delete a directory */
+  app.post<{ Body: typeof DeleteDirectoryBody.static }>(
+    "/directories/delete",
+    { schema: { tags: ["workspace"], body: DeleteDirectoryBody } },
+    async (request, reply) => {
+      try {
+        await app.workspaceService.deleteDirectory(request.body.path, request.body.force);
+        return { deleted: true, path: request.body.path };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const status = msg.includes("traversal") ? 403 : 500;
+        return reply.status(status).send({ error: msg });
+      }
+    },
+  );
   /* POST /files/read — read a file */
   app.post<{ Body: typeof ReadFileBody.static }>(
     "/files/read",

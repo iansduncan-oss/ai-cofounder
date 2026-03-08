@@ -17,16 +17,40 @@ const DOCKER_IMAGES: Record<SandboxLanguage, string> = {
   bash: "alpine:3.20",
 };
 
-const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string) => string[]> = {
-  typescript: (code) => [
-    "sh",
-    "-c",
-    `echo '${escapeShell(code)}' > /tmp/run.ts && npx --yes tsx /tmp/run.ts`,
-  ],
-  javascript: (code) => ["node", "-e", code],
-  python: (code) => ["python3", "-c", code],
+const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[]) => string[]> = {
+  typescript: (code, deps) => {
+    const install = deps?.length ? `npm install --no-save ${deps.join(" ")} && ` : "";
+    return [
+      "sh",
+      "-c",
+      `${install}echo '${escapeShell(code)}' > /tmp/run.ts && npx --yes tsx /tmp/run.ts`,
+    ];
+  },
+  javascript: (code, deps) => {
+    if (deps?.length) {
+      return ["sh", "-c", `npm install --no-save ${deps.join(" ")} && node -e ${JSON.stringify(code)}`];
+    }
+    return ["node", "-e", code];
+  },
+  python: (code, deps) => {
+    if (deps?.length) {
+      return ["sh", "-c", `pip install --quiet ${deps.join(" ")} && python3 -c ${JSON.stringify(code)}`];
+    }
+    return ["python3", "-c", code];
+  },
   bash: (code) => ["sh", "-c", code],
 };
+
+interface CacheEntry {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  cachedAt: number;
+}
+
+const CACHE_MAX_SIZE = 100;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 function escapeShell(s: string): string {
   return s.replace(/'/g, "'\\''");
@@ -46,6 +70,7 @@ async function isDockerAvailable(): Promise<boolean> {
 
 export class SandboxService {
   private config: Required<SandboxConfig>;
+  private cache = new Map<string, CacheEntry>();
 
   constructor(config?: SandboxConfig) {
     this.config = {
@@ -55,6 +80,32 @@ export class SandboxService {
       defaultTimeoutMs: config?.defaultTimeoutMs ?? 30_000,
       dockerAvailable: config?.dockerAvailable ?? false,
     };
+  }
+
+  private cacheKey(request: ExecutionRequest): string {
+    const deps = request.dependencies?.sort().join(",") ?? "";
+    return createHash("sha256")
+      .update(`${request.language}:${request.code}:${deps}`)
+      .digest("hex");
+  }
+
+  private getCached(key: string): CacheEntry | undefined {
+    const entry = this.cache.get(key);
+    if (!entry) return undefined;
+    if (Date.now() - entry.cachedAt > CACHE_TTL_MS) {
+      this.cache.delete(key);
+      return undefined;
+    }
+    return entry;
+  }
+
+  private putCache(key: string, entry: CacheEntry): void {
+    // Evict oldest if at capacity
+    if (this.cache.size >= CACHE_MAX_SIZE) {
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) this.cache.delete(firstKey);
+    }
+    this.cache.set(key, entry);
   }
 
   async init(): Promise<void> {
@@ -82,25 +133,43 @@ export class SandboxService {
       };
     }
 
+    // Check cache
+    const cacheKey = this.cacheKey(request);
+    const cached = this.getCached(cacheKey);
+    if (cached) {
+      logger.info({ language: request.language, cacheKey: cacheKey.slice(0, 12) }, "sandbox cache hit");
+      return {
+        stdout: cached.stdout,
+        stderr: cached.stderr,
+        exitCode: cached.exitCode,
+        durationMs: cached.durationMs,
+        language: request.language,
+        timedOut: false,
+        cached: true,
+      };
+    }
+
     const timeoutMs = request.timeoutMs ?? this.config.defaultTimeoutMs;
     const image = DOCKER_IMAGES[request.language];
-    const cmd = LANGUAGE_COMMANDS[request.language](request.code);
+    const cmd = LANGUAGE_COMMANDS[request.language](request.code, request.dependencies);
 
     const containerName = `sandbox-${hashCode(request.code)}-${Date.now()}`;
 
+    const hasDeps = request.dependencies && request.dependencies.length > 0;
     const dockerArgs = [
       "run",
       "--rm",
       "--name",
       containerName,
-      "--network=none",
-      "--read-only",
+      // Allow network only when dependencies need installing
+      ...(hasDeps ? [] : ["--network=none"]),
+      ...(hasDeps ? [] : ["--read-only"]),
       `--memory=${this.config.memoryLimit}`,
       `--cpus=${this.config.cpuLimit}`,
       `--pids-limit=${this.config.pidsLimit}`,
       // Writable /tmp for temp files
       "--tmpfs",
-      "/tmp:rw,noexec,nosuid,size=64m",
+      "/tmp:rw,nosuid,size=128m",
       image,
       ...cmd,
     ];
@@ -158,14 +227,28 @@ export class SandboxService {
             "sandbox execution completed",
           );
 
-          resolve({
+          const result: ExecutionResult = {
             stdout: truncate(stdout, 10_000),
             stderr: truncate(stderr, 10_000),
             exitCode,
             durationMs,
             language: request.language,
             timedOut,
-          });
+            cached: false,
+          };
+
+          // Cache successful, non-timed-out results
+          if (exitCode === 0 && !timedOut) {
+            this.putCache(cacheKey, {
+              stdout: result.stdout,
+              stderr: result.stderr,
+              exitCode,
+              durationMs,
+              cachedAt: Date.now(),
+            });
+          }
+
+          resolve(result);
         },
       );
 

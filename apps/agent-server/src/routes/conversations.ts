@@ -5,6 +5,7 @@ import {
   listConversationsByUser,
   getConversation,
   getConversationMessages,
+  listGoalsByConversation,
 } from "@ai-cofounder/db";
 import { IdParams, PaginationQuery } from "../schemas.js";
 
@@ -67,6 +68,31 @@ export const conversationRoutes: FastifyPluginAsync = async (app) => {
       const conv = await getConversation(app.db, request.params.id);
       if (!conv) return reply.status(404).send({ error: "Conversation not found" });
       return conv;
+    },
+  );
+
+  /* GET /:id/export — export full conversation as JSON */
+  app.get<{ Params: typeof IdParams.static }>(
+    "/:id/export",
+    { schema: { tags: ["conversations"], params: IdParams } },
+    async (request, reply) => {
+      const conv = await getConversation(app.db, request.params.id);
+      if (!conv) return reply.status(404).send({ error: "Conversation not found" });
+
+      const messages = await getConversationMessages(app.db, request.params.id, 10_000, 0);
+      const goals = await listGoalsByConversation(app.db, request.params.id, { limit: 1000 });
+
+      const exportData = {
+        exportedAt: new Date().toISOString(),
+        conversation: conv,
+        messages: messages.reverse(),
+        goals,
+      };
+
+      reply
+        .header("Content-Disposition", `attachment; filename=conversation-${request.params.id}.json`)
+        .type("application/json")
+        .send(JSON.stringify(exportData, null, 2));
     },
   );
 

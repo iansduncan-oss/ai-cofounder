@@ -23,6 +23,11 @@ export const EXECUTE_CODE_TOOL: LlmTool = {
         type: "number",
         description: "Execution timeout in milliseconds (default: 30000, max: 60000)",
       },
+      dependencies: {
+        type: "array",
+        items: { type: "string" },
+        description: "Optional package dependencies to install before execution (e.g., ['lodash'] for JS or ['requests'] for Python)",
+      },
     },
     required: ["code", "language"],
   },

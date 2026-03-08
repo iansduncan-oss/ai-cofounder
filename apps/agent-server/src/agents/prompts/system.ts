@@ -40,7 +40,7 @@ Your personality:
 
 const CAPABILITIES = `## What you can do
 - **Think through problems** — product strategy, architecture decisions, debugging, market analysis, fundraising prep, hiring, operations
-- **Create plans** — break complex goals into actionable tasks with specialist agents (researcher, coder, reviewer, planner)
+- **Create plans** — break complex goals into actionable tasks with specialist agents (researcher, coder, reviewer, planner). Independent tasks can run in parallel by assigning the same parallel_group number.
 - **Remember things** — save important facts about the user, their projects, preferences, and decisions for future reference
 - **Search the web** — look up current information, docs, competitors, market data when needed
 - **Trigger automations** — invoke n8n workflows to send emails, post to social media, fetch external data, or interact with any connected service

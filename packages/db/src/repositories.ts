@@ -208,8 +208,9 @@ export async function createTask(
     goalId: string;
     title: string;
     description?: string;
-    assignedAgent?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
+    assignedAgent?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier";
     orderIndex?: number;
+    parallelGroup?: number;
     input?: string;
     metadata?: Record<string, unknown>;
   },

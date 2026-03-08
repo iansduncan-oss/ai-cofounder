@@ -38,6 +38,45 @@ export const WRITE_FILE_TOOL: LlmTool = {
   },
 };
 
+export const DELETE_FILE_TOOL: LlmTool = {
+  name: "delete_file",
+  description:
+    "Delete a file from the workspace. The path is relative to the workspace root directory. " +
+    "This is irreversible — use with caution.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Relative path to the file within the workspace",
+      },
+    },
+    required: ["path"],
+  },
+};
+
+export const DELETE_DIRECTORY_TOOL: LlmTool = {
+  name: "delete_directory",
+  description:
+    "Delete a directory from the workspace. By default only removes empty directories. " +
+    "Set force=true to recursively delete a directory and all its contents. " +
+    "The path is relative to the workspace root directory.",
+  input_schema: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Relative path to the directory within the workspace",
+      },
+      force: {
+        type: "boolean",
+        description: "If true, recursively delete non-empty directories (default: false)",
+      },
+    },
+    required: ["path"],
+  },
+};
+
 export const LIST_DIRECTORY_TOOL: LlmTool = {
   name: "list_directory",
   description:

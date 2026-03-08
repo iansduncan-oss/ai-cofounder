@@ -110,316 +110,56 @@ export class TaskDispatcher {
     let completedCount = 0;
     const retryCounts = new Map<string, number>();
 
-    for (const task of tasks) {
-      const agentRole = (task.assignedAgent ?? "researcher") as AgentRole;
-      const specialist = this.specialists.get(agentRole);
+    // Group tasks by parallelGroup. Tasks without a group get their own implicit sequential group.
+    const groups = this.groupTasks(tasks);
+    let stopped = false;
 
-      if (!specialist) {
-        this.logger.warn({ taskId: task.id, agent: agentRole }, "no specialist for role");
-        await failTask(this.db, task.id, `No specialist agent for role: ${agentRole}`);
-        taskResults.push({
-          id: task.id,
-          title: task.title,
-          agent: agentRole,
-          status: "failed",
-          output: `No specialist agent for role: ${agentRole}`,
-        });
-        continue;
-      }
+    for (const group of groups) {
+      if (stopped) break;
 
-      // Check for pending approvals on this task
+      // Check for pending approvals on any task in this group
       const pendingApprovals = await listPendingApprovals(this.db);
-      const taskApproval = pendingApprovals.find(
-        (a) => a.taskId === task.id && a.status === "pending",
-      );
-      if (taskApproval) {
-        this.logger.info({ taskId: task.id }, "task awaiting approval, skipping");
-        taskResults.push({
-          id: task.id,
-          title: task.title,
-          agent: agentRole,
-          status: "awaiting_approval",
-        });
-        break; // Stop execution chain until approved
-      }
-
-      // Assign and start the task
-      await assignTask(this.db, task.id, agentRole);
-      await startTask(this.db, task.id);
-
-      this.logger.info(
-        { taskId: task.id, taskTitle: task.title, agent: agentRole },
-        "executing task",
-      );
-
-      if (onProgress) {
-        try {
-          await onProgress({
-            goalId,
-            goalTitle: goal.title,
-            taskId: task.id,
-            taskTitle: task.title,
-            agent: agentRole,
-            status: "started",
-            completedTasks: completedCount,
-            totalTasks: tasks.length,
-          });
-        } catch {
-          /* notification failures are non-fatal */
-        }
-      }
-
-      // Push proactive notification for task started
-      if (this.notificationService) {
-        this.notificationService
-          .notifyGoalProgress({
-            goalId,
-            goalTitle: goal.title,
-            taskTitle: task.title,
-            agent: agentRole,
-            completedTasks: completedCount,
-            totalTasks: tasks.length,
-            status: "started",
-          })
-          .catch(() => {
-            /* notification failures are non-fatal */
-          });
-      }
-
-      const context: SpecialistContext = {
-        taskId: task.id,
-        taskTitle: task.title,
-        taskDescription: task.description ?? task.title,
-        goalTitle: goal.title,
-        previousOutputs: previousOutputs.length > 0 ? previousOutputs : undefined,
-        userId,
-      };
-
-      try {
-        const result = await specialist.execute(context);
-
-        await completeTask(this.db, task.id, result.output);
-
-        // Record LLM usage for cost tracking
-        try {
-          await recordLlmUsage(this.db, {
-            provider: result.provider,
-            model: result.model,
-            taskCategory: specialist.taskCategory,
-            agentRole: agentRole as AgentRole,
-            inputTokens: result.usage.inputTokens,
-            outputTokens: result.usage.outputTokens,
-            goalId,
-            taskId: task.id,
-          });
-        } catch {
-          /* usage tracking failures are non-fatal */
-        }
-
-        previousOutputs.push(result.output);
-        completedCount++;
-
-        taskResults.push({
-          id: task.id,
-          title: task.title,
-          agent: agentRole,
-          status: "completed",
-          output: result.output,
-        });
-
-        this.logger.info(
-          {
-            taskId: task.id,
-            model: result.model,
-            provider: result.provider,
-          },
-          "task completed",
+      let groupBlocked = false;
+      for (const task of group) {
+        const taskApproval = pendingApprovals.find(
+          (a) => a.taskId === task.id && a.status === "pending",
         );
-
-        if (onProgress) {
-          try {
-            await onProgress({
-              goalId,
-              goalTitle: goal.title,
-              taskId: task.id,
-              taskTitle: task.title,
-              agent: agentRole,
-              status: "completed",
-              completedTasks: completedCount,
-              totalTasks: tasks.length,
-              output: result.output.slice(0, 500),
-            });
-          } catch {
-            /* notification failures are non-fatal */
-          }
+        if (taskApproval) {
+          this.logger.info({ taskId: task.id }, "task awaiting approval, skipping");
+          taskResults.push({
+            id: task.id,
+            title: task.title,
+            agent: (task.assignedAgent ?? "researcher") as string,
+            status: "awaiting_approval",
+          });
+          groupBlocked = true;
+          stopped = true;
+          break;
         }
+      }
+      if (groupBlocked) break;
 
-        // Push proactive notification for task completed
-        if (this.notificationService) {
-          this.notificationService
-            .notifyGoalProgress({
-              goalId,
-              goalTitle: goal.title,
-              taskTitle: task.title,
-              agent: agentRole,
-              completedTasks: completedCount,
-              totalTasks: tasks.length,
-              status: "completed",
-            })
-            .catch(() => {
-              /* notification failures are non-fatal */
-            });
-        }
-      } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : String(err);
-        const retries = retryCounts.get(task.id) ?? 0;
+      // Snapshot previousOutputs for this group (all tasks in group see same context)
+      const groupPreviousOutputs = [...previousOutputs];
 
-        // Retry retryable roles once with error context
-        if (RETRYABLE_ROLES.has(agentRole) && retries < MAX_RETRIES) {
-          retryCounts.set(task.id, retries + 1);
-          this.logger.info({ taskId: task.id, agent: agentRole, attempt: retries + 2 }, "retrying task");
+      // Execute all tasks in this group concurrently
+      const groupPromises = group.map((task) =>
+        this.executeTask(task, goalId, goal.title, groupPreviousOutputs, tasks.length, completedCount, userId, onProgress, retryCounts),
+      );
 
-          const retryContext: SpecialistContext = {
-            ...context,
-            taskDescription: `${context.taskDescription}\n\n[RETRY] Previous attempt failed with error: ${errorMsg}\nPlease try a different approach.`,
-          };
+      const results = await Promise.allSettled(groupPromises);
 
-          try {
-            const retryResult = await specialist.execute(retryContext);
-            await completeTask(this.db, task.id, retryResult.output);
-
-            try {
-              await recordLlmUsage(this.db, {
-                provider: retryResult.provider,
-                model: retryResult.model,
-                taskCategory: specialist.taskCategory,
-                agentRole: agentRole as AgentRole,
-                inputTokens: retryResult.usage.inputTokens,
-                outputTokens: retryResult.usage.outputTokens,
-                goalId,
-                taskId: task.id,
-              });
-            } catch { /* usage tracking failures are non-fatal */ }
-
-            previousOutputs.push(retryResult.output);
+      // Collect results from this group
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          taskResults.push(result.value.taskResult);
+          if (result.value.taskResult.status === "completed" && result.value.output) {
+            previousOutputs.push(result.value.output);
             completedCount++;
-
-            taskResults.push({
-              id: task.id,
-              title: task.title,
-              agent: agentRole,
-              status: "completed",
-              output: retryResult.output,
-            });
-
-            this.logger.info({ taskId: task.id, agent: agentRole }, "task succeeded on retry");
-
-            if (onProgress) {
-              try {
-                await onProgress({
-                  goalId,
-                  goalTitle: goal.title,
-                  taskId: task.id,
-                  taskTitle: task.title,
-                  agent: agentRole,
-                  status: "completed",
-                  completedTasks: completedCount,
-                  totalTasks: tasks.length,
-                  output: retryResult.output.slice(0, 500),
-                });
-              } catch { /* notification failures are non-fatal */ }
-            }
-
-            if (this.notificationService) {
-              this.notificationService.notifyGoalProgress({
-                goalId,
-                goalTitle: goal.title,
-                taskTitle: task.title,
-                agent: agentRole,
-                completedTasks: completedCount,
-                totalTasks: tasks.length,
-                status: "completed",
-              }).catch(() => { /* non-fatal */ });
-            }
-
-            continue;
-          } catch (retryErr) {
-            const retryErrorMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-            this.logger.error({ taskId: task.id, err: retryErr }, "task retry also failed");
-            await failTask(this.db, task.id, retryErrorMsg);
-
-            taskResults.push({
-              id: task.id,
-              title: task.title,
-              agent: agentRole,
-              status: "failed",
-              output: retryErrorMsg,
-            });
-
-            if (this.notificationService) {
-              this.notificationService.notifyTaskFailed({
-                goalId, goalTitle: goal.title, taskId: task.id, taskTitle: task.title, agent: agentRole, error: retryErrorMsg,
-              }).catch(() => { /* non-fatal */ });
-            }
-
-            if (onProgress) {
-              try {
-                await onProgress({
-                  goalId, goalTitle: goal.title, taskId: task.id, taskTitle: task.title, agent: agentRole,
-                  status: "failed", completedTasks: completedCount, totalTasks: tasks.length, output: retryErrorMsg,
-                });
-              } catch { /* non-fatal */ }
-            }
-
-            continue;
+          } else if (result.value.taskResult.status === "failed") {
+            // failed tasks don't increment completedCount
           }
         }
-
-        await failTask(this.db, task.id, errorMsg);
-
-        taskResults.push({
-          id: task.id,
-          title: task.title,
-          agent: agentRole,
-          status: "failed",
-          output: errorMsg,
-        });
-
-        this.logger.error({ taskId: task.id, err }, "task failed");
-
-        if (this.notificationService) {
-          this.notificationService
-            .notifyTaskFailed({
-              goalId,
-              goalTitle: goal.title,
-              taskId: task.id,
-              taskTitle: task.title,
-              agent: agentRole,
-              error: errorMsg,
-            })
-            .catch(() => {
-              /* notification failures are non-fatal */
-            });
-        }
-
-        if (onProgress) {
-          try {
-            await onProgress({
-              goalId,
-              goalTitle: goal.title,
-              taskId: task.id,
-              taskTitle: task.title,
-              agent: agentRole,
-              status: "failed",
-              completedTasks: completedCount,
-              totalTasks: tasks.length,
-              output: errorMsg,
-            });
-          } catch {
-            /* notification failures are non-fatal */
-          }
-        }
-        // Continue to next task instead of stopping entirely
       }
     }
 
@@ -489,6 +229,340 @@ export class TaskDispatcher {
       completedTasks: completedCount,
       tasks: taskResults,
     };
+  }
+
+  /** Group tasks by parallelGroup. Tasks without a group get their own implicit sequential group.
+   *  Groups execute in numeric order (0, 1, 2...). Ungrouped tasks each run alone, preserving
+   *  their position relative to grouped tasks based on orderIndex. */
+  private groupTasks(
+    tasks: Array<{ id: string; parallelGroup?: number | null; orderIndex: number; [key: string]: unknown }>,
+  ): Array<typeof tasks> {
+    // Build groups: explicit parallelGroups merge tasks; null/undefined each get their own group
+    const explicitGroups = new Map<number, typeof tasks>();
+    const result: Array<{ sortKey: number; tasks: typeof tasks }> = [];
+    const seenGroups = new Set<number>();
+
+    for (const task of tasks) {
+      if (task.parallelGroup != null) {
+        if (!explicitGroups.has(task.parallelGroup)) {
+          explicitGroups.set(task.parallelGroup, []);
+        }
+        explicitGroups.get(task.parallelGroup)!.push(task);
+        // Insert the group into results at first occurrence position
+        if (!seenGroups.has(task.parallelGroup)) {
+          seenGroups.add(task.parallelGroup);
+          result.push({ sortKey: task.parallelGroup, tasks: explicitGroups.get(task.parallelGroup)! });
+        }
+      } else {
+        // Ungrouped task runs alone in its own implicit sequential group
+        result.push({ sortKey: task.orderIndex + 1000, tasks: [task] });
+      }
+    }
+
+    // Sort: explicit groups by group number, then implicit by insertion order
+    result.sort((a, b) => a.sortKey - b.sortKey);
+    return result.map((r) => r.tasks);
+  }
+
+  /** Execute a single task with retry logic, notifications, and progress callbacks */
+  private async executeTask(
+    task: { id: string; title: string; description?: string | null; assignedAgent?: string | null; orderIndex: number },
+    goalId: string,
+    goalTitle: string,
+    previousOutputs: string[],
+    totalTasks: number,
+    baseCompletedCount: number,
+    userId?: string,
+    onProgress?: TaskProgressCallback,
+    retryCounts?: Map<string, number>,
+  ): Promise<{ taskResult: DispatcherProgress["tasks"][0]; output?: string }> {
+    const agentRole = (task.assignedAgent ?? "researcher") as AgentRole;
+    const specialist = this.specialists.get(agentRole);
+
+    if (!specialist) {
+      this.logger.warn({ taskId: task.id, agent: agentRole }, "no specialist for role");
+      await failTask(this.db, task.id, `No specialist agent for role: ${agentRole}`);
+      return {
+        taskResult: {
+          id: task.id,
+          title: task.title,
+          agent: agentRole,
+          status: "failed",
+          output: `No specialist agent for role: ${agentRole}`,
+        },
+      };
+    }
+
+    // Assign and start the task
+    await assignTask(this.db, task.id, agentRole);
+    await startTask(this.db, task.id);
+
+    this.logger.info(
+      { taskId: task.id, taskTitle: task.title, agent: agentRole },
+      "executing task",
+    );
+
+    if (onProgress) {
+      try {
+        await onProgress({
+          goalId,
+          goalTitle,
+          taskId: task.id,
+          taskTitle: task.title,
+          agent: agentRole,
+          status: "started",
+          completedTasks: baseCompletedCount,
+          totalTasks,
+        });
+      } catch {
+        /* notification failures are non-fatal */
+      }
+    }
+
+    if (this.notificationService) {
+      this.notificationService
+        .notifyGoalProgress({
+          goalId,
+          goalTitle,
+          taskTitle: task.title,
+          agent: agentRole,
+          completedTasks: baseCompletedCount,
+          totalTasks,
+          status: "started",
+        })
+        .catch(() => {
+          /* notification failures are non-fatal */
+        });
+    }
+
+    const context: SpecialistContext = {
+      taskId: task.id,
+      taskTitle: task.title,
+      taskDescription: task.description ?? task.title,
+      goalTitle,
+      previousOutputs: previousOutputs.length > 0 ? previousOutputs : undefined,
+      userId,
+    };
+
+    try {
+      const result = await specialist.execute(context);
+
+      await completeTask(this.db, task.id, result.output);
+
+      try {
+        await recordLlmUsage(this.db, {
+          provider: result.provider,
+          model: result.model,
+          taskCategory: specialist.taskCategory,
+          agentRole: agentRole as AgentRole,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          goalId,
+          taskId: task.id,
+        });
+      } catch {
+        /* usage tracking failures are non-fatal */
+      }
+
+      this.logger.info(
+        { taskId: task.id, model: result.model, provider: result.provider },
+        "task completed",
+      );
+
+      if (onProgress) {
+        try {
+          await onProgress({
+            goalId,
+            goalTitle,
+            taskId: task.id,
+            taskTitle: task.title,
+            agent: agentRole,
+            status: "completed",
+            completedTasks: baseCompletedCount + 1,
+            totalTasks,
+            output: result.output.slice(0, 500),
+          });
+        } catch {
+          /* notification failures are non-fatal */
+        }
+      }
+
+      if (this.notificationService) {
+        this.notificationService
+          .notifyGoalProgress({
+            goalId,
+            goalTitle,
+            taskTitle: task.title,
+            agent: agentRole,
+            completedTasks: baseCompletedCount + 1,
+            totalTasks,
+            status: "completed",
+          })
+          .catch(() => {
+            /* notification failures are non-fatal */
+          });
+      }
+
+      return {
+        taskResult: {
+          id: task.id,
+          title: task.title,
+          agent: agentRole,
+          status: "completed",
+          output: result.output,
+        },
+        output: result.output,
+      };
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      const retries = retryCounts?.get(task.id) ?? 0;
+
+      // Retry retryable roles once with error context
+      if (RETRYABLE_ROLES.has(agentRole) && retries < MAX_RETRIES) {
+        retryCounts?.set(task.id, retries + 1);
+        this.logger.info({ taskId: task.id, agent: agentRole, attempt: retries + 2 }, "retrying task");
+
+        const retryContext: SpecialistContext = {
+          ...context,
+          taskDescription: `${context.taskDescription}\n\n[RETRY] Previous attempt failed with error: ${errorMsg}\nPlease try a different approach.`,
+        };
+
+        try {
+          const retryResult = await specialist.execute(retryContext);
+          await completeTask(this.db, task.id, retryResult.output);
+
+          try {
+            await recordLlmUsage(this.db, {
+              provider: retryResult.provider,
+              model: retryResult.model,
+              taskCategory: specialist.taskCategory,
+              agentRole: agentRole as AgentRole,
+              inputTokens: retryResult.usage.inputTokens,
+              outputTokens: retryResult.usage.outputTokens,
+              goalId,
+              taskId: task.id,
+            });
+          } catch { /* usage tracking failures are non-fatal */ }
+
+          this.logger.info({ taskId: task.id, agent: agentRole }, "task succeeded on retry");
+
+          if (onProgress) {
+            try {
+              await onProgress({
+                goalId,
+                goalTitle,
+                taskId: task.id,
+                taskTitle: task.title,
+                agent: agentRole,
+                status: "completed",
+                completedTasks: baseCompletedCount + 1,
+                totalTasks,
+                output: retryResult.output.slice(0, 500),
+              });
+            } catch { /* notification failures are non-fatal */ }
+          }
+
+          if (this.notificationService) {
+            this.notificationService.notifyGoalProgress({
+              goalId,
+              goalTitle,
+              taskTitle: task.title,
+              agent: agentRole,
+              completedTasks: baseCompletedCount + 1,
+              totalTasks,
+              status: "completed",
+            }).catch(() => { /* non-fatal */ });
+          }
+
+          return {
+            taskResult: {
+              id: task.id,
+              title: task.title,
+              agent: agentRole,
+              status: "completed",
+              output: retryResult.output,
+            },
+            output: retryResult.output,
+          };
+        } catch (retryErr) {
+          const retryErrorMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+          this.logger.error({ taskId: task.id, err: retryErr }, "task retry also failed");
+          await failTask(this.db, task.id, retryErrorMsg);
+
+          if (this.notificationService) {
+            this.notificationService.notifyTaskFailed({
+              goalId, goalTitle, taskId: task.id, taskTitle: task.title, agent: agentRole, error: retryErrorMsg,
+            }).catch(() => { /* non-fatal */ });
+          }
+
+          if (onProgress) {
+            try {
+              await onProgress({
+                goalId, goalTitle, taskId: task.id, taskTitle: task.title, agent: agentRole,
+                status: "failed", completedTasks: baseCompletedCount, totalTasks, output: retryErrorMsg,
+              });
+            } catch { /* non-fatal */ }
+          }
+
+          return {
+            taskResult: {
+              id: task.id,
+              title: task.title,
+              agent: agentRole,
+              status: "failed",
+              output: retryErrorMsg,
+            },
+          };
+        }
+      }
+
+      await failTask(this.db, task.id, errorMsg);
+
+      this.logger.error({ taskId: task.id, err }, "task failed");
+
+      if (this.notificationService) {
+        this.notificationService
+          .notifyTaskFailed({
+            goalId,
+            goalTitle,
+            taskId: task.id,
+            taskTitle: task.title,
+            agent: agentRole,
+            error: errorMsg,
+          })
+          .catch(() => {
+            /* notification failures are non-fatal */
+          });
+      }
+
+      if (onProgress) {
+        try {
+          await onProgress({
+            goalId,
+            goalTitle,
+            taskId: task.id,
+            taskTitle: task.title,
+            agent: agentRole,
+            status: "failed",
+            completedTasks: baseCompletedCount,
+            totalTasks,
+            output: errorMsg,
+          });
+        } catch {
+          /* notification failures are non-fatal */
+        }
+      }
+
+      return {
+        taskResult: {
+          id: task.id,
+          title: task.title,
+          agent: agentRole,
+          status: "failed",
+          output: errorMsg,
+        },
+      };
+    }
   }
 
   /** Analyze execution results and store learnings as memories */

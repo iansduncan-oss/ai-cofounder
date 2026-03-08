@@ -1,5 +1,6 @@
+import http from "node:http";
 import { Client, GatewayIntentBits, Events } from "discord.js";
-import { createLogger, requireEnv } from "@ai-cofounder/shared";
+import { createLogger, requireEnv, optionalEnv } from "@ai-cofounder/shared";
 import { registerCommands } from "./commands/register.js";
 import { handleInteraction } from "./handlers/interaction.js";
 
@@ -27,6 +28,26 @@ async function main() {
   });
 
   await client.login(token);
+
+  // Health check HTTP server
+  const healthPort = Number(optionalEnv("DISCORD_HEALTH_PORT", "3101"));
+  const healthServer = http.createServer((_req, res) => {
+    if (_req.url === "/health" && _req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        status: "ok",
+        bot: "discord",
+        uptime: process.uptime(),
+        connected: client.isReady(),
+      }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+  healthServer.listen(healthPort, () => {
+    logger.info({ port: healthPort }, "Discord bot health check server started");
+  });
 }
 
 main().catch((err) => {

@@ -11,6 +11,8 @@ export interface ExecutionRequest {
   timeoutMs?: number;
   /** Optional task ID for tracking */
   taskId?: string;
+  /** Optional dependencies to install before execution */
+  dependencies?: string[];
 }
 
 /** Result of a sandboxed code execution */
@@ -27,6 +29,8 @@ export interface ExecutionResult {
   language: SandboxLanguage;
   /** Whether the execution was killed due to timeout */
   timedOut: boolean;
+  /** Whether result was served from cache */
+  cached?: boolean;
 }
 
 /** Configuration for the sandbox service */

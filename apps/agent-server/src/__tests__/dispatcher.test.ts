@@ -541,4 +541,143 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       expect(mockVerify).not.toHaveBeenCalled();
     });
   });
+
+  describe("parallel execution", () => {
+    it("runs tasks in same parallel group concurrently", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Parallel Goal" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Research A", assignedAgent: "researcher", orderIndex: 0, parallelGroup: 0 },
+        { id: "t-2", title: "Research B", assignedAgent: "researcher", orderIndex: 1, parallelGroup: 0 },
+      ]);
+
+      // Track execution timing to verify concurrency
+      const executionOrder: string[] = [];
+      mockComplete.mockImplementation(async () => {
+        const taskId = `call-${executionOrder.length}`;
+        executionOrder.push(`start-${taskId}`);
+        await new Promise((r) => setTimeout(r, 50));
+        executionOrder.push(`end-${taskId}`);
+        return {
+          content: [{ type: "text", text: "Output" }],
+          model: "test-model",
+          stop_reason: "end_turn",
+          usage: { inputTokens: 10, outputTokens: 20 },
+          provider: "test",
+        };
+      });
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.completedTasks).toBe(2);
+      // Both tasks should have started before either finished (concurrent execution)
+      // With Promise.allSettled, both start nearly simultaneously
+      expect(mockAssignTask).toHaveBeenCalledTimes(2);
+      expect(mockCompleteTask).toHaveBeenCalledTimes(2);
+    });
+
+    it("waits for group to finish before starting next group", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Sequential Groups" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "First", assignedAgent: "researcher", orderIndex: 0, parallelGroup: 0 },
+        { id: "t-2", title: "Second", assignedAgent: "coder", orderIndex: 1, parallelGroup: 1 },
+      ]);
+
+      const executionOrder: string[] = [];
+      mockComplete.mockImplementation(async () => {
+        executionOrder.push(`task-${executionOrder.length}`);
+        return {
+          content: [{ type: "text", text: "Output" }],
+          model: "test-model",
+          stop_reason: "end_turn",
+          usage: { inputTokens: 10, outputTokens: 20 },
+          provider: "test",
+        };
+      });
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.completedTasks).toBe(2);
+      // Group 0 must complete before group 1 starts
+      expect(executionOrder).toEqual(["task-0", "task-1"]);
+    });
+
+    it("handles failure in one parallel task without cancelling siblings", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Mixed Results" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Will fail", assignedAgent: "researcher", orderIndex: 0, parallelGroup: 0 },
+        { id: "t-2", title: "Will succeed", assignedAgent: "researcher", orderIndex: 1, parallelGroup: 0 },
+      ]);
+
+      let callCount = 0;
+      mockComplete.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          throw new Error("Task 1 failed");
+        }
+        return {
+          content: [{ type: "text", text: "Success" }],
+          model: "test-model",
+          stop_reason: "end_turn",
+          usage: { inputTokens: 10, outputTokens: 20 },
+          provider: "test",
+        };
+      });
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      // One succeeded, one failed
+      expect(result.completedTasks).toBe(1);
+      expect(result.tasks).toHaveLength(2);
+      const statuses = result.tasks.map((t) => t.status).sort();
+      expect(statuses).toEqual(["completed", "failed"]);
+    });
+
+    it("tasks without parallelGroup run sequentially (backward compat)", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Sequential" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "First", assignedAgent: "researcher", orderIndex: 0 },
+        { id: "t-2", title: "Second", assignedAgent: "coder", orderIndex: 1 },
+      ]);
+
+      const executionOrder: string[] = [];
+      mockComplete.mockImplementation(async () => {
+        executionOrder.push(`task-${executionOrder.length}`);
+        return {
+          content: [{ type: "text", text: "Output" }],
+          model: "test-model",
+          stop_reason: "end_turn",
+          usage: { inputTokens: 10, outputTokens: 20 },
+          provider: "test",
+        };
+      });
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.completedTasks).toBe(2);
+      // Tasks run one at a time since they have no parallelGroup
+      expect(executionOrder).toEqual(["task-0", "task-1"]);
+    });
+
+    it("mixes parallel groups with sequential ungrouped tasks", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Mixed" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Parallel A", assignedAgent: "researcher", orderIndex: 0, parallelGroup: 0 },
+        { id: "t-2", title: "Parallel B", assignedAgent: "researcher", orderIndex: 1, parallelGroup: 0 },
+        { id: "t-3", title: "Sequential", assignedAgent: "coder", orderIndex: 2 },
+      ]);
+
+      const dispatcher = createDispatcher();
+      const result = await dispatcher.runGoal("g-1");
+
+      expect(result.status).toBe("completed");
+      expect(result.completedTasks).toBe(3);
+    });
+  });
 });

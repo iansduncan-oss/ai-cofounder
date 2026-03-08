@@ -342,6 +342,10 @@ export class ApiClient {
     );
   }
 
+  exportConversation(id: string) {
+    return this.request<Record<string, unknown>>("GET", `/api/conversations/${id}/export`);
+  }
+
   searchConversations(q: string, options?: { conversationId?: string; role?: string } & PaginationParams) {
     const params = new URLSearchParams({ q });
     if (options?.conversationId) params.set("conversationId", options.conversationId);

@@ -56,10 +56,36 @@ export class WorkspaceService {
   async listDirectory(relativePath: string = "."): Promise<FileEntry[]> {
     const fullPath = this.resolveSafe(relativePath);
     const entries = await fs.readdir(fullPath, { withFileTypes: true });
-    return entries.map((entry) => ({
-      name: entry.name,
-      type: entry.isDirectory() ? "directory" as const : "file" as const,
-    }));
+    const results: FileEntry[] = [];
+    for (const entry of entries) {
+      const isDir = entry.isDirectory();
+      let size: number | undefined;
+      if (!isDir) {
+        try {
+          const stat = await fs.stat(path.join(fullPath, entry.name));
+          size = stat.size;
+        } catch {
+          // If stat fails, leave size undefined
+        }
+      }
+      results.push({ name: entry.name, type: isDir ? "directory" : "file", size });
+    }
+    return results;
+  }
+
+  async deleteFile(relativePath: string): Promise<void> {
+    const fullPath = this.resolveSafe(relativePath);
+    await fs.unlink(fullPath);
+  }
+
+  async deleteDirectory(relativePath: string, force = false): Promise<void> {
+    const fullPath = this.resolveSafe(relativePath);
+    if (force) {
+      await fs.rm(fullPath, { recursive: true });
+    } else {
+      // rmdir only works on empty directories
+      await fs.rmdir(fullPath);
+    }
   }
 
   /** Run a git command in a specific directory within the workspace */
@@ -76,7 +102,7 @@ export class WorkspaceService {
     });
   }
 
-  async gitClone(repoUrl: string, dirName?: string): Promise<GitResult> {
+  async gitClone(repoUrl: string, dirName?: string, depth?: number): Promise<GitResult> {
     const targetName = dirName ?? this.repoNameFromUrl(repoUrl);
     const targetPath = this.resolveSafe(targetName);
 
@@ -88,10 +114,11 @@ export class WorkspaceService {
       // Directory doesn't exist, proceed with clone
     }
 
+    const cloneDepth = depth ?? 1;
     return new Promise((resolve) => {
       execFile(
         "git",
-        ["clone", "--depth", "1", repoUrl, targetPath],
+        ["clone", "--depth", String(cloneDepth), repoUrl, targetPath],
         { cwd: this.rootDir, timeout: 120_000 },
         (error, stdout, stderr) => {
           resolve({

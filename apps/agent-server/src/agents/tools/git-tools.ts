@@ -16,6 +16,10 @@ export const GIT_CLONE_TOOL: LlmTool = {
         type: "string",
         description: "Optional directory name for the clone (defaults to repo name)",
       },
+      depth: {
+        type: "number",
+        description: "Clone depth for shallow clones (default: 1). Use higher values to include more history.",
+      },
     },
     required: ["repo_url"],
   },
