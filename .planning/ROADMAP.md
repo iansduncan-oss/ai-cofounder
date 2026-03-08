@@ -32,9 +32,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Queue config hardening (lockDuration, TTL cleanup) + Redis in production Docker Compose
-- [ ] 01-02-PLAN.md — Worker entry point + non-blocking execution route
-- [ ] 01-03-PLAN.md — Job status API endpoint + Redis health monitoring
+- [x] 01-01-PLAN.md — Queue config hardening (lockDuration, TTL cleanup) + Redis in production Docker Compose
+- [x] 01-02-PLAN.md — Worker entry point + non-blocking execution route
+- [x] 01-03-PLAN.md — Job status API endpoint + Redis health monitoring
 
 ### Phase 2: SSE Migration
 **Goal**: Dashboard clients receive real-time agent execution events after execution moves to the background worker
@@ -44,11 +44,11 @@ Plans:
   1. While a goal executes in the worker, the dashboard SSE stream receives tool-execution and progress events in real time
   2. Opening the SSE endpoint for a job that is already in progress replays missed events from the Redis pub/sub channel
   3. The existing bot commands (Discord/Slack) and dashboard streaming behavior are unchanged from the user's perspective
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: Worker Redis pub/sub publisher (emit events during orchestrator tool loop)
-- [ ] 02-02: SSE endpoint Redis subscriber (forward pub/sub events to connected clients)
+- [ ] 02-01-PLAN.md — RedisPubSub class in packages/queue + worker event publishing via onProgress callback
+- [ ] 02-02-PLAN.md — Fastify pubsub plugin + SSE endpoint rewrite with Redis subscribe and history replay
 
 ### Phase 3: Authentication
 **Goal**: The dashboard is secured behind JWT login; bot endpoints continue working without disruption
@@ -98,3 +98,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 ---
 *Roadmap created: 2026-03-07*
 *Phase 1 planned: 2026-03-07*
+*Phase 2 planned: 2026-03-08*
