@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 01-queue-foundation-01-PLAN.md
-last_updated: "2026-03-08T05:20:56.612Z"
+stopped_at: Completed 01-queue-foundation-02-PLAN.md
+last_updated: "2026-03-08T05:24:30.000Z"
 last_activity: 2026-03-07 — Roadmap created, phases derived from requirements
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -26,31 +26,30 @@ See: .planning/PROJECT.md (updated 2026-03-07)
 ## Current Position
 
 Phase: 1 of 4 (Queue Foundation)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-07 — Roadmap created, phases derived from requirements
+Plan: 2 of 3 in current phase
+Status: In progress
+Last activity: 2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route
 
-Progress: [███░░░░░░░] 33%
+Progress: [██████░░░░] 67%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: -
+- Total plans completed: 2
+- Average duration: ~8 min
+- Total execution time: ~16 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01-queue-foundation | 2/3 | ~16 min | ~8 min |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: [01-01: ~8 min] [01-02: ~8 min]
+- Trend: Consistent
 
 *Updated after each plan completion*
-| Phase 01-queue-foundation P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +66,9 @@ Recent decisions affecting current work:
 - [Phase 01-queue-foundation]: Age-based TTL over count-only: ensures failed jobs visible for 7 days regardless of volume for debugging
 - [Phase 01-queue-foundation]: Worker as separate container with stop_grace_period=120s: allows in-flight job completion on deploy
 - [Phase 01-queue-foundation]: Redis no exposed ports in prod: only accessible via Docker network avion_avion_net for security
+- [Phase 01-queue-foundation P02]: Worker registers ONLY agentTask processor — monitoring/notification/briefing/pipeline stay in HTTP server to maintain JARVIS monitoring uptime
+- [Phase 01-queue-foundation P02]: SSE streaming endpoint kept as-is for Phase 1 — Phase 2 will bridge via Redis pub/sub
+- [Phase 01-queue-foundation P02]: updateGoalMetadata() stores queueJobId in goal.metadata for later async status lookup
 
 ### Pending Todos
 
@@ -80,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T05:20:56.606Z
-Stopped at: Completed 01-queue-foundation-01-PLAN.md
+Last session: 2026-03-08T05:24:30.000Z
+Stopped at: Completed 01-queue-foundation-02-PLAN.md
 Resume file: None
