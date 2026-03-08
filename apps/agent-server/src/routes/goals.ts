@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus } from "@ai-cofounder/db";
+import { getJobStatus } from "@ai-cofounder/queue";
 import { CreateGoalBody, UpdateGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
@@ -50,6 +51,36 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       const goal = await updateGoalStatus(app.db, request.params.id, request.body.status);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });
       return goal;
+    },
+  );
+
+  /* GET /:id/queue-status — query BullMQ job state for this goal */
+  app.get<{ Params: typeof IdParams.static }>(
+    "/:id/queue-status",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const goal = await getGoal(app.db, request.params.id);
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+
+      const metadata = goal.metadata as Record<string, unknown> | null;
+      const jobId = metadata?.queueJobId as string | undefined;
+
+      if (!jobId) {
+        return { status: "not_queued", goalStatus: goal.status };
+      }
+
+      const jobStatus = await getJobStatus(jobId);
+      if (!jobStatus) {
+        return { status: "not_found", jobId };
+      }
+
+      return {
+        status: jobStatus.state,
+        jobId,
+        attemptsMade: jobStatus.attemptsMade,
+        finishedOn: jobStatus.finishedOn,
+        failedReason: jobStatus.failedReason,
+      };
     },
   );
 
