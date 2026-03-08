@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-queue-foundation-03-PLAN.md
-last_updated: "2026-03-08T07:10:47.856Z"
+stopped_at: Completed 02-sse-migration-02-01-PLAN.md
+last_updated: "2026-03-08T12:53:03.090Z"
 last_activity: "2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 3
-  completed_plans: 3
+  total_plans: 5
+  completed_plans: 4
   percent: 67
 ---
 
@@ -51,6 +51,7 @@ Progress: [██████░░░░] 67%
 
 *Updated after each plan completion*
 | Phase 01-queue-foundation P03 | 6 | 2 tasks | 6 files |
+| Phase 02-sse-migration P02-01 | 12 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - [Phase 01-queue-foundation]: pingRedis() uses Node net.connect TCP probe (not ioredis) because ioredis is nested in bullmq's own node_modules and not resolvable from queue package TypeScript
 - [Phase 01-queue-foundation]: Redis health check is optional: disabled status when REDIS_URL not set preserves zero-config local development
 - [Phase 01-queue-foundation]: Queue helper pattern: BullMQ-specific operations kept in packages/queue helpers, never imported directly in route handlers
+- [Phase 02-sse-migration]: class syntax in vi.mock() factory required for constructable mocks — vi.fn().mockImplementation() does not create constructors in Vitest
+- [Phase 02-sse-migration]: RedisPubSub uses dedicated ioredis publisher connection; createSubscriber() provides separate connection for subscribe mode (Redis protocol constraint)
+- [Phase 02-sse-migration]: HISTORY_TTL_SECONDS=3600: 1-hour event history window sufficient for SSE late joiners in typical execution scenarios
 
 ### Pending Todos
 
@@ -86,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T05:34:54.428Z
-Stopped at: Completed 01-queue-foundation-03-PLAN.md
+Last session: 2026-03-08T12:53:03.088Z
+Stopped at: Completed 02-sse-migration-02-01-PLAN.md
 Resume file: None
