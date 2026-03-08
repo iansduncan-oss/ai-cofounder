@@ -25,6 +25,7 @@ import { DocWriterAgent } from "./specialists/doc-writer.js";
 import type { NotificationService } from "../services/notifications.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { VerificationService } from "../services/verification.js";
+import { enqueueReflection } from "@ai-cofounder/queue";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -198,12 +199,28 @@ export class TaskDispatcher {
       "goal execution finished",
     );
 
-    // Post-execution self-improvement: analyze and store learnings
-    if (userId) {
-      this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId).catch((err) => {
-        this.logger.warn({ err, goalId }, "self-improvement analysis failed (non-fatal)");
-      });
-    }
+    // Post-execution self-improvement: enqueue structured reflection via queue
+    enqueueReflection({
+      action: "analyze_goal",
+      goalId,
+      goalTitle: goal.title,
+      status: goalStatus,
+      taskResults: taskResults.map((t) => ({
+        id: t.id,
+        title: t.title,
+        agent: t.agent,
+        status: t.status,
+        output: t.output?.slice(0, 1000),
+      })),
+    }).catch((err) => {
+      this.logger.warn({ err, goalId }, "failed to enqueue reflection (non-fatal)");
+      // Fallback to in-process analysis when queue is unavailable
+      if (userId) {
+        this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId).catch((e) => {
+          this.logger.warn({ err: e, goalId }, "fallback analysis also failed (non-fatal)");
+        });
+      }
+    });
 
     // Notify goal completion/failure
     if (this.notificationService) {
@@ -234,12 +251,12 @@ export class TaskDispatcher {
   /** Group tasks by parallelGroup. Tasks without a group get their own implicit sequential group.
    *  Groups execute in numeric order (0, 1, 2...). Ungrouped tasks each run alone, preserving
    *  their position relative to grouped tasks based on orderIndex. */
-  private groupTasks(
-    tasks: Array<{ id: string; parallelGroup?: number | null; orderIndex: number; [key: string]: unknown }>,
-  ): Array<typeof tasks> {
+  private groupTasks<T extends { id: string; parallelGroup?: number | null; orderIndex: number }>(
+    tasks: T[],
+  ): T[][] {
     // Build groups: explicit parallelGroups merge tasks; null/undefined each get their own group
-    const explicitGroups = new Map<number, typeof tasks>();
-    const result: Array<{ sortKey: number; tasks: typeof tasks }> = [];
+    const explicitGroups = new Map<number, T[]>();
+    const result: Array<{ sortKey: number; tasks: T[] }> = [];
     const seenGroups = new Set<number>();
 
     for (const task of tasks) {

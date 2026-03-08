@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -148,6 +148,57 @@ export function useUpdateMilestoneStatus() {
     },
     onError: (err) => {
       toast.error(`Failed to update milestone: ${err.message}`);
+    },
+  });
+}
+
+export function useSubmitGoalPipeline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      goalId,
+      context,
+    }: {
+      goalId: string;
+      context?: Record<string, unknown>;
+    }) => apiClient.submitGoalPipeline(goalId, context),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+      toast.success("Pipeline submitted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to submit pipeline: ${err.message}`);
+    },
+  });
+}
+
+export function useUpsertPersona() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: UpsertPersonaInput) => apiClient.upsertPersona(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.all });
+      toast.success("Persona saved");
+    },
+    onError: (err) => {
+      toast.error(`Failed to save persona: ${err.message}`);
+    },
+  });
+}
+
+export function useDeletePersona() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deletePersona(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.persona.all });
+      toast.success("Persona deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete persona: ${err.message}`);
     },
   });
 }

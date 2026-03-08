@@ -1,21 +1,30 @@
 import type { Db } from "@ai-cofounder/db";
-import { getActivePrompt } from "@ai-cofounder/db";
+import { getActivePrompt, getActivePersona } from "@ai-cofounder/db";
 
-/** Build system prompt, loading from DB if a versioned prompt exists, otherwise using hardcoded default */
+/** Build system prompt, loading from active persona or DB prompts, falling back to hardcoded defaults */
 export async function buildSystemPrompt(memoryContext?: string, db?: Db): Promise<string> {
   let core = CORE_PERSONALITY;
   let capabilities = CAPABILITIES;
   let guidelines = BEHAVIORAL_GUIDELINES;
 
   if (db) {
-    const [dbCore, dbCaps, dbGuide] = await Promise.all([
-      getActivePrompt(db, "core_personality"),
-      getActivePrompt(db, "capabilities"),
-      getActivePrompt(db, "behavioral_guidelines"),
-    ]);
-    if (dbCore) core = dbCore.content;
-    if (dbCaps) capabilities = dbCaps.content;
-    if (dbGuide) guidelines = dbGuide.content;
+    // Try active persona first
+    const persona = await getActivePersona(db);
+    if (persona) {
+      core = persona.corePersonality;
+      if (persona.capabilities) capabilities = persona.capabilities;
+      if (persona.behavioralGuidelines) guidelines = persona.behavioralGuidelines;
+    } else {
+      // Fall back to versioned prompts
+      const [dbCore, dbCaps, dbGuide] = await Promise.all([
+        getActivePrompt(db, "core_personality"),
+        getActivePrompt(db, "capabilities"),
+        getActivePrompt(db, "behavioral_guidelines"),
+      ]);
+      if (dbCore) core = dbCore.content;
+      if (dbCaps) capabilities = dbCaps.content;
+      if (dbGuide) guidelines = dbGuide.content;
+    }
   }
 
   return `${core}

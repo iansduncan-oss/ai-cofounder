@@ -73,6 +73,105 @@ export const queuePlugin = fp(async (app) => {
       );
       await executor.execute(job.data);
     },
+
+    reflection: async (job) => {
+      const { action } = job.data;
+      logger.info({ jobId: job.id, action }, "Processing reflection job");
+      const { ReflectionService } = await import("../services/reflection.js");
+      const reflectionService = new ReflectionService(
+        app.db,
+        app.llmRegistry,
+        app.embeddingService,
+      );
+
+      switch (action) {
+        case "analyze_goal": {
+          const { goalId, goalTitle, status, taskResults } = job.data;
+          if (goalId && goalTitle && status && taskResults) {
+            await reflectionService.reflectOnGoal(goalId, goalTitle, status, taskResults);
+          }
+          break;
+        }
+        case "weekly_patterns":
+          await reflectionService.extractWeeklyPatterns();
+          break;
+      }
+    },
+
+    ragIngestion: async (job) => {
+      const { action, sourceId } = job.data;
+      logger.info({ jobId: job.id, action, sourceId }, "Running RAG ingestion");
+      const { ingestText } = await import("@ai-cofounder/rag");
+      if (!app.embeddingService) {
+        logger.warn("RAG ingestion skipped — no embedding service available");
+        return;
+      }
+      switch (action) {
+        case "ingest_conversations": {
+          // Ingest recent conversations as text
+          const { getLatestConversationSummary } = await import("@ai-cofounder/db");
+          const summary = await getLatestConversationSummary(app.db, sourceId);
+          if (summary) {
+            await ingestText(
+              app.db,
+              app.embeddingService.embed.bind(app.embeddingService),
+              "conversation",
+              sourceId,
+              summary.summary,
+              { cursor: summary.id },
+            );
+          }
+          break;
+        }
+        case "ingest_text": {
+          const content = job.data.metadata?.content as string | undefined;
+          if (content) {
+            await ingestText(
+              app.db,
+              app.embeddingService.embed.bind(app.embeddingService),
+              "markdown",
+              sourceId,
+              content,
+              { cursor: job.data.cursor },
+            );
+          }
+          break;
+        }
+        case "ingest_repo": {
+          // Repo ingestion uses workspace service to read files
+          if (!app.workspaceService) {
+            logger.warn("RAG repo ingestion skipped — no workspace service");
+            return;
+          }
+          const { ingestFiles, shouldSkipFile } = await import("@ai-cofounder/rag");
+          const entries = await app.workspaceService.listDirectory(sourceId);
+          const filePaths = entries.filter((e) => e.type === "file").map((e) => e.name);
+          const fileContents = await Promise.all(
+            filePaths
+              .filter((f) => !shouldSkipFile(f))
+              .slice(0, 500) // limit to 500 files per ingestion
+              .map(async (f) => {
+                try {
+                  const content = await app.workspaceService!.readFile(`${sourceId}/${f}`);
+                  return { path: f, content };
+                } catch {
+                  return null;
+                }
+              }),
+          );
+          const validFiles = fileContents.filter((f): f is { path: string; content: string } => f !== null);
+          await ingestFiles(
+            app.db,
+            app.embeddingService!.embed.bind(app.embeddingService!),
+            "git",
+            sourceId,
+            validFiles,
+            { cursor: job.data.cursor },
+          );
+          break;
+        }
+      }
+    },
   };
 
   startWorkers(processors);

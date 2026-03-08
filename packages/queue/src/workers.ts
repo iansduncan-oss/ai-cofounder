@@ -8,6 +8,8 @@ import {
   type BriefingJob,
   type NotificationJob,
   type PipelineJob,
+  type RagIngestionJob,
+  type ReflectionJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-workers");
@@ -23,6 +25,8 @@ export type NotificationProcessor = (
   job: Job<NotificationJob>,
 ) => Promise<void>;
 export type PipelineProcessor = (job: Job<PipelineJob>) => Promise<void>;
+export type RagIngestionProcessor = (job: Job<RagIngestionJob>) => Promise<void>;
+export type ReflectionProcessor = (job: Job<ReflectionJob>) => Promise<void>;
 
 export interface WorkerProcessors {
   agentTask?: AgentTaskProcessor;
@@ -30,6 +34,8 @@ export interface WorkerProcessors {
   briefing?: BriefingProcessor;
   notification?: NotificationProcessor;
   pipeline?: PipelineProcessor;
+  ragIngestion?: RagIngestionProcessor;
+  reflection?: ReflectionProcessor;
 }
 
 const activeWorkers: Worker[] = [];
@@ -106,6 +112,34 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.PIPELINES);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.ragIngestion) {
+    const worker = new Worker<RagIngestionJob>(
+      QUEUE_NAMES.RAG_INGESTION,
+      processors.ragIngestion,
+      {
+        connection,
+        concurrency: 2,
+        lockDuration: 300_000, // 5 min — ingestion can be slow for large repos
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.RAG_INGESTION);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.reflection) {
+    const worker = new Worker<ReflectionJob>(
+      QUEUE_NAMES.REFLECTIONS,
+      processors.reflection,
+      {
+        connection,
+        concurrency: 1, // LLM-intensive — one at a time
+        lockDuration: 300_000, // 5 min — LLM reflection can be slow
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.REFLECTIONS);
     activeWorkers.push(worker);
   }
 

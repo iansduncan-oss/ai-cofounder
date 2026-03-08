@@ -2,6 +2,7 @@ import { NavLink } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
+  Monitor,
   Target,
   ShieldCheck,
   MessageSquare,
@@ -16,6 +17,8 @@ import {
   BarChart3,
   FolderOpen,
   LogOut,
+  Bot,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -27,6 +30,7 @@ import { NotificationBell } from "@/components/common/notification-bell";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
+  { to: "/dashboard/hud", icon: Monitor, label: "HUD" },
   { to: "/dashboard/goals", icon: Target, label: "Goals" },
   { to: "/dashboard/approvals", icon: ShieldCheck, label: "Approvals" },
   { to: "/dashboard/chat", icon: MessageSquare, label: "Chat" },
@@ -35,6 +39,8 @@ const navItems = [
   { to: "/dashboard/activity", icon: Activity, label: "Activity" },
   { to: "/dashboard/usage", icon: BarChart3, label: "Usage" },
   { to: "/dashboard/workspace", icon: FolderOpen, label: "Workspace" },
+  { to: "/dashboard/pipelines", icon: GitBranch, label: "Pipelines" },
+  { to: "/dashboard/persona", icon: Bot, label: "Persona" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 

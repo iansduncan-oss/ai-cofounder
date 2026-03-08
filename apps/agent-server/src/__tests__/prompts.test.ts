@@ -9,6 +9,7 @@ const mockGetActivePrompt = vi.fn();
 vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   getActivePrompt: (...args: unknown[]) => mockGetActivePrompt(...args),
+  getActivePersona: vi.fn().mockResolvedValue(null),
 }));
 
 const { buildSystemPrompt } = await import("../agents/prompts/system.js");

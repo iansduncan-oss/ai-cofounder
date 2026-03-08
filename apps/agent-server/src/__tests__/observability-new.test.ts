@@ -70,6 +70,7 @@ vi.mock("@ai-cofounder/db", () => ({
   getConversation: vi.fn(),
   findUserByPlatform: vi.fn(),
   getActivePrompt: vi.fn(),
+  getActivePersona: vi.fn().mockResolvedValue(null),
   listPromptVersions: vi.fn().mockResolvedValue([]),
   createPromptVersion: vi.fn(),
   getProviderHealthHistory: (...args: unknown[]) => mockGetProviderHealthHistory(...args),

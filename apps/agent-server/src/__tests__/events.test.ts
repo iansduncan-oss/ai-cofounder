@@ -34,6 +34,7 @@ vi.mock("@ai-cofounder/db", () => ({
   listSchedules: vi.fn().mockResolvedValue([]),
   deleteSchedule: vi.fn(),
   getActivePrompt: vi.fn().mockResolvedValue(null),
+  getActivePersona: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {

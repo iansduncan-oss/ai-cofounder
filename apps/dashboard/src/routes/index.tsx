@@ -35,6 +35,15 @@ const UsagePage = lazy(() =>
 const WorkspacePage = lazy(() =>
   import("./workspace").then((m) => ({ default: m.WorkspacePage })),
 );
+const HudPage = lazy(() =>
+  import("./hud").then((m) => ({ default: m.HudPage })),
+);
+const PipelinesPage = lazy(() =>
+  import("./pipelines").then((m) => ({ default: m.PipelinesPage })),
+);
+const PersonaPage = lazy(() =>
+  import("./persona").then((m) => ({ default: m.PersonaPage })),
+);
 const LoginPage = lazy(() =>
   import("./login").then((m) => ({ default: m.LoginPage })),
 );
@@ -49,6 +58,7 @@ export const router = createBrowserRouter([
     element: <App />,
     children: [
       { index: true, element: <OverviewPage /> },
+      { path: "hud", element: <HudPage /> },
       { path: "goals", element: <GoalsPage /> },
       { path: "goals/:id", element: <GoalDetailPage /> },
       { path: "approvals", element: <ApprovalsPage /> },
@@ -58,6 +68,8 @@ export const router = createBrowserRouter([
       { path: "activity", element: <ActivityPage /> },
       { path: "usage", element: <UsagePage /> },
       { path: "workspace", element: <WorkspacePage /> },
+      { path: "pipelines", element: <PipelinesPage /> },
+      { path: "persona", element: <PersonaPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

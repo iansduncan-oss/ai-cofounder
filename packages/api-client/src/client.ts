@@ -25,6 +25,15 @@ import type {
   ConversationMessage,
   DashboardSummary,
   BriefingResponse,
+  MonitoringReport,
+  QueueStatus,
+  ToolStat,
+  Persona,
+  UpsertPersonaInput,
+  PipelineRun,
+  PipelineDetail,
+  SubmitPipelineInput,
+  SubmitPipelineResponse,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -353,6 +362,70 @@ export class ApiClient {
     if (options?.limit != null) params.set("limit", String(options.limit));
     if (options?.offset != null) params.set("offset", String(options.offset));
     return this.request<PaginatedResponse<ConversationMessage>>("GET", `/api/conversations/search?${params}`);
+  }
+
+  /* ── Monitoring ── */
+
+  getMonitoringStatus() {
+    return this.request<MonitoringReport>("GET", "/api/monitoring/status");
+  }
+
+  /* ── Queue ── */
+
+  getQueueStatus() {
+    return this.request<{ queues: QueueStatus[] }>("GET", "/api/queue/status");
+  }
+
+  /* ── Tool Stats ── */
+
+  getToolStats() {
+    return this.request<{ timestamp: string; tools: ToolStat[] }>("GET", "/api/tools/stats");
+  }
+
+  /* ── Provider Health History ── */
+
+  getProviderHealthHistory(provider?: string) {
+    const query = provider ? `?provider=${encodeURIComponent(provider)}` : "";
+    return this.request<{ timestamp: string; records: Record<string, unknown>[] }>(
+      "GET",
+      `/health/providers/history${query}`,
+    );
+  }
+
+  /* ── Persona ── */
+
+  getActivePersona() {
+    return this.request<{ persona: Persona | null }>("GET", "/api/persona");
+  }
+
+  listPersonas() {
+    return this.request<{ personas: Persona[] }>("GET", "/api/persona/all");
+  }
+
+  upsertPersona(data: UpsertPersonaInput) {
+    return this.request<{ persona: Persona }>("PUT", "/api/persona", data);
+  }
+
+  deletePersona(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/persona/${id}`);
+  }
+
+  /* ── Pipelines ── */
+
+  listPipelines() {
+    return this.request<{ runs: PipelineRun[] }>("GET", "/api/pipelines");
+  }
+
+  getPipeline(jobId: string) {
+    return this.request<PipelineDetail>("GET", `/api/pipelines/${jobId}`);
+  }
+
+  submitPipeline(data: SubmitPipelineInput) {
+    return this.request<SubmitPipelineResponse>("POST", "/api/pipelines", data);
+  }
+
+  submitGoalPipeline(goalId: string, context?: Record<string, unknown>) {
+    return this.request<SubmitPipelineResponse>("POST", `/api/pipelines/goal/${goalId}`, { context });
   }
 
   /* ── Streaming ── */

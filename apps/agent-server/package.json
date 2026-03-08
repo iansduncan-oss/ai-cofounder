@@ -12,13 +12,18 @@
   "dependencies": {
     "@ai-cofounder/db": "*",
     "@ai-cofounder/llm": "*",
+    "@ai-cofounder/queue": "*",
+    "@ai-cofounder/rag": "*",
     "@ai-cofounder/sandbox": "*",
     "@ai-cofounder/shared": "*",
+    "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
+    "@fastify/jwt": "^10.0.0",
     "@fastify/static": "^9.0.0",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^5.2.5",
     "@sinclair/typebox": "^0.34.48",
+    "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "cron-parser": "^5.5.0",
     "drizzle-orm": "^0.45.1",
@@ -27,6 +32,7 @@
     "prom-client": "^15.1.3"
   },
   "devDependencies": {
-    "@ai-cofounder/test-utils": "*"
+    "@ai-cofounder/test-utils": "*",
+    "@types/bcryptjs": "^2.4.6"
   }
 }

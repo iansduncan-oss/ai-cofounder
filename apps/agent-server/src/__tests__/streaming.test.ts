@@ -23,6 +23,7 @@ vi.mock("@ai-cofounder/db", () => ({
   recallMemories: vi.fn().mockResolvedValue([]),
   searchMemoriesByVector: vi.fn().mockResolvedValue([]),
   getActivePrompt: vi.fn(),
+  getActivePersona: vi.fn().mockResolvedValue(null),
   getConversation: vi.fn(),
   getGoal: vi.fn(),
   createGoal: vi.fn(),

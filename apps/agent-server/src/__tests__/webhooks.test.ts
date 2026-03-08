@@ -46,6 +46,7 @@ vi.mock("@ai-cofounder/db", () => ({
   upsertChannelConversation: vi.fn(),
   findUserByPlatform: vi.fn(),
   getActivePrompt: vi.fn(),
+  getActivePersona: vi.fn().mockResolvedValue(null),
   listPromptVersions: vi.fn().mockResolvedValue([]),
   createPromptVersion: vi.fn(),
   createN8nWorkflow: vi.fn(),

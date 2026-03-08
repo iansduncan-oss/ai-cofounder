@@ -21,6 +21,11 @@ import {
   conversationSummaries,
   providerHealth,
   toolExecutions,
+  personas,
+  documentChunks,
+  ingestionState,
+  reflections,
+  adminUsers,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -1430,6 +1435,57 @@ export async function getLatestUserMessageTime(db: Db): Promise<Date | null> {
   return rows[0]?.latest ?? null;
 }
 
+/* ────────────────── Personas ──────────────── */
+
+export async function getActivePersona(db: Db) {
+  const rows = await db.select().from(personas).where(eq(personas.isActive, true)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listPersonas(db: Db) {
+  return db.select().from(personas).orderBy(desc(personas.updatedAt));
+}
+
+export async function getPersona(db: Db, id: string) {
+  const rows = await db.select().from(personas).where(eq(personas.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertPersona(
+  db: Db,
+  data: {
+    id?: string;
+    name: string;
+    voiceId?: string;
+    corePersonality: string;
+    capabilities?: string;
+    behavioralGuidelines?: string;
+    isActive?: boolean;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  // If setting as active, deactivate all others first
+  if (data.isActive) {
+    await db.update(personas).set({ isActive: false }).where(eq(personas.isActive, true));
+  }
+
+  if (data.id) {
+    const rows = await db
+      .update(personas)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(personas.id, data.id))
+      .returning();
+    return rows[0];
+  }
+
+  const rows = await db.insert(personas).values(data).returning();
+  return rows[0];
+}
+
+export async function deletePersona(db: Db, id: string) {
+  await db.delete(personas).where(eq(personas.id, id));
+}
+
 /* ────────────────── Due Schedules ──────────────── */
 
 export async function listDueSchedules(db: Db) {
@@ -1443,4 +1499,241 @@ export async function listDueSchedules(db: Db) {
       ),
     )
     .orderBy(asc(schedules.nextRunAt));
+}
+
+/* ────────────────── RAG: Document Chunks ──────────────── */
+
+type SourceType = "git" | "conversation" | "slack" | "memory" | "reflection" | "markdown";
+
+export interface ChunkInsert {
+  sourceType: SourceType;
+  sourceId: string;
+  content: string;
+  embedding?: number[];
+  metadata?: Record<string, unknown>;
+  chunkIndex: number;
+  tokenCount: number;
+}
+
+export async function insertChunks(db: Db, chunks: ChunkInsert[]) {
+  if (chunks.length === 0) return [];
+  const rows = await db.insert(documentChunks).values(chunks).returning();
+  return rows;
+}
+
+export async function searchChunksByVector(
+  db: Db,
+  embedding: number[],
+  options?: {
+    limit?: number;
+    sourceType?: SourceType;
+    sourceId?: string;
+  },
+) {
+  const limit = options?.limit ?? 20;
+  const vectorLiteral = `[${embedding.join(",")}]`;
+
+  const conditions = [`embedding IS NOT NULL`];
+  if (options?.sourceType) {
+    conditions.push(`source_type = '${options.sourceType}'`);
+  }
+  if (options?.sourceId) {
+    conditions.push(`source_id = '${options.sourceId}'`);
+  }
+
+  const whereClause = conditions.join(" AND ");
+
+  const rows = await db.execute(
+    sql`SELECT id, source_type, source_id, content, metadata, chunk_index, token_count, created_at,
+               embedding <=> ${vectorLiteral}::vector AS distance
+        FROM document_chunks
+        WHERE ${sql.raw(whereClause)}
+        ORDER BY distance ASC
+        LIMIT ${limit}`,
+  );
+  return rows as unknown as Array<{
+    id: string;
+    source_type: string;
+    source_id: string;
+    content: string;
+    metadata: Record<string, unknown> | null;
+    chunk_index: number;
+    token_count: number;
+    created_at: Date;
+    distance: number;
+  }>;
+}
+
+export async function deleteChunksBySource(db: Db, sourceType: SourceType, sourceId: string) {
+  await db
+    .delete(documentChunks)
+    .where(
+      and(
+        eq(documentChunks.sourceType, sourceType),
+        eq(documentChunks.sourceId, sourceId),
+      ),
+    );
+}
+
+export async function getChunkCount(db: Db, sourceType?: SourceType): Promise<number> {
+  const conditions = sourceType ? [eq(documentChunks.sourceType, sourceType)] : [];
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(documentChunks)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  return rows[0]?.count ?? 0;
+}
+
+/* ────────────────── RAG: Ingestion State ──────────────── */
+
+export async function upsertIngestionState(
+  db: Db,
+  data: {
+    sourceType: SourceType;
+    sourceId: string;
+    lastCursor?: string;
+    chunkCount: number;
+  },
+) {
+  const [result] = await db
+    .insert(ingestionState)
+    .values({
+      sourceType: data.sourceType,
+      sourceId: data.sourceId,
+      lastIngestedAt: new Date(),
+      lastCursor: data.lastCursor,
+      chunkCount: data.chunkCount,
+    })
+    .onConflictDoUpdate({
+      target: [ingestionState.sourceType, ingestionState.sourceId],
+      set: {
+        lastIngestedAt: new Date(),
+        lastCursor: data.lastCursor,
+        chunkCount: data.chunkCount,
+      },
+    })
+    .returning();
+  return result;
+}
+
+export async function getIngestionState(db: Db, sourceType: SourceType, sourceId: string) {
+  const rows = await db
+    .select()
+    .from(ingestionState)
+    .where(
+      and(
+        eq(ingestionState.sourceType, sourceType),
+        eq(ingestionState.sourceId, sourceId),
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listIngestionStates(db: Db, sourceType?: SourceType) {
+  if (sourceType) {
+    return db
+      .select()
+      .from(ingestionState)
+      .where(eq(ingestionState.sourceType, sourceType))
+      .orderBy(desc(ingestionState.lastIngestedAt));
+  }
+  return db.select().from(ingestionState).orderBy(desc(ingestionState.lastIngestedAt));
+}
+
+/* ────────────────── Reflections ──────────────── */
+
+type ReflectionType = "goal_completion" | "failure_analysis" | "pattern_extraction" | "weekly_summary";
+
+export async function insertReflection(
+  db: Db,
+  data: {
+    goalId?: string;
+    reflectionType: ReflectionType;
+    content: string;
+    embedding?: number[];
+    lessons?: unknown;
+    agentPerformance?: unknown;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [row] = await db.insert(reflections).values(data).returning();
+  return row;
+}
+
+export async function getReflection(db: Db, id: string) {
+  const rows = await db.select().from(reflections).where(eq(reflections.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listReflectionsByGoal(db: Db, goalId: string) {
+  return db
+    .select()
+    .from(reflections)
+    .where(eq(reflections.goalId, goalId))
+    .orderBy(desc(reflections.createdAt));
+}
+
+export async function listReflections(
+  db: Db,
+  options?: { type?: ReflectionType; limit?: number; offset?: number },
+) {
+  const limit = options?.limit ?? 50;
+  const offset = options?.offset ?? 0;
+  const conditions = options?.type ? [eq(reflections.reflectionType, options.type)] : [];
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select()
+      .from(reflections)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(reflections.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(reflections)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+export async function getReflectionStats(db: Db) {
+  const rows = await db
+    .select({
+      reflectionType: reflections.reflectionType,
+      count: sql<number>`count(*)::int`,
+      avgLessons: sql<number>`round(avg(jsonb_array_length(coalesce(${reflections.lessons}, '[]'::jsonb))))::int`,
+    })
+    .from(reflections)
+    .groupBy(reflections.reflectionType)
+    .orderBy(asc(reflections.reflectionType));
+  return rows;
+}
+
+/* ────────────────── Admin Users ──────────────── */
+
+export async function findAdminByEmail(db: Db, email: string) {
+  const rows = await db
+    .select()
+    .from(adminUsers)
+    .where(eq(adminUsers.email, email))
+    .limit(1);
+  return rows[0] ?? undefined;
+}
+
+export async function createAdminUser(
+  db: Db,
+  data: { email: string; passwordHash: string },
+) {
+  const [created] = await db.insert(adminUsers).values(data).returning();
+  return created;
+}
+
+export async function countAdminUsers(db: Db): Promise<number> {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(adminUsers);
+  return rows[0]?.count ?? 0;
 }

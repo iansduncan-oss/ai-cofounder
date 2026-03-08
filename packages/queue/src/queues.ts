@@ -47,6 +47,27 @@ export interface PipelineStage {
   dependsOnPrevious: boolean;
 }
 
+export interface RagIngestionJob {
+  action: "ingest_repo" | "ingest_conversations" | "ingest_text";
+  sourceId: string;
+  cursor?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ReflectionJob {
+  action: "analyze_goal" | "weekly_patterns";
+  goalId?: string;
+  goalTitle?: string;
+  status?: string;
+  taskResults?: Array<{
+    id: string;
+    title: string;
+    agent: string;
+    status: string;
+    output?: string;
+  }>;
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
@@ -55,6 +76,8 @@ export const QUEUE_NAMES = {
   BRIEFINGS: "briefings",
   NOTIFICATIONS: "notifications",
   PIPELINES: "pipelines",
+  RAG_INGESTION: "rag-ingestion",
+  REFLECTIONS: "reflections",
 } as const;
 
 // ── Queue instances ──
@@ -95,6 +118,14 @@ export function getNotificationQueue(): Queue<NotificationJob> {
 
 export function getPipelineQueue(): Queue<PipelineJob> {
   return getOrCreateQueue<PipelineJob>(QUEUE_NAMES.PIPELINES);
+}
+
+export function getRagIngestionQueue(): Queue<RagIngestionJob> {
+  return getOrCreateQueue<RagIngestionJob>(QUEUE_NAMES.RAG_INGESTION);
+}
+
+export function getReflectionQueue(): Queue<ReflectionJob> {
+  return getOrCreateQueue<ReflectionJob>(QUEUE_NAMES.REFLECTIONS);
 }
 
 export async function closeAllQueues(): Promise<void> {

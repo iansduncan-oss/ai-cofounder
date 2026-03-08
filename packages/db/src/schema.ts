@@ -353,3 +353,82 @@ export const n8nWorkflows = pgTable("n8n_workflows", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ── Reflections (post-goal learning) ── */
+
+export const reflectionTypeEnum = pgEnum("reflection_type", [
+  "goal_completion",
+  "failure_analysis",
+  "pattern_extraction",
+  "weekly_summary",
+]);
+
+export const reflections = pgTable("reflections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  reflectionType: reflectionTypeEnum("reflection_type").notNull(),
+  content: text("content").notNull(),
+  embedding: vector("embedding"),
+  lessons: jsonb("lessons"), // [{lesson, category, confidence}]
+  agentPerformance: jsonb("agent_performance"), // {role: {success, fail, insights}}
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── RAG Document Chunks ── */
+
+export const sourceTypeEnum = pgEnum("source_type", [
+  "git",
+  "conversation",
+  "slack",
+  "memory",
+  "reflection",
+  "markdown",
+]);
+
+export const documentChunks = pgTable("document_chunks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceType: sourceTypeEnum("source_type").notNull(),
+  sourceId: text("source_id").notNull(), // repo path, conversation ID, etc.
+  content: text("content").notNull(),
+  embedding: vector("embedding"),
+  metadata: jsonb("metadata"), // file path, language, line range, author, timestamp
+  chunkIndex: integer("chunk_index").notNull(),
+  tokenCount: integer("token_count").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const ingestionState = pgTable("ingestion_state", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceType: sourceTypeEnum("source_type").notNull(),
+  sourceId: text("source_id").notNull(),
+  lastIngestedAt: timestamp("last_ingested_at", { withTimezone: true }).notNull().defaultNow(),
+  lastCursor: text("last_cursor"), // git SHA, message timestamp, etc.
+  chunkCount: integer("chunk_count").notNull().default(0),
+});
+
+/* ── Admin Users (dashboard auth) ── */
+
+export const adminUsers = pgTable("admin_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Personas ── */
+
+export const personas = pgTable("personas", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  voiceId: text("voice_id"),
+  corePersonality: text("core_personality").notNull(),
+  capabilities: text("capabilities"),
+  behavioralGuidelines: text("behavioral_guidelines"),
+  isActive: boolean("is_active").notNull().default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

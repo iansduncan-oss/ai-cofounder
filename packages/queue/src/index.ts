@@ -23,6 +23,7 @@ export {
   getBriefingQueue,
   getNotificationQueue,
   getPipelineQueue,
+  getRagIngestionQueue,
   closeAllQueues,
   type AgentTaskJob,
   type MonitoringJob,
@@ -30,6 +31,9 @@ export {
   type NotificationJob,
   type PipelineJob,
   type PipelineStage,
+  type RagIngestionJob,
+  getReflectionQueue,
+  type ReflectionJob,
 } from "./queues.js";
 
 // Workers
@@ -42,6 +46,8 @@ export {
   type BriefingProcessor,
   type NotificationProcessor,
   type PipelineProcessor,
+  type RagIngestionProcessor,
+  type ReflectionProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)
@@ -54,6 +60,8 @@ export {
   enqueueBriefing,
   enqueueNotification,
   enqueuePipeline,
+  enqueueRagIngestion,
+  enqueueReflection,
   getAllQueueStatus,
   getJobStatus,
   pingRedis,

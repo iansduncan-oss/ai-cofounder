@@ -135,3 +135,69 @@ export function useConversationMessages(id: string | undefined) {
     enabled: !!id,
   });
 }
+
+export function useMonitoringStatus() {
+  return useQuery({
+    queryKey: queryKeys.monitoring.status,
+    queryFn: () => apiClient.getMonitoringStatus(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useQueueStatus() {
+  return useQuery({
+    queryKey: queryKeys.queue.status,
+    queryFn: () => apiClient.getQueueStatus(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useBriefing() {
+  return useQuery({
+    queryKey: queryKeys.briefing.latest,
+    queryFn: () => apiClient.getBriefing(),
+  });
+}
+
+export function useToolStats() {
+  return useQuery({
+    queryKey: queryKeys.tools.stats,
+    queryFn: () => apiClient.getToolStats(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useActivePersona() {
+  return useQuery({
+    queryKey: queryKeys.persona.active,
+    queryFn: () => apiClient.getActivePersona(),
+  });
+}
+
+export function useListPipelines() {
+  return useQuery({
+    queryKey: queryKeys.pipelines.list,
+    queryFn: () => apiClient.listPipelines(),
+    refetchInterval: 10_000,
+  });
+}
+
+export function usePipeline(jobId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.pipelines.detail(jobId ?? ""),
+    queryFn: () => apiClient.getPipeline(jobId!),
+    enabled: !!jobId,
+    refetchInterval: (query) => {
+      const state = query.state.data?.state;
+      if (state === "completed" || state === "failed") return false;
+      return 5_000;
+    },
+  });
+}
+
+export function useListPersonas() {
+  return useQuery({
+    queryKey: queryKeys.persona.list,
+    queryFn: () => apiClient.listPersonas(),
+  });
+}

@@ -268,3 +268,167 @@ export interface DashboardSummary {
   };
   recentEvents: Event[];
 }
+
+/* ── Monitoring ── */
+
+export interface MonitoringReport {
+  timestamp: string;
+  github?: {
+    ciStatus: GitHubCIStatus[];
+    openPRs: GitHubPR[];
+  };
+  vps?: VPSHealthStatus;
+  alerts: MonitoringAlert[];
+}
+
+export interface GitHubCIStatus {
+  repo: string;
+  branch: string;
+  status: "success" | "failure" | "pending" | "error";
+  conclusion: string | null;
+  url: string;
+  updatedAt: string;
+}
+
+export interface GitHubPR {
+  repo: string;
+  number: number;
+  title: string;
+  author: string;
+  state: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VPSHealthStatus {
+  diskUsagePercent: number;
+  memoryUsagePercent: number;
+  cpuLoadAvg: number[];
+  uptime: string;
+  containers: ContainerStatus[];
+}
+
+export interface ContainerStatus {
+  name: string;
+  status: string;
+  health?: string;
+}
+
+export interface MonitoringAlert {
+  severity: "critical" | "warning" | "info";
+  source: string;
+  message: string;
+}
+
+/* ── Queue ── */
+
+export interface QueueStatus {
+  name: string;
+  waiting: number;
+  active: number;
+  completed: number;
+  failed: number;
+  delayed: number;
+}
+
+/* ── Tool Stats ── */
+
+export interface ToolStat {
+  toolName: string;
+  totalExecutions: number;
+  successCount: number;
+  errorCount: number;
+  avgDurationMs: number;
+  p95DurationMs: number;
+}
+
+/* ── Persona ── */
+
+export interface Persona {
+  id: string;
+  name: string;
+  voiceId: string | null;
+  corePersonality: string;
+  capabilities: string | null;
+  behavioralGuidelines: string | null;
+  isActive: boolean;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertPersonaInput {
+  id?: string;
+  name: string;
+  voiceId?: string;
+  corePersonality: string;
+  capabilities?: string;
+  behavioralGuidelines?: string;
+  isActive?: boolean;
+}
+
+/* ── Pipelines ── */
+
+export type PipelineRunState = "waiting" | "active" | "completed" | "failed" | "delayed";
+
+export type PipelineAgentRole = "planner" | "coder" | "reviewer" | "debugger" | "researcher";
+
+export interface PipelineStageDefinition {
+  agent: PipelineAgentRole;
+  prompt: string;
+  dependsOnPrevious: boolean;
+}
+
+export interface PipelineStageResult {
+  stageIndex: number;
+  agent: string;
+  status: "completed" | "failed" | "skipped";
+  output?: string;
+  error?: string;
+}
+
+export interface PipelineResult {
+  pipelineId: string;
+  goalId: string;
+  status: "completed" | "failed" | "partial";
+  stageResults: PipelineStageResult[];
+}
+
+export interface PipelineRun {
+  jobId: string;
+  pipelineId: string;
+  goalId: string;
+  stageCount: number;
+  state: PipelineRunState;
+  createdAt: string | null;
+  finishedAt: string | null;
+  failedReason: string | null;
+  result: PipelineResult | null;
+}
+
+export interface PipelineDetail {
+  jobId: string;
+  pipelineId: string;
+  goalId: string;
+  stages: PipelineStageDefinition[];
+  currentStage: number;
+  context: Record<string, unknown>;
+  state: PipelineRunState;
+  createdAt: string | null;
+  finishedAt: string | null;
+  failedReason: string | null;
+  result: PipelineResult | null;
+}
+
+export interface SubmitPipelineInput {
+  goalId: string;
+  stages: PipelineStageDefinition[];
+  context?: Record<string, unknown>;
+}
+
+export interface SubmitPipelineResponse {
+  jobId: string;
+  status: string;
+  stageCount: number;
+}

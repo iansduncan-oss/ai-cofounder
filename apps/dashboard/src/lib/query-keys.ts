@@ -43,4 +43,26 @@ export const queryKeys = {
   usage: {
     summary: (period?: string) => ["usage", period ?? "all"] as const,
   },
+  monitoring: {
+    status: ["monitoring", "status"] as const,
+  },
+  queue: {
+    status: ["queue", "status"] as const,
+  },
+  briefing: {
+    latest: ["briefing", "latest"] as const,
+  },
+  tools: {
+    stats: ["tools", "stats"] as const,
+  },
+  persona: {
+    all: ["persona"] as const,
+    active: ["persona", "active"] as const,
+    list: ["persona", "list"] as const,
+  },
+  pipelines: {
+    all: ["pipelines"] as const,
+    list: ["pipelines", "list"] as const,
+    detail: (jobId: string) => ["pipelines", "detail", jobId] as const,
+  },
 };

@@ -11,6 +11,7 @@ import type {
 import { createLogger } from "@ai-cofounder/shared";
 import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
+import { retrieve, formatContext } from "@ai-cofounder/rag";
 import {
   createGoal,
   createTask,
@@ -138,7 +139,6 @@ const CREATE_PLAN_TOOL: LlmTool = {
                 "researcher (gather info), coder (write/edit code), " +
                 "reviewer (critique/validate), planner (break down further)",
             },
-          },
             parallel_group: {
               type: "integer",
               description:
@@ -308,6 +308,12 @@ export class Orchestrator {
       if (parts.length > 0) {
         memoryContext = parts.join("\n");
       }
+    }
+
+    // RAG retrieval: find relevant document chunks
+    const ragContext = await this.retrieveRagContext(message);
+    if (ragContext) {
+      memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
 
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
@@ -486,6 +492,12 @@ export class Orchestrator {
         parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
       }
       if (parts.length > 0) memoryContext = parts.join("\n");
+    }
+
+    // RAG retrieval: find relevant document chunks
+    const ragContext = await this.retrieveRagContext(message);
+    if (ragContext) {
+      memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
 
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
@@ -984,6 +996,22 @@ export class Orchestrator {
       }
       default:
         return { error: `Unknown tool: ${block.name}` };
+    }
+  }
+
+  private async retrieveRagContext(query: string): Promise<string | null> {
+    if (!this.db || !this.embeddingService) return null;
+    try {
+      const chunks = await retrieve(this.db, this.embeddingService.embed.bind(this.embeddingService), query, {
+        limit: 5,
+        minScore: 0.3,
+        diversifySources: true,
+      });
+      if (chunks.length === 0) return null;
+      return formatContext(chunks);
+    } catch (err) {
+      this.logger.warn({ err }, "RAG retrieval failed (non-fatal)");
+      return null;
     }
   }
 

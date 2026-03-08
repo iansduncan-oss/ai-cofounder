@@ -48,6 +48,7 @@ vi.mock("@ai-cofounder/db", () => ({
   deleteSchedule: vi.fn(),
   createMilestone: vi.fn(),
   getActivePrompt: vi.fn().mockResolvedValue(null),
+  getActivePersona: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../services/notifications.js", () => ({

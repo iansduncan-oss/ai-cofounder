@@ -7,12 +7,16 @@ import {
   getBriefingQueue,
   getNotificationQueue,
   getPipelineQueue,
+  getRagIngestionQueue,
+  getReflectionQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
   type NotificationJob,
   type PipelineJob,
   type PipelineStage,
+  type RagIngestionJob,
+  type ReflectionJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-helpers");
@@ -83,6 +87,24 @@ export async function enqueuePipeline(opts: {
     { jobId: added.id, pipelineId, stageCount: opts.stages.length },
     "Pipeline enqueued",
   );
+  return added.id;
+}
+
+export async function enqueueRagIngestion(
+  job: RagIngestionJob,
+): Promise<string | undefined> {
+  const queue = getRagIngestionQueue();
+  const added = await queue.add("rag-ingestion", job);
+  logger.info({ jobId: added.id, action: job.action, sourceId: job.sourceId }, "RAG ingestion enqueued");
+  return added.id;
+}
+
+export async function enqueueReflection(
+  job: ReflectionJob,
+): Promise<string | undefined> {
+  const queue = getReflectionQueue();
+  const added = await queue.add(`reflection-${job.action}`, job);
+  logger.info({ jobId: added.id, action: job.action, goalId: job.goalId }, "Reflection job enqueued");
   return added.id;
 }
 
@@ -162,6 +184,8 @@ export async function getAllQueueStatus(): Promise<QueueStatus[]> {
     { name: "briefings", queue: getBriefingQueue() },
     { name: "notifications", queue: getNotificationQueue() },
     { name: "pipelines", queue: getPipelineQueue() },
+    { name: "rag-ingestion", queue: getRagIngestionQueue() },
+    { name: "reflections", queue: getReflectionQueue() },
   ];
 
   return Promise.all(
