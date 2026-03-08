@@ -14,9 +14,9 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **QUEUE-03**: Worker process picks up jobs from the queue and executes them via orchestrator/dispatcher
 - [x] **QUEUE-04**: Worker runs as a separate Docker container (same image, different CMD)
 - [x] **QUEUE-05**: Failed jobs retry with exponential backoff up to a configurable max attempts
-- [ ] **QUEUE-06**: Jobs can be queried by status (waiting, active, completed, failed) via API
+- [x] **QUEUE-06**: Jobs can be queried by status (waiting, active, completed, failed) via API
 - [x] **QUEUE-07**: Worker handles SIGTERM gracefully — finishes active job before shutting down (stop_grace_period: 120s)
-- [ ] **QUEUE-08**: Redis connection health is monitored and exposed at GET /health endpoint
+- [x] **QUEUE-08**: Redis connection health is monitored and exposed at GET /health endpoint
 - [x] **QUEUE-09**: Job priorities allow urgent tasks to be processed before routine ones
 - [ ] **QUEUE-10**: Worker publishes real-time events to Redis pub/sub channel during job execution
 - [ ] **QUEUE-11**: SSE endpoint subscribes to Redis pub/sub and forwards events to dashboard clients
@@ -98,9 +98,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUEUE-03 | Phase 1 | Complete |
 | QUEUE-04 | Phase 1 | Complete |
 | QUEUE-05 | Phase 1 | Complete |
-| QUEUE-06 | Phase 1 | Pending |
+| QUEUE-06 | Phase 1 | Complete |
 | QUEUE-07 | Phase 1 | Complete |
-| QUEUE-08 | Phase 1 | Pending |
+| QUEUE-08 | Phase 1 | Complete |
 | QUEUE-09 | Phase 1 | Complete |
 | QUEUE-12 | Phase 1 | Complete |
 | QUEUE-13 | Phase 1 | Complete |

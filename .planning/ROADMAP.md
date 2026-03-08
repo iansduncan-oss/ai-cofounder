@@ -12,7 +12,7 @@ This milestone decouples long-running agent work from HTTP request handlers via 
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Queue Foundation** - Redis container, BullMQ module, worker process, job lifecycle management
+- [x] **Phase 1: Queue Foundation** - Redis container, BullMQ module, worker process, job lifecycle management (completed 2026-03-08)
 - [ ] **Phase 2: SSE Migration** - Move agent execution to workers with real-time streaming via Redis pub/sub
 - [ ] **Phase 3: Authentication** - JWT login, refresh tokens, protected routes, bot endpoint isolation
 - [ ] **Phase 4: Tests & Quick Wins** - E2E test suite, workspace delete tools, API docs, export endpoint
@@ -90,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Queue Foundation | 2/3 | In Progress|  |
+| 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
 | 2. SSE Migration | 0/2 | Not started | - |
 | 3. Authentication | 0/2 | Not started | - |
 | 4. Tests & Quick Wins | 0/3 | Not started | - |
