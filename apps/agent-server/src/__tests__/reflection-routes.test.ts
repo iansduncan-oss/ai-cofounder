@@ -4,8 +4,11 @@ beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
   process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
-  process.env.COOKIE_SECRET = "test-cookie-secret-32-chars-min!!";
-  process.env.JWT_SECRET = "test-jwt-secret-32-chars-minimum!!";
+  // NOTE: JWT_SECRET and COOKIE_SECRET intentionally NOT set here.
+  // Reflection route tests focus on business logic, not auth.
+  // Without JWT_SECRET, authPlugin no-ops and jwtGuardPlugin allows all requests through.
+  delete process.env.JWT_SECRET;
+  delete process.env.COOKIE_SECRET;
 });
 
 const mockListReflections = vi.fn().mockResolvedValue({ data: [], total: 0 });
