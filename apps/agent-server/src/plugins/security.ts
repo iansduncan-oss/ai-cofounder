@@ -193,14 +193,18 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   const banCleanupInterval = startCleanup();
 
   const apiSecret = optionalEnv("API_SECRET", "");
+  // When JWT_SECRET is set, JWT auth handles protected routes — API_SECRET only applies to bot routes
+  const jwtSecret = optionalEnv("JWT_SECRET", "");
   const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
   const rateLimitWindowSec = parseInt(optionalEnv("RATE_LIMIT_WINDOW", "60"), 10);
   const rateLimitWindowMs = rateLimitWindowSec * 1000;
   // Expensive endpoints get a tighter limit (default: 10 per window)
   const expensiveLimitMax = parseInt(optionalEnv("RATE_LIMIT_EXPENSIVE_MAX", "10"), 10);
 
-  if (apiSecret) {
-    logger.info("API bearer token auth enabled");
+  if (apiSecret && jwtSecret) {
+    logger.info("JWT auth active — API_SECRET limited to bot routes (/api/channels/, /api/webhooks/)");
+  } else if (apiSecret) {
+    logger.info("API bearer token auth enabled (all /api/* routes)");
   }
   logger.info(
     { maxRequests: rateLimitMax, expensiveMax: expensiveLimitMax, windowSec: rateLimitWindowSec },
@@ -261,11 +265,19 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     }
 
     // 6. Bearer token auth on /api/* routes (skip public paths and internal requests)
+    // When JWT is active (jwtSecret set), API_SECRET only enforced on bot routes
+    // (channels + webhooks) so Discord/Slack bots continue to work without JWT.
+    // Dashboard requests use JWT (handled by jwtGuardPlugin), not API_SECRET.
     if (apiSecret && url.startsWith("/api/") && !isInternalRequest(request)) {
-      const authHeader = request.headers.authorization;
-      if (!authHeader || authHeader !== `Bearer ${apiSecret}`) {
-        reply.code(401).send({ error: "Unauthorized" });
-        return;
+      const isBotRoute =
+        url.startsWith("/api/channels/") || url.startsWith("/api/webhooks/");
+      const shouldCheck = jwtSecret ? isBotRoute : true;
+      if (shouldCheck) {
+        const authHeader = request.headers.authorization;
+        if (!authHeader || authHeader !== `Bearer ${apiSecret}`) {
+          reply.code(401).send({ error: "Unauthorized" });
+          return;
+        }
       }
     }
   });

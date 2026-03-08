@@ -19,34 +19,12 @@ import { dbPlugin } from "./plugins/db.js";
 import { authPlugin } from "./plugins/auth.js";
 import { securityPlugin } from "./plugins/security.js";
 import { observabilityPlugin } from "./plugins/observability.js";
+import { jwtGuardPlugin } from "./plugins/jwt-guard.js";
 import { authRoutes } from "./routes/auth.js";
 import { healthRoutes } from "./routes/health.js";
-import { agentRoutes } from "./routes/agents.js";
-import { goalRoutes } from "./routes/goals.js";
-import { taskRoutes } from "./routes/tasks.js";
-import { approvalRoutes } from "./routes/approvals.js";
 import { channelRoutes } from "./routes/channels.js";
-import { memoryRoutes } from "./routes/memories.js";
-import { executionRoutes } from "./routes/execution.js";
-import { userRoutes } from "./routes/users.js";
-import { promptRoutes } from "./routes/prompts.js";
-import { n8nRoutes } from "./routes/n8n.js";
-import { usageRoutes } from "./routes/usage.js";
-import { eventRoutes } from "./routes/events.js";
-import { scheduleRoutes } from "./routes/schedules.js";
 import { webhookRoutes } from "./routes/webhooks.js";
-import { workspaceRoutes } from "./routes/workspace.js";
-import { milestoneRoutes } from "./routes/milestones.js";
-import { dashboardRoutes } from "./routes/dashboard.js";
-import { conversationRoutes } from "./routes/conversations.js";
-import { decisionRoutes } from "./routes/decisions.js";
 import { voiceRoutes } from "./routes/voice.js";
-import { queueRoutes } from "./routes/queue.js";
-import { monitoringRoutes } from "./routes/monitoring.js";
-import { pipelineRoutes } from "./routes/pipeline.js";
-import { personaRoutes } from "./routes/persona.js";
-import { ragRoutes } from "./routes/rag.js";
-import { reflectionRoutes } from "./routes/reflections.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
@@ -100,9 +78,11 @@ export function buildServer(registry?: LlmRegistry) {
   });
 
   // CORS — restrict origins in production, allow same-origin for voice UI
+  // credentials: true required for cross-origin HttpOnly cookie support
   const allowedOrigins = optionalEnv("CORS_ORIGINS", "").split(",").filter(Boolean);
   app.register(cors, {
     origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   });
 
@@ -264,35 +244,16 @@ export function buildServer(registry?: LlmRegistry) {
     });
   });
 
-  // Register routes
-  app.register(authRoutes, { prefix: "/api/auth" });
+  // Register public routes (no JWT required)
   app.register(healthRoutes);
-  app.register(agentRoutes, { prefix: "/api/agents" });
-  app.register(goalRoutes, { prefix: "/api/goals" });
-  app.register(taskRoutes, { prefix: "/api/tasks" });
-  app.register(approvalRoutes, { prefix: "/api/approvals" });
+  app.register(authRoutes, { prefix: "/api/auth" });
   app.register(channelRoutes, { prefix: "/api/channels" });
-  app.register(memoryRoutes, { prefix: "/api/memories" });
-  app.register(userRoutes, { prefix: "/api/users" });
-  app.register(promptRoutes, { prefix: "/api/prompts" });
-  app.register(n8nRoutes, { prefix: "/api/n8n" });
-  app.register(executionRoutes, { prefix: "/api/goals" });
-  app.register(usageRoutes, { prefix: "/api/usage" });
-  app.register(eventRoutes, { prefix: "/api/events" });
-  app.register(scheduleRoutes, { prefix: "/api/schedules" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
-  app.register(workspaceRoutes, { prefix: "/api/workspace" });
-  app.register(milestoneRoutes, { prefix: "/api/milestones" });
-  app.register(dashboardRoutes, { prefix: "/api/dashboard" });
-  app.register(conversationRoutes, { prefix: "/api/conversations" });
-  app.register(decisionRoutes, { prefix: "/api/decisions" });
   app.register(voiceRoutes, { prefix: "/voice" });
-  app.register(queueRoutes, { prefix: "/api/queue" });
-  app.register(monitoringRoutes, { prefix: "/api/monitoring" });
-  app.register(pipelineRoutes, { prefix: "/api/pipelines" });
-  app.register(ragRoutes, { prefix: "/api/rag" });
-  app.register(reflectionRoutes, { prefix: "/api/reflections" });
-  app.register(personaRoutes, { prefix: "/api/persona" });
+
+  // Register all protected API routes inside jwtGuardPlugin scope
+  // The guard applies onRequest JWT verification to everything inside its scope
+  app.register(jwtGuardPlugin);
 
   // Queue system (requires REDIS_URL)
   app.register(queuePlugin);

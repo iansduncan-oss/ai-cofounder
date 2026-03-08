@@ -442,3 +442,102 @@ describe("AUTH-08: Password hashed with bcrypt cost factor 12", () => {
     expect(mockBcryptHash).toHaveBeenCalledWith("supersecret", 12);
   });
 });
+
+/* ───────────────────── JWT Route Protection Tests ─────────────────────── */
+
+describe("AUTH-04: Protected routes require valid JWT", () => {
+  it("returns 401 for GET /api/goals without Authorization header", async () => {
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/goals?conversationId=test-conv",
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it("returns 200 for GET /api/goals with valid JWT", async () => {
+    // First login to get a valid JWT
+    mockFindAdminByEmail.mockResolvedValueOnce(MOCK_ADMIN);
+    mockBcryptCompare.mockResolvedValueOnce(true);
+
+    const { app } = buildServer();
+    await app.ready();
+
+    const loginRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "supersecret" },
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    expect(loginRes.statusCode).toBe(200);
+    const { accessToken } = loginRes.json() as { accessToken: string };
+
+    // GET /api/goals requires conversationId — mock the DB calls
+    // These are set up in the top-level vi.mock for @ai-cofounder/db
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/goals?conversationId=00000000-0000-0000-0000-000000000001",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    await app.close();
+
+    // With valid JWT, the route should not return 401
+    // It may return 200 (with data) or other non-401 status based on route logic
+    expect(res.statusCode).not.toBe(401);
+  });
+});
+
+/* ───────────────────── Bot Isolation Tests ─────────────────────── */
+
+describe("AUTH-09: Bot routes work without JWT", () => {
+  it("GET /api/channels/:id/conversation returns non-401 without JWT", async () => {
+    // getChannelConversation is mocked to return null (404, not 401)
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "GET",
+      url: "/api/channels/test-channel/conversation",
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    await app.close();
+
+    // Should get 404 (channel not found) not 401 (unauthorized)
+    expect(res.statusCode).not.toBe(401);
+    expect(res.statusCode).toBe(404);
+  });
+
+  it("POST /api/webhooks/github returns non-401 without JWT", async () => {
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/webhooks/github",
+      headers: { "x-forwarded-for": "10.0.0.1" },
+      payload: {},
+    });
+    await app.close();
+
+    // Should not be 401 — webhook routes don't require JWT
+    expect(res.statusCode).not.toBe(401);
+  });
+
+  it("GET /api/auth/login is accessible without JWT", async () => {
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "noone@example.com", password: "wrong" },
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    await app.close();
+
+    // Returns 401 for bad credentials, not because JWT is required for the route itself
+    // The key is that the route responds — it's not blocked by jwtGuardPlugin
+    expect(res.statusCode).toBe(401);
+    expect(res.json().error).toBe("Invalid credentials");
+  });
+});
