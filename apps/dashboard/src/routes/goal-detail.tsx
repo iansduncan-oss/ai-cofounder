@@ -24,7 +24,8 @@ import type { GoalStatus } from "@ai-cofounder/api-client";
 export function GoalDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: goal, isLoading: goalLoading, error: goalError } = useGoal(id!);
-  const { data: tasks, isLoading: tasksLoading } = useTasks(id!);
+  const { data: tasksData, isLoading: tasksLoading } = useTasks(id!);
+  const tasks = tasksData?.data;
   const updateStatus = useUpdateGoalStatus();
 
   const [confirmDialog, setConfirmDialog] = useState<{

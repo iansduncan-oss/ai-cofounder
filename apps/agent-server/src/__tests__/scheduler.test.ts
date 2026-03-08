@@ -9,6 +9,18 @@ const mockListActiveGoals = vi.fn();
 const mockListRecentlyCompletedGoals = vi.fn();
 const mockCountTasksByStatus = vi.fn();
 const mockListPendingApprovals = vi.fn();
+const mockGetUsageSummary = vi.fn();
+const mockListEnabledSchedules = vi.fn();
+const mockListRecentWorkSessions = vi.fn();
+const mockListDueSchedules = vi.fn().mockResolvedValue([]);
+const mockDecayAllMemoryImportance = vi.fn();
+const mockGetTodayTokenTotal = vi.fn().mockResolvedValue(0);
+const mockGetLatestUserMessageTime = vi.fn().mockResolvedValue(null);
+
+vi.mock("@ai-cofounder/shared", () => ({
+  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+}));
 
 vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
@@ -16,6 +28,18 @@ vi.mock("@ai-cofounder/db", () => ({
   listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
   countTasksByStatus: (...args: unknown[]) => mockCountTasksByStatus(...args),
   listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
+  getUsageSummary: (...args: unknown[]) => mockGetUsageSummary(...args),
+  listEnabledSchedules: (...args: unknown[]) => mockListEnabledSchedules(...args),
+  listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),
+  listDueSchedules: (...args: unknown[]) => mockListDueSchedules(...args),
+  decayAllMemoryImportance: (...args: unknown[]) => mockDecayAllMemoryImportance(...args),
+  getTodayTokenTotal: (...args: unknown[]) => mockGetTodayTokenTotal(...args),
+  getLatestUserMessageTime: (...args: unknown[]) => mockGetLatestUserMessageTime(...args),
+  updateScheduleLastRun: vi.fn(),
+  createWorkSession: vi.fn().mockResolvedValue({ id: "ws-1" }),
+  completeWorkSession: vi.fn(),
+  createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
+  findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1" }),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -33,6 +57,7 @@ vi.mock("@ai-cofounder/llm", () => {
     getProvider = vi.fn();
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
+    getProviderHealth = vi.fn().mockReturnValue([]);
   }
   return {
     LlmRegistry: MockLlmRegistry,
@@ -46,23 +71,25 @@ vi.mock("@ai-cofounder/llm", () => {
 
 const {
   gatherBriefingData,
-  buildBriefingPrompt,
-  buildFallbackBriefing,
-  startScheduler,
-} = await import("../scheduler.js");
+  formatBriefing,
+} = await import("../services/briefing.js");
+const { startScheduler } = await import("../services/scheduler.js");
 const { LlmRegistry } = await import("@ai-cofounder/llm");
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
-// Helper: create mock briefing data
-function makeBriefingData(overrides: Partial<Parameters<typeof buildBriefingPrompt>[0]> = {}) {
+// Helper: create mock briefing data matching BriefingData interface
+function makeBriefingData(overrides: Partial<Parameters<typeof formatBriefing>[0]> = {}) {
   return {
-    activeGoals: [],
-    recentlyCompleted: [],
-    taskCounts: {} as Record<string, number>,
-    pendingApprovals: [],
+    activeGoals: [] as Array<{ title: string; priority: string; progress: string; hoursStale: number }>,
+    completedYesterday: [] as Array<{ title: string }>,
+    taskBreakdown: {} as Record<string, number>,
+    costsSinceYesterday: { totalCostUsd: 0, requestCount: 0 },
+    upcomingSchedules: [] as Array<{ description: string; nextRunAt: Date | null }>,
+    recentSessions: [] as Array<{ trigger: string; status: string; summary: string | null }>,
+    pendingApprovalCount: 0,
     staleGoalCount: 0,
     ...overrides,
   };
@@ -79,6 +106,9 @@ describe("Scheduler", () => {
         { id: "g-2", title: "Done Goal" },
       ]);
       mockCountTasksByStatus.mockResolvedValueOnce({ pending: 2, completed: 5, running: 1 });
+      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0.5, requestCount: 10 });
+      mockListEnabledSchedules.mockResolvedValueOnce([]);
+      mockListRecentWorkSessions.mockResolvedValueOnce([]);
       mockListPendingApprovals.mockResolvedValueOnce([
         { id: "a-1", taskId: "t-1", status: "pending" },
       ]);
@@ -87,20 +117,23 @@ describe("Scheduler", () => {
       const data = await gatherBriefingData(db);
 
       expect(data.activeGoals).toHaveLength(1);
-      expect(data.recentlyCompleted).toHaveLength(1);
-      expect(data.taskCounts).toEqual({ pending: 2, completed: 5, running: 1 });
-      expect(data.pendingApprovals).toHaveLength(1);
+      expect(data.completedYesterday).toHaveLength(1);
+      expect(data.taskBreakdown).toEqual({ pending: 2, completed: 5, running: 1 });
+      expect(data.pendingApprovalCount).toBe(1);
       expect(data.staleGoalCount).toBe(0); // updatedAt is "now", not stale
     });
 
-    it("counts stale goals (24h+ since update)", async () => {
-      const staleDate = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    it("counts stale goals (48h+ since update)", async () => {
+      const staleDate = new Date(Date.now() - 49 * 60 * 60 * 1000);
       mockListActiveGoals.mockResolvedValueOnce([
         { id: "g-1", title: "Stale", updatedAt: staleDate, taskCount: 1, completedTaskCount: 0 },
         { id: "g-2", title: "Fresh", updatedAt: new Date(), taskCount: 1, completedTaskCount: 0 },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
       mockCountTasksByStatus.mockResolvedValueOnce({});
+      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
+      mockListEnabledSchedules.mockResolvedValueOnce([]);
+      mockListRecentWorkSessions.mockResolvedValueOnce([]);
       mockListPendingApprovals.mockResolvedValueOnce([]);
 
       const db = {} as any;
@@ -110,115 +143,59 @@ describe("Scheduler", () => {
     });
   });
 
-  describe("buildBriefingPrompt", () => {
+  describe("formatBriefing", () => {
     it("includes completed goals when present", () => {
       const data = makeBriefingData({
-        recentlyCompleted: [{ id: "g-1", title: "Shipped Feature" } as any],
+        completedYesterday: [{ title: "Shipped Feature" }],
       });
-      const prompt = buildBriefingPrompt(data);
+      const text = formatBriefing(data);
 
-      expect(prompt).toContain("Shipped Feature");
-      expect(prompt).toContain("Goals completed in last 24h");
+      expect(text).toContain("Shipped Feature");
+      expect(text).toContain("Completed Yesterday");
     });
 
-    it("notes when no goals completed", () => {
+    it("shows no active goals message when empty", () => {
       const data = makeBriefingData();
-      const prompt = buildBriefingPrompt(data);
+      const text = formatBriefing(data);
 
-      expect(prompt).toContain("No goals completed in the last 24 hours");
+      expect(text).toContain("No active goals");
     });
 
     it("includes active goals with progress", () => {
       const data = makeBriefingData({
         activeGoals: [
-          {
-            id: "g-1",
-            title: "Build API",
-            priority: "high",
-            updatedAt: new Date(),
-            taskCount: 4,
-            completedTaskCount: 2,
-          } as any,
+          { title: "Build API", priority: "high", progress: "2/4 tasks", hoursStale: 0 },
         ],
       });
-      const prompt = buildBriefingPrompt(data);
+      const text = formatBriefing(data);
 
-      expect(prompt).toContain("Build API");
-      expect(prompt).toContain("2/4 tasks done");
-    });
-
-    it("marks stale goals", () => {
-      const staleDate = new Date(Date.now() - 25 * 60 * 60 * 1000);
-      const data = makeBriefingData({
-        activeGoals: [
-          {
-            id: "g-1",
-            title: "Forgotten",
-            priority: "low",
-            updatedAt: staleDate,
-            taskCount: 1,
-            completedTaskCount: 0,
-          } as any,
-        ],
-      });
-      const prompt = buildBriefingPrompt(data);
-
-      expect(prompt).toContain("[STALE]");
+      expect(text).toContain("Build API");
+      expect(text).toContain("2/4 tasks");
     });
 
     it("includes pending approvals count", () => {
       const data = makeBriefingData({
-        pendingApprovals: [{ id: "a-1" } as any, { id: "a-2" } as any],
+        pendingApprovalCount: 2,
       });
-      const prompt = buildBriefingPrompt(data);
+      const text = formatBriefing(data);
 
-      expect(prompt).toContain("Pending approvals: 2");
+      expect(text).toContain("Pending Approvals");
+      expect(text).toContain("2");
     });
 
     it("includes task breakdown", () => {
       const data = makeBriefingData({
-        taskCounts: { completed: 10, pending: 3, running: 1 },
+        taskBreakdown: { completed: 10, pending: 3, running: 1 },
       });
-      const prompt = buildBriefingPrompt(data);
+      const text = formatBriefing(data);
 
-      expect(prompt).toContain("14 total");
-      expect(prompt).toContain("10 completed");
+      expect(text).toContain("14 total");
+      expect(text).toContain("10 completed");
     });
 
-    it("truncates to 5 active goals with overflow count", () => {
-      const goals = Array.from({ length: 7 }, (_, i) => ({
-        id: `g-${i}`,
-        title: `Goal ${i}`,
-        priority: "medium",
-        updatedAt: new Date(),
-        taskCount: 1,
-        completedTaskCount: 0,
-      }));
-      const data = makeBriefingData({ activeGoals: goals as any });
-      const prompt = buildBriefingPrompt(data);
-
-      expect(prompt).toContain("... and 2 more");
-    });
-  });
-
-  describe("buildFallbackBriefing", () => {
-    it("produces a briefing with completed goals", () => {
-      const data = makeBriefingData({
-        recentlyCompleted: [{ id: "g-1", title: "Done Thing" } as any],
-        activeGoals: [
-          { id: "g-2", title: "Active", taskCount: 2, completedTaskCount: 1 } as any,
-        ],
-      });
-      const text = buildFallbackBriefing(data);
-
-      expect(text).toContain("Morning Briefing");
-      expect(text).toContain("Done Thing");
-      expect(text).toContain("Active");
-    });
-
-    it("shows stale goal count", () => {
+    it("includes stale goal count", () => {
       const data = makeBriefingData({ staleGoalCount: 3 });
-      const text = buildFallbackBriefing(data);
+      const text = formatBriefing(data);
 
       expect(text).toContain("3");
       expect(text).toContain("Stale");
@@ -226,55 +203,51 @@ describe("Scheduler", () => {
 
     it("shows pending approvals with /approve hint", () => {
       const data = makeBriefingData({
-        pendingApprovals: [{ id: "a-1" } as any],
+        pendingApprovalCount: 1,
       });
-      const text = buildFallbackBriefing(data);
+      const text = formatBriefing(data);
 
       expect(text).toContain("/approve");
     });
   });
 
   describe("startScheduler", () => {
-    it("does nothing when DISCORD_FOLLOWUP_WEBHOOK_URL is not set", () => {
-      const origUrl = process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
-      delete process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
-
+    it("returns a handle with stop()", () => {
       const registry = new LlmRegistry();
       const db = {} as any;
 
-      // Should not throw
-      startScheduler(db, registry);
-
-      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
-    });
-
-    it("returns a SchedulerHandle with stop() when URL is set", () => {
-      const origUrl = process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
-      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = "https://discord.com/api/webhooks/test";
-
-      const registry = new LlmRegistry();
-      const db = {} as any;
-
-      const handle = startScheduler(db, registry);
+      const handle = startScheduler({
+        db,
+        llmRegistry: registry as any,
+        n8nService: {} as any,
+        sandboxService: {} as any,
+        workspaceService: {} as any,
+        pollIntervalMs: 60_000,
+        briefingHour: 25, // impossible hour to prevent tick from consuming mocks
+      });
       expect(handle).toBeDefined();
-      expect(typeof handle!.stop).toBe("function");
+      expect(typeof handle.stop).toBe("function");
 
       // Clean up timers
-      handle!.stop();
-      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
+      handle.stop();
     });
 
-    it("returns undefined when URL is empty string", () => {
-      const origUrl = process.env.DISCORD_FOLLOWUP_WEBHOOK_URL;
-      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = "";
-
+    it("stop() clears the interval", () => {
       const registry = new LlmRegistry();
       const db = {} as any;
 
-      const handle = startScheduler(db, registry);
-      expect(handle).toBeUndefined();
+      const handle = startScheduler({
+        db,
+        llmRegistry: registry as any,
+        n8nService: {} as any,
+        sandboxService: {} as any,
+        workspaceService: {} as any,
+        pollIntervalMs: 60_000,
+        briefingHour: 25,
+      });
 
-      process.env.DISCORD_FOLLOWUP_WEBHOOK_URL = origUrl;
+      // Should not throw
+      handle.stop();
     });
   });
 });

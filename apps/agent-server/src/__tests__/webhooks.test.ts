@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
 });
 
 const mockCreateEvent = vi.fn();
@@ -64,10 +65,37 @@ vi.mock("@ai-cofounder/db", () => ({
   recordLlmUsage: vi.fn(),
   getTodayTokenUsage: vi.fn().mockResolvedValue(0),
   touchMemory: vi.fn(),
+  saveCodeExecution: vi.fn(),
+  listEnabledSchedules: vi.fn().mockResolvedValue([]),
+  listDueSchedules: vi.fn().mockResolvedValue([]),
+  updateScheduleLastRun: vi.fn(),
+  listRecentWorkSessions: vi.fn().mockResolvedValue([]),
+  listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
+  decayAllMemoryImportance: vi.fn(),
+  getLatestUserMessageTime: vi.fn().mockResolvedValue(null),
+  getTodayTokenTotal: vi.fn().mockResolvedValue(0),
+  listActiveGoals: vi.fn().mockResolvedValue([]),
+  countTasksByStatus: vi.fn().mockResolvedValue({}),
+  getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0 }),
+  getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+  upsertProviderHealth: vi.fn(),
+  getProviderHealthHistory: vi.fn().mockResolvedValue([]),
+  getToolStats: vi.fn().mockResolvedValue([]),
+  recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
+  searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  countGoalsByConversation: vi.fn().mockResolvedValue(0),
+  countTasksByGoal: vi.fn().mockResolvedValue(0),
+  countMemoriesByUser: vi.fn().mockResolvedValue(0),
+  completeWorkSession: vi.fn(),
   goals: {},
   channelConversations: {},
   prompts: {},
   n8nWorkflows: {},
+  schedules: {},
+  events: {},
+  workSessions: {},
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -133,7 +161,7 @@ describe("GitHub webhook routes", () => {
 
     expect(res.statusCode).toBe(202);
     const body = res.json();
-    expect(body.status).toBe("accepted");
+    expect(body.status).toBe("logged");
     expect(body.type).toBe("push");
     expect(body.summary).toContain("1 commit(s)");
     expect(mockCreateEvent).toHaveBeenCalledWith(
@@ -271,6 +299,6 @@ describe("GitHub webhook routes", () => {
     await app.close();
 
     expect(res.statusCode).toBe(202);
-    expect(res.json().status).toBe("accepted");
+    expect(res.json().status).toBe("logged");
   });
 });

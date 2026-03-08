@@ -2,7 +2,6 @@ import path from "node:path";
 import { buildServer } from "./server.js";
 import { optionalEnv, requireEnv, createLogger } from "@ai-cofounder/shared";
 import { runMigrations } from "@ai-cofounder/db";
-import { startScheduler } from "./scheduler.js";
 import { initTracing, shutdownTracing } from "./tracing.js";
 
 async function main() {
@@ -41,13 +40,9 @@ async function main() {
   await app.listen({ port, host });
   logger.info({ port, host }, "agent-server started");
 
-  // Start background scheduler for proactive follow-ups
-  const scheduler = startScheduler(app.db, app.llmRegistry, app.embeddingService, app.sandboxService, app.workspaceService);
-
-  // Graceful shutdown
+  // Graceful shutdown (scheduler is started inside buildServer)
   const shutdown = async () => {
     logger.info("shutting down...");
-    scheduler?.stop();
     await shutdownTracing();
     await app.close();
     process.exit(0);

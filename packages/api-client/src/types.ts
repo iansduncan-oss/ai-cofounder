@@ -106,7 +106,9 @@ export interface ExecutionProgress {
 
 /* ── Streaming ── */
 
-export type StreamEventType = "thinking" | "tool_call" | "tool_result" | "text_delta" | "done" | "error";
+export type StreamEventType =
+  | "thinking" | "tool_call" | "tool_result" | "text_delta" | "done" | "error"
+  | "started" | "progress" | "completed";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -212,6 +214,26 @@ export interface BriefingResponse {
     upcomingSchedules: Array<{ description: string; nextRunAt: string | null }>;
     recentSessions: Array<{ trigger: string; status: string; summary: string | null }>;
   };
+}
+
+/* ── Conversations ── */
+
+export interface Conversation {
+  id: string;
+  userId: string;
+  title: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConversationMessage {
+  id: string;
+  conversationId: string;
+  role: "user" | "agent" | "system";
+  agentRole?: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
 }
 
 /* ── Dashboard ── */

@@ -7,7 +7,11 @@ export default defineConfig({
   base: "/dashboard/",
   plugins: [react(), tailwindcss()],
   test: {
-    passWithNoTests: true,
+    environment: "jsdom",
+    globals: true,
+    setupFiles: ["./src/__tests__/setup.ts"],
+    css: false,
+    include: ["src/__tests__/**/*.test.{ts,tsx}"],
   },
   resolve: {
     alias: {

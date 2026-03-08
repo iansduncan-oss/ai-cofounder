@@ -195,7 +195,7 @@ export function buildServer(registry?: LlmRegistry) {
       workspaceService,
       notificationService,
       pollIntervalMs: 60_000,
-      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "8")),
+      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
       briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
     });
     app.addHook("onClose", async () => scheduler.stop());

@@ -285,6 +285,97 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
+  /** Notify about goals that have gone stale (no updates in 48h+) */
+  async notifyStaleGoals(goals: Array<{ title: string; hoursStale: number }>): Promise<void> {
+    const goalList = goals
+      .slice(0, 5)
+      .map((g) => `- **${g.title}** \u2014 ${g.hoursStale}h since last update`)
+      .join("\n");
+
+    const text = `${goals.length} goal(s) sitting idle:\n\n${goalList}\n\nWant to \`/execute\` them or close them out?`;
+
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(this.slackChannel, text, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "Goals going cold" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text },
+          },
+        ])
+      : Promise.resolve();
+
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: "Goals going cold",
+            description: text,
+            color: 0xf0932b, // orange
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
+  /** Remind about pending approvals that need attention */
+  async notifyApprovalReminder(count: number): Promise<void> {
+    const text = `**${count}** task(s) need your sign-off before execution can continue.\n\nUse \`/approve <id>\` to review and approve.`;
+
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(this.slackChannel, text, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "Approvals waiting on you" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text },
+          },
+        ])
+      : Promise.resolve();
+
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: "Approvals waiting on you",
+            description: text,
+            color: 0xfee75c, // amber
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
+  /** Notify about inactivity with a suggested focus */
+  async notifyQuietCheckIn(suggestion: string): Promise<void> {
+    const text = `Haven't heard from you in a while. Here's what I'd suggest focusing on:\n\n${suggestion}`;
+
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(this.slackChannel, text, [
+          {
+            type: "section",
+            text: { type: "mrkdwn", text },
+          },
+        ])
+      : Promise.resolve();
+
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: "Checking in",
+            description: text,
+            color: 0x5865f2, // blurple
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
   /** Send a daily briefing to configured channels */
   async sendBriefing(text: string): Promise<void> {
     const slackPromise = this.hasSlack()

@@ -1,6 +1,7 @@
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import { createEvent } from "@ai-cofounder/db";
 
 const logger = createLogger("security");
 
@@ -23,10 +24,8 @@ const BLOCKED_USER_AGENTS = [
   "hydra",
   "nuclei",
   "httpx",
-  "curl/",
   "python-requests",
   "go-http-client",
-  "wget",
   "scrapy",
   "libwww-perl",
 ];
@@ -102,6 +101,9 @@ interface IpRecord {
 const ipHits = new Map<string, IpRecord>();
 const bannedIps = new Map<string, number>(); // ip -> ban expiry timestamp
 
+// Set by the plugin so recordHit can log bans to DB
+let banEventDb: import("@ai-cofounder/db").Db | undefined;
+
 function getClientIp(request: FastifyRequest): string {
   // Behind reverse proxy: use x-forwarded-for or x-real-ip
   const forwarded = request.headers["x-forwarded-for"];
@@ -153,6 +155,14 @@ function recordHit(ip: string): boolean {
     bannedIps.set(ip, now + BAN_DURATION_MS);
     ipHits.delete(ip);
     logger.warn({ ip, hits: record.hits }, "IP banned for excessive 404s");
+    // Record ban event in DB if available (fire-and-forget)
+    if (banEventDb) {
+      createEvent(banEventDb, {
+        source: "security",
+        type: "ip_banned",
+        payload: { ip, hits: record.hits, durationMs: BAN_DURATION_MS },
+      }).catch(() => {});
+    }
     return true; // newly banned
   }
 
@@ -175,6 +185,11 @@ function startCleanup(): NodeJS.Timeout {
 }
 
 export const securityPlugin = fp(async (app: FastifyInstance) => {
+  // Make DB available to recordHit for ban logging once ready
+  app.addHook("onReady", async () => {
+    banEventDb = app.db;
+  });
+
   const banCleanupInterval = startCleanup();
 
   const apiSecret = optionalEnv("API_SECRET", "");

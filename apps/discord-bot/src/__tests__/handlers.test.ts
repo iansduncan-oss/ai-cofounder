@@ -371,19 +371,36 @@ describe("interaction handler", () => {
   });
 
   describe("handleExecute", () => {
+    function createSSEBody(events: Array<{ event: string; data: Record<string, unknown> }>) {
+      const text = events
+        .map((e) => `event: ${e.event}\ndata: ${JSON.stringify(e.data)}\n\n`)
+        .join("");
+      const encoder = new TextEncoder();
+      const chunks = [encoder.encode(text)];
+      let index = 0;
+      return {
+        getReader() {
+          return {
+            read() {
+              if (index < chunks.length) return Promise.resolve({ done: false, value: chunks[index++] });
+              return Promise.resolve({ done: true, value: undefined });
+            },
+            releaseLock: vi.fn(),
+          };
+        },
+      };
+    }
+
     it("executes a goal and shows results", async () => {
       (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
-        json: () => ({
-          goalTitle: "Build MVP",
-          status: "completed",
-          totalTasks: 2,
-          completedTasks: 2,
-          tasks: [
-            { title: "Research", agent: "researcher", status: "completed" },
-            { title: "Code", agent: "coder", status: "completed" },
-          ],
-        }),
+        status: 200,
+        body: createSSEBody([
+          { event: "started", data: { goalId: "goal-1" } },
+          { event: "progress", data: { taskTitle: "Research", agent: "researcher", status: "completed", goalTitle: "Build MVP", totalTasks: 2, completedTasks: 1 } },
+          { event: "progress", data: { taskTitle: "Code", agent: "coder", status: "completed", goalTitle: "Build MVP", totalTasks: 2, completedTasks: 2 } },
+          { event: "completed", data: { goalTitle: "Build MVP", status: "completed", totalTasks: 2, completedTasks: 2 } },
+        ]),
       });
 
       const interaction = mockInteraction("execute", { goal_id: "goal-1" });

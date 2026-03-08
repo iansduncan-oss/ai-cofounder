@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { sql } from "drizzle-orm";
 import { getProviderHealthHistory, getToolStats } from "@ai-cofounder/db";
-import { generateBriefing, formatBriefing, sendDailyBriefing } from "../services/briefing.js";
+import { gatherBriefingData, formatBriefing, sendDailyBriefing } from "../services/briefing.js";
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
   app.get("/health", { schema: { tags: ["health"] } }, async (_request, reply) => {
@@ -69,7 +69,7 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
         return { sent: true, briefing: text };
       }
 
-      const data = await generateBriefing(app.db);
+      const data = await gatherBriefingData(app.db);
       const text = formatBriefing(data);
       return { sent: false, briefing: text, data };
     },

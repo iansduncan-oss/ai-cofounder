@@ -389,21 +389,21 @@ describe("Orchestrator", () => {
   });
 
   describe("tool loop", () => {
-    it("respects MAX_TOOL_ROUNDS (5)", async () => {
-      // Return tool_use 6 times — should stop after 5 rounds
-      for (let i = 0; i < 6; i++) {
+    it("respects MAX_TOOL_ROUNDS (10)", async () => {
+      // Return tool_use 11 times — should stop after 10 rounds
+      for (let i = 0; i < 11; i++) {
         mockComplete.mockResolvedValueOnce(
           toolUseResponse("search_web", { query: `q${i}` }, `tu-${i}`),
         );
       }
-      // 7th call won't happen since loop stops at 5
+      // 12th call won't happen since loop stops at 10
 
       const registry = new LlmRegistry();
       const orchestrator = new Orchestrator(registry);
       const result = await orchestrator.run("search a lot");
 
-      // 1 initial + 5 rounds = 6 calls total
-      expect(mockComplete).toHaveBeenCalledTimes(6);
+      // 1 initial + 10 rounds = 11 calls total
+      expect(mockComplete).toHaveBeenCalledTimes(11);
     });
 
     it("accumulates token usage across rounds", async () => {

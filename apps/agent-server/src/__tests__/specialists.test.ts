@@ -265,43 +265,58 @@ describe("Specialist Agents", () => {
 
   describe("completeWithRetry", () => {
     it("retries on transient 429 error and succeeds", async () => {
+      vi.useFakeTimers();
       mockComplete
         .mockRejectedValueOnce(new Error("rate limit exceeded (429)"))
         .mockResolvedValueOnce(mockTextResponse("Recovered"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
-      const result = await agent.execute(makeContext());
+      const executePromise = agent.execute(makeContext());
 
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const result = await executePromise;
       expect(result.output).toBe("Recovered");
       // 1st call fails, retry succeeds
       expect(mockComplete).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
     });
 
     it("retries on timeout error", async () => {
+      vi.useFakeTimers();
       mockComplete
         .mockRejectedValueOnce(new Error("Request timeout"))
         .mockResolvedValueOnce(mockTextResponse("Recovered from timeout"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
-      const result = await agent.execute(makeContext());
+      const executePromise = agent.execute(makeContext());
 
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const result = await executePromise;
       expect(result.output).toBe("Recovered from timeout");
       expect(mockComplete).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
     });
 
     it("retries on 503 overloaded error", async () => {
+      vi.useFakeTimers();
       mockComplete
         .mockRejectedValueOnce(new Error("503 Service Unavailable: overloaded"))
         .mockResolvedValueOnce(mockTextResponse("Back online"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
-      const result = await agent.execute(makeContext());
+      const executePromise = agent.execute(makeContext());
 
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const result = await executePromise;
       expect(result.output).toBe("Back online");
       expect(mockComplete).toHaveBeenCalledTimes(2);
+      vi.useRealTimers();
     });
 
     it("does not retry on non-transient errors", async () => {
@@ -314,28 +329,50 @@ describe("Specialist Agents", () => {
       expect(mockComplete).toHaveBeenCalledTimes(1);
     });
 
-    it("throws if retry also fails", async () => {
+    it("throws if all retries fail", async () => {
+      vi.useFakeTimers();
+      // MAX_RETRIES = 3: initial attempt + 3 retries = 4 total calls
       mockComplete
         .mockRejectedValueOnce(new Error("429 rate limit"))
-        .mockRejectedValueOnce(new Error("429 rate limit again"));
+        .mockRejectedValueOnce(new Error("429 rate limit"))
+        .mockRejectedValueOnce(new Error("429 rate limit"))
+        .mockRejectedValueOnce(new Error("429 rate limit final"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
 
-      await expect(agent.execute(makeContext())).rejects.toThrow("429 rate limit again");
-      expect(mockComplete).toHaveBeenCalledTimes(2);
+      // Capture rejection immediately to prevent unhandled rejection
+      let thrownError: Error | undefined;
+      const executePromise = agent.execute(makeContext()).catch((err) => {
+        thrownError = err as Error;
+      });
+
+      // Advance timers through all retry delays (exponential: ~1s, ~2s, ~4s + random)
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      await executePromise;
+
+      expect(thrownError).toBeDefined();
+      expect(thrownError!.message).toContain("429 rate limit final");
+      expect(mockComplete).toHaveBeenCalledTimes(4);
+      vi.useRealTimers();
     });
 
     it("retries on ECONNRESET error", async () => {
+      vi.useFakeTimers();
       mockComplete
         .mockRejectedValueOnce(new Error("ECONNRESET"))
         .mockResolvedValueOnce(mockTextResponse("Reconnected"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
-      const result = await agent.execute(makeContext());
+      const executePromise = agent.execute(makeContext());
 
+      await vi.advanceTimersByTimeAsync(5_000);
+
+      const result = await executePromise;
       expect(result.output).toBe("Reconnected");
+      vi.useRealTimers();
     });
   });
 

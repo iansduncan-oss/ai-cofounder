@@ -31,6 +31,11 @@ export const queryKeys = {
     detail: (id: string) => ["milestones", "detail", id] as const,
     progress: (id: string) => ["milestones", "progress", id] as const,
   },
+  conversations: {
+    all: ["conversations"] as const,
+    list: (userId: string) => ["conversations", "list", userId] as const,
+    messages: (id: string) => ["conversations", "messages", id] as const,
+  },
   workspace: {
     tree: (path: string) => ["workspace", "tree", path] as const,
     file: (path: string) => ["workspace", "file", path] as const,

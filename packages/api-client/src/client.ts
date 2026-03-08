@@ -21,6 +21,8 @@ import type {
   StreamEventType,
   PaginationParams,
   PaginatedResponse,
+  Conversation,
+  ConversationMessage,
   DashboardSummary,
   BriefingResponse,
 } from "./types.js";
@@ -316,7 +318,83 @@ export class ApiClient {
     return this.request<BriefingResponse>("GET", `/api/briefing${query}`);
   }
 
+  /* ── Conversations ── */
+
+  listConversations(userId: string, pagination?: PaginationParams) {
+    const params = new URLSearchParams({ userId });
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    return this.request<PaginatedResponse<Conversation>>("GET", `/api/conversations?${params}`);
+  }
+
+  getConversation(id: string) {
+    return this.request<Conversation>("GET", `/api/conversations/${id}`);
+  }
+
+  getConversationMessages(id: string, pagination?: PaginationParams) {
+    const params = new URLSearchParams();
+    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
+    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    const qs = params.toString();
+    return this.request<{ data: ConversationMessage[]; limit: number; offset: number }>(
+      "GET",
+      `/api/conversations/${id}/messages${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  searchConversations(q: string, options?: { conversationId?: string; role?: string } & PaginationParams) {
+    const params = new URLSearchParams({ q });
+    if (options?.conversationId) params.set("conversationId", options.conversationId);
+    if (options?.role) params.set("role", options.role);
+    if (options?.limit != null) params.set("limit", String(options.limit));
+    if (options?.offset != null) params.set("offset", String(options.offset));
+    return this.request<PaginatedResponse<ConversationMessage>>("GET", `/api/conversations/search?${params}`);
+  }
+
   /* ── Streaming ── */
+
+  async *streamExecute(goalId: string, userId?: string): AsyncGenerator<StreamEvent> {
+    const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    const res = await fetch(`${this.baseUrl}/api/goals/${goalId}/execute/stream${params}`, {
+      method: "GET",
+      headers: this.headers,
+    });
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, (errorBody as { error?: string }).error ?? res.statusText);
+    }
+
+    const reader = res.body?.getReader();
+    if (!reader) throw new ApiError(0, "No response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            currentEvent = line.slice(7);
+          } else if (line.startsWith("data: ")) {
+            const data = JSON.parse(line.slice(6)) as Record<string, unknown>;
+            yield { type: currentEvent as StreamEventType, data };
+            currentEvent = "";
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
 
   async *streamChat(data: {
     message: string;

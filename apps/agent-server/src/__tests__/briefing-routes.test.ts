@@ -95,6 +95,8 @@ vi.mock("@ai-cofounder/db", () => ({
   createWorkSession: vi.fn().mockResolvedValue({ id: "ws-1" }),
   completeWorkSession: vi.fn(),
   decayAllMemoryImportance: vi.fn(),
+  getTodayTokenTotal: vi.fn().mockResolvedValue(0),
+  getLatestUserMessageTime: vi.fn().mockResolvedValue(null),
   getProviderHealthRecords: vi.fn().mockResolvedValue([]),
   upsertProviderHealth: vi.fn(),
   getProviderHealthHistory: vi.fn().mockResolvedValue([]),
@@ -145,14 +147,15 @@ beforeEach(() => {
 describe("Briefing routes", () => {
   describe("GET /api/briefing", () => {
     it("returns briefing without sending notifications", async () => {
-      mockListActiveGoals.mockResolvedValueOnce([
-        { id: "g-1", title: "Build API", priority: "high", taskCount: 4, completedTaskCount: 2 },
+      // Use persistent mocks so scheduler tick doesn't consume them
+      mockListActiveGoals.mockResolvedValue([
+        { id: "g-1", title: "Build API", priority: "high", taskCount: 4, completedTaskCount: 2, updatedAt: new Date() },
       ]);
-      mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
-      mockCountTasksByStatus.mockResolvedValueOnce({ pending: 3, completed: 5 });
-      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0.15, requestCount: 12 });
-      mockListEnabledSchedules.mockResolvedValueOnce([]);
-      mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListRecentlyCompletedGoals.mockResolvedValue([]);
+      mockCountTasksByStatus.mockResolvedValue({ pending: 3, completed: 5 });
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 0.15, requestCount: 12 });
+      mockListEnabledSchedules.mockResolvedValue([]);
+      mockListRecentWorkSessions.mockResolvedValue([]);
 
       const { app } = buildServer();
       const res = await app.inject({
@@ -171,12 +174,12 @@ describe("Briefing routes", () => {
     });
 
     it("returns briefing with empty data", async () => {
-      mockListActiveGoals.mockResolvedValueOnce([]);
-      mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
-      mockCountTasksByStatus.mockResolvedValueOnce({});
-      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
-      mockListEnabledSchedules.mockResolvedValueOnce([]);
-      mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListActiveGoals.mockResolvedValue([]);
+      mockListRecentlyCompletedGoals.mockResolvedValue([]);
+      mockCountTasksByStatus.mockResolvedValue({});
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 0, requestCount: 0 });
+      mockListEnabledSchedules.mockResolvedValue([]);
+      mockListRecentWorkSessions.mockResolvedValue([]);
 
       const { app } = buildServer();
       const res = await app.inject({
@@ -192,12 +195,12 @@ describe("Briefing routes", () => {
     });
 
     it("sends briefing when send=true", async () => {
-      mockListActiveGoals.mockResolvedValueOnce([]);
-      mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
-      mockCountTasksByStatus.mockResolvedValueOnce({});
-      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
-      mockListEnabledSchedules.mockResolvedValueOnce([]);
-      mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListActiveGoals.mockResolvedValue([]);
+      mockListRecentlyCompletedGoals.mockResolvedValue([]);
+      mockCountTasksByStatus.mockResolvedValue({});
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 0, requestCount: 0 });
+      mockListEnabledSchedules.mockResolvedValue([]);
+      mockListRecentWorkSessions.mockResolvedValue([]);
 
       const { app } = buildServer();
       const res = await app.inject({
@@ -213,12 +216,12 @@ describe("Briefing routes", () => {
     });
 
     it("includes cost data in briefing text", async () => {
-      mockListActiveGoals.mockResolvedValueOnce([]);
-      mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
-      mockCountTasksByStatus.mockResolvedValueOnce({});
-      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 2.50, requestCount: 42 });
-      mockListEnabledSchedules.mockResolvedValueOnce([]);
-      mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListActiveGoals.mockResolvedValue([]);
+      mockListRecentlyCompletedGoals.mockResolvedValue([]);
+      mockCountTasksByStatus.mockResolvedValue({});
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 2.50, requestCount: 42 });
+      mockListEnabledSchedules.mockResolvedValue([]);
+      mockListRecentWorkSessions.mockResolvedValue([]);
 
       const { app } = buildServer();
       const res = await app.inject({
@@ -234,15 +237,15 @@ describe("Briefing routes", () => {
     });
 
     it("includes completed yesterday in briefing", async () => {
-      mockListActiveGoals.mockResolvedValueOnce([]);
-      mockListRecentlyCompletedGoals.mockResolvedValueOnce([
+      mockListActiveGoals.mockResolvedValue([]);
+      mockListRecentlyCompletedGoals.mockResolvedValue([
         { title: "Deploy v1.0" },
         { title: "Fix auth bug" },
       ]);
-      mockCountTasksByStatus.mockResolvedValueOnce({});
-      mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
-      mockListEnabledSchedules.mockResolvedValueOnce([]);
-      mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockCountTasksByStatus.mockResolvedValue({});
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 0, requestCount: 0 });
+      mockListEnabledSchedules.mockResolvedValue([]);
+      mockListRecentWorkSessions.mockResolvedValue([]);
 
       const { app } = buildServer();
       const res = await app.inject({

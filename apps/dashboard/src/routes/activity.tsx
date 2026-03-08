@@ -38,7 +38,8 @@ export function ActivityPage() {
 
   const { data: tasks, isLoading: tasksLoading } = usePendingTasks();
   const { data: approvals, isLoading: approvalsLoading } = usePendingApprovals();
-  const { data: goals, isLoading: goalsLoading } = useGoals(conversationId);
+  const { data: goalsData, isLoading: goalsLoading } = useGoals(conversationId);
+  const goals = goalsData?.data;
 
   const isLoading = tasksLoading || approvalsLoading || goalsLoading;
 

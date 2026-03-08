@@ -275,6 +275,71 @@ export async function handleExecute(
   }
 }
 
+export async function handleExecuteStreaming(
+  client: ApiClient,
+  ctx: CommandContext,
+  goalId: string,
+  onProgress: (text: string) => void | Promise<void>,
+): Promise<HandlerResult> {
+  try {
+    let completedCount = 0;
+    let totalCount = 0;
+    let goalTitle = "";
+    const taskStatuses: Array<{ title: string; agent: string; status: string; icon: string }> = [];
+
+    const stream = client.streamExecute(goalId, ctx.userId);
+
+    for await (const event of stream) {
+      if (event.type === "started") {
+        await onProgress("Starting execution...");
+      } else if (event.type === "progress") {
+        const d = event.data as Record<string, unknown>;
+        const taskTitle = String(d.taskTitle ?? d.title ?? "");
+        const agent = String(d.agent ?? "");
+        const status = String(d.status ?? "running");
+        goalTitle = String(d.goalTitle ?? goalTitle);
+        totalCount = Number(d.totalTasks ?? totalCount);
+        completedCount = Number(d.completedTasks ?? completedCount);
+
+        const icon = STATUS_ICON[status] ?? "\u26aa";
+        taskStatuses.push({ title: taskTitle, agent, status, icon });
+
+        const lines = taskStatuses
+          .map((t) => `${t.icon} ${t.title} (${t.agent})`)
+          .join("\n");
+        await onProgress(`**Executing:** ${goalTitle}\n${completedCount}/${totalCount} tasks\n\n${lines}`);
+      } else if (event.type === "completed") {
+        const d = event.data as Record<string, unknown>;
+        return {
+          type: "execute",
+          data: {
+            goalTitle: String(d.goalTitle ?? goalTitle),
+            status: String(d.status ?? "completed"),
+            completedTasks: Number(d.completedTasks ?? completedCount),
+            totalTasks: Number(d.totalTasks ?? totalCount),
+            tasks: taskStatuses,
+          },
+        };
+      } else if (event.type === "error") {
+        return { type: "error", message: `Execution failed: ${String(event.data.error ?? "unknown")}` };
+      }
+    }
+
+    return {
+      type: "execute",
+      data: {
+        goalTitle,
+        status: "completed",
+        completedTasks: completedCount,
+        totalTasks: totalCount,
+        tasks: taskStatuses,
+      },
+    };
+  } catch {
+    return { type: "error", message: `Failed to execute goal: ${goalId}` };
+  }
+}
+
 export async function handleApprove(
   client: ApiClient,
   ctx: CommandContext,

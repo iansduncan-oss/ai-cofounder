@@ -1,30 +1,23 @@
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useRunAgent } from "@/api/mutations";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useStreamChat } from "@/hooks/use-stream-chat";
+import { useDashboardUser, useConversationMessages } from "@/api/queries";
+import { StreamingMessage } from "@/components/chat/streaming-message";
+import { PlanCard } from "@/components/chat/plan-card";
+import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
+import type { PlanInfo, ToolCallInfo } from "@/hooks/use-stream-chat";
 import {
   Send,
   Loader2,
   Bot,
   User,
   ChevronDown,
-  ChevronRight,
-  Target,
+  X,
 } from "lucide-react";
-
-interface PlanInfo {
-  goalId: string;
-  goalTitle: string;
-  tasks: Array<{
-    id: string;
-    title: string;
-    assignedAgent: string;
-    orderIndex: number;
-  }>;
-}
 
 interface Message {
   role: "user" | "assistant";
@@ -32,75 +25,12 @@ interface Message {
   model?: string;
   provider?: string;
   plan?: PlanInfo;
+  isStreaming?: boolean;
+  toolCalls?: ToolCallInfo[];
+  thinkingPhase?: string;
 }
 
 const CONVERSATION_STORAGE_KEY = "ai-cofounder-conversation-id";
-
-function PlanCard({ plan }: { plan: PlanInfo }) {
-  const [expanded, setExpanded] = useState(true);
-
-  return (
-    <div className="mt-2 rounded-md border bg-background/50 p-3">
-      <button
-        className="flex w-full items-center gap-2 text-left text-xs font-medium"
-        onClick={() => setExpanded(!expanded)}
-        aria-label={expanded ? "Collapse plan" : "Expand plan"}
-      >
-        {expanded ? (
-          <ChevronDown className="h-3 w-3" />
-        ) : (
-          <ChevronRight className="h-3 w-3" />
-        )}
-        <Target className="h-3 w-3 text-primary" />
-        <span>{plan.goalTitle}</span>
-      </button>
-      {expanded && (
-        <div className="mt-2 space-y-1 pl-5">
-          {plan.tasks
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map((task, i) => (
-              <div
-                key={task.id}
-                className="flex items-center gap-2 text-xs text-muted-foreground"
-              >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium">
-                  {i + 1}
-                </span>
-                <span>{task.title}</span>
-                <span className="ml-auto text-[10px] opacity-60">
-                  {task.assignedAgent}
-                </span>
-              </div>
-            ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function TypingIndicator() {
-  return (
-    <div className="flex gap-3">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
-        <Bot className="h-4 w-4 text-primary-foreground" />
-      </div>
-      <div className="flex items-center gap-1 rounded-lg bg-muted px-4 py-2">
-        <span
-          className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce-dot"
-          style={{ animationDelay: "0s" }}
-        />
-        <span
-          className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce-dot"
-          style={{ animationDelay: "0.16s" }}
-        />
-        <span
-          className="h-2 w-2 rounded-full bg-muted-foreground animate-bounce-dot"
-          style={{ animationDelay: "0.32s" }}
-        />
-      </div>
-    </div>
-  );
-}
 
 export function ChatPage() {
   usePageTitle("Chat");
@@ -112,7 +42,30 @@ export function ChatPage() {
   const [showScrollButton, setShowScrollButton] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const runAgent = useRunAgent();
+
+  const { data: dashboardUser } = useDashboardUser();
+  const stream = useStreamChat();
+
+  // Load conversation history from backend
+  const { data: historyData } = useConversationMessages(conversationId);
+
+  // Populate messages from history on mount / conversation switch
+  const historyLoaded = useRef<string | null>(null);
+  useEffect(() => {
+    if (!historyData?.data || !conversationId) return;
+    if (historyLoaded.current === conversationId) return;
+    historyLoaded.current = conversationId;
+
+    const loaded: Message[] = historyData.data
+      .slice()
+      .reverse()
+      .map((m) => ({
+        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.content,
+      }));
+
+    setMessages(loaded);
+  }, [historyData, conversationId]);
 
   // Persist conversationId
   useEffect(() => {
@@ -128,9 +81,47 @@ export function ChatPage() {
     if (!showScrollButton) {
       scrollRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [messages, showScrollButton]);
+  }, [messages, stream.accumulatedText, stream.toolCalls, showScrollButton]);
 
-  // Track scroll position for scroll-to-bottom button
+  // Track streaming completion — finalize message
+  const prevStreaming = useRef(false);
+  useEffect(() => {
+    if (prevStreaming.current && !stream.isStreaming && !stream.error) {
+      if (stream.accumulatedText || stream.toolCalls.length > 0) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: stream.accumulatedText,
+            model: stream.model,
+            provider: stream.provider,
+            plan: stream.plan,
+            toolCalls: stream.toolCalls.length > 0 ? stream.toolCalls : undefined,
+          },
+        ]);
+        if (stream.conversationId) {
+          setConversationId(stream.conversationId);
+        }
+        stream.reset();
+      }
+    }
+    prevStreaming.current = stream.isStreaming;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.isStreaming]);
+
+  // Handle stream error — show as message
+  useEffect(() => {
+    if (stream.error && stream.error !== "Cancelled") {
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: `Error: ${stream.error}` },
+      ]);
+      stream.reset();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.error]);
+
+  // Track scroll position
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -145,39 +136,12 @@ export function ChatPage() {
 
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed || runAgent.isPending) return;
+    if (!trimmed || stream.isStreaming) return;
 
-    const userMsg: Message = { role: "user", content: trimmed };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setInput("");
 
-    runAgent.mutate(
-      { message: trimmed, conversationId, userId: "dashboard-user" },
-      {
-        onSuccess: (result) => {
-          setConversationId(result.conversationId);
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: result.response,
-              model: result.model,
-              provider: result.provider,
-              plan: result.plan,
-            },
-          ]);
-        },
-        onError: (err) => {
-          setMessages((prev) => [
-            ...prev,
-            {
-              role: "assistant",
-              content: `Error: ${err.message}`,
-            },
-          ]);
-        },
-      },
-    );
+    stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -187,127 +151,194 @@ export function ChatPage() {
     }
   };
 
+  // Cmd+N for new chat, Escape to cancel
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
+      if (e.key === "Escape" && stream.isStreaming) {
+        stream.cancel();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream.isStreaming]);
+
+  const handleNewChat = () => {
+    setConversationId(undefined);
+    setMessages([]);
+    historyLoaded.current = null;
+    stream.reset();
+  };
+
+  const handleSelectConversation = (id: string) => {
+    if (id === conversationId) return;
+    historyLoaded.current = null;
+    setConversationId(id);
+    setMessages([]);
+    stream.reset();
+  };
+
+  // Memoize the rendering of static messages
+  const renderedMessages = useMemo(
+    () =>
+      messages.map((msg, i) => (
+        <div
+          key={i}
+          className={`flex gap-3 animate-slide-up ${
+            msg.role === "user" ? "justify-end" : ""
+          }`}
+        >
+          {msg.role === "assistant" && (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
+              <Bot className="h-4 w-4 text-primary-foreground" />
+            </div>
+          )}
+          <div
+            className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
+              msg.role === "user"
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted"
+            }`}
+          >
+            {msg.role === "assistant" ? (
+              <div className="prose prose-sm prose-invert max-w-none">
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="whitespace-pre-wrap">{msg.content}</p>
+            )}
+            {msg.plan && <PlanCard plan={msg.plan} />}
+            {msg.model && (
+              <p className="mt-1 text-xs opacity-60">
+                {msg.model}
+                {msg.provider && ` via ${msg.provider}`}
+              </p>
+            )}
+          </div>
+          {msg.role === "user" && (
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
+              <User className="h-4 w-4" />
+            </div>
+          )}
+        </div>
+      )),
+    [messages],
+  );
+
   return (
-    <div className="flex h-[calc(100vh-3rem)] flex-col">
-      <PageHeader
-        title="Chat"
-        description={
-          conversationId
-            ? `Conversation: ${conversationId.slice(0, 8)}...`
-            : "Start a conversation with the orchestrator"
-        }
-        actions={
-          conversationId ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setConversationId(undefined);
-                setMessages([]);
-              }}
-            >
-              New Chat
-            </Button>
-          ) : undefined
-        }
+    <div className="flex h-[calc(100vh-3rem)]">
+      <ConversationSidebar
+        userId={dashboardUser?.id}
+        activeConversationId={conversationId}
+        onSelect={handleSelectConversation}
+        onNewChat={handleNewChat}
       />
 
-      <div
-        ref={containerRef}
-        className="relative flex-1 overflow-y-auto rounded-lg border bg-card"
-        onScroll={handleScroll}
-      >
-        {messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="text-center">
-              <Bot className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Send a message to start chatting with the AI Cofounder
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 p-4">
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex gap-3 animate-slide-up ${
-                  msg.role === "user" ? "justify-end" : ""
-                }`}
-              >
-                {msg.role === "assistant" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
-                    <Bot className="h-4 w-4 text-primary-foreground" />
-                  </div>
-                )}
-                <div
-                  className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted"
-                  }`}
+      <div className="flex flex-1 flex-col">
+        <PageHeader
+          title="Chat"
+          description={
+            conversationId
+              ? `Conversation: ${conversationId.slice(0, 8)}...`
+              : "Start a conversation with the orchestrator"
+          }
+          actions={
+            <div className="flex gap-2">
+              {stream.isStreaming && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={stream.cancel}
                 >
-                  {msg.role === "assistant" ? (
-                    <div className="prose prose-sm prose-invert max-w-none">
-                      <ReactMarkdown>{msg.content}</ReactMarkdown>
-                    </div>
-                  ) : (
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
-                  )}
-                  {msg.plan && <PlanCard plan={msg.plan} />}
-                  {msg.model && (
-                    <p className="mt-1 text-xs opacity-60">
-                      {msg.model}
-                      {msg.provider && ` via ${msg.provider}`}
-                    </p>
-                  )}
-                </div>
-                {msg.role === "user" && (
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
-                    <User className="h-4 w-4" />
-                  </div>
-                )}
-              </div>
-            ))}
-            {runAgent.isPending && <TypingIndicator />}
-            <div ref={scrollRef} />
-          </div>
-        )}
-
-        {showScrollButton && (
-          <button
-            onClick={scrollToBottom}
-            className="sticky bottom-3 left-1/2 -translate-x-1/2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-md transition-colors hover:bg-accent"
-            aria-label="Scroll to bottom"
-          >
-            <ChevronDown className="inline h-3 w-3 mr-1" />
-            New messages
-          </button>
-        )}
-      </div>
-
-      <div className="mt-3 flex gap-2">
-        <Textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
-          rows={2}
-          className="resize-none"
-          disabled={runAgent.isPending}
+                  <X className="mr-1 h-3 w-3" />
+                  Cancel
+                </Button>
+              )}
+              {conversationId && (
+                <Button variant="outline" size="sm" onClick={handleNewChat}>
+                  New Chat
+                </Button>
+              )}
+            </div>
+          }
         />
-        <Button
-          onClick={handleSend}
-          disabled={!input.trim() || runAgent.isPending}
-          className="self-end"
-          aria-label="Send message"
+
+        <div
+          ref={containerRef}
+          className="relative flex-1 overflow-y-auto rounded-lg border bg-card"
+          onScroll={handleScroll}
         >
-          {runAgent.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {messages.length === 0 && !stream.isStreaming ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-center">
+                <Bot className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Send a message to start chatting with the AI Cofounder
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Cmd+N new chat · Escape cancel · Enter send
+                </p>
+              </div>
+            </div>
           ) : (
-            <Send className="h-4 w-4" />
+            <div className="space-y-4 p-4">
+              {renderedMessages}
+
+              {stream.isStreaming && (
+                <StreamingMessage
+                  text={stream.accumulatedText}
+                  toolCalls={stream.toolCalls}
+                  thinkingMessage={stream.thinkingMessage}
+                  isStreaming={stream.isStreaming}
+                  model={stream.model}
+                  provider={stream.provider}
+                  plan={stream.plan}
+                />
+              )}
+
+              <div ref={scrollRef} />
+            </div>
           )}
-        </Button>
+
+          {showScrollButton && (
+            <button
+              onClick={scrollToBottom}
+              className="sticky bottom-3 left-1/2 -translate-x-1/2 rounded-full border bg-card px-3 py-1.5 text-xs shadow-md transition-colors hover:bg-accent"
+              aria-label="Scroll to bottom"
+            >
+              <ChevronDown className="inline h-3 w-3 mr-1" />
+              New messages
+            </button>
+          )}
+        </div>
+
+        <div className="mt-3 flex gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
+            rows={2}
+            className="resize-none"
+            disabled={stream.isStreaming}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || stream.isStreaming}
+            className="self-end"
+            aria-label="Send message"
+          >
+            {stream.isStreaming ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );

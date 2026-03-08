@@ -8,6 +8,10 @@ import {
   createConversation,
   findOrCreateUser,
   decayAllMemoryImportance,
+  getTodayTokenTotal,
+  listPendingApprovals,
+  listActiveGoals,
+  getLatestUserMessageTime,
 } from "@ai-cofounder/db";
 import type { Db } from "@ai-cofounder/db";
 import { Orchestrator } from "../agents/orchestrator.js";
@@ -50,6 +54,8 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
   let running = false;
   let lastBriefingDate = ""; // "YYYY-MM-DD" to send once per day
   let lastDecayDate = ""; // "YYYY-MM-DD" to decay once per day
+  let lastCheckInHour = -1; // track last hour we ran proactive check-in
+  let lastQuietCheckDate = ""; // "YYYY-MM-DD" to send quiet check-in at most once per day
 
   /** Run built-in daily system tasks (briefing + memory decay) */
   async function runSystemTasks() {
@@ -74,7 +80,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     if (hour >= briefingHour && lastBriefingDate !== dateStr && notificationService) {
       lastBriefingDate = dateStr;
       try {
-        await sendDailyBriefing(db, notificationService);
+        await sendDailyBriefing(db, notificationService, llmRegistry);
         logger.info({ dateStr }, "daily briefing sent by scheduler");
       } catch (err) {
         logger.error({ err }, "failed to send daily briefing");
@@ -91,6 +97,78 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
         logger.error({ err }, "failed to decay memory importance");
       }
     }
+
+    // Proactive check-in: run at most once per hour
+    if (hour !== lastCheckInHour && notificationService) {
+      lastCheckInHour = hour;
+      try {
+        await runProactiveCheckIn();
+      } catch (err) {
+        logger.error({ err }, "proactive check-in failed");
+      }
+    }
+  }
+
+  /** Check for stale goals and pending approvals, send reminders */
+  async function runProactiveCheckIn() {
+    if (!notificationService) return;
+
+    // Pending approval reminders
+    const pendingApprovals = await listPendingApprovals(db);
+    if (pendingApprovals.length > 0) {
+      await notificationService.notifyApprovalReminder(pendingApprovals.length);
+      logger.info({ count: pendingApprovals.length }, "approval reminder sent");
+    }
+
+    // Stale goal nudges (48h+ no updates)
+    const activeGoals = await listActiveGoals(db);
+    const now = Date.now();
+    const staleGoals = activeGoals
+      .filter((g) => now - g.updatedAt.getTime() > 48 * 60 * 60 * 1000)
+      .map((g) => ({
+        title: g.title,
+        hoursStale: Math.round((now - g.updatedAt.getTime()) / (60 * 60 * 1000)),
+      }));
+
+    if (staleGoals.length > 0) {
+      await notificationService.notifyStaleGoals(staleGoals);
+      logger.info({ count: staleGoals.length }, "stale goal nudge sent");
+    }
+
+    // "Been quiet" check-in: once per day, during working hours, after 6h silence
+    const localParts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: briefingTimezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "numeric",
+      hour12: false,
+    }).formatToParts(new Date());
+
+    const localDateStr = localParts
+      .filter((p) => ["year", "month", "day"].includes(p.type))
+      .map((p) => p.value)
+      .join("");
+    const localHour = Number(localParts.find((p) => p.type === "hour")?.value ?? 0);
+
+    if (lastQuietCheckDate !== localDateStr && localHour >= 9 && localHour <= 18) {
+      const latestUserMessage = await getLatestUserMessageTime(db);
+      if (latestUserMessage) {
+        const silenceHours = (now - latestUserMessage.getTime()) / (60 * 60 * 1000);
+        if (silenceHours >= 6) {
+          lastQuietCheckDate = localDateStr;
+          // Build suggestion from top stale goal or pending task
+          let suggestion = "No specific suggestions — everything looks on track.";
+          if (staleGoals.length > 0) {
+            suggestion = `**${staleGoals[0].title}** has been idle for ${staleGoals[0].hoursStale}h. Consider running \`/execute\` or updating its status.`;
+          } else if (activeGoals.length > 0) {
+            suggestion = `Your top active goal is **${activeGoals[0].title}** (${activeGoals[0].taskCount > 0 ? `${activeGoals[0].completedTaskCount}/${activeGoals[0].taskCount} tasks` : "no tasks yet"}).`;
+          }
+          await notificationService.notifyQuietCheckIn(suggestion);
+          logger.info({ silenceHours: Math.round(silenceHours) }, "quiet check-in sent");
+        }
+      }
+    }
   }
 
   async function tick() {
@@ -100,6 +178,17 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     try {
       // Run built-in daily tasks (briefing, memory decay)
       await runSystemTasks();
+
+      // Check daily token limit before executing schedules
+      const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
+      if (dailyTokenLimit > 0) {
+        const todayTotal = await getTodayTokenTotal(db);
+        if (todayTotal >= dailyTokenLimit) {
+          logger.warn({ todayTotal, dailyTokenLimit }, "daily token limit reached, skipping schedule execution");
+          running = false;
+          return;
+        }
+      }
 
       const dueSchedules = await listDueSchedules(db);
       if (dueSchedules.length === 0) {

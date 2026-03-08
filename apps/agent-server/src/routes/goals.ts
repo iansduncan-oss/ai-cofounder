@@ -52,4 +52,20 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       return goal;
     },
   );
+
+  /* GET /:id/verification — get verification results */
+  app.get<{ Params: typeof IdParams.static }>(
+    "/:id/verification",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const goal = await getGoal(app.db, request.params.id);
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+
+      const metadata = goal.metadata as Record<string, unknown> | null;
+      const verification = metadata?.verification;
+      if (!verification) return reply.status(404).send({ error: "No verification results found" });
+
+      return verification;
+    },
+  );
 };

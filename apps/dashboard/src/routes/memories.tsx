@@ -33,7 +33,8 @@ export function MemoriesPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const { data: memories, isLoading, error } = useMemories(userId);
+  const { data: memoriesData, isLoading, error } = useMemories(userId);
+  const memories = memoriesData?.data;
   const deleteMemory = useDeleteMemory();
 
   const categories = memories

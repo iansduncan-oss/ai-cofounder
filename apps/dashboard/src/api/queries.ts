@@ -54,6 +54,7 @@ export function usePendingTasks() {
   return useQuery({
     queryKey: queryKeys.tasks.pending,
     queryFn: () => apiClient.listPendingTasks(),
+    refetchInterval: 30_000,
   });
 }
 
@@ -108,5 +109,29 @@ export function useFileContent(path: string | null) {
     queryKey: queryKeys.workspace.file(path ?? ""),
     queryFn: () => apiClient.readFile(path!),
     enabled: !!path,
+  });
+}
+
+export function useDashboardUser() {
+  return useQuery({
+    queryKey: ["dashboard-user"],
+    queryFn: () => apiClient.getUserByPlatform("dashboard", "dashboard-user"),
+    staleTime: Infinity,
+  });
+}
+
+export function useConversations(userId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.conversations.list(userId ?? ""),
+    queryFn: () => apiClient.listConversations(userId!),
+    enabled: !!userId,
+  });
+}
+
+export function useConversationMessages(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.conversations.messages(id ?? ""),
+    queryFn: () => apiClient.getConversationMessages(id!, { limit: 200 }),
+    enabled: !!id,
   });
 }

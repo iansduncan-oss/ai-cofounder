@@ -24,6 +24,7 @@ import { DebuggerAgent } from "./specialists/debugger.js";
 import { DocWriterAgent } from "./specialists/doc-writer.js";
 import type { NotificationService } from "../services/notifications.js";
 import type { WorkspaceService } from "../services/workspace.js";
+import type { VerificationService } from "../services/verification.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -67,6 +68,7 @@ export class TaskDispatcher {
     sandboxService?: SandboxService,
     private notificationService?: NotificationService,
     workspaceService?: WorkspaceService,
+    private verificationService?: VerificationService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -551,57 +553,13 @@ export class TaskDispatcher {
     taskResults: DispatcherProgress["tasks"],
     userId?: string,
   ): Promise<void> {
-    const codeAgents = new Set(["coder", "debugger", "doc_writer"]);
-    const hadCodeTasks = taskResults.some((t) => codeAgents.has(t.agent) && t.status === "completed");
-
-    if (!hadCodeTasks) return; // nothing code-related to verify
-
-    const checks: string[] = [];
-    const outputs = taskResults
-      .filter((t) => t.status === "completed" && t.output)
-      .map((t) => `[${t.agent}] ${t.title}: ${(t.output ?? "").slice(0, 200)}`);
-
-    // Summarize what was produced
-    checks.push(`Goal "${goalTitle}" completed with ${taskResults.length} tasks.`);
-    checks.push(`Code-related tasks detected — verification triggered.`);
-
-    if (outputs.length > 0) {
-      checks.push(`Task outputs:\n${outputs.join("\n")}`);
+    if (this.verificationService) {
+      await this.verificationService.verify({ goalId, goalTitle, taskResults, userId });
+      return;
     }
 
-    // Store verification record as memory
-    if (userId) {
-      await saveMemory(this.db, {
-        userId,
-        category: "decisions",
-        key: `verification-${goalId.slice(0, 8)}-${Date.now()}`,
-        content: checks.join("\n"),
-        source: `goal-verification:${goalId}`,
-        metadata: {
-          goalId,
-          goalTitle,
-          taskCount: taskResults.length,
-          codeTaskCount: taskResults.filter((t) => codeAgents.has(t.agent)).length,
-          verifiedAt: new Date().toISOString(),
-        },
-      });
-    }
-
-    // Notify about verification
-    if (this.notificationService) {
-      this.notificationService
-        .notifyGoalCompleted({
-          goalId,
-          goalTitle,
-          status: "verified",
-          completedTasks: taskResults.filter((t) => t.status === "completed").length,
-          totalTasks: taskResults.length,
-          tasks: taskResults.map((t) => ({ title: t.title, agent: t.agent, status: t.status })),
-        })
-        .catch(() => { /* non-fatal */ });
-    }
-
-    this.logger.info({ goalId, codeTaskCount: taskResults.filter((t) => codeAgents.has(t.agent)).length }, "goal verification complete");
+    // Fallback: no verification service configured, just log
+    this.logger.info({ goalId }, "no verification service configured, skipping verification");
   }
 
   /** Get current progress for a goal */

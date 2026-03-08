@@ -6,6 +6,7 @@ import {
   countTasksByStatus,
   createWorkSession,
   completeWorkSession,
+  getTodayTokenTotal,
 } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
@@ -127,6 +128,22 @@ export async function runAutonomousSession(
   const webhookUrl = options?.webhookUrl ?? optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
 
   const startTime = Date.now();
+
+  // Check daily token limit before starting
+  const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
+  if (dailyTokenLimit > 0) {
+    const todayTotal = await getTodayTokenTotal(db);
+    if (todayTotal >= dailyTokenLimit) {
+      logger.warn({ todayTotal, dailyTokenLimit, trigger }, "daily token limit reached, skipping autonomous session");
+      return {
+        sessionId: "",
+        status: "failed",
+        summary: "Daily token limit reached",
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+      };
+    }
+  }
 
   // Create work session record
   const session = await createWorkSession(db, {

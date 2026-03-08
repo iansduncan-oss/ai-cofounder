@@ -355,7 +355,7 @@ export class Orchestrator {
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
 
-      const MAX_TOOL_ROUNDS = 5;
+      const MAX_TOOL_ROUNDS = 10;
       let round = 0;
 
       while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
@@ -509,7 +509,7 @@ export class Orchestrator {
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
 
-      const MAX_TOOL_ROUNDS = 5;
+      const MAX_TOOL_ROUNDS = 10;
       let round = 0;
 
       while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
@@ -544,7 +544,11 @@ export class Orchestrator {
       let responseText = textBlocks.join("\n");
       if (!responseText && plan) responseText = this.buildPlanSummary(plan);
 
-      await onEvent({ type: "text_delta", data: { text: responseText } });
+      // Emit text in chunks for progressive rendering
+      const CHUNK_SIZE = 100;
+      for (let i = 0; i < responseText.length; i += CHUNK_SIZE) {
+        await onEvent({ type: "text_delta", data: { text: responseText.slice(i, i + CHUNK_SIZE) } });
+      }
       await onEvent({ type: "done", data: { response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens } } });
 
       return { conversationId: id, agentRole: "orchestrator", response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }, plan };

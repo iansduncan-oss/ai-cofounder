@@ -1,10 +1,19 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
 import { TaskDispatcher, type TaskProgressCallback } from "../agents/dispatcher.js";
+import { VerificationService } from "../services/verification.js";
 
 const logger = createLogger("execution-routes");
 
 export const executionRoutes: FastifyPluginAsync = async (app) => {
+  const verificationService = new VerificationService(
+    app.llmRegistry,
+    app.db,
+    app.notificationService,
+    app.workspaceService,
+    app.sandboxService,
+  );
+
   const dispatcher = new TaskDispatcher(
     app.llmRegistry,
     app.db,
@@ -12,6 +21,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
     app.sandboxService,
     app.notificationService,
     app.workspaceService,
+    verificationService,
   );
 
   // Execute all tasks for a goal

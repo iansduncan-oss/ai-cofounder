@@ -24,19 +24,27 @@ jobs:
 
       - name: Deploy via SSH
         id: deploy
+        env:
+          GITHUB_SHA: ${{ github.sha }}
         run: |
           ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ian@avion-stack-01 << 'DEPLOY'
           set -e
           cd /opt/ai-cofounder
 
+          SHA="$GITHUB_SHA"
+          SHORT_SHA="${SHA:0:7}"
+
+          echo "==> Saving previous image SHA for rollback..."
+          PREVIOUS_SHA=$(sudo docker inspect --format='{{index .Config.Labels "git.sha"}}' ai-cofounder-agent-server:latest 2>/dev/null || echo "")
+
           echo "==> Pulling latest code..."
           git fetch origin main
           git reset --hard origin/main
 
-          echo "==> Building Docker images..."
-          sudo docker build -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
-          sudo docker build -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
-          sudo docker build -t ai-cofounder-slack-bot:latest -f apps/slack-bot/Dockerfile .
+          echo "==> Building Docker images (tagged: ${SHORT_SHA})..."
+          sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-agent-server:${SHA} -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
+          sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-discord-bot:${SHA} -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
+          sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-slack-bot:${SHA} -t ai-cofounder-slack-bot:latest -f apps/slack-bot/Dockerfile .
 
           echo "==> Restarting services..."
           sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
@@ -52,12 +60,24 @@ jobs:
 
           echo "==> Waiting for health check..."
           sleep 10
-          curl -sf http://localhost:3100/health || { echo "Health check failed!"; exit 1; }
+          if ! curl -sf http://localhost:3100/health; then
+            echo "Health check failed! Attempting rollback..."
+            if [ -n "$PREVIOUS_SHA" ] && sudo docker image inspect ai-cofounder-agent-server:${PREVIOUS_SHA} >/dev/null 2>&1; then
+              echo "==> Rolling back to ${PREVIOUS_SHA:0:7}..."
+              sudo docker tag ai-cofounder-agent-server:${PREVIOUS_SHA} ai-cofounder-agent-server:latest
+              sudo docker tag ai-cofounder-discord-bot:${PREVIOUS_SHA} ai-cofounder-discord-bot:latest
+              sudo docker tag ai-cofounder-slack-bot:${PREVIOUS_SHA} ai-cofounder-slack-bot:latest
+              sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
+              sleep 10
+              curl -sf http://localhost:3100/health && echo "Rollback successful!" || echo "Rollback also failed!"
+            fi
+            exit 1
+          fi
 
-          echo "==> Cleaning up old images..."
-          sudo docker image prune -f
+          echo "==> Pruning images older than 72h..."
+          sudo docker image prune -a --filter "until=72h" -f
 
-          echo "==> Deploy complete!"
+          echo "==> Deploy complete (${SHORT_SHA})!"
           DEPLOY
 
       - name: Notify Discord — Success

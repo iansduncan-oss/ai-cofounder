@@ -7,6 +7,7 @@ export {
   handleMemory,
   handleClear,
   handleExecute,
+  handleExecuteStreaming,
   handleApprove,
   handleReject,
   handleListApprovals,

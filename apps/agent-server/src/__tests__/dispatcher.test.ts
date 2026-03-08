@@ -485,4 +485,60 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       });
     });
   });
+
+  describe("verification", () => {
+    function createDispatcherWithVerification(mockVerify: ReturnType<typeof vi.fn>) {
+      const registry = new LlmRegistry();
+      const db = {} as any;
+      const verificationService = { verify: mockVerify } as any;
+      return new TaskDispatcher(
+        registry,
+        db,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        verificationService,
+      );
+    }
+
+    it("calls verificationService.verify after successful goal execution", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Build it" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Code", assignedAgent: "coder", orderIndex: 0 },
+      ]);
+
+      const mockVerify = vi.fn().mockResolvedValue(null);
+      const dispatcher = createDispatcherWithVerification(mockVerify);
+      await dispatcher.runGoal("g-1", "user-1");
+
+      // Wait for fire-and-forget
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockVerify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          goalId: "g-1",
+          goalTitle: "Build it",
+          userId: "user-1",
+        }),
+      );
+    });
+
+    it("does NOT call verificationService.verify when tasks failed", async () => {
+      mockGetGoal.mockResolvedValueOnce({ id: "g-1", title: "Fail" });
+      mockListTasksByGoal.mockResolvedValueOnce([
+        { id: "t-1", title: "Fail task", assignedAgent: "researcher", orderIndex: 0 },
+      ]);
+
+      mockComplete.mockRejectedValueOnce(new Error("LLM error"));
+
+      const mockVerify = vi.fn().mockResolvedValue(null);
+      const dispatcher = createDispatcherWithVerification(mockVerify);
+      await dispatcher.runGoal("g-1", "user-1");
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      expect(mockVerify).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -25,6 +25,7 @@ export const UpdateGoalStatusBody = Type.Object({
     Type.Literal("active"),
     Type.Literal("completed"),
     Type.Literal("cancelled"),
+    Type.Literal("needs_review"),
   ]),
 });
 export type UpdateGoalStatusBody = Static<typeof UpdateGoalStatusBody>;

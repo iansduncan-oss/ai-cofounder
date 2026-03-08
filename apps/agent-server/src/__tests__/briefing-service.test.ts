@@ -11,6 +11,7 @@ const mockCountTasksByStatus = vi.fn();
 const mockGetUsageSummary = vi.fn();
 const mockListEnabledSchedules = vi.fn();
 const mockListRecentWorkSessions = vi.fn();
+const mockListPendingApprovals = vi.fn();
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -24,19 +25,20 @@ vi.mock("@ai-cofounder/db", () => ({
   getUsageSummary: (...args: unknown[]) => mockGetUsageSummary(...args),
   listEnabledSchedules: (...args: unknown[]) => mockListEnabledSchedules(...args),
   listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),
+  listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
 }));
 
-const { generateBriefing, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
+const { gatherBriefingData, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe("Briefing service", () => {
-  describe("generateBriefing", () => {
+  describe("gatherBriefingData", () => {
     it("aggregates data from all queries", async () => {
       mockListActiveGoals.mockResolvedValueOnce([
-        { title: "Build MVP", priority: "high", taskCount: 5, completedTaskCount: 2 },
+        { title: "Build MVP", priority: "high", taskCount: 5, completedTaskCount: 2, updatedAt: new Date() },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValueOnce([{ title: "Setup CI" }]);
       mockCountTasksByStatus.mockResolvedValueOnce({ pending: 3, completed: 10, running: 1 });
@@ -47,9 +49,10 @@ describe("Briefing service", () => {
       mockListRecentWorkSessions.mockResolvedValueOnce([
         { trigger: "schedule", status: "completed", summary: "Ran backup" },
       ]);
+      mockListPendingApprovals.mockResolvedValueOnce([]);
 
       const db = {} as any;
-      const data = await generateBriefing(db);
+      const data = await gatherBriefingData(db);
 
       expect(data.activeGoals).toHaveLength(1);
       expect(data.activeGoals[0].title).toBe("Build MVP");
@@ -63,16 +66,17 @@ describe("Briefing service", () => {
 
     it("handles goals with no tasks", async () => {
       mockListActiveGoals.mockResolvedValueOnce([
-        { title: "New Goal", priority: "medium", taskCount: 0, completedTaskCount: 0 },
+        { title: "New Goal", priority: "medium", taskCount: 0, completedTaskCount: 0, updatedAt: new Date() },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
       mockCountTasksByStatus.mockResolvedValueOnce({});
       mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
       mockListEnabledSchedules.mockResolvedValueOnce([]);
       mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListPendingApprovals.mockResolvedValueOnce([]);
 
       const db = {} as any;
-      const data = await generateBriefing(db);
+      const data = await gatherBriefingData(db);
 
       expect(data.activeGoals[0].progress).toBe("no tasks yet");
     });
@@ -147,6 +151,7 @@ describe("Briefing service", () => {
       mockGetUsageSummary.mockResolvedValueOnce({ totalCostUsd: 0, requestCount: 0 });
       mockListEnabledSchedules.mockResolvedValueOnce([]);
       mockListRecentWorkSessions.mockResolvedValueOnce([]);
+      mockListPendingApprovals.mockResolvedValueOnce([]);
 
       const mockSendBriefing = vi.fn().mockResolvedValue(undefined);
       const notificationService = { sendBriefing: mockSendBriefing } as any;

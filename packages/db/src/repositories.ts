@@ -173,11 +173,28 @@ export async function countGoalsByConversation(db: Db, conversationId: string): 
 export async function updateGoalStatus(
   db: Db,
   id: string,
-  status: "draft" | "active" | "completed" | "cancelled",
+  status: "draft" | "active" | "completed" | "cancelled" | "needs_review",
 ) {
   const [updated] = await db
     .update(goals)
     .set({ status, updatedAt: new Date() })
+    .where(eq(goals.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateGoalMetadata(
+  db: Db,
+  id: string,
+  metadata: Record<string, unknown>,
+) {
+  const goal = await getGoal(db, id);
+  if (!goal) return null;
+
+  const merged = { ...(goal.metadata as Record<string, unknown> ?? {}), ...metadata };
+  const [updated] = await db
+    .update(goals)
+    .set({ metadata: merged, updatedAt: new Date() })
     .where(eq(goals.id, id))
     .returning();
   return updated ?? null;
@@ -1400,6 +1417,16 @@ export async function listConversationsByUser(
   ]);
 
   return { data, total: countRows[0]?.count ?? 0 };
+}
+
+/* ────────────────── User Activity ──────────────── */
+
+export async function getLatestUserMessageTime(db: Db): Promise<Date | null> {
+  const rows = await db
+    .select({ latest: sql<Date>`max(${messages.createdAt})` })
+    .from(messages)
+    .where(eq(messages.role, "user"));
+  return rows[0]?.latest ?? null;
 }
 
 /* ────────────────── Due Schedules ──────────────── */

@@ -191,18 +191,27 @@ export abstract class SpecialistAgent {
   private async _completeWithRetryInner(
     ...args: Parameters<LlmRegistry["complete"]>
   ): ReturnType<LlmRegistry["complete"]> {
-    try {
-      return await this.registry.complete(...args);
-    } catch (err) {
-      const isTransient =
-        err instanceof Error &&
-        (/rate.?limit|429|timeout|econnreset|socket hang up|503|overloaded/i.test(err.message));
-      if (!isTransient) throw err;
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 1000;
 
-      this.logger.warn({ err }, "transient LLM failure, retrying in 2s");
-      await new Promise((r) => setTimeout(r, 2000));
-      return this.registry.complete(...args);
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.registry.complete(...args);
+      } catch (err) {
+        const isTransient =
+          err instanceof Error &&
+          (/rate.?limit|429|timeout|econnreset|socket hang up|503|overloaded/i.test(err.message));
+
+        if (!isTransient || attempt === MAX_RETRIES) throw err;
+
+        const delayMs = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+        this.logger.warn({ err, attempt: attempt + 1, delayMs: Math.round(delayMs) }, "transient LLM failure, retrying");
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
     }
+
+    // Unreachable, but satisfies TypeScript
+    throw new Error("retry loop exited unexpectedly");
   }
 
   protected async executeTool(

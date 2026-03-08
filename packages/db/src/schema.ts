@@ -30,6 +30,7 @@ export const agentRoleEnum = pgEnum("agent_role", [
   "planner",
   "debugger",
   "doc_writer",
+  "verifier",
 ]);
 
 export const users = pgTable("users", {
@@ -76,7 +77,7 @@ export const channelConversations = pgTable("channel_conversations", {
 
 /* ── Goal / Task / Approval enums ── */
 
-export const goalStatusEnum = pgEnum("goal_status", ["draft", "active", "completed", "cancelled"]);
+export const goalStatusEnum = pgEnum("goal_status", ["draft", "active", "completed", "cancelled", "needs_review"]);
 
 export const goalPriorityEnum = pgEnum("goal_priority", ["low", "medium", "high", "critical"]);
 

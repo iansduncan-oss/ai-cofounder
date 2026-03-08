@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
 });
 
 // --- Mocked DB functions with controllable return values ---
@@ -83,10 +84,46 @@ vi.mock("@ai-cofounder/db", () => ({
   listN8nWorkflows: vi.fn().mockResolvedValue([]),
   deleteN8nWorkflow: vi.fn(),
   findN8nWorkflowByEvent: vi.fn(),
+  saveCodeExecution: vi.fn(),
+  createSchedule: vi.fn(),
+  listSchedules: vi.fn().mockResolvedValue([]),
+  getSchedule: vi.fn(),
+  deleteSchedule: vi.fn(),
+  toggleSchedule: vi.fn(),
+  listEnabledSchedules: vi.fn().mockResolvedValue([]),
+  listDueSchedules: vi.fn().mockResolvedValue([]),
+  updateScheduleLastRun: vi.fn(),
+  recordLlmUsage: vi.fn(),
+  countEvents: vi.fn().mockResolvedValue(0),
+  listEvents: vi.fn().mockResolvedValue([]),
+  createEvent: vi.fn(),
+  markEventProcessed: vi.fn(),
+  listUnprocessedEvents: vi.fn().mockResolvedValue([]),
+  createWorkSession: vi.fn().mockResolvedValue({ id: "ws-1" }),
+  completeWorkSession: vi.fn(),
+  listRecentWorkSessions: vi.fn().mockResolvedValue([]),
+  listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
+  decayAllMemoryImportance: vi.fn(),
+  getTodayTokenTotal: vi.fn().mockResolvedValue(0),
+  getLatestUserMessageTime: vi.fn().mockResolvedValue(null),
+  getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+  upsertProviderHealth: vi.fn(),
+  getProviderHealthHistory: vi.fn().mockResolvedValue([]),
+  getToolStats: vi.fn().mockResolvedValue([]),
+  recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
+  searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0 }),
+  countTasksByStatus: vi.fn().mockResolvedValue({}),
+  listActiveGoals: vi.fn().mockResolvedValue([]),
   goals: {},
   channelConversations: {},
   prompts: {},
   n8nWorkflows: {},
+  schedules: {},
+  events: {},
+  workSessions: {},
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -105,6 +142,7 @@ vi.mock("@ai-cofounder/llm", () => {
     getProvider = vi.fn();
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
+    getProviderHealth = vi.fn().mockReturnValue([]);
   }
 
   return {
@@ -391,8 +429,8 @@ describe("Approval routes", () => {
   });
 
   it("GET /api/approvals/pending — lists pending", async () => {
-    mockListPendingApprovals.mockResolvedValueOnce([{ id: UUID }]);
-
+    // Use persistent mock so scheduler's async tick doesn't consume the value
+    mockListPendingApprovals.mockResolvedValue([{ id: UUID }]);
     const { app } = buildServer();
     const res = await app.inject({ method: "GET", url: "/api/approvals/pending" });
     await app.close();

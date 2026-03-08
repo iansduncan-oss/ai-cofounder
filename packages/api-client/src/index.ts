@@ -24,6 +24,8 @@ export type {
   StreamEventType,
   PaginationParams,
   PaginatedResponse,
+  Conversation,
+  ConversationMessage,
   Event,
   GoalSummary,
   DashboardSummary,

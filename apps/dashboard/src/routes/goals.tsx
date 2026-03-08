@@ -37,7 +37,8 @@ export function GoalsPage() {
     });
   };
 
-  const { data: goals, isLoading, error } = useGoals(conversationId);
+  const { data: goalsData, isLoading, error } = useGoals(conversationId);
+  const goals = goalsData?.data;
 
   const filtered = goals?.filter((g) => {
     if (statusFilter !== "all" && g.status !== statusFilter) return false;

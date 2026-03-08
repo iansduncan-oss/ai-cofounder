@@ -6,6 +6,19 @@ import { processEvent } from "../events.js";
 
 const logger = createLogger("github-webhook");
 
+/** Event types that trigger autonomous processing sessions */
+const ACTIONABLE_EVENTS = new Set([
+  "pr_opened",
+  "pr_closed",
+  "issue_opened",
+  "workflow_failure",
+]);
+
+/** Returns true if this event should trigger an autonomous session */
+function isActionableEvent(type: string): boolean {
+  return ACTIONABLE_EVENTS.has(type);
+}
+
 /** Verify GitHub webhook HMAC-SHA256 signature */
 function verifyGitHubSignature(payload: string, signature: string, secret: string): boolean {
   const expected = "sha256=" + crypto.createHmac("sha256", secret).update(payload).digest("hex");
@@ -48,8 +61,10 @@ function summarizeGitHubEvent(
       const run = payload.workflow_run as Record<string, unknown>;
       const name = run?.name ?? "unknown";
       const conclusion = run?.conclusion ?? "unknown";
+      // Map conclusions to actionable types: only "failure" triggers processing
+      const type = conclusion === "failure" ? "workflow_failure" : `workflow_${conclusion}`;
       return {
-        type: `workflow_${conclusion}`,
+        type,
         summary: `Workflow "${name}" ${conclusion} on ${repo}`,
       };
     }
@@ -105,18 +120,22 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
         },
       });
 
-      // Process asynchronously — don't block the webhook response
-      processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService, app.workspaceService).catch(
-        (err) => {
-          logger.error({ err, eventId: event.id }, "background GitHub event processing failed");
-        },
-      );
+      // Only trigger autonomous processing for actionable events
+      if (isActionableEvent(type)) {
+        processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService, app.workspaceService).catch(
+          (err) => {
+            logger.error({ err, eventId: event.id }, "background GitHub event processing failed");
+          },
+        );
+      } else {
+        logger.info({ eventId: event.id, type }, "non-actionable event logged (no session created)");
+      }
 
       return reply.status(202).send({
         eventId: event.id,
         type,
         summary,
-        status: "accepted",
+        status: isActionableEvent(type) ? "processing" : "logged",
       });
     },
   );

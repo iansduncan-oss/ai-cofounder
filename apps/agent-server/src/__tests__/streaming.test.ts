@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
+  process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
 });
 
 vi.mock("@ai-cofounder/db", () => ({
@@ -22,7 +23,80 @@ vi.mock("@ai-cofounder/db", () => ({
   recallMemories: vi.fn().mockResolvedValue([]),
   searchMemoriesByVector: vi.fn().mockResolvedValue([]),
   getActivePrompt: vi.fn(),
+  getConversation: vi.fn(),
+  getGoal: vi.fn(),
+  createGoal: vi.fn(),
+  listGoalsByConversation: vi.fn().mockResolvedValue([]),
+  countGoalsByConversation: vi.fn().mockResolvedValue(0),
+  updateGoalStatus: vi.fn(),
+  getTask: vi.fn(),
+  createTask: vi.fn(),
+  listTasksByGoal: vi.fn().mockResolvedValue([]),
+  countTasksByGoal: vi.fn().mockResolvedValue(0),
+  listPendingTasks: vi.fn().mockResolvedValue([]),
+  assignTask: vi.fn(),
+  startTask: vi.fn(),
+  completeTask: vi.fn(),
+  failTask: vi.fn(),
+  createApproval: vi.fn(),
+  getApproval: vi.fn(),
+  listPendingApprovals: vi.fn().mockResolvedValue([]),
+  listApprovalsByTask: vi.fn().mockResolvedValue([]),
+  resolveApproval: vi.fn(),
+  listMemoriesByUser: vi.fn().mockResolvedValue([]),
+  countMemoriesByUser: vi.fn().mockResolvedValue(0),
+  deleteMemory: vi.fn(),
+  getChannelConversation: vi.fn(),
+  upsertChannelConversation: vi.fn(),
+  findUserByPlatform: vi.fn(),
+  listPromptVersions: vi.fn().mockResolvedValue([]),
+  createPromptVersion: vi.fn(),
+  searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  createN8nWorkflow: vi.fn(),
+  updateN8nWorkflow: vi.fn(),
+  getN8nWorkflow: vi.fn(),
+  getN8nWorkflowByName: vi.fn(),
+  listN8nWorkflows: vi.fn().mockResolvedValue([]),
+  deleteN8nWorkflow: vi.fn(),
+  findN8nWorkflowByEvent: vi.fn(),
+  saveCodeExecution: vi.fn(),
+  createSchedule: vi.fn(),
+  listSchedules: vi.fn().mockResolvedValue([]),
+  getSchedule: vi.fn(),
+  deleteSchedule: vi.fn(),
+  toggleSchedule: vi.fn(),
+  listEnabledSchedules: vi.fn().mockResolvedValue([]),
+  listDueSchedules: vi.fn().mockResolvedValue([]),
+  updateScheduleLastRun: vi.fn(),
+  countEvents: vi.fn().mockResolvedValue(0),
+  listEvents: vi.fn().mockResolvedValue([]),
+  createEvent: vi.fn(),
+  markEventProcessed: vi.fn(),
+  listUnprocessedEvents: vi.fn().mockResolvedValue([]),
+  createWorkSession: vi.fn().mockResolvedValue({ id: "ws-1" }),
+  completeWorkSession: vi.fn(),
+  listRecentWorkSessions: vi.fn().mockResolvedValue([]),
+  listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
+  decayAllMemoryImportance: vi.fn(),
+  getLatestUserMessageTime: vi.fn().mockResolvedValue(null),
+  getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+  upsertProviderHealth: vi.fn(),
+  getProviderHealthHistory: vi.fn().mockResolvedValue([]),
+  getToolStats: vi.fn().mockResolvedValue([]),
+  recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
+  getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0 }),
+  countTasksByStatus: vi.fn().mockResolvedValue({}),
+  listActiveGoals: vi.fn().mockResolvedValue([]),
+  touchMemory: vi.fn(),
   goals: {},
+  channelConversations: {},
+  prompts: {},
+  n8nWorkflows: {},
+  schedules: {},
+  events: {},
+  workSessions: {},
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -123,10 +197,11 @@ describe("POST /api/agents/run/stream", { timeout: 15_000 }, () => {
 
   it("enforces daily token limit", async () => {
     process.env.DAILY_TOKEN_LIMIT = "100";
-    const { getTodayTokenTotal } = await import("@ai-cofounder/db");
-    (getTodayTokenTotal as ReturnType<typeof vi.fn>).mockResolvedValueOnce(200);
-
     const { app } = buildServer();
+    // Use persistent mock so scheduler tick doesn't consume the value
+    const { getTodayTokenTotal } = await import("@ai-cofounder/db");
+    (getTodayTokenTotal as ReturnType<typeof vi.fn>).mockResolvedValue(200);
+
     const res = await app.inject({
       method: "POST",
       url: "/api/agents/run/stream",
@@ -135,6 +210,8 @@ describe("POST /api/agents/run/stream", { timeout: 15_000 }, () => {
     await app.close();
 
     expect(res.statusCode).toBe(429);
+    // Reset mock and env
+    (getTodayTokenTotal as ReturnType<typeof vi.fn>).mockResolvedValue(0);
     delete process.env.DAILY_TOKEN_LIMIT;
   });
 });

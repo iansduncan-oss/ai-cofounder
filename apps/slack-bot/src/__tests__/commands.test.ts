@@ -22,6 +22,7 @@ const mockClient = {
   listPendingApprovals: vi.fn(),
   listMemories: vi.fn(),
   executeGoal: vi.fn(),
+  streamExecute: vi.fn(),
   resolveApproval: vi.fn(),
   getChannelConversation: vi.fn(),
   setChannelConversation: vi.fn(),
@@ -364,20 +365,17 @@ describe("slack commands", () => {
 
   describe("/execute", () => {
     it("executes a goal and shows results", async () => {
-      mockClient.executeGoal.mockResolvedValueOnce({
-        goalTitle: "Build MVP",
-        status: "completed",
-        totalTasks: 2,
-        completedTasks: 2,
-        tasks: [
-          { title: "Research", agent: "researcher", status: "completed" },
-          { title: "Code", agent: "coder", status: "completed" },
-        ],
-      });
+      mockClient.streamExecute.mockReturnValueOnce(
+        (async function* () {
+          yield { type: "progress", data: { taskTitle: "Research", agent: "researcher", status: "completed", goalTitle: "Build MVP", totalTasks: 2, completedTasks: 1 } };
+          yield { type: "progress", data: { taskTitle: "Code", agent: "coder", status: "completed", goalTitle: "Build MVP", totalTasks: 2, completedTasks: 2 } };
+          yield { type: "completed", data: { goalTitle: "Build MVP", status: "completed", totalTasks: 2, completedTasks: 2 } };
+        })(),
+      );
 
       const { respond } = await invokeCommand("/execute", "goal-1");
 
-      expect(mockClient.executeGoal).toHaveBeenCalledWith("goal-1", { userId: "U456" });
+      expect(mockClient.streamExecute).toHaveBeenCalledWith("goal-1", "U456");
       expect(respond).toHaveBeenCalledWith({
         blocks: expect.arrayContaining([
           expect.objectContaining({
@@ -389,7 +387,9 @@ describe("slack commands", () => {
     });
 
     it("shows error on execution failure", async () => {
-      mockClient.executeGoal.mockRejectedValueOnce(new Error("Goal not found"));
+      mockClient.streamExecute.mockImplementationOnce(() => {
+        throw new Error("Goal not found");
+      });
 
       const { respond } = await invokeCommand("/execute", "bad-id");
 

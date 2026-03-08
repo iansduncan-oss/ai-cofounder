@@ -21,8 +21,9 @@ COPY packages/llm/ packages/llm/
 COPY packages/sandbox/ packages/sandbox/
 COPY packages/api-client/ packages/api-client/
 COPY apps/agent-server/ apps/agent-server/
+COPY apps/dashboard/ apps/dashboard/
 RUN rm -rf packages/*/node_modules/drizzle-orm \
-    && npx turbo run build --filter=@ai-cofounder/agent-server
+    && npx turbo run build --filter=@ai-cofounder/agent-server --filter=@ai-cofounder/dashboard
 
 # Production stage
 FROM node:24-alpine
@@ -44,6 +45,7 @@ COPY --from=base /app/packages/sandbox/dist/ packages/sandbox/dist/
 COPY --from=base /app/apps/agent-server/package.json apps/agent-server/
 COPY --from=base /app/apps/agent-server/dist/ apps/agent-server/dist/
 COPY apps/voice-ui/public/ apps/voice-ui/public/
+COPY --from=base /app/apps/dashboard/dist/ apps/dashboard/dist/
 
 RUN npm ci --omit=dev --ignore-scripts --force
 
