@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-authentication-03-01-PLAN.md
-last_updated: "2026-03-08T22:30:54.464Z"
+stopped_at: Completed 03-authentication-03-02-PLAN.md
+last_updated: "2026-03-08T22:48:55.125Z"
 last_activity: "2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route"
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 67
 ---
 
@@ -54,6 +54,7 @@ Progress: [██████░░░░] 67%
 | Phase 02-sse-migration P02-01 | 12 min | 2 tasks | 6 files |
 | Phase 02-sse-migration P02 | 10 min | 2 tasks | 6 files |
 | Phase 03-authentication P01 | 18 | 1 tasks | 8 files |
+| Phase 03-authentication P02 | 14 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 03-authentication]: Migration number corrected to 0019 (0018 was already used by reflections)
 - [Phase 03-authentication]: Auth plugin uses optionalEnv for JWT_SECRET/COOKIE_SECRET — graceful no-op in test environments without auth secrets set
 - [Phase 03-authentication]: Refresh cookie path-scoped to /api/auth/refresh to minimize cookie transmission attack surface
+- [Phase 03-authentication]: jwtGuardPlugin not wrapped in fp(): Fastify scoping mechanism enforces JWT only on routes registered inside the scope
+- [Phase 03-authentication]: API_SECRET coexistence: when JWT_SECRET set, API_SECRET only enforced on bot routes (channels, webhooks)
+- [Phase 03-authentication]: In-memory token over localStorage: protects access token from XSS; HttpOnly cookie persists session across reloads
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T22:30:54.462Z
-Stopped at: Completed 03-authentication-03-01-PLAN.md
+Last session: 2026-03-08T22:48:55.123Z
+Stopped at: Completed 03-authentication-03-02-PLAN.md
 Resume file: None
