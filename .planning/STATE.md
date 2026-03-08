@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-sse-migration-02-02-PLAN.md
-last_updated: "2026-03-08T13:30:15.927Z"
+stopped_at: Completed 03-authentication-03-01-PLAN.md
+last_updated: "2026-03-08T22:30:54.464Z"
 last_activity: "2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route"
 progress:
   total_phases: 4
   completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 67
 ---
 
@@ -53,6 +53,7 @@ Progress: [██████░░░░] 67%
 | Phase 01-queue-foundation P03 | 6 | 2 tasks | 6 files |
 | Phase 02-sse-migration P02-01 | 12 min | 2 tasks | 6 files |
 | Phase 02-sse-migration P02 | 10 min | 2 tasks | 6 files |
+| Phase 03-authentication P01 | 18 | 1 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [Phase 02-sse-migration]: Reference-counted Redis subscribe: listenerCount check before subscribe/unsubscribe avoids redundant network calls for multiple SSE clients on same goal
 - [Phase 02-sse-migration]: SSE data-only format (no event: field): dashboard useSSE uses source.onmessage which only fires for unnamed events
 - [Phase 02-sse-migration]: No-op pubsub decorators when REDIS_URL not set: server starts cleanly without Redis, local dev zero-config preserved
+- [Phase 03-authentication]: Migration number corrected to 0019 (0018 was already used by reflections)
+- [Phase 03-authentication]: Auth plugin uses optionalEnv for JWT_SECRET/COOKIE_SECRET — graceful no-op in test environments without auth secrets set
+- [Phase 03-authentication]: Refresh cookie path-scoped to /api/auth/refresh to minimize cookie transmission attack surface
 
 ### Pending Todos
 
@@ -94,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T13:05:59.594Z
-Stopped at: Completed 02-sse-migration-02-02-PLAN.md
+Last session: 2026-03-08T22:30:54.462Z
+Stopped at: Completed 03-authentication-03-01-PLAN.md
 Resume file: None

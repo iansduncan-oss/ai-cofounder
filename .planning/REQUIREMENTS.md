@@ -25,14 +25,14 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Authentication
 
-- [ ] **AUTH-01**: User can log in to the dashboard with email and password via POST /api/auth/login
-- [ ] **AUTH-02**: Successful login returns a short-lived access token (JWT, 15min expiry)
-- [ ] **AUTH-03**: Successful login sets a long-lived refresh token as HttpOnly + Secure + SameSite=Strict cookie
+- [x] **AUTH-01**: User can log in to the dashboard with email and password via POST /api/auth/login
+- [x] **AUTH-02**: Successful login returns a short-lived access token (JWT, 15min expiry)
+- [x] **AUTH-03**: Successful login sets a long-lived refresh token as HttpOnly + Secure + SameSite=Strict cookie
 - [ ] **AUTH-04**: Protected API routes verify JWT via Fastify onRequest hook and reject unauthorized requests with 401
-- [ ] **AUTH-05**: POST /api/auth/refresh issues a new access token using the refresh token cookie
-- [ ] **AUTH-06**: User can log out via POST /api/auth/logout which clears the refresh cookie
-- [ ] **AUTH-07**: Admin user is auto-created on server startup from ADMIN_EMAIL + ADMIN_PASSWORD env vars if no user exists
-- [ ] **AUTH-08**: Passwords are hashed with bcrypt (cost factor 12) and never stored in plaintext
+- [x] **AUTH-05**: POST /api/auth/refresh issues a new access token using the refresh token cookie
+- [x] **AUTH-06**: User can log out via POST /api/auth/logout which clears the refresh cookie
+- [x] **AUTH-07**: Admin user is auto-created on server startup from ADMIN_EMAIL + ADMIN_PASSWORD env vars if no user exists
+- [x] **AUTH-08**: Passwords are hashed with bcrypt (cost factor 12) and never stored in plaintext
 - [ ] **AUTH-09**: Bot endpoints (Discord/Slack webhook routes) use a separate auth mechanism (API key) and are not affected by JWT middleware
 - [ ] **AUTH-10**: Dashboard stores access token in memory (not localStorage) and includes it as Authorization: Bearer header
 
@@ -106,14 +106,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUEUE-13 | Phase 1 | Complete |
 | QUEUE-10 | Phase 2 | Complete |
 | QUEUE-11 | Phase 2 | Complete |
-| AUTH-01 | Phase 3 | Pending |
-| AUTH-02 | Phase 3 | Pending |
-| AUTH-03 | Phase 3 | Pending |
+| AUTH-01 | Phase 3 | Complete |
+| AUTH-02 | Phase 3 | Complete |
+| AUTH-03 | Phase 3 | Complete |
 | AUTH-04 | Phase 3 | Pending |
-| AUTH-05 | Phase 3 | Pending |
-| AUTH-06 | Phase 3 | Pending |
-| AUTH-07 | Phase 3 | Pending |
-| AUTH-08 | Phase 3 | Pending |
+| AUTH-05 | Phase 3 | Complete |
+| AUTH-06 | Phase 3 | Complete |
+| AUTH-07 | Phase 3 | Complete |
+| AUTH-08 | Phase 3 | Complete |
 | AUTH-09 | Phase 3 | Pending |
 | AUTH-10 | Phase 3 | Pending |
 | TEST-01 | Phase 4 | Pending |

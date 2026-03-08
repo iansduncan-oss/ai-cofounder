@@ -92,7 +92,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
 | 2. SSE Migration | 0/2 | Not started | - |
-| 3. Authentication | 0/2 | Not started | - |
+| 3. Authentication | 1/2 | In Progress|  |
 | 4. Tests & Quick Wins | 0/3 | Not started | - |
 
 ---
