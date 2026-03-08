@@ -1,0 +1,104 @@
+import { Queue } from "bullmq";
+import { getRedisConnection } from "./connection.js";
+
+// ── Job type definitions ──
+
+export interface AgentTaskJob {
+  goalId: string;
+  taskId?: string;
+  prompt: string;
+  conversationId?: string;
+  userId?: string;
+  agentRole?: string;
+  priority?: "critical" | "high" | "normal" | "low";
+}
+
+export interface MonitoringJob {
+  check: "github_ci" | "github_prs" | "vps_health" | "vps_containers" | "custom";
+  target?: string; // repo name, service name, etc.
+  metadata?: Record<string, unknown>;
+}
+
+export interface BriefingJob {
+  type: "morning" | "evening" | "on_demand";
+  userId?: string;
+  deliveryChannels?: ("slack" | "discord" | "voice" | "dashboard")[];
+}
+
+export interface NotificationJob {
+  channel: "slack" | "discord" | "all";
+  type: "alert" | "info" | "warning" | "success";
+  title: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PipelineJob {
+  pipelineId: string;
+  goalId: string;
+  stages: PipelineStage[];
+  currentStage: number;
+  context: Record<string, unknown>;
+}
+
+export interface PipelineStage {
+  agent: "planner" | "coder" | "reviewer" | "debugger" | "researcher";
+  prompt: string;
+  dependsOnPrevious: boolean;
+}
+
+// ── Queue names ──
+
+export const QUEUE_NAMES = {
+  AGENT_TASKS: "agent-tasks",
+  MONITORING: "monitoring",
+  BRIEFINGS: "briefings",
+  NOTIFICATIONS: "notifications",
+  PIPELINES: "pipelines",
+} as const;
+
+// ── Queue instances ──
+
+const queues = new Map<string, Queue>();
+
+function getOrCreateQueue<T>(name: string): Queue<T> {
+  if (!queues.has(name)) {
+    const queue = new Queue<T>(name, {
+      connection: getRedisConnection(),
+      defaultJobOptions: {
+        removeOnComplete: { age: 24 * 3600, count: 1000 },  // 24h TTL, max 1000
+        removeOnFail: { age: 7 * 24 * 3600, count: 500 },   // 7d TTL for debugging
+        attempts: 3,
+        backoff: { type: "exponential", delay: 2000 },
+      },
+    });
+    queues.set(name, queue);
+  }
+  return queues.get(name)! as Queue<T>;
+}
+
+export function getAgentTaskQueue(): Queue<AgentTaskJob> {
+  return getOrCreateQueue<AgentTaskJob>(QUEUE_NAMES.AGENT_TASKS);
+}
+
+export function getMonitoringQueue(): Queue<MonitoringJob> {
+  return getOrCreateQueue<MonitoringJob>(QUEUE_NAMES.MONITORING);
+}
+
+export function getBriefingQueue(): Queue<BriefingJob> {
+  return getOrCreateQueue<BriefingJob>(QUEUE_NAMES.BRIEFINGS);
+}
+
+export function getNotificationQueue(): Queue<NotificationJob> {
+  return getOrCreateQueue<NotificationJob>(QUEUE_NAMES.NOTIFICATIONS);
+}
+
+export function getPipelineQueue(): Queue<PipelineJob> {
+  return getOrCreateQueue<PipelineJob>(QUEUE_NAMES.PIPELINES);
+}
+
+export async function closeAllQueues(): Promise<void> {
+  const closers = Array.from(queues.values()).map((q) => q.close());
+  await Promise.all(closers);
+  queues.clear();
+}
