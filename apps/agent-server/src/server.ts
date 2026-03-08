@@ -39,7 +39,15 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { conversationRoutes } from "./routes/conversations.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { voiceRoutes } from "./routes/voice.js";
+import { queueRoutes } from "./routes/queue.js";
+import { monitoringRoutes } from "./routes/monitoring.js";
+import { pipelineRoutes } from "./routes/pipeline.js";
+import { personaRoutes } from "./routes/persona.js";
+import { queuePlugin } from "./plugins/queue.js";
+import { pubsubPlugin } from "./plugins/pubsub.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
+import { createMonitoringService, type MonitoringService } from "./services/monitoring.js";
+import { createTTSService, type TTSService } from "./services/tts.js";
 import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
 import {
   createNotificationService,
@@ -124,6 +132,8 @@ export function buildServer(registry?: LlmRegistry) {
         { name: "conversations", description: "Conversation and message search" },
         { name: "decisions", description: "Decision log" },
         { name: "dashboard", description: "Dashboard summary" },
+        { name: "queue", description: "Background task queue" },
+        { name: "monitoring", description: "Proactive system monitoring" },
       ],
     },
   });
@@ -160,6 +170,14 @@ export function buildServer(registry?: LlmRegistry) {
   // Create notification service for proactive alerts
   const notificationService = createNotificationService();
   app.decorate("notificationService", notificationService);
+
+  // Create monitoring service for JARVIS-like proactive checks
+  const monitoringService = createMonitoringService(notificationService);
+  app.decorate("monitoringService", monitoringService);
+
+  // Create TTS service for ElevenLabs voice synthesis
+  const ttsService = createTTSService();
+  app.decorate("ttsService", ttsService);
 
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
@@ -263,6 +281,16 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(conversationRoutes, { prefix: "/api/conversations" });
   app.register(decisionRoutes, { prefix: "/api/decisions" });
   app.register(voiceRoutes, { prefix: "/voice" });
+  app.register(queueRoutes, { prefix: "/api/queue" });
+  app.register(monitoringRoutes, { prefix: "/api/monitoring" });
+  app.register(pipelineRoutes, { prefix: "/api/pipelines" });
+  app.register(personaRoutes, { prefix: "/api/persona" });
+
+  // Queue system (requires REDIS_URL)
+  app.register(queuePlugin);
+
+  // Pub/sub bridge: shared Redis subscriber + EventEmitter routing for SSE endpoint
+  app.register(pubsubPlugin);
 
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
@@ -323,5 +351,7 @@ declare module "fastify" {
     sandboxService: SandboxService;
     workspaceService: WorkspaceService;
     notificationService: NotificationService;
+    monitoringService: MonitoringService;
+    ttsService: TTSService;
   }
 }
