@@ -126,7 +126,7 @@ vi.mock("@ai-cofounder/db", () => ({
 const mockPingRedis = vi.fn().mockResolvedValue("ok");
 
 vi.mock("@ai-cofounder/queue", () => ({
-  getRedisConnection: vi.fn().mockReturnValue({}),
+  getRedisConnection: vi.fn().mockReturnValue({ host: "localhost", port: 6379 }),
   startWorkers: vi.fn(),
   stopWorkers: vi.fn().mockResolvedValue(undefined),
   closeAllQueues: vi.fn().mockResolvedValue(undefined),
@@ -134,6 +134,23 @@ vi.mock("@ai-cofounder/queue", () => ({
   enqueueAgentTask: vi.fn().mockResolvedValue("job-123"),
   getJobStatus: vi.fn().mockResolvedValue(null),
   pingRedis: (...args: unknown[]) => mockPingRedis(...args),
+  // pubsub exports required by pubsubPlugin
+  goalChannel: (goalId: string) => `agent-events:goal:${goalId}`,
+  historyKey: (goalId: string) => `agent-events:history:${goalId}`,
+  CHANNEL_PREFIX: "agent-events:goal:",
+  HISTORY_PREFIX: "agent-events:history:",
+  HISTORY_TTL_SECONDS: 3600,
+  RedisPubSub: class {
+    publish = vi.fn().mockResolvedValue(undefined);
+    getHistory = vi.fn().mockResolvedValue([]);
+    close = vi.fn().mockResolvedValue(undefined);
+  },
+  createSubscriber: vi.fn().mockReturnValue({
+    subscribe: vi.fn().mockResolvedValue(undefined),
+    unsubscribe: vi.fn().mockResolvedValue(undefined),
+    on: vi.fn(),
+    quit: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 // --- Mock @ai-cofounder/llm ---
