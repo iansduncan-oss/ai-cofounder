@@ -1,3 +1,4 @@
+import net from "net";
 import { Job } from "bullmq";
 import { createLogger } from "@ai-cofounder/shared";
 import {
@@ -108,6 +109,39 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResult | nul
     finishedOn: job.finishedOn,
     failedReason: job.failedReason,
   };
+}
+
+// ── Redis ping helper ──
+
+export async function pingRedis(): Promise<"ok" | "unreachable"> {
+  return new Promise((resolve) => {
+    try {
+      const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+      const parsed = new URL(redisUrl);
+      const host = parsed.hostname || "localhost";
+      const port = parseInt(parsed.port || "6379", 10);
+
+      const socket = net.connect({ host, port });
+      const timeout = setTimeout(() => {
+        socket.destroy();
+        resolve("unreachable");
+      }, 3000);
+
+      socket.on("connect", () => {
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve("ok");
+      });
+
+      socket.on("error", () => {
+        clearTimeout(timeout);
+        socket.destroy();
+        resolve("unreachable");
+      });
+    } catch {
+      resolve("unreachable");
+    }
+  });
 }
 
 // ── Queue status helpers ──

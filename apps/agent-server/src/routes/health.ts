@@ -1,26 +1,39 @@
 import type { FastifyPluginAsync } from "fastify";
 import { sql } from "drizzle-orm";
 import { getProviderHealthHistory, getToolStats } from "@ai-cofounder/db";
+import { pingRedis } from "@ai-cofounder/queue";
+import { optionalEnv } from "@ai-cofounder/shared";
 import { gatherBriefingData, formatBriefing, sendDailyBriefing } from "../services/briefing.js";
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
   app.get("/health", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    let dbStatus = "ok";
     try {
       await app.db.execute(sql`SELECT 1`);
-      return {
-        status: "ok",
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-      };
     } catch {
-      reply.code(503);
-      return {
-        status: "degraded",
-        timestamp: new Date().toISOString(),
-        uptime: process.uptime(),
-        error: "database unreachable",
-      };
+      dbStatus = "unreachable";
     }
+
+    // Redis health check — only if REDIS_URL is configured
+    let redisStatus = "disabled";
+    const redisUrl = optionalEnv("REDIS_URL", "");
+    if (redisUrl) {
+      redisStatus = await pingRedis();
+    }
+
+    const isHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
+
+    if (!isHealthy) {
+      reply.code(503);
+    }
+
+    return {
+      status: isHealthy ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: dbStatus,
+      redis: redisStatus,
+    };
   });
 
   /** GET /health/providers — LLM provider health status */
@@ -65,7 +78,7 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
       const shouldSend = request.query.send === "true";
 
       if (shouldSend) {
-        const text = await sendDailyBriefing(app.db, app.notificationService);
+        const text = await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry);
         return { sent: true, briefing: text };
       }
 

@@ -42,6 +42,7 @@ export {
   enqueuePipeline,
   getAllQueueStatus,
   getJobStatus,
+  pingRedis,
   type QueueStatus,
   type JobStatusResult,
 } from "./helpers.js";
