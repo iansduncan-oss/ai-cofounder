@@ -10,6 +10,7 @@ import {
   startWorkers,
   stopWorkers,
   closeAllQueues,
+  RedisPubSub,
 } from "@ai-cofounder/queue";
 import { createLlmRegistry } from "./server.js";
 import { TaskDispatcher } from "./agents/dispatcher.js";
@@ -26,7 +27,8 @@ export async function main() {
 
   // Initialize Redis connection
   const redisUrl = requireEnv("REDIS_URL");
-  getRedisConnection(redisUrl);
+  const redisConnection = getRedisConnection(redisUrl);
+  const redisPubSub = new RedisPubSub(redisConnection);
 
   // Initialize database (with migrations)
   const databaseUrl = requireEnv("DATABASE_URL");
@@ -73,11 +75,30 @@ export async function main() {
       const { goalId, userId } = job.data;
       logger.info({ jobId: job.id, goalId, userId }, "Processing agent task");
 
+      // Publish job_started lifecycle event before execution begins
+      await redisPubSub.publish(goalId, { goalId, type: "job_started", timestamp: Date.now() });
+
       try {
-        await dispatcher.runGoal(goalId, userId);
+        await dispatcher.runGoal(goalId, userId, async (event) => {
+          // Publish task-level progress events as they occur
+          await redisPubSub.publish(goalId, { ...event, timestamp: Date.now() });
+        });
+
         logger.info({ jobId: job.id, goalId }, "Agent task completed");
+
+        // Publish job_completed lifecycle event after successful execution
+        await redisPubSub.publish(goalId, { goalId, type: "job_completed", timestamp: Date.now() });
       } catch (err) {
         logger.error({ jobId: job.id, goalId, err }, "Agent task failed");
+
+        // Publish job_failed lifecycle event before re-throwing
+        await redisPubSub.publish(goalId, {
+          goalId,
+          type: "job_failed",
+          error: err instanceof Error ? err.message : String(err),
+          timestamp: Date.now(),
+        });
+
         throw err; // Re-throw so BullMQ marks job as failed and handles retries
       }
     },
@@ -90,6 +111,7 @@ export async function main() {
     logger.info({ signal }, "Shutdown signal received — draining active jobs...");
     await stopWorkers();     // waits for active job to finish
     await closeAllQueues();  // close queue connections
+    await redisPubSub.close(); // close publisher connection
     logger.info("Worker shut down cleanly");
     process.exit(0);
   };
