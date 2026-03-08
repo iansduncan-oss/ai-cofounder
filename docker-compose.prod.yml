@@ -1,4 +1,19 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ai-cofounder-redis
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - avion_avion_net
+
   agent-server:
     image: ai-cofounder-agent-server:latest
     container_name: ai-cofounder-agent-server
@@ -9,6 +24,7 @@ services:
       - PORT=3100
       - HOST=0.0.0.0
       - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
       - API_SECRET=${API_SECRET:-}
@@ -32,12 +48,41 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - avion_avion_net
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3100/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  worker:
+    image: ai-cofounder-agent-server:latest
+    container_name: ai-cofounder-worker
+    restart: unless-stopped
+    command: ["node", "apps/agent-server/dist/worker.js"]
+    stop_grace_period: 120s
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+      - WORKSPACE_DIR=/data/workspace
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    volumes:
+      - workspace_data:/data/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - avion_avion_net
+    depends_on:
+      redis:
+        condition: service_healthy
 
   discord-bot:
     image: ai-cofounder-discord-bot:latest
@@ -74,6 +119,7 @@ services:
 
 volumes:
   workspace_data:
+  redisdata:
 
 networks:
   avion_avion_net:
