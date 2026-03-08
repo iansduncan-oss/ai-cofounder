@@ -2,6 +2,7 @@
 // Standalone worker process — same Docker image, different CMD
 // Processes agent-task jobs from the BullMQ queue
 
+import path from "node:path";
 import { createLogger, requireEnv, optionalEnv } from "@ai-cofounder/shared";
 import { createDb, runMigrations } from "@ai-cofounder/db";
 import {
@@ -29,8 +30,13 @@ export async function main() {
 
   // Initialize database (with migrations)
   const databaseUrl = requireEnv("DATABASE_URL");
+  const migrationsFolder = path.resolve(
+    require.resolve("@ai-cofounder/db/package.json"),
+    "..",
+    "drizzle",
+  );
+  await runMigrations(databaseUrl, migrationsFolder);
   const db = createDb(databaseUrl);
-  await runMigrations(db);
 
   // Bootstrap services (same as server.ts but no Fastify)
   const llmRegistry = createLlmRegistry();
