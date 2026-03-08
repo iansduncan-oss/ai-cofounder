@@ -29,12 +29,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The worker process picks up the job, executes it via the orchestrator, and records completion status
   4. A failed job retries automatically with exponential backoff; GET /api/goals/:id/queue-status shows waiting/active/completed/failed
   5. GET /health includes Redis connection status; sending SIGTERM to the worker lets the active job finish before exit
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Redis + BullMQ setup (Docker Compose, queue module, packages)
-- [ ] 01-02: Worker process (separate entry point, job execution, graceful shutdown)
-- [ ] 01-03: Job lifecycle management (retries, priorities, stalled detection, TTL cleanup, status API)
+- [ ] 01-01-PLAN.md — Queue config hardening (lockDuration, TTL cleanup) + Redis in production Docker Compose
+- [ ] 01-02-PLAN.md — Worker entry point + non-blocking execution route
+- [ ] 01-03-PLAN.md — Job status API endpoint + Redis health monitoring
 
 ### Phase 2: SSE Migration
 **Goal**: Dashboard clients receive real-time agent execution events after execution moves to the background worker
@@ -90,10 +90,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Queue Foundation | 0/3 | Not started | - |
+| 1. Queue Foundation | 0/3 | Planning complete | - |
 | 2. SSE Migration | 0/2 | Not started | - |
 | 3. Authentication | 0/2 | Not started | - |
 | 4. Tests & Quick Wins | 0/3 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-07*
+*Phase 1 planned: 2026-03-07*
