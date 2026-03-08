@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: planning
+stopped_at: Completed 01-queue-foundation-01-PLAN.md
+last_updated: "2026-03-08T05:20:56.612Z"
+last_activity: 2026-03-07 — Roadmap created, phases derived from requirements
+progress:
+  total_phases: 4
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 1
+  percent: 33
+---
+
 # Project State
 
 ## Project Reference
@@ -14,7 +30,7 @@ Plan: 0 of 3 in current phase
 Status: Ready to plan
 Last activity: 2026-03-07 — Roadmap created, phases derived from requirements
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
@@ -34,6 +50,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01-queue-foundation P01 | 4 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -46,6 +63,10 @@ Recent decisions affecting current work:
 - Milestone: JWT over OAuth for dashboard auth (single user, fast to implement)
 - Milestone: Redis as Docker Compose service (self-contained, matches existing deploy pattern)
 - Milestone: E2E tests use isolated test database (reset between runs, no prod data risk)
+- [Phase 01-queue-foundation]: lockDuration=600000: agent tasks take 5-10 min, must exceed job duration to prevent false stall detection
+- [Phase 01-queue-foundation]: Age-based TTL over count-only: ensures failed jobs visible for 7 days regardless of volume for debugging
+- [Phase 01-queue-foundation]: Worker as separate container with stop_grace_period=120s: allows in-flight job completion on deploy
+- [Phase 01-queue-foundation]: Redis no exposed ports in prod: only accessible via Docker network avion_avion_net for security
 
 ### Pending Todos
 
@@ -59,6 +80,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-07
-Stopped at: Roadmap created, requirements mapped, ready for `/gsd:plan-phase 1`
+Last session: 2026-03-08T05:20:56.606Z
+Stopped at: Completed 01-queue-foundation-01-PLAN.md
 Resume file: None

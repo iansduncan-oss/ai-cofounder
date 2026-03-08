@@ -9,19 +9,19 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Message Queue
 
-- [ ] **QUEUE-01**: Redis container added to Docker Compose for both dev and production environments
+- [x] **QUEUE-01**: Redis container added to Docker Compose for both dev and production environments
 - [ ] **QUEUE-02**: BullMQ queue module can enqueue goal/task execution jobs from HTTP route handlers
 - [ ] **QUEUE-03**: Worker process picks up jobs from the queue and executes them via orchestrator/dispatcher
 - [ ] **QUEUE-04**: Worker runs as a separate Docker container (same image, different CMD)
-- [ ] **QUEUE-05**: Failed jobs retry with exponential backoff up to a configurable max attempts
+- [x] **QUEUE-05**: Failed jobs retry with exponential backoff up to a configurable max attempts
 - [ ] **QUEUE-06**: Jobs can be queried by status (waiting, active, completed, failed) via API
 - [ ] **QUEUE-07**: Worker handles SIGTERM gracefully — finishes active job before shutting down (stop_grace_period: 120s)
 - [ ] **QUEUE-08**: Redis connection health is monitored and exposed at GET /health endpoint
-- [ ] **QUEUE-09**: Job priorities allow urgent tasks to be processed before routine ones
+- [x] **QUEUE-09**: Job priorities allow urgent tasks to be processed before routine ones
 - [ ] **QUEUE-10**: Worker publishes real-time events to Redis pub/sub channel during job execution
 - [ ] **QUEUE-11**: SSE endpoint subscribes to Redis pub/sub and forwards events to dashboard clients
-- [ ] **QUEUE-12**: Stalled jobs are detected and re-queued (lockDuration configured for 5-10 min agent tasks)
-- [ ] **QUEUE-13**: Completed/failed jobs are auto-cleaned from Redis (removeOnComplete, removeOnFail TTLs)
+- [x] **QUEUE-12**: Stalled jobs are detected and re-queued (lockDuration configured for 5-10 min agent tasks)
+- [x] **QUEUE-13**: Completed/failed jobs are auto-cleaned from Redis (removeOnComplete, removeOnFail TTLs)
 
 ### Authentication
 
@@ -93,17 +93,17 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUEUE-01 | Phase 1 | Pending |
+| QUEUE-01 | Phase 1 | Complete |
 | QUEUE-02 | Phase 1 | Pending |
 | QUEUE-03 | Phase 1 | Pending |
 | QUEUE-04 | Phase 1 | Pending |
-| QUEUE-05 | Phase 1 | Pending |
+| QUEUE-05 | Phase 1 | Complete |
 | QUEUE-06 | Phase 1 | Pending |
 | QUEUE-07 | Phase 1 | Pending |
 | QUEUE-08 | Phase 1 | Pending |
-| QUEUE-09 | Phase 1 | Pending |
-| QUEUE-12 | Phase 1 | Pending |
-| QUEUE-13 | Phase 1 | Pending |
+| QUEUE-09 | Phase 1 | Complete |
+| QUEUE-12 | Phase 1 | Complete |
+| QUEUE-13 | Phase 1 | Complete |
 | QUEUE-10 | Phase 2 | Pending |
 | QUEUE-11 | Phase 2 | Pending |
 | AUTH-01 | Phase 3 | Pending |
