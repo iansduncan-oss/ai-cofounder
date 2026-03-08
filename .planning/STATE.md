@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-sse-migration-02-01-PLAN.md
-last_updated: "2026-03-08T12:53:03.090Z"
+stopped_at: Completed 02-sse-migration-02-02-PLAN.md
+last_updated: "2026-03-08T13:05:59.596Z"
 last_activity: "2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route"
 progress:
   total_phases: 4
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 67
 ---
 
@@ -52,6 +52,7 @@ Progress: [██████░░░░] 67%
 *Updated after each plan completion*
 | Phase 01-queue-foundation P03 | 6 | 2 tasks | 6 files |
 | Phase 02-sse-migration P02-01 | 12 min | 2 tasks | 6 files |
+| Phase 02-sse-migration P02 | 10 min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,9 @@ Recent decisions affecting current work:
 - [Phase 02-sse-migration]: class syntax in vi.mock() factory required for constructable mocks — vi.fn().mockImplementation() does not create constructors in Vitest
 - [Phase 02-sse-migration]: RedisPubSub uses dedicated ioredis publisher connection; createSubscriber() provides separate connection for subscribe mode (Redis protocol constraint)
 - [Phase 02-sse-migration]: HISTORY_TTL_SECONDS=3600: 1-hour event history window sufficient for SSE late joiners in typical execution scenarios
+- [Phase 02-sse-migration]: Reference-counted Redis subscribe: listenerCount check before subscribe/unsubscribe avoids redundant network calls for multiple SSE clients on same goal
+- [Phase 02-sse-migration]: SSE data-only format (no event: field): dashboard useSSE uses source.onmessage which only fires for unnamed events
+- [Phase 02-sse-migration]: No-op pubsub decorators when REDIS_URL not set: server starts cleanly without Redis, local dev zero-config preserved
 
 ### Pending Todos
 
@@ -90,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T12:53:03.088Z
-Stopped at: Completed 02-sse-migration-02-01-PLAN.md
+Last session: 2026-03-08T13:05:59.594Z
+Stopped at: Completed 02-sse-migration-02-02-PLAN.md
 Resume file: None

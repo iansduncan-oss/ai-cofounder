@@ -19,7 +19,7 @@ Requirements for this milestone. Each maps to roadmap phases.
 - [x] **QUEUE-08**: Redis connection health is monitored and exposed at GET /health endpoint
 - [x] **QUEUE-09**: Job priorities allow urgent tasks to be processed before routine ones
 - [x] **QUEUE-10**: Worker publishes real-time events to Redis pub/sub channel during job execution
-- [ ] **QUEUE-11**: SSE endpoint subscribes to Redis pub/sub and forwards events to dashboard clients
+- [x] **QUEUE-11**: SSE endpoint subscribes to Redis pub/sub and forwards events to dashboard clients
 - [x] **QUEUE-12**: Stalled jobs are detected and re-queued (lockDuration configured for 5-10 min agent tasks)
 - [x] **QUEUE-13**: Completed/failed jobs are auto-cleaned from Redis (removeOnComplete, removeOnFail TTLs)
 
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUEUE-12 | Phase 1 | Complete |
 | QUEUE-13 | Phase 1 | Complete |
 | QUEUE-10 | Phase 2 | Complete |
-| QUEUE-11 | Phase 2 | Pending |
+| QUEUE-11 | Phase 2 | Complete |
 | AUTH-01 | Phase 3 | Pending |
 | AUTH-02 | Phase 3 | Pending |
 | AUTH-03 | Phase 3 | Pending |
