@@ -13,7 +13,7 @@ This milestone decouples long-running agent work from HTTP request handlers via 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Queue Foundation** - Redis container, BullMQ module, worker process, job lifecycle management (completed 2026-03-08)
-- [ ] **Phase 2: SSE Migration** - Move agent execution to workers with real-time streaming via Redis pub/sub
+- [x] **Phase 2: SSE Migration** - Move agent execution to workers with real-time streaming via Redis pub/sub (completed 2026-03-08)
 - [x] **Phase 3: Authentication** - JWT login, refresh tokens, protected routes, bot endpoint isolation (completed 2026-03-08)
 - [x] **Phase 4: Tests & Quick Wins** - E2E test suite, workspace delete tools, API docs, export endpoint (completed 2026-03-09)
 
@@ -47,8 +47,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — RedisPubSub class in packages/queue + worker event publishing via onProgress callback
-- [ ] 02-02-PLAN.md — Fastify pubsub plugin + SSE endpoint rewrite with Redis subscribe and history replay
+- [x] 02-01-PLAN.md — RedisPubSub class in packages/queue + worker event publishing via onProgress callback
+- [x] 02-02-PLAN.md — Fastify pubsub plugin + SSE endpoint rewrite with Redis subscribe and history replay
 
 ### Phase 3: Authentication
 **Goal**: The dashboard is secured behind JWT login; bot endpoints continue working without disruption
@@ -63,8 +63,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Auth foundation: admin_users DB table, @fastify/jwt + @fastify/cookie plugin, login/refresh/logout routes, admin seed, auth tests
-- [ ] 03-02-PLAN.md — Route protection via JWT guard plugin, server route restructuring, dashboard login UI + in-memory token management + silent refresh
+- [x] 03-01-PLAN.md — Auth foundation: admin_users DB table, @fastify/jwt + @fastify/cookie plugin, login/refresh/logout routes, admin seed, auth tests
+- [x] 03-02-PLAN.md — Route protection via JWT guard plugin, server route restructuring, dashboard login UI + in-memory token management + silent refresh
 
 ### Phase 4: Tests & Quick Wins
 **Goal**: The goal lifecycle is covered by E2E integration tests and the API surface is complete with utility features
@@ -79,8 +79,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — E2E goal lifecycle test with real DB isolation, truncation, Fastify inject, and MockLlmRegistry scripted responses
-- [ ] 04-02-PLAN.md — Quick win tests: deleteFile/deleteDirectory workspace tests + route tests for roles, export, and Swagger endpoints
+- [x] 04-01-PLAN.md — E2E goal lifecycle test with real DB isolation, truncation, Fastify inject, and MockLlmRegistry scripted responses
+- [x] 04-02-PLAN.md — Quick win tests: deleteFile/deleteDirectory workspace tests + route tests for roles, export, and Swagger endpoints
 
 ## Progress
 
@@ -90,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
-| 2. SSE Migration | 0/2 | Not started | - |
+| 2. SSE Migration | 2/2 | Complete   | 2026-03-08 |
 | 3. Authentication | 2/2 | Complete   | 2026-03-08 |
 | 4. Tests & Quick Wins | 2/2 | Complete   | 2026-03-09 |
 
