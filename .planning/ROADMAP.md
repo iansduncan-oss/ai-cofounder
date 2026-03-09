@@ -80,7 +80,7 @@ Plans:
 
 </details>
 
-### 🚧 v1.1 Pipeline Dashboard UI (In Progress)
+### v1.1 Pipeline Dashboard UI (In Progress)
 
 **Milestone Goal:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
 
@@ -103,7 +103,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 05-01-PLAN.md — Rewrite pipeline list page with state filter, timing, clickable rows + detail route stub + tests
+- [x] 05-01-PLAN.md — Rewrite pipeline list page with state filter, timing, clickable rows + detail route stub + tests
 
 ### Phase 6: Pipeline Detail
 **Goal**: Users can inspect a specific pipeline run's per-stage progress, outputs, timing, and overall metadata
@@ -115,7 +115,10 @@ Plans:
   3. User can see the duration of each completed stage displayed inline
   4. User can see the pipeline's overall state, linked goal reference, and created/finished timestamps
   5. User can see an active pipeline's detail page auto-refresh every 5 seconds
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — Full pipeline detail page with metadata card, expandable stage rows, and tests
 
 ### Phase 7: Pipeline Trigger
 **Goal**: Users can submit new pipeline runs — goal-based or custom-stage — and be taken directly to the resulting run
@@ -138,8 +141,8 @@ Plans:
 | 2. SSE Migration | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 3. Authentication | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 5. Pipeline List + Navigation | 1/1 | Complete   | 2026-03-09 | - |
-| 6. Pipeline Detail | v1.1 | 0/TBD | Not started | - |
+| 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
+| 6. Pipeline Detail | v1.1 | 0/1 | Not started | - |
 | 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
 
 ---
