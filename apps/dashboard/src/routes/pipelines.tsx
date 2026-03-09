@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useListPipelines, usePipeline } from "@/api/queries";
+import { Link, useSearchParams } from "react-router";
+import { useListPipelines } from "@/api/queries";
 import { useSubmitGoalPipeline } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import {
   Dialog,
   DialogHeader,
@@ -15,24 +17,10 @@ import {
 } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
+import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
-import {
-  AlertTriangle,
-  Plus,
-  Check,
-  X,
-  SkipForward,
-  Loader2,
-  Clock,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
-import type {
-  PipelineRun,
-  PipelineRunState,
-  PipelineStageDefinition,
-  PipelineStageResult,
-} from "@ai-cofounder/api-client";
+import { AlertTriangle, Plus } from "lucide-react";
+import type { PipelineRun, PipelineRunState } from "@ai-cofounder/api-client";
 
 /* ── PipelineStateBadge ── */
 
@@ -44,168 +32,19 @@ const stateConfig: Record<PipelineRunState, { label: string; variant: BadgeProps
   delayed: { label: "Delayed", variant: "outline" },
 };
 
-function PipelineStateBadge({ state }: { state: PipelineRunState }) {
+export function PipelineStateBadge({ state }: { state: PipelineRunState }) {
   const config = stateConfig[state] ?? { label: state, variant: "outline" as const };
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }
 
-/* ── StageProgress ── */
+/* ── formatDuration ── */
 
-function StageIcon({ status }: { status: "completed" | "failed" | "skipped" | "active" | "pending" }) {
-  switch (status) {
-    case "completed":
-      return <Check className="h-3.5 w-3.5 text-emerald-500" />;
-    case "failed":
-      return <X className="h-3.5 w-3.5 text-destructive" />;
-    case "skipped":
-      return <SkipForward className="h-3.5 w-3.5 text-muted-foreground" />;
-    case "active":
-      return <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500" />;
-    case "pending":
-      return <Clock className="h-3.5 w-3.5 text-muted-foreground" />;
-  }
-}
-
-function StageProgress({
-  stages,
-  stageResults,
-  currentStage,
-  pipelineState,
-}: {
-  stages: PipelineStageDefinition[];
-  stageResults?: PipelineStageResult[];
-  currentStage: number;
-  pipelineState: PipelineRunState;
-}) {
-  const resultMap = new Map(stageResults?.map((r) => [r.stageIndex, r]));
-
-  return (
-    <div className="flex items-center gap-1">
-      {stages.map((stage, i) => {
-        const result = resultMap.get(i);
-        let status: "completed" | "failed" | "skipped" | "active" | "pending";
-        if (result) {
-          status = result.status;
-        } else if (pipelineState === "active" && i === currentStage) {
-          status = "active";
-        } else {
-          status = "pending";
-        }
-
-        return (
-          <div
-            key={i}
-            className="flex items-center gap-1"
-            title={`${stage.agent}: ${status}`}
-          >
-            {i > 0 && <div className="h-px w-3 bg-border" />}
-            <div className="flex items-center gap-1 rounded-md border px-2 py-1 text-xs">
-              <StageIcon status={status} />
-              <span className="capitalize">{stage.agent}</span>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ── PipelineRow ── */
-
-function PipelineRow({ run }: { run: PipelineRun }) {
-  const [expanded, setExpanded] = useState(false);
-  const { data: detail } = usePipeline(expanded ? (run.jobId ?? null) : null);
-
-  return (
-    <Card>
-      <CardHeader
-        className="cursor-pointer flex flex-row items-center justify-between space-y-0 pb-2"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-3">
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-          <div>
-            <CardTitle className="text-sm font-medium">
-              Pipeline {run.pipelineId.slice(0, 8)}
-            </CardTitle>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Goal: {run.goalId.slice(0, 8)} &middot; {run.stageCount} stages
-              {run.createdAt && (
-                <> &middot; {new Date(run.createdAt).toLocaleString()}</>
-              )}
-            </p>
-          </div>
-        </div>
-        <PipelineStateBadge state={run.state} />
-      </CardHeader>
-
-      {expanded && (
-        <CardContent className="space-y-3">
-          {detail ? (
-            <>
-              <StageProgress
-                stages={detail.stages}
-                stageResults={detail.result?.stageResults}
-                currentStage={detail.currentStage}
-                pipelineState={detail.state}
-              />
-
-              {detail.failedReason && (
-                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                  {detail.failedReason}
-                </div>
-              )}
-
-              {detail.result?.stageResults && detail.result.stageResults.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">Stage Results</p>
-                  {detail.result.stageResults.map((sr) => (
-                    <div
-                      key={sr.stageIndex}
-                      className="rounded-md border p-2 text-xs space-y-1"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium capitalize">{sr.agent}</span>
-                        <Badge
-                          variant={
-                            sr.status === "completed"
-                              ? "success"
-                              : sr.status === "failed"
-                                ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {sr.status}
-                        </Badge>
-                      </div>
-                      {sr.output && (
-                        <pre className="whitespace-pre-wrap text-muted-foreground max-h-40 overflow-auto">
-                          {sr.output.slice(0, 500)}
-                          {sr.output.length > 500 && "..."}
-                        </pre>
-                      )}
-                      {sr.error && (
-                        <p className="text-destructive">{sr.error}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Loading details...
-            </div>
-          )}
-        </CardContent>
-      )}
-    </Card>
-  );
+function formatDuration(startIso: string, endIso: string): string {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000)
+    return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+  return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
 }
 
 /* ── SubmitPipelineDialog ── */
@@ -272,10 +111,30 @@ function SubmitPipelineDialog({
 
 export function PipelinesPage() {
   usePageTitle("Pipelines");
-  const { data, isLoading, error } = useListPipelines();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  const stateFilter = searchParams.get("state") ?? "all";
+
+  const setFilter = (value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === "" || value === "all") {
+        next.delete("state");
+      } else {
+        next.set("state", value);
+      }
+      return next;
+    });
+  };
+
+  const { data, isLoading, error } = useListPipelines();
   const runs = data?.runs ?? [];
+
+  const filtered =
+    stateFilter === "all"
+      ? runs
+      : runs.filter((r: PipelineRun) => r.state === stateFilter);
 
   return (
     <div>
@@ -290,6 +149,26 @@ export function PipelinesPage() {
         }
       />
 
+      <div className="mb-4 flex items-center gap-3">
+        <Select
+          value={stateFilter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="w-40"
+        >
+          <option value="all">All states</option>
+          <option value="waiting">Waiting</option>
+          <option value="active">Active</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+        </Select>
+        {stateFilter !== "all" && (
+          <span className="text-xs text-muted-foreground">
+            {filtered.length} result{filtered.length !== 1 ? "s" : ""} filtered
+          </span>
+        )}
+      </div>
+      <p className="mb-4 text-xs text-muted-foreground">Auto-refreshing every 10s</p>
+
       <div className="space-y-3">
         {isLoading ? (
           <ListSkeleton rows={3} />
@@ -302,19 +181,52 @@ export function PipelinesPage() {
               </div>
             </CardContent>
           </Card>
-        ) : runs.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <EmptyState
             title="No pipeline runs"
-            description="Submit a pipeline to run multi-stage agent workflows."
+            description={
+              stateFilter !== "all"
+                ? "No runs match the selected filter."
+                : "Submit a pipeline to run multi-stage agent workflows."
+            }
             action={
-              <Button onClick={() => setDialogOpen(true)} size="sm">
-                <Plus className="mr-1 h-4 w-4" />
-                Run Pipeline
-              </Button>
+              stateFilter === "all" ? (
+                <Button onClick={() => setDialogOpen(true)} size="sm">
+                  <Plus className="mr-1 h-4 w-4" />
+                  Run Pipeline
+                </Button>
+              ) : undefined
             }
           />
         ) : (
-          runs.map((run) => <PipelineRow key={run.jobId} run={run} />)
+          filtered.map((run: PipelineRun) => (
+            <Link
+              key={run.jobId}
+              to={`/dashboard/pipelines/${run.jobId}`}
+              className="block rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:shadow-md hover:-translate-y-0.5"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">
+                    Pipeline {run.pipelineId.slice(0, 8)}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Goal: {run.goalId.slice(0, 8)} &middot; {run.stageCount} stages
+                    {run.createdAt && (
+                      <>
+                        {" "}
+                        &middot; <RelativeTime date={run.createdAt} />
+                      </>
+                    )}
+                    {run.finishedAt && run.createdAt && (
+                      <> &middot; {formatDuration(run.createdAt, run.finishedAt)}</>
+                    )}
+                  </p>
+                </div>
+                <PipelineStateBadge state={run.state} />
+              </div>
+            </Link>
+          ))
         )}
       </div>
 
