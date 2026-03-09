@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import { PipelinesPage } from "@/routes/pipelines";
 import { renderWithProviders } from "../test-utils";
 
@@ -7,12 +7,28 @@ vi.mock("@/api/queries", () => ({
   usePipeline: vi.fn(),
 }));
 
+const mockGoalMutate = vi.fn();
+const mockCustomMutate = vi.fn();
+
 vi.mock("@/api/mutations", () => ({
   useSubmitGoalPipeline: vi.fn(() => ({
-    mutate: vi.fn(),
+    mutate: mockGoalMutate,
+    isPending: false,
+  })),
+  useSubmitPipeline: vi.fn(() => ({
+    mutate: mockCustomMutate,
     isPending: false,
   })),
 }));
+
+const mockNavigate = vi.fn();
+vi.mock("react-router", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("react-router")>();
+  return {
+    ...mod,
+    useNavigate: () => mockNavigate,
+  };
+});
 
 import { useListPipelines } from "@/api/queries";
 
@@ -56,6 +72,9 @@ const mockPipelineRuns = [
 
 describe("PipelinesPage", () => {
   beforeEach(() => {
+    mockGoalMutate.mockReset();
+    mockCustomMutate.mockReset();
+    mockNavigate.mockReset();
     mockUseListPipelines.mockReturnValue({
       data: { runs: mockPipelineRuns },
       isLoading: false,
@@ -168,5 +187,219 @@ describe("PipelinesPage", () => {
       initialEntries: ["/dashboard/pipelines"],
     });
     expect(screen.getByText("Auto-refreshing every 10s")).toBeInTheDocument();
+  });
+});
+
+describe("Pipeline Trigger", () => {
+  beforeEach(() => {
+    mockGoalMutate.mockReset();
+    mockCustomMutate.mockReset();
+    mockNavigate.mockReset();
+    mockUseListPipelines.mockReturnValue({
+      data: { runs: mockPipelineRuns },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useListPipelines>);
+  });
+
+  // TRIGGER-01: Goal-based pipeline form renders and submits
+  it("TRIGGER-01: opens dialog in goal mode and submits goal pipeline", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    // Dialog is open with goal mode active by default
+    expect(screen.getAllByText("Run Pipeline").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole("button", { name: /goal pipeline/i })).toBeInTheDocument();
+
+    // Fill in goal ID
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, {
+      target: { value: "550e8400-e29b-41d4-a716-446655440000" },
+    });
+
+    // Submit the form
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Assert mutation was called with correct goalId
+    expect(mockGoalMutate).toHaveBeenCalledWith(
+      { goalId: "550e8400-e29b-41d4-a716-446655440000" },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  // TRIGGER-02: Custom pipeline builder renders, add/remove stages, submits
+  it("TRIGGER-02: switches to custom mode and submits pipeline with stages", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    // Switch to custom mode
+    fireEvent.click(screen.getByRole("button", { name: /custom pipeline/i }));
+
+    // Verify default stage row appears with a role select
+    const selects = screen.getAllByRole("combobox");
+    // First select should be for stage agent role (planner by default)
+    expect(selects.some((s) => (s as HTMLSelectElement).value === "planner")).toBe(true);
+
+    // Click Add Stage
+    fireEvent.click(screen.getByRole("button", { name: /add stage/i }));
+
+    // Two stage selects should now exist for agent roles
+    const allSelects = screen.getAllByRole("combobox");
+    const stageSelects = allSelects.filter((s) =>
+      ["planner", "coder", "reviewer", "debugger", "researcher"].includes((s as HTMLSelectElement).value),
+    );
+    expect(stageSelects.length).toBe(2);
+
+    // Change second stage agent to reviewer
+    fireEvent.change(stageSelects[1], { target: { value: "reviewer" } });
+
+    // Add prompt to second stage
+    const textareas = screen.getAllByPlaceholderText(/instructions for this stage/i);
+    fireEvent.change(textareas[1], { target: { value: "Review the code" } });
+
+    // Fill in the goal ID
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, {
+      target: { value: "test-goal-uuid-1234" },
+    });
+
+    // Submit
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Assert custom mutation was called with stages
+    expect(mockCustomMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        goalId: "test-goal-uuid-1234",
+        stages: expect.arrayContaining([
+          expect.objectContaining({ agent: "reviewer", prompt: "Review the code" }),
+        ]),
+      }),
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+
+    // Verify 2 stages were submitted
+    const callArgs = mockCustomMutate.mock.calls[0][0];
+    expect(callArgs.stages).toHaveLength(2);
+  });
+
+  // TRIGGER-02b: Remove stage enforces minimum 1
+  it("TRIGGER-02b: remove stage works and enforces minimum of 1 stage", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog and switch to custom mode
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    fireEvent.click(screen.getByRole("button", { name: /custom pipeline/i }));
+
+    // Add a second stage
+    fireEvent.click(screen.getByRole("button", { name: /add stage/i }));
+
+    // Verify 2 remove buttons exist
+    const removeButtons = screen.getAllByRole("button", { name: /remove stage/i });
+    expect(removeButtons.length).toBe(2);
+
+    // Click one remove button
+    fireEvent.click(removeButtons[1]);
+
+    // Only 1 stage row should remain
+    const remainingRemoveButtons = screen.getAllByRole("button", { name: /remove stage/i });
+    expect(remainingRemoveButtons.length).toBe(1);
+
+    // The remaining remove button should be disabled
+    expect(remainingRemoveButtons[0]).toBeDisabled();
+  });
+
+  // TRIGGER-03: onSuccess callback is wired from mutate call
+  it("TRIGGER-03: onSuccess callback is wired in goal pipeline mutate call", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog, fill goal ID, submit
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, { target: { value: "test-job-goal" } });
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Capture onSuccess callback
+    const onSuccess = mockGoalMutate.mock.calls[0][1].onSuccess;
+    expect(onSuccess).toBeInstanceOf(Function);
+
+    // Invoke onSuccess with mock data
+    onSuccess({ jobId: "test-job-123", status: "waiting", stageCount: 3 });
+
+    // Navigate should have been called (proves onSuccess is wired)
+    expect(mockNavigate).toHaveBeenCalled();
+  });
+
+  // TRIGGER-04: Navigate called with correct path on success (goal mode)
+  it("TRIGGER-04: navigate called with /dashboard/pipelines/:jobId after goal submission", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog, fill goal ID, submit
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, { target: { value: "any-goal-id" } });
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Extract and invoke onSuccess
+    const onSuccess = mockGoalMutate.mock.calls[0][1].onSuccess;
+    onSuccess({ jobId: "new-job-abc", status: "waiting", stageCount: 3 });
+
+    expect(mockNavigate).toHaveBeenCalledWith("/dashboard/pipelines/new-job-abc");
+  });
+
+  // TRIGGER-04b: Navigate works for custom pipeline too
+  it("TRIGGER-04b: navigate called with /dashboard/pipelines/:jobId after custom submission", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog, switch to custom mode, fill goal ID, submit
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    fireEvent.click(screen.getByRole("button", { name: /custom pipeline/i }));
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, { target: { value: "any-goal-id" } });
+    fireEvent.click(screen.getByRole("button", { name: /^submit$/i }));
+
+    // Extract and invoke onSuccess
+    const onSuccess = mockCustomMutate.mock.calls[0][1].onSuccess;
+    onSuccess({ jobId: "custom-job-xyz", status: "waiting", stageCount: 2 });
+
+    expect(mockNavigate).toHaveBeenCalledWith("/dashboard/pipelines/custom-job-xyz");
+  });
+
+  // Dialog resets on close
+  it("dialog resets goal ID when closed and reopened", () => {
+    renderWithProviders(<PipelinesPage />, {
+      initialEntries: ["/dashboard/pipelines"],
+    });
+
+    // Open dialog, type a Goal ID
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+    const goalIdInput = screen.getByPlaceholderText(/550e8400/);
+    fireEvent.change(goalIdInput, { target: { value: "my-goal-id" } });
+    expect(goalIdInput).toHaveValue("my-goal-id");
+
+    // Close dialog via Cancel button
+    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
+
+    // Reopen dialog
+    fireEvent.click(screen.getByRole("button", { name: /run pipeline/i }));
+
+    // Goal ID input should be reset
+    const reopenedInput = screen.getByPlaceholderText(/550e8400/);
+    expect(reopenedInput).toHaveValue("");
   });
 });
