@@ -41,6 +41,9 @@ const HudPage = lazy(() =>
 const PipelinesPage = lazy(() =>
   import("./pipelines").then((m) => ({ default: m.PipelinesPage })),
 );
+const PipelineDetailPage = lazy(() =>
+  import("./pipeline-detail").then((m) => ({ default: m.PipelineDetailPage })),
+);
 const PersonaPage = lazy(() =>
   import("./persona").then((m) => ({ default: m.PersonaPage })),
 );
@@ -69,6 +72,7 @@ export const router = createBrowserRouter([
       { path: "usage", element: <UsagePage /> },
       { path: "workspace", element: <WorkspacePage /> },
       { path: "pipelines", element: <PipelinesPage /> },
+      { path: "pipelines/:jobId", element: <PipelineDetailPage /> },
       { path: "persona", element: <PersonaPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
