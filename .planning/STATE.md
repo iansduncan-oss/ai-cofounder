@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Pipeline Dashboard UI
 status: completed
-stopped_at: Completed 06-pipeline-detail/06-01-PLAN.md
-last_updated: "2026-03-09T15:03:22.046Z"
+stopped_at: Completed 06-pipeline-detail/06-02-PLAN.md
+last_updated: "2026-03-09T15:21:14.378Z"
 last_activity: 2026-03-09 — Phase 5 plan 01 executed, all 3 tasks committed
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 12
+  completed_plans: 12
   percent: 100
 ---
 
@@ -57,6 +57,7 @@ Recent decisions affecting current work:
 - [Phase 05-pipeline-list-navigation]: Filter uses useSearchParams (URL state) matching goals.tsx pattern for consistency
 - [Phase 06-pipeline-detail]: getStageStatus extracted to top-level function to fix TypeScript control flow narrowing in nested function closures
 - [Phase 06-pipeline-detail]: formatDuration duplicated locally in pipeline-detail.tsx (not imported from pipelines.tsx) to prevent route-to-route circular dependency
+- [Phase 06-pipeline-detail]: ROADMAP SC3 updated to match actual implementation scope (overall duration, not per-stage), closing gap identified in 06-VERIFICATION.md
 
 ### Pending Todos
 
@@ -70,6 +71,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T15:03:22.044Z
-Stopped at: Completed 06-pipeline-detail/06-01-PLAN.md
+Last session: 2026-03-09T15:21:14.376Z
+Stopped at: Completed 06-pipeline-detail/06-02-PLAN.md
 Resume file: None
