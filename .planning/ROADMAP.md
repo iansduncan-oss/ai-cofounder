@@ -100,7 +100,10 @@ Plans:
   3. User can filter the list to show only runs in a selected state (waiting, active, completed, failed)
   4. User can see the list auto-refresh every 10 seconds without any manual action
   5. User can click a pipeline row to navigate to its detail view, with the URL updating to /pipelines/:jobId
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 05-01-PLAN.md — Rewrite pipeline list page with state filter, timing, clickable rows + detail route stub + tests
 
 ### Phase 6: Pipeline Detail
 **Goal**: Users can inspect a specific pipeline run's per-stage progress, outputs, timing, and overall metadata
@@ -135,7 +138,7 @@ Plans:
 | 2. SSE Migration | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 3. Authentication | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 5. Pipeline List + Navigation | v1.1 | 0/TBD | Not started | - |
+| 5. Pipeline List + Navigation | v1.1 | 0/1 | Planning | - |
 | 6. Pipeline Detail | v1.1 | 0/TBD | Not started | - |
 | 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
 
