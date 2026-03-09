@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Pipeline Dashboard UI
-status: archived
-stopped_at: Milestone v1.1 archived
-last_updated: "2026-03-09T18:46:00.000Z"
-last_activity: 2026-03-09 — Milestone v1.1 archived and tagged
+milestone: v2.0
+milestone_name: Autonomous Cofounder
+status: active
+stopped_at: Defining requirements
+last_updated: "2026-03-09T19:00:00.000Z"
+last_activity: 2026-03-09 — Milestone v2.0 started
 progress:
-  total_phases: 7
-  completed_phases: 7
-  total_plans: 13
-  completed_plans: 13
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -21,13 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** An AI-powered engineering partner that autonomously plans, executes, and verifies software tasks.
-**Current focus:** Planning next milestone — run `/gsd:new-milestone`
+**Current focus:** v2.0 Autonomous Cofounder — Defining requirements
 
 ## Current Position
 
-Milestone: v1.1 Pipeline Dashboard UI — ARCHIVED
-All 7 phases complete (13 plans, 8 tasks)
-Next: `/gsd:new-milestone` to start v1.2+
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-09 — Milestone v2.0 started
 
 ## Milestones Shipped
 
@@ -51,5 +52,5 @@ None — clean milestone completion.
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: Milestone v1.1 archived
+Stopped at: Defining v2.0 requirements
 Resume file: None

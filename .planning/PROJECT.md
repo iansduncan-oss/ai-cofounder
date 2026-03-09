@@ -52,7 +52,19 @@ The platform is fully operational with:
 
 ### Active
 
-(Next milestone requirements TBD — run `/gsd:new-milestone`)
+#### Current Milestone: v2.0 Autonomous Cofounder
+
+**Goal:** Transform the AI Cofounder from a reactive tool into an autonomous engineering partner that works independently, remembers everything, and manages all systems.
+
+**Target features:**
+- Autonomous task execution via terminal access (works through planned tasks, commits, deploys)
+- Persistent memory via RAG (conversations, decisions, project context across sessions)
+- Tiered autonomy system (green/yellow/red approval levels)
+- Daily standup & work journal (proactive check-in, browsable activity log)
+- Content automations wired in (YouTube pipeline + n8n workflows as managed tasks)
+- Multi-project awareness (all projects, VPS, infrastructure)
+- Smart financial tracking (automated cost tracking, budget alerts, optimization suggestions)
+- Dashboard as command center (chat, work journal, approvals, costs)
 
 ### Out of Scope
 
@@ -90,4 +102,4 @@ The platform is fully operational with:
 | formatDuration duplicated across routes | Avoids route-to-route circular deps | ✓ Good — pragmatic |
 
 ---
-*Last updated: 2026-03-09 after v1.1 milestone completion*
+*Last updated: 2026-03-09 after v2.0 milestone started*
