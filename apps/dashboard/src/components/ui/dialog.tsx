@@ -11,9 +11,10 @@ interface DialogProps {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }
 
-export function Dialog({ open, onClose, children }: DialogProps) {
+export function Dialog({ open, onClose, children, className }: DialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -90,7 +91,7 @@ export function Dialog({ open, onClose, children }: DialogProps) {
     >
       <div
         ref={contentRef}
-        className="w-full max-w-md rounded-lg border bg-card p-6 shadow-lg animate-scale-in"
+        className={cn("w-full max-w-md rounded-lg border bg-card p-6 shadow-lg animate-scale-in", className)}
       >
         {children}
       </div>

@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -163,9 +163,24 @@ export function useSubmitGoalPipeline() {
       goalId: string;
       context?: Record<string, unknown>;
     }) => apiClient.submitGoalPipeline(goalId, context),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
-      toast.success("Pipeline submitted");
+      toast.success(`Pipeline submitted — Job ${data.jobId.slice(0, 8)}`);
+    },
+    onError: (err) => {
+      toast.error(`Failed to submit pipeline: ${err.message}`);
+    },
+  });
+}
+
+export function useSubmitPipeline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: SubmitPipelineInput) => apiClient.submitPipeline(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+      toast.success(`Pipeline queued — Job ${data.jobId.slice(0, 8)}`);
     },
     onError: (err) => {
       toast.error(`Failed to submit pipeline: ${err.message}`);
