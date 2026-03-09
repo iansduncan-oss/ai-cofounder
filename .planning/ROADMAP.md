@@ -84,7 +84,7 @@ Plans:
 
 **Milestone Goal:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
 
-- [ ] **Phase 5: Pipeline List + Navigation** - Sidebar nav entry, list page with filtering and auto-refresh, click-through to detail
+- [x] **Phase 5: Pipeline List + Navigation** - Sidebar nav entry, list page with filtering and auto-refresh, click-through to detail (completed 2026-03-09)
 - [ ] **Phase 6: Pipeline Detail** - Per-stage status, expandable outputs, timing, metadata, auto-refresh on active runs
 - [ ] **Phase 7: Pipeline Trigger** - Goal-based and custom-stage submission forms with confirmation and redirect
 
@@ -138,7 +138,7 @@ Plans:
 | 2. SSE Migration | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 3. Authentication | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
-| 5. Pipeline List + Navigation | v1.1 | 0/1 | Planning | - |
+| 5. Pipeline List + Navigation | 1/1 | Complete   | 2026-03-09 | - |
 | 6. Pipeline Detail | v1.1 | 0/TBD | Not started | - |
 | 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
 

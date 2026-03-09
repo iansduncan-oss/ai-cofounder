@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Pipeline Dashboard UI
-status: ready_to_plan
-stopped_at: null
-last_updated: "2026-03-09"
-last_activity: "2026-03-09 — Roadmap created, Phase 5 ready to plan"
+status: planning
+stopped_at: Completed 05-pipeline-list-navigation/05-01-PLAN.md
+last_updated: "2026-03-09T14:36:50.654Z"
+last_activity: 2026-03-09 — Roadmap created, Phase 5 ready to plan
 progress:
-  total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 7
+  completed_phases: 5
+  total_plans: 10
+  completed_plans: 10
   percent: 0
 ---
 
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 5 of 7 (Pipeline List + Navigation)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-03-09 — Roadmap created, Phase 5 ready to plan
+Phase: 5 of 7 (Pipeline List + Navigation) — COMPLETE
+Plan: 1 of 1 in current phase — COMPLETE
+Status: Phase 5 complete, ready for Phase 6
+Last activity: 2026-03-09 — Phase 5 plan 01 executed, all 3 tasks committed
 
-Progress: [░░░░░░░░░░] 0% (v1.1 milestone)
+Progress: [██████████] 100% (v1.1 milestone)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0 (v1.1)
-- Average duration: —
-- Total execution time: —
+- Total plans completed: 1 (v1.1)
+- Average duration: 6 min
+- Total execution time: 6 min
 
 ## Accumulated Context
 
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - [v1.1]: 3-phase structure derived from natural delivery boundaries (list → detail → trigger)
 - [v1.1]: NAV requirements merged into Phase 5 (list page IS the first nav destination)
 - [v1.1]: Polling (refetchInterval) over SSE for pipeline progress — SSE deferred to future milestone
+- [Phase 05-pipeline-list-navigation]: PipelineStateBadge exported from pipelines.tsx for detail page reuse without circular deps
+- [Phase 05-pipeline-list-navigation]: StageProgress/StageIcon moved to components/pipelines/stage-progress.tsx for Phase 6 reuse
+- [Phase 05-pipeline-list-navigation]: Filter uses useSearchParams (URL state) matching goals.tsx pattern for consistency
 
 ### Pending Todos
 
@@ -65,6 +68,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09
-Stopped at: Roadmap created, ready for /gsd:plan-phase 5
+Last session: 2026-03-09T14:36:50.652Z
+Stopped at: Completed 05-pipeline-list-navigation/05-01-PLAN.md
 Resume file: None

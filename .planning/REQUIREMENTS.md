@@ -26,10 +26,10 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 ### Pipeline List
 
-- [ ] **LIST-01**: User can view a page listing all pipeline runs with status, stage count, and timing
-- [ ] **LIST-02**: User can filter pipeline runs by state (waiting, active, completed, failed)
-- [ ] **LIST-03**: User can see pipeline list auto-refresh every 10 seconds while viewing
-- [ ] **LIST-04**: User can navigate from a pipeline list item to its detail view
+- [x] **LIST-01**: User can view a page listing all pipeline runs with status, stage count, and timing
+- [x] **LIST-02**: User can filter pipeline runs by state (waiting, active, completed, failed)
+- [x] **LIST-03**: User can see pipeline list auto-refresh every 10 seconds while viewing
+- [x] **LIST-04**: User can navigate from a pipeline list item to its detail view
 
 ### Pipeline Detail
 
@@ -48,8 +48,8 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: User can access the pipelines page from the dashboard sidebar
-- [ ] **NAV-02**: User can navigate between pipeline list and detail views via URL routing
+- [x] **NAV-01**: User can access the pipelines page from the dashboard sidebar
+- [x] **NAV-02**: User can navigate between pipeline list and detail views via URL routing
 
 ## Future Requirements
 
@@ -108,12 +108,12 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| NAV-01 | Phase 5 | Pending |
-| NAV-02 | Phase 5 | Pending |
-| LIST-01 | Phase 5 | Pending |
-| LIST-02 | Phase 5 | Pending |
-| LIST-03 | Phase 5 | Pending |
-| LIST-04 | Phase 5 | Pending |
+| NAV-01 | Phase 5 | Complete |
+| NAV-02 | Phase 5 | Complete |
+| LIST-01 | Phase 5 | Complete |
+| LIST-02 | Phase 5 | Complete |
+| LIST-03 | Phase 5 | Complete |
+| LIST-04 | Phase 5 | Complete |
 | DETAIL-01 | Phase 6 | Pending |
 | DETAIL-02 | Phase 6 | Pending |
 | DETAIL-03 | Phase 6 | Pending |
