@@ -86,7 +86,7 @@ Plans:
 
 - [x] **Phase 5: Pipeline List + Navigation** - Sidebar nav entry, list page with filtering and auto-refresh, click-through to detail (completed 2026-03-09)
 - [x] **Phase 6: Pipeline Detail** - Per-stage status, expandable outputs, timing, metadata, auto-refresh on active runs (completed 2026-03-09)
-- [ ] **Phase 7: Pipeline Trigger** - Goal-based and custom-stage submission forms with confirmation and redirect
+- [x] **Phase 7: Pipeline Trigger** - Goal-based and custom-stage submission forms with confirmation and redirect (completed 2026-03-09)
 
 ## Phase Details
 
@@ -147,7 +147,7 @@ Plans:
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
-| 7. Pipeline Trigger | v1.1 | 0/1 | Not started | - |
+| 7. Pipeline Trigger | 1/1 | Complete   | 2026-03-09 | - |
 
 ---
 *v1.0 roadmap created: 2026-03-07*

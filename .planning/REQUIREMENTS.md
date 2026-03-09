@@ -41,10 +41,10 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 ### Pipeline Trigger
 
-- [ ] **TRIGGER-01**: User can submit a goal-based pipeline (default 3-stage: planner → coder → reviewer) from the dashboard
-- [ ] **TRIGGER-02**: User can build a custom pipeline with configurable stages (agent role, prompt, dependency flag)
-- [ ] **TRIGGER-03**: User receives confirmation with job ID after successful pipeline submission
-- [ ] **TRIGGER-04**: User is redirected to the pipeline detail view after submission
+- [x] **TRIGGER-01**: User can submit a goal-based pipeline (default 3-stage: planner → coder → reviewer) from the dashboard
+- [x] **TRIGGER-02**: User can build a custom pipeline with configurable stages (agent role, prompt, dependency flag)
+- [x] **TRIGGER-03**: User receives confirmation with job ID after successful pipeline submission
+- [x] **TRIGGER-04**: User is redirected to the pipeline detail view after submission
 
 ### Navigation
 
@@ -119,10 +119,10 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 | DETAIL-03 | Phase 6 | Complete |
 | DETAIL-04 | Phase 6 | Complete |
 | DETAIL-05 | Phase 6 | Complete |
-| TRIGGER-01 | Phase 7 | Pending |
-| TRIGGER-02 | Phase 7 | Pending |
-| TRIGGER-03 | Phase 7 | Pending |
-| TRIGGER-04 | Phase 7 | Pending |
+| TRIGGER-01 | Phase 7 | Complete |
+| TRIGGER-02 | Phase 7 | Complete |
+| TRIGGER-03 | Phase 7 | Complete |
+| TRIGGER-04 | Phase 7 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 15 total

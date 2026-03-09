@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Pipeline Dashboard UI
 status: completed
-stopped_at: Completed 06-pipeline-detail/06-02-PLAN.md
-last_updated: "2026-03-09T15:30:40.186Z"
-last_activity: 2026-03-09 — Phase 5 plan 01 executed, all 3 tasks committed
+stopped_at: Completed 07-pipeline-trigger/07-01-PLAN.md
+last_updated: "2026-03-09T17:23:30Z"
+last_activity: 2026-03-09 — Phase 7 plan 01 executed, all 2 tasks committed
 progress:
   total_phases: 7
-  completed_phases: 6
-  total_plans: 12
-  completed_plans: 12
+  completed_phases: 7
+  total_plans: 13
+  completed_plans: 13
   percent: 100
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
-**Current focus:** Phase 5 — Pipeline List + Navigation
+**Current focus:** Phase 7 — Pipeline Trigger (COMPLETE)
 
 ## Current Position
 
-Phase: 5 of 7 (Pipeline List + Navigation) — COMPLETE
+Phase: 7 of 7 (Pipeline Trigger) — COMPLETE
 Plan: 1 of 1 in current phase — COMPLETE
-Status: Phase 5 complete, ready for Phase 6
-Last activity: 2026-03-09 — Phase 5 plan 01 executed, all 3 tasks committed
+Status: v1.1 milestone complete — all phases done
+Last activity: 2026-03-09 — Phase 7 plan 01 executed, all 2 tasks committed
 
-Progress: [██████████] 100% (v1.1 milestone)
+Progress: [██████████] 100% (v1.1 milestone COMPLETE)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1 (v1.1)
-- Average duration: 6 min
-- Total execution time: 6 min
+- Total plans completed: 13 (v1.1)
+- Average duration: ~5 min
+- Total execution time: ~65 min
 
 ## Accumulated Context
 
@@ -58,6 +58,9 @@ Recent decisions affecting current work:
 - [Phase 06-pipeline-detail]: getStageStatus extracted to top-level function to fix TypeScript control flow narrowing in nested function closures
 - [Phase 06-pipeline-detail]: formatDuration duplicated locally in pipeline-detail.tsx (not imported from pipelines.tsx) to prevent route-to-route circular dependency
 - [Phase 06-pipeline-detail]: ROADMAP SC3 updated to match actual implementation scope (overall duration, not per-stage), closing gap identified in 06-VERIFICATION.md
+- [Phase 07-pipeline-trigger]: handleClose resets all form state to prevent stale data on dialog reopen
+- [Phase 07-pipeline-trigger]: Navigation in callsite onSuccess, toast/cache invalidation in hook onSuccess — no toast duplication
+- [Phase 07-pipeline-trigger]: Dialog className prop uses cn() merge — backward compatible with existing callers
 
 ### Pending Todos
 
@@ -71,6 +74,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T15:21:14.376Z
-Stopped at: Completed 06-pipeline-detail/06-02-PLAN.md
+Last session: 2026-03-09T17:23:30Z
+Stopped at: Completed 07-pipeline-trigger/07-01-PLAN.md
 Resume file: None
