@@ -8,7 +8,7 @@ beforeAll(() => {
 
 // Mock the DB package so tests don't need a real Postgres connection
 vi.mock("@ai-cofounder/db", () => {
-  return {
+  const mocks: Record<string, unknown> = {
     createDb: vi.fn().mockReturnValue({
       execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
     }),
@@ -48,7 +48,7 @@ vi.mock("@ai-cofounder/db", () => {
     getConversation: vi.fn(),
     findUserByPlatform: vi.fn().mockResolvedValue(null),
     getActivePrompt: vi.fn().mockResolvedValue(null),
-  getActivePersona: vi.fn().mockResolvedValue(null),
+    getActivePersona: vi.fn().mockResolvedValue(null),
     getPromptVersion: vi.fn().mockResolvedValue(null),
     listPromptVersions: vi.fn().mockResolvedValue([]),
     createPromptVersion: vi.fn().mockResolvedValue({ id: "p-1", name: "test", version: 1 }),
@@ -56,6 +56,17 @@ vi.mock("@ai-cofounder/db", () => {
     channelConversations: {},
     prompts: {},
   };
+  return new Proxy(mocks, {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  });
 });
 
 // Mock the LLM package with a fake registry

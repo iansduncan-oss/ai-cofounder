@@ -9,7 +9,7 @@ const mockCreateEvent = vi.fn();
 const mockListEvents = vi.fn().mockResolvedValue([]);
 const mockCountEvents = vi.fn().mockResolvedValue(0);
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
@@ -85,7 +85,17 @@ vi.mock("@ai-cofounder/db", () => ({
   schedules: {},
   events: {},
   workSessions: {},
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({

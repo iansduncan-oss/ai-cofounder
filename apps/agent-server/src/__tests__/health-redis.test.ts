@@ -33,7 +33,7 @@ const mockCreateDb = vi.fn().mockReturnValue({
   execute: (...args: unknown[]) => mockDbExecute(...args),
 });
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   createDb: (...args: unknown[]) => mockCreateDb(...args),
   // All DB fns needed for server bootstrap
   findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1", externalId: "ext-1" }),
@@ -120,7 +120,17 @@ vi.mock("@ai-cofounder/db", () => ({
   schedules: {},
   events: {},
   workSessions: {},
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 // --- Mock @ai-cofounder/queue ---
 const mockPingRedis = vi.fn().mockResolvedValue("ok");

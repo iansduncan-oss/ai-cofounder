@@ -7,12 +7,22 @@ beforeAll(() => {
 
 const mockComplete = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   createDb: vi.fn().mockReturnValue({}),
   recallMemories: vi.fn().mockResolvedValue([
     { key: "pref", category: "preferences", content: "likes TypeScript" },
   ]),
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 

@@ -27,7 +27,7 @@ const mockGetConversationMessages = vi.fn();
 const mockRecallMemories = vi.fn();
 const mockSearchMemoriesByVector = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   getConversationMessageCount: (...args: unknown[]) => mockGetConversationMessageCount(...args),
   getLatestConversationSummary: (...args: unknown[]) => mockGetLatestConversationSummary(...args),
   saveConversationSummary: (...args: unknown[]) => mockSaveConversationSummary(...args),
@@ -49,7 +49,17 @@ vi.mock("@ai-cofounder/db", () => ({
   createMilestone: vi.fn(),
   getActivePrompt: vi.fn().mockResolvedValue(null),
   getActivePersona: vi.fn().mockResolvedValue(null),
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 vi.mock("../services/notifications.js", () => ({
   notifyApprovalCreated: vi.fn().mockResolvedValue(undefined),

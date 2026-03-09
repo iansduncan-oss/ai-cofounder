@@ -12,7 +12,7 @@ const mockListActiveGoals = vi.fn().mockResolvedValue([]);
 const mockListRecentWorkSessions = vi.fn().mockResolvedValue([]);
 const mockCountTasksByStatus = vi.fn().mockResolvedValue({});
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   createDb: vi.fn().mockReturnValue({}),
   markEventProcessed: (...args: unknown[]) => mockMarkEventProcessed(...args),
   createWorkSession: (...args: unknown[]) => mockCreateWorkSession(...args),
@@ -35,7 +35,17 @@ vi.mock("@ai-cofounder/db", () => ({
   deleteSchedule: vi.fn(),
   getActivePrompt: vi.fn().mockResolvedValue(null),
   getActivePersona: vi.fn().mockResolvedValue(null),
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({

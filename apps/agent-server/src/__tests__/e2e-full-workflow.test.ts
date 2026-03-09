@@ -22,7 +22,7 @@ const mockCreateMilestone = vi.fn();
 const mockListMilestones = vi.fn().mockResolvedValue([]);
 const mockGetMilestoneProgress = vi.fn().mockResolvedValue({ total: 0, completed: 0, percent: 0 });
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
@@ -86,7 +86,17 @@ vi.mock("@ai-cofounder/db", () => ({
   channelConversations: {},
   prompts: {},
   n8nWorkflows: {},
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 const mockEnqueueAgentTask = vi.fn().mockResolvedValue("job-123");
 

@@ -18,7 +18,7 @@ vi.mock("@ai-cofounder/shared", () => ({
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
 
-vi.mock("@ai-cofounder/db", () => ({
+vi.mock("@ai-cofounder/db", () => new Proxy({
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
   countTasksByStatus: (...args: unknown[]) => mockCountTasksByStatus(...args),
@@ -26,7 +26,17 @@ vi.mock("@ai-cofounder/db", () => ({
   listEnabledSchedules: (...args: unknown[]) => mockListEnabledSchedules(...args),
   listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),
   listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
-}));
+}, {
+    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const fn = vi.fn().mockResolvedValue(null);
+        target[prop] = fn;
+        return fn;
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+    has() { return true; },
+  }));
 
 const { gatherBriefingData, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
 
