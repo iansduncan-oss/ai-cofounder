@@ -38,12 +38,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### E2E Testing
 
-- [ ] **TEST-01**: E2E test suite runs against a dedicated test database that is isolated from dev/production
-- [ ] **TEST-02**: E2E tests use Fastify inject() for HTTP-level testing without actual network connections
-- [ ] **TEST-03**: Full goal lifecycle test covers create goal → dispatch → orchestrator tool loop → goal completion
-- [ ] **TEST-04**: LLM responses are mocked using existing MockLlmRegistry for deterministic, reproducible tests
-- [ ] **TEST-05**: Test database is cleaned between test runs (truncate or transaction rollback)
-- [ ] **TEST-06**: E2E test suite runs in GitHub Actions CI pipeline alongside existing unit tests
+- [x] **TEST-01**: E2E test suite runs against a dedicated test database that is isolated from dev/production
+- [x] **TEST-02**: E2E tests use Fastify inject() for HTTP-level testing without actual network connections
+- [x] **TEST-03**: Full goal lifecycle test covers create goal → dispatch → orchestrator tool loop → goal completion
+- [x] **TEST-04**: LLM responses are mocked using existing MockLlmRegistry for deterministic, reproducible tests
+- [x] **TEST-05**: Test database is cleaned between test runs (truncate or transaction rollback)
+- [x] **TEST-06**: E2E test suite runs in GitHub Actions CI pipeline alongside existing unit tests
 
 ### Quick Wins
 
@@ -116,12 +116,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-08 | Phase 3 | Complete |
 | AUTH-09 | Phase 3 | Complete |
 | AUTH-10 | Phase 3 | Complete |
-| TEST-01 | Phase 4 | Pending |
-| TEST-02 | Phase 4 | Pending |
-| TEST-03 | Phase 4 | Pending |
-| TEST-04 | Phase 4 | Pending |
-| TEST-05 | Phase 4 | Pending |
-| TEST-06 | Phase 4 | Pending |
+| TEST-01 | Phase 4 | Complete |
+| TEST-02 | Phase 4 | Complete |
+| TEST-03 | Phase 4 | Complete |
+| TEST-04 | Phase 4 | Complete |
+| TEST-05 | Phase 4 | Complete |
+| TEST-06 | Phase 4 | Complete |
 | QWIN-01 | Phase 4 | Pending |
 | QWIN-02 | Phase 4 | Pending |
 | QWIN-03 | Phase 4 | Pending |

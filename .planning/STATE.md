@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-authentication-03-02-PLAN.md
-last_updated: "2026-03-08T22:57:28.124Z"
+stopped_at: Completed 04-tests-quick-wins-04-01-PLAN.md
+last_updated: "2026-03-09T02:27:21.749Z"
 last_activity: "2026-03-08 — Plan 01-02 complete: standalone worker + non-blocking execution route"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
   percent: 67
 ---
 
@@ -55,6 +55,7 @@ Progress: [██████░░░░] 67%
 | Phase 02-sse-migration P02 | 10 min | 2 tasks | 6 files |
 | Phase 03-authentication P01 | 18 | 1 tasks | 8 files |
 | Phase 03-authentication P02 | 14 | 2 tasks | 14 files |
+| Phase 04-tests-quick-wins P04-01 | 2 min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,8 @@ Recent decisions affecting current work:
 - [Phase 03-authentication]: jwtGuardPlugin not wrapped in fp(): Fastify scoping mechanism enforces JWT only on routes registered inside the scope
 - [Phase 03-authentication]: API_SECRET coexistence: when JWT_SECRET set, API_SECRET only enforced on bot routes (channels, webhooks)
 - [Phase 03-authentication]: In-memory token over localStorage: protects access token from XSS; HttpOnly cookie persists session across reloads
+- [Phase 04-tests-quick-wins]: E2E tests use real PostgreSQL via DATABASE_URL env (not mocked) with TRUNCATE CASCADE for test isolation
+- [Phase 04-tests-quick-wins]: TaskDispatcher constructed with 7 explicit args in E2E test to satisfy TypeScript without spread ambiguity
 
 ### Pending Todos
 
@@ -102,6 +105,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-08T22:51:24.355Z
-Stopped at: Completed 03-authentication-03-02-PLAN.md
+Last session: 2026-03-09T02:27:21.747Z
+Stopped at: Completed 04-tests-quick-wins-04-01-PLAN.md
 Resume file: None
