@@ -8,7 +8,11 @@ import { vi } from "vitest";
  */
 export function mockDbModule() {
   return {
-    createDb: vi.fn().mockReturnValue({}),
+    // Client
+    createDb: vi.fn().mockReturnValue({
+      execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+    }),
+    runMigrations: vi.fn().mockResolvedValue(undefined),
     // Users
     findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1", externalId: "ext-1" }),
     findUserByPlatform: vi.fn().mockResolvedValue(null),
@@ -16,7 +20,10 @@ export function mockDbModule() {
     createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
     getConversation: vi.fn().mockResolvedValue(null),
     getConversationMessages: vi.fn().mockResolvedValue([]),
+    getConversationMessageCount: vi.fn().mockResolvedValue(0),
     createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
+    searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     // Channel conversations
     getChannelConversation: vi.fn().mockResolvedValue(null),
     upsertChannelConversation: vi.fn().mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),
@@ -25,13 +32,18 @@ export function mockDbModule() {
     createGoal: vi.fn().mockResolvedValue({ id: "goal-1", title: "Test Goal" }),
     getGoal: vi.fn().mockResolvedValue(null),
     listGoalsByConversation: vi.fn().mockResolvedValue([]),
+    countGoalsByConversation: vi.fn().mockResolvedValue(0),
     listActiveGoals: vi.fn().mockResolvedValue([]),
+    listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
     updateGoalStatus: vi.fn().mockResolvedValue({}),
+    updateGoalMetadata: vi.fn().mockResolvedValue({}),
     // Tasks
     createTask: vi.fn().mockResolvedValue({ id: "task-1", title: "Test Task" }),
     getTask: vi.fn().mockResolvedValue(null),
     listTasksByGoal: vi.fn().mockResolvedValue([]),
+    countTasksByGoal: vi.fn().mockResolvedValue(0),
     listPendingTasks: vi.fn().mockResolvedValue([]),
+    countTasksByStatus: vi.fn().mockResolvedValue({}),
     assignTask: vi.fn().mockResolvedValue({}),
     startTask: vi.fn().mockResolvedValue({}),
     completeTask: vi.fn().mockResolvedValue({}),
@@ -47,8 +59,11 @@ export function mockDbModule() {
     recallMemories: vi.fn().mockResolvedValue([]),
     searchMemoriesByVector: vi.fn().mockResolvedValue([]),
     listMemoriesByUser: vi.fn().mockResolvedValue([]),
+    countMemoriesByUser: vi.fn().mockResolvedValue(0),
     deleteMemory: vi.fn().mockResolvedValue(undefined),
+    computeImportance: vi.fn().mockReturnValue(0.5),
     touchMemory: vi.fn().mockResolvedValue(undefined),
+    decayMemoryImportance: vi.fn().mockResolvedValue(undefined),
     decayAllMemoryImportance: vi.fn().mockResolvedValue(undefined),
     // Prompts
     getActivePrompt: vi.fn().mockResolvedValue(null),
@@ -56,17 +71,28 @@ export function mockDbModule() {
     listPromptVersions: vi.fn().mockResolvedValue([]),
     createPromptVersion: vi.fn().mockResolvedValue({ id: "p-1", name: "test", version: 1 }),
     // n8n
+    getN8nWorkflow: vi.fn().mockResolvedValue(null),
     getN8nWorkflowByName: vi.fn().mockResolvedValue(null),
     listN8nWorkflows: vi.fn().mockResolvedValue([]),
+    findN8nWorkflowByEvent: vi.fn().mockResolvedValue(null),
     createN8nWorkflow: vi.fn().mockResolvedValue({ id: "wf-1" }),
     updateN8nWorkflow: vi.fn().mockResolvedValue({}),
     deleteN8nWorkflow: vi.fn().mockResolvedValue(undefined),
+    // Code executions
+    saveCodeExecution: vi.fn().mockResolvedValue({ id: "ce-1" }),
+    listCodeExecutionsByTask: vi.fn().mockResolvedValue([]),
+    // LLM usage
+    recordLlmUsage: vi.fn().mockResolvedValue(undefined),
+    getTodayTokenTotal: vi.fn().mockResolvedValue(0),
+    getTodayTokenUsage: vi.fn().mockResolvedValue(0),
+    getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
     // Schedules
     createSchedule: vi.fn().mockResolvedValue({ id: "sch-1" }),
     getSchedule: vi.fn().mockResolvedValue(null),
     listSchedules: vi.fn().mockResolvedValue([]),
     listEnabledSchedules: vi.fn().mockResolvedValue([]),
     listDueSchedules: vi.fn().mockResolvedValue([]),
+    toggleSchedule: vi.fn().mockResolvedValue({}),
     updateScheduleEnabled: vi.fn().mockResolvedValue({}),
     updateScheduleLastRun: vi.fn().mockResolvedValue(undefined),
     deleteSchedule: vi.fn().mockResolvedValue(undefined),
@@ -81,17 +107,6 @@ export function mockDbModule() {
     updateWorkSession: vi.fn().mockResolvedValue({}),
     completeWorkSession: vi.fn().mockResolvedValue(undefined),
     listRecentWorkSessions: vi.fn().mockResolvedValue([]),
-    // LLM usage
-    recordLlmUsage: vi.fn().mockResolvedValue(undefined),
-    getTodayTokenUsage: vi.fn().mockResolvedValue(0),
-    getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
-    // Conversations
-    searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    // Decisions
-    listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
-    countTasksByStatus: vi.fn().mockResolvedValue({}),
     // Milestones
     createMilestone: vi.fn().mockResolvedValue({ id: "ms-1", title: "Test Milestone" }),
     getMilestone: vi.fn().mockResolvedValue(null),
@@ -100,17 +115,77 @@ export function mockDbModule() {
     getMilestoneProgress: vi.fn().mockResolvedValue({ total: 0, completed: 0 }),
     assignGoalToMilestone: vi.fn().mockResolvedValue({}),
     deleteMilestone: vi.fn().mockResolvedValue(undefined),
+    // Conversation summaries
+    saveConversationSummary: vi.fn().mockResolvedValue({ id: "cs-1" }),
+    getLatestConversationSummary: vi.fn().mockResolvedValue(null),
+    getRecentConversationSummaries: vi.fn().mockResolvedValue([]),
     // Observability
     upsertProviderHealth: vi.fn().mockResolvedValue({}),
     getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+    getProviderHealthHistory: vi.fn().mockResolvedValue([]),
     recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
     getToolStats: vi.fn().mockResolvedValue([]),
+    // Decisions
+    listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    // User time
+    getLatestUserMessageTime: vi.fn().mockResolvedValue(null),
+    // Personas
+    getActivePersona: vi.fn().mockResolvedValue(null),
+    listPersonas: vi.fn().mockResolvedValue([]),
+    getPersona: vi.fn().mockResolvedValue(null),
+    upsertPersona: vi.fn().mockResolvedValue({ id: "persona-1" }),
+    deletePersona: vi.fn().mockResolvedValue(undefined),
+    // RAG / Document chunks
+    insertChunks: vi.fn().mockResolvedValue(undefined),
+    searchChunksByVector: vi.fn().mockResolvedValue([]),
+    deleteChunksBySource: vi.fn().mockResolvedValue(undefined),
+    getChunkCount: vi.fn().mockResolvedValue(0),
+    // Ingestion state
+    upsertIngestionState: vi.fn().mockResolvedValue({}),
+    getIngestionState: vi.fn().mockResolvedValue(null),
+    listIngestionStates: vi.fn().mockResolvedValue([]),
+    // Reflections
+    insertReflection: vi.fn().mockResolvedValue({ id: "ref-1" }),
+    getReflection: vi.fn().mockResolvedValue(null),
+    listReflectionsByGoal: vi.fn().mockResolvedValue([]),
+    listReflections: vi.fn().mockResolvedValue([]),
+    getReflectionStats: vi.fn().mockResolvedValue({ total: 0 }),
+    // Admin users
+    findAdminByEmail: vi.fn().mockResolvedValue(null),
+    createAdminUser: vi.fn().mockResolvedValue({ id: "admin-1" }),
+    countAdminUsers: vi.fn().mockResolvedValue(0),
+    // Subagent runs
+    createSubagentRun: vi.fn().mockResolvedValue({ id: "sa-1" }),
+    updateSubagentRunStatus: vi.fn().mockResolvedValue({}),
+    getSubagentRun: vi.fn().mockResolvedValue(null),
+    listSubagentRuns: vi.fn().mockResolvedValue([]),
+    getSubagentRunsByParentRequest: vi.fn().mockResolvedValue([]),
     // Schema table references (used in some queries)
     goals: {},
-    channelConversations: {},
-    prompts: {},
     tasks: {},
     memories: {},
+    users: {},
+    conversations: {},
+    messages: {},
+    channelConversations: {},
+    milestones: {},
+    approvals: {},
+    prompts: {},
+    n8nWorkflows: {},
+    schedules: {},
+    events: {},
+    workSessions: {},
+    codeExecutions: {},
+    llmUsage: {},
+    conversationSummaries: {},
+    providerHealth: {},
+    toolExecutions: {},
+    personas: {},
+    documentChunks: {},
+    ingestionState: {},
+    reflections: {},
+    adminUsers: {},
+    subagentRuns: {},
   };
 }
 

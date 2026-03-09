@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { setupTestEnv, mockLlmModule } from "@ai-cofounder/test-utils";
+import { setupTestEnv, mockLlmModule , mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   setupTestEnv();
@@ -8,6 +8,7 @@ beforeAll(() => {
 const mockComplete = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({}),
   recallMemories: vi.fn().mockResolvedValue([
     { key: "pref", category: "preferences", content: "likes TypeScript" },

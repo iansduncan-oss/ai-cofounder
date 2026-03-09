@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
@@ -26,6 +27,7 @@ const mockListN8nWorkflows = vi.fn().mockResolvedValue([]);
 const mockSaveCodeExecution = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   saveMemory: (...args: unknown[]) => mockSaveMemory(...args),
   recallMemories: (...args: unknown[]) => mockRecallMemories(...args),
   searchMemoriesByVector: (...args: unknown[]) => mockSearchMemoriesByVector(...args),

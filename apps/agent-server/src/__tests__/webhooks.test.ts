@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 import crypto from "node:crypto";
 
 beforeAll(() => {
@@ -10,6 +11,7 @@ beforeAll(() => {
 const mockCreateEvent = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),

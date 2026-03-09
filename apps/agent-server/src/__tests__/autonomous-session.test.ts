@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -12,6 +13,7 @@ const mockCreateWorkSession = vi.fn().mockResolvedValue({ id: "ws-1" });
 const mockCompleteWorkSession = vi.fn().mockResolvedValue({});
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({}),
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -34,6 +35,7 @@ const mockCreateDb = vi.fn().mockReturnValue({
 });
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: (...args: unknown[]) => mockCreateDb(...args),
   // All DB fns needed for server bootstrap
   findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1", externalId: "ext-1" }),

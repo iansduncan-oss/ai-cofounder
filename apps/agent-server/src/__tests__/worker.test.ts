@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.REDIS_URL = "redis://localhost:6379";
@@ -32,6 +33,7 @@ const mockCreateDb = vi.fn().mockReturnValue({});
 const mockRunMigrations = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: (...args: unknown[]) => mockCreateDb(...args),
   runMigrations: (...args: unknown[]) => mockRunMigrations(...args),
 }));

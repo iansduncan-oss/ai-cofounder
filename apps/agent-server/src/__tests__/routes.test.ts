@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 // Set env before any imports that read it
 beforeAll(() => {
@@ -38,6 +39,7 @@ const mockListPromptVersions = vi.fn().mockResolvedValue([]);
 const mockCreatePromptVersion = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),

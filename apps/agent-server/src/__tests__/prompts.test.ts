@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
@@ -7,6 +8,7 @@ beforeAll(() => {
 const mockGetActivePrompt = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({}),
   getActivePrompt: (...args: unknown[]) => mockGetActivePrompt(...args),
   getActivePersona: vi.fn().mockResolvedValue(null),
