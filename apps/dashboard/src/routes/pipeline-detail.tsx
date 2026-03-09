@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { usePipeline } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
@@ -5,8 +6,30 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { PipelineStateBadge } from "@/routes/pipelines";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StageIcon } from "@/components/pipelines/stage-progress";
+import { formatDate } from "@/lib/utils";
+import type { PipelineDetail, PipelineStageResult } from "@ai-cofounder/api-client";
+
+function formatDuration(startIso: string, endIso: string): string {
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000)
+    return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
+  return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
+}
+
+function getStageStatus(
+  data: PipelineDetail,
+  resultMap: Map<number, PipelineStageResult>,
+  i: number,
+): "completed" | "failed" | "skipped" | "active" | "pending" {
+  const result = resultMap.get(i);
+  if (result) return result.status;
+  if (data.state === "active" && i === data.currentStage) return "active";
+  return "pending";
+}
 
 export function PipelineDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
@@ -14,7 +37,25 @@ export function PipelineDetailPage() {
 
   const { data, isLoading, error } = usePipeline(jobId ?? null);
 
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  function toggleStage(i: number) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) {
+        next.delete(i);
+      } else {
+        next.add(i);
+      }
+      return next;
+    });
+  }
+
   const shortId = jobId?.slice(0, 8) ?? "...";
+
+  const resultMap = new Map<number, PipelineStageResult>(
+    (data?.result?.stageResults ?? []).map((r) => [r.stageIndex, r]),
+  );
 
   return (
     <div>
@@ -52,21 +93,93 @@ export function PipelineDetailPage() {
                   {data.stages.length} stage{data.stages.length !== 1 ? "s" : ""}
                 </span>
               </div>
+              {data.goalId && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Goal:</span>
+                  <Link
+                    to={`/dashboard/goals/${data.goalId}`}
+                    className="font-mono text-primary hover:underline truncate"
+                  >
+                    {data.goalId.slice(0, 8)}
+                  </Link>
+                </div>
+              )}
               {data.createdAt && (
                 <p className="text-xs text-muted-foreground">
-                  Created: {new Date(data.createdAt).toLocaleString()}
+                  Created: {formatDate(data.createdAt)}
                 </p>
               )}
               {data.finishedAt && (
                 <p className="text-xs text-muted-foreground">
-                  Finished: {new Date(data.finishedAt).toLocaleString()}
+                  Finished: {formatDate(data.finishedAt)}
                 </p>
               )}
-              <p className="text-sm text-muted-foreground italic">
-                Detailed stage view coming in Phase 6
-              </p>
+              {data.createdAt && data.finishedAt && (
+                <p className="text-xs text-muted-foreground">
+                  Duration: {formatDuration(data.createdAt, data.finishedAt)}
+                </p>
+              )}
+              {data.failedReason && (
+                <p className="text-xs text-destructive">
+                  Failed: {data.failedReason}
+                </p>
+              )}
             </CardContent>
           </Card>
+
+          {(data.state === "active" || data.state === "waiting") && (
+            <p className="text-xs text-muted-foreground">Auto-refreshing every 5s</p>
+          )}
+
+          <div className="space-y-2">
+            {data.stages.map((stage, i) => {
+              const status = getStageStatus(data, resultMap, i);
+              const isExpanded = expanded.has(i);
+              const result = resultMap.get(i);
+              const hasExpandableContent = result && (result.output || result.error);
+
+              return (
+                <div key={i}>
+                  <div
+                    role="button"
+                    aria-expanded={isExpanded}
+                    onClick={() => toggleStage(i)}
+                    className="cursor-pointer rounded-lg border bg-card p-3 hover:bg-accent transition-colors flex items-center gap-3"
+                  >
+                    <StageIcon status={status} />
+                    <span className="text-sm font-medium capitalize flex-1">
+                      {stage.agent}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Stage {i + 1}
+                    </span>
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {status}
+                    </span>
+                    {isExpanded ? (
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
+                  </div>
+                  {isExpanded && hasExpandableContent && (
+                    <div className="rounded-b-lg border-x border-b bg-muted/50 px-3 pb-3 pt-2">
+                      {result.output && (
+                        <p className="whitespace-pre-wrap text-xs font-mono">
+                          {result.output}
+                        </p>
+                      )}
+                      {result.error && (
+                        <p className="whitespace-pre-wrap text-xs text-destructive">
+                          {result.error}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
     </div>
