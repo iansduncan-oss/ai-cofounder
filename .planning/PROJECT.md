@@ -1,14 +1,22 @@
-# AI Cofounder — Infrastructure & Reliability Milestone
+# AI Cofounder
 
 ## What This Is
 
-AI Cofounder is a multi-agent AI assistant platform that orchestrates specialist agents (Researcher, Coder, Reviewer, Planner, Debugger, DocWriter, Verifier) to execute software engineering goals. It's accessible via Discord bot, Slack bot, web dashboard, and voice UI — all backed by a Fastify API server with PostgreSQL persistence and Docker sandboxed code execution.
-
-This milestone hardens the infrastructure: decoupling long-running agent work from HTTP requests via a message queue, securing the dashboard with JWT authentication, adding end-to-end integration tests, and shipping remaining quick wins.
+AI Cofounder is a multi-agent AI assistant platform that orchestrates specialist agents (Researcher, Coder, Reviewer, Planner, Debugger, DocWriter, Verifier) to execute software engineering goals. It's accessible via Discord bot, Slack bot, web dashboard, and voice UI — all backed by a Fastify API server with PostgreSQL persistence, BullMQ job queues, and Docker sandboxed code execution.
 
 ## Core Value
 
-Agent tasks execute reliably without blocking the API server, and the dashboard is secured behind proper authentication.
+Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
+
+## Current Milestone: v1.1 Pipeline Dashboard UI
+
+**Goal:** Build dashboard pages for visualizing, monitoring, and triggering pipeline runs with real-time stage progress.
+
+**Target features:**
+- Pipeline list page showing all runs with status, progress, and timing
+- Pipeline detail view with stage-by-stage progress, logs, and timing
+- Trigger pipelines from the dashboard UI (custom stages or goal-based)
+- Real-time stage progress updates via polling/SSE
 
 ## Requirements
 
@@ -26,20 +34,21 @@ Agent tasks execute reliably without blocking the API server, and the dashboard 
 - ✓ Goal verification via VerifierAgent — existing
 - ✓ Prometheus metrics, request tracing, tool execution tracking — existing
 - ✓ Git tools (clone, status, diff, add, commit, log, pull, branch, checkout, push) — existing
-- ✓ Workspace file operations (read, write, list) — existing
+- ✓ Workspace file operations (read, write, list, delete) — existing
 - ✓ Cost guardrails (DAILY_TOKEN_LIMIT) and exponential backoff — existing
 - ✓ CI/CD with auto-deploy on green tests — existing
+- ✓ Message queue infrastructure (Redis + BullMQ) with separate worker process — v1.0
+- ✓ Real-time SSE streaming via Redis pub/sub — v1.0
+- ✓ JWT authentication for dashboard (login, refresh, logout) — v1.0
+- ✓ E2E integration tests (goal lifecycle) — v1.0
+- ✓ Conversation export, OpenAPI docs, agent roles endpoint — v1.0
 
 ### Active
 
-- [ ] Message queue infrastructure (Redis + BullMQ) for agent task processing
-- [ ] Worker processes separated from HTTP server
-- [ ] JWT authentication for dashboard (email/password login)
-- [ ] E2E integration tests (goal lifecycle: create → dispatch → execute → verify)
-- [ ] deleteFile / deleteDirectory workspace tools with safety checks
-- [ ] Conversation export as JSON
-- [ ] OpenAPI spec generation from Fastify schemas
-- [ ] GET /api/agents/roles endpoint
+- [ ] Pipeline list page with status/progress overview
+- [ ] Pipeline detail view with stage-by-stage progress and logs
+- [ ] Trigger pipelines from dashboard (custom and goal-based)
+- [ ] Real-time pipeline stage progress updates
 
 ### Out of Scope
 
@@ -48,6 +57,8 @@ Agent tasks execute reliably without blocking the API server, and the dashboard 
 - Circuit breaker pattern — existing exponential backoff and provider fallback is adequate for now
 - Database read replicas — current load doesn't warrant this complexity
 - WebSocket support — SSE streaming is working well for current needs
+- Pipeline CRUD (create/edit/delete pipeline definitions) — this milestone covers execution monitoring, not pipeline template management
+- Pipeline scheduling/recurring runs — deferred to future milestone
 
 ## Context
 
@@ -74,4 +85,4 @@ Agent tasks execute reliably without blocking the API server, and the dashboard 
 | E2E tests use test database | Isolation from production data, can reset between test runs | — Pending |
 
 ---
-*Last updated: 2026-03-07 after initialization*
+*Last updated: 2026-03-09 after v1.1 Pipeline Dashboard UI milestone started*
