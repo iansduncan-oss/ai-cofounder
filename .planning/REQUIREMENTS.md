@@ -1,62 +1,57 @@
-# Requirements: AI Cofounder — Infrastructure & Reliability
+# Requirements: AI Cofounder
 
 **Defined:** 2026-03-07
-**Core Value:** Agent tasks execute reliably without blocking the API server, and the dashboard is secured behind proper authentication.
+**Updated:** 2026-03-09 (v1.1 Pipeline Dashboard UI)
+**Core Value:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
 
-## v1 Requirements
+## v1.0 Requirements (Complete)
 
-Requirements for this milestone. Each maps to roadmap phases.
+All 35 requirements completed in v1.0 Infrastructure & Reliability milestone.
 
-### Message Queue
+### Message Queue (13 requirements — all complete)
+- [x] **QUEUE-01** through **QUEUE-13**: Redis + BullMQ infrastructure, worker process, job lifecycle, health monitoring, SSE streaming via pub/sub
 
-- [x] **QUEUE-01**: Redis container added to Docker Compose for both dev and production environments
-- [x] **QUEUE-02**: BullMQ queue module can enqueue goal/task execution jobs from HTTP route handlers
-- [x] **QUEUE-03**: Worker process picks up jobs from the queue and executes them via orchestrator/dispatcher
-- [x] **QUEUE-04**: Worker runs as a separate Docker container (same image, different CMD)
-- [x] **QUEUE-05**: Failed jobs retry with exponential backoff up to a configurable max attempts
-- [x] **QUEUE-06**: Jobs can be queried by status (waiting, active, completed, failed) via API
-- [x] **QUEUE-07**: Worker handles SIGTERM gracefully — finishes active job before shutting down (stop_grace_period: 120s)
-- [x] **QUEUE-08**: Redis connection health is monitored and exposed at GET /health endpoint
-- [x] **QUEUE-09**: Job priorities allow urgent tasks to be processed before routine ones
-- [x] **QUEUE-10**: Worker publishes real-time events to Redis pub/sub channel during job execution
-- [x] **QUEUE-11**: SSE endpoint subscribes to Redis pub/sub and forwards events to dashboard clients
-- [x] **QUEUE-12**: Stalled jobs are detected and re-queued (lockDuration configured for 5-10 min agent tasks)
-- [x] **QUEUE-13**: Completed/failed jobs are auto-cleaned from Redis (removeOnComplete, removeOnFail TTLs)
+### Authentication (10 requirements — all complete)
+- [x] **AUTH-01** through **AUTH-10**: JWT login, refresh tokens, protected routes, admin seed, bot endpoint isolation
 
-### Authentication
+### E2E Testing (6 requirements — all complete)
+- [x] **TEST-01** through **TEST-06**: Goal lifecycle E2E tests, test DB isolation, CI integration
 
-- [x] **AUTH-01**: User can log in to the dashboard with email and password via POST /api/auth/login
-- [x] **AUTH-02**: Successful login returns a short-lived access token (JWT, 15min expiry)
-- [x] **AUTH-03**: Successful login sets a long-lived refresh token as HttpOnly + Secure + SameSite=Strict cookie
-- [x] **AUTH-04**: Protected API routes verify JWT via Fastify onRequest hook and reject unauthorized requests with 401
-- [x] **AUTH-05**: POST /api/auth/refresh issues a new access token using the refresh token cookie
-- [x] **AUTH-06**: User can log out via POST /api/auth/logout which clears the refresh cookie
-- [x] **AUTH-07**: Admin user is auto-created on server startup from ADMIN_EMAIL + ADMIN_PASSWORD env vars if no user exists
-- [x] **AUTH-08**: Passwords are hashed with bcrypt (cost factor 12) and never stored in plaintext
-- [x] **AUTH-09**: Bot endpoints (Discord/Slack webhook routes) use a separate auth mechanism (API key) and are not affected by JWT middleware
-- [x] **AUTH-10**: Dashboard stores access token in memory (not localStorage) and includes it as Authorization: Bearer header
+### Quick Wins (6 requirements — all complete)
+- [x] **QWIN-01** through **QWIN-06**: Workspace delete tools, agent roles, conversation export, OpenAPI/Swagger
 
-### E2E Testing
+## v1.1 Requirements
 
-- [x] **TEST-01**: E2E test suite runs against a dedicated test database that is isolated from dev/production
-- [x] **TEST-02**: E2E tests use Fastify inject() for HTTP-level testing without actual network connections
-- [x] **TEST-03**: Full goal lifecycle test covers create goal → dispatch → orchestrator tool loop → goal completion
-- [x] **TEST-04**: LLM responses are mocked using existing MockLlmRegistry for deterministic, reproducible tests
-- [x] **TEST-05**: Test database is cleaned between test runs (truncate or transaction rollback)
-- [x] **TEST-06**: E2E test suite runs in GitHub Actions CI pipeline alongside existing unit tests
+Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
-### Quick Wins
+### Pipeline List
 
-- [x] **QWIN-01**: deleteFile workspace tool removes a single file with path validation (no traversal outside workspace)
-- [x] **QWIN-02**: deleteDirectory workspace tool removes a directory with recursive option and safety checks
-- [x] **QWIN-03**: GET /api/agents/roles returns list of available agent roles with descriptions
-- [x] **QWIN-04**: GET /api/conversations/:id/export returns full conversation with messages as JSON
-- [x] **QWIN-05**: OpenAPI spec is auto-generated from Fastify route schemas via @fastify/swagger
-- [x] **QWIN-06**: Swagger UI serves interactive API docs at a configurable endpoint
+- [ ] **LIST-01**: User can view a page listing all pipeline runs with status, stage count, and timing
+- [ ] **LIST-02**: User can filter pipeline runs by state (waiting, active, completed, failed)
+- [ ] **LIST-03**: User can see pipeline list auto-refresh every 10 seconds while viewing
+- [ ] **LIST-04**: User can navigate from a pipeline list item to its detail view
 
-## v2 Requirements
+### Pipeline Detail
 
-Deferred to future milestone. Tracked but not in current roadmap.
+- [ ] **DETAIL-01**: User can view a pipeline's stages with per-stage status indicators (pending, active, completed, failed, skipped)
+- [ ] **DETAIL-02**: User can expand a stage to see its output text and error details
+- [ ] **DETAIL-03**: User can see timing information for each completed stage
+- [ ] **DETAIL-04**: User can see the pipeline's overall state, goal link, and created/finished timestamps
+- [ ] **DETAIL-05**: User can see active pipeline details auto-refresh every 5 seconds
+
+### Pipeline Trigger
+
+- [ ] **TRIGGER-01**: User can submit a goal-based pipeline (default 3-stage: planner → coder → reviewer) from the dashboard
+- [ ] **TRIGGER-02**: User can build a custom pipeline with configurable stages (agent role, prompt, dependency flag)
+- [ ] **TRIGGER-03**: User receives confirmation with job ID after successful pipeline submission
+- [ ] **TRIGGER-04**: User is redirected to the pipeline detail view after submission
+
+### Navigation
+
+- [ ] **NAV-01**: User can access the pipelines page from the dashboard sidebar
+- [ ] **NAV-02**: User can navigate between pipeline list and detail views via URL routing
+
+## Future Requirements
 
 ### Queue Enhancements
 - **QUEUE-V2-01**: Dead letter queue for jobs that fail after max retries
@@ -75,67 +70,65 @@ Deferred to future milestone. Tracked but not in current roadmap.
 - **TEST-V2-02**: Auth flow tests (login → protected route → refresh → logout)
 - **TEST-V2-03**: Bot command integration tests
 
+### Pipeline Management
+- **MGMT-01**: User can save pipeline stage configurations as reusable templates
+- **MGMT-02**: User can schedule pipelines to run on a recurring basis
+- **MGMT-03**: User can cancel a running pipeline
+- **MGMT-04**: User can re-run a failed pipeline
+
+### Pipeline Streaming
+- **STREAM-01**: User receives real-time SSE events for stage transitions (not just polling)
+- **STREAM-02**: User can see live agent output as stages execute
+
 ## Out of Scope
 
 | Feature | Reason |
 |---------|--------|
+| Pipeline template CRUD | This milestone covers execution monitoring, not template management |
+| Pipeline scheduling/recurring runs | Adds queue complexity; defer to future milestone |
+| SSE streaming for pipeline events | Polling sufficient for v1.1; SSE requires new backend endpoint |
+| Pipeline cancellation | Requires BullMQ job abort support; defer to future |
+| Pipeline comparison/analytics | Not needed for core monitoring use case |
 | Horizontal scaling (multi-instance) | Queue enables this but actual multi-instance is future work |
-| Circuit breaker pattern | Existing exponential backoff and provider fallback is adequate |
-| WebSocket support | SSE streaming is working well for current needs |
 | OAuth / SSO providers | JWT sufficient for single-user dashboard |
-| Browser E2E tests (Playwright/Cypress) | API-level tests cover the important paths |
-| Redis Cluster | Single VPS doesn't need cluster mode |
-| Multi-tenant / RBAC | Single user, no need for complex authorization |
+| WebSocket support | SSE streaming is working well for current needs |
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+### v1.0 (Complete)
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| QUEUE-01 | Phase 1 | Complete |
-| QUEUE-02 | Phase 1 | Complete |
-| QUEUE-03 | Phase 1 | Complete |
-| QUEUE-04 | Phase 1 | Complete |
-| QUEUE-05 | Phase 1 | Complete |
-| QUEUE-06 | Phase 1 | Complete |
-| QUEUE-07 | Phase 1 | Complete |
-| QUEUE-08 | Phase 1 | Complete |
-| QUEUE-09 | Phase 1 | Complete |
-| QUEUE-12 | Phase 1 | Complete |
-| QUEUE-13 | Phase 1 | Complete |
-| QUEUE-10 | Phase 2 | Complete |
-| QUEUE-11 | Phase 2 | Complete |
-| AUTH-01 | Phase 3 | Complete |
-| AUTH-02 | Phase 3 | Complete |
-| AUTH-03 | Phase 3 | Complete |
-| AUTH-04 | Phase 3 | Complete |
-| AUTH-05 | Phase 3 | Complete |
-| AUTH-06 | Phase 3 | Complete |
-| AUTH-07 | Phase 3 | Complete |
-| AUTH-08 | Phase 3 | Complete |
-| AUTH-09 | Phase 3 | Complete |
-| AUTH-10 | Phase 3 | Complete |
-| TEST-01 | Phase 4 | Complete |
-| TEST-02 | Phase 4 | Complete |
-| TEST-03 | Phase 4 | Complete |
-| TEST-04 | Phase 4 | Complete |
-| TEST-05 | Phase 4 | Complete |
-| TEST-06 | Phase 4 | Complete |
-| QWIN-01 | Phase 4 | Complete |
-| QWIN-02 | Phase 4 | Complete |
-| QWIN-03 | Phase 4 | Complete |
-| QWIN-04 | Phase 4 | Complete |
-| QWIN-05 | Phase 4 | Complete |
-| QWIN-06 | Phase 4 | Complete |
+| QUEUE-01 through QUEUE-09, QUEUE-12, QUEUE-13 | Phase 1 | Complete |
+| QUEUE-10, QUEUE-11 | Phase 2 | Complete |
+| AUTH-01 through AUTH-10 | Phase 3 | Complete |
+| TEST-01 through TEST-06, QWIN-01 through QWIN-06 | Phase 4 | Complete |
+
+### v1.1 (Active)
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| LIST-01 | — | Pending |
+| LIST-02 | — | Pending |
+| LIST-03 | — | Pending |
+| LIST-04 | — | Pending |
+| DETAIL-01 | — | Pending |
+| DETAIL-02 | — | Pending |
+| DETAIL-03 | — | Pending |
+| DETAIL-04 | — | Pending |
+| DETAIL-05 | — | Pending |
+| TRIGGER-01 | — | Pending |
+| TRIGGER-02 | — | Pending |
+| TRIGGER-03 | — | Pending |
+| TRIGGER-04 | — | Pending |
+| NAV-01 | — | Pending |
+| NAV-02 | — | Pending |
 
 **Coverage:**
-- v1 requirements: 35 total
-- Mapped to phases: 35
-- Unmapped: 0
-
-Note: The original count of "25 total" was incorrect — a recount of the defined requirements yields 35 (QUEUE 1-13 = 13, AUTH 1-10 = 10, TEST 1-6 = 6, QWIN 1-6 = 6).
+- v1.1 requirements: 15 total
+- Mapped to phases: 0
+- Unmapped: 15
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-07 after roadmap creation — traceability populated, coverage 35/35*
+*Last updated: 2026-03-09 after v1.1 requirements definition*
