@@ -76,12 +76,11 @@ Plans:
   3. The orchestrator can delete a file or directory within the workspace; path traversal attempts are rejected
   4. GET /api/conversations/:id/export returns the full conversation as downloadable JSON
   5. Swagger UI is accessible at a configurable URL and reflects all current API routes
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: E2E test infrastructure (test database isolation, Fastify inject harness, CI integration)
-- [ ] 04-02: E2E test suite (goal lifecycle test, MockLlmRegistry integration)
-- [ ] 04-03: Quick wins (deleteFile, deleteDirectory, GET /api/agents/roles, export endpoint, OpenAPI + Swagger UI)
+- [ ] 04-01-PLAN.md — E2E goal lifecycle test with real DB isolation, truncation, Fastify inject, and MockLlmRegistry scripted responses
+- [ ] 04-02-PLAN.md — Quick win tests: deleteFile/deleteDirectory workspace tests + route tests for roles, export, and Swagger endpoints
 
 ## Progress
 
@@ -93,10 +92,11 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
 | 2. SSE Migration | 0/2 | Not started | - |
 | 3. Authentication | 2/2 | Complete   | 2026-03-08 |
-| 4. Tests & Quick Wins | 0/3 | Not started | - |
+| 4. Tests & Quick Wins | 0/2 | Not started | - |
 
 ---
 *Roadmap created: 2026-03-07*
 *Phase 1 planned: 2026-03-07*
 *Phase 2 planned: 2026-03-08*
 *Phase 3 planned: 2026-03-08*
+*Phase 4 planned: 2026-03-08*
