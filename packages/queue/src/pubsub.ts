@@ -38,8 +38,19 @@ export interface AgentLifecycleEvent {
   error?: string;
 }
 
-/** Union of both event types */
-export type AgentEvent = AgentProgressEvent | AgentLifecycleEvent;
+/** Subagent progress event (emitted during subagent tool loops) */
+export interface SubagentProgressEvent {
+  subagentRunId: string;
+  type: "subagent_started" | "subagent_tool_call" | "subagent_tool_result" | "subagent_completed" | "subagent_failed";
+  round?: number;
+  toolName?: string;
+  output?: string;
+  error?: string;
+  timestamp: number;
+}
+
+/** Union of all event types */
+export type AgentEvent = AgentProgressEvent | AgentLifecycleEvent | SubagentProgressEvent;
 
 // ── Helper functions ──
 
@@ -51,6 +62,19 @@ export function goalChannel(goalId: string): string {
 /** Returns the Redis LIST key for storing event history for a given goal */
 export function historyKey(goalId: string): string {
   return `${HISTORY_PREFIX}${goalId}`;
+}
+
+export const SUBAGENT_CHANNEL_PREFIX = "agent-events:subagent:";
+export const SUBAGENT_HISTORY_PREFIX = "agent-events:subagent-history:";
+
+/** Returns the Redis pub/sub channel name for a given subagent run */
+export function subagentChannel(subagentRunId: string): string {
+  return `${SUBAGENT_CHANNEL_PREFIX}${subagentRunId}`;
+}
+
+/** Returns the Redis LIST key for subagent event history */
+export function subagentHistoryKey(subagentRunId: string): string {
+  return `${SUBAGENT_HISTORY_PREFIX}${subagentRunId}`;
 }
 
 // ── RedisPubSub class ──
@@ -103,6 +127,30 @@ export class RedisPubSub {
     const key = historyKey(goalId);
     const items = await this.publisher.lrange(key, 0, -1);
     return items.map((item) => JSON.parse(item) as AgentEvent);
+  }
+
+  /**
+   * Publish a subagent progress event to the subagent's channel and append to history.
+   */
+  async publishSubagent(subagentRunId: string, event: SubagentProgressEvent): Promise<void> {
+    const channel = subagentChannel(subagentRunId);
+    const key = subagentHistoryKey(subagentRunId);
+    const payload = JSON.stringify(event);
+
+    await Promise.all([
+      this.publisher.publish(channel, payload),
+      this.publisher.rpush(key, payload),
+      this.publisher.expire(key, HISTORY_TTL_SECONDS),
+    ]);
+  }
+
+  /**
+   * Retrieve all stored events for a subagent run (for late-joining SSE clients).
+   */
+  async getSubagentHistory(subagentRunId: string): Promise<SubagentProgressEvent[]> {
+    const key = subagentHistoryKey(subagentRunId);
+    const items = await this.publisher.lrange(key, 0, -1);
+    return items.map((item) => JSON.parse(item) as SubagentProgressEvent);
   }
 
   /** Close the publisher connection cleanly */

@@ -7,11 +7,16 @@ export {
   createSubscriber,
   goalChannel,
   historyKey,
+  subagentChannel,
+  subagentHistoryKey,
   CHANNEL_PREFIX,
   HISTORY_PREFIX,
+  SUBAGENT_CHANNEL_PREFIX,
+  SUBAGENT_HISTORY_PREFIX,
   HISTORY_TTL_SECONDS,
   type AgentProgressEvent,
   type AgentLifecycleEvent,
+  type SubagentProgressEvent,
   type AgentEvent,
 } from "./pubsub.js";
 
@@ -24,6 +29,7 @@ export {
   getNotificationQueue,
   getPipelineQueue,
   getRagIngestionQueue,
+  getSubagentTaskQueue,
   closeAllQueues,
   type AgentTaskJob,
   type MonitoringJob,
@@ -35,6 +41,7 @@ export {
   getReflectionQueue,
   getDeadLetterQueue,
   type ReflectionJob,
+  type SubagentTaskJob,
   type DeadLetterJob,
 } from "./queues.js";
 
@@ -50,6 +57,7 @@ export {
   type PipelineProcessor,
   type RagIngestionProcessor,
   type ReflectionProcessor,
+  type SubagentTaskProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)
@@ -64,6 +72,7 @@ export {
   enqueuePipeline,
   enqueueRagIngestion,
   enqueueReflection,
+  enqueueSubagentTask,
   getAllQueueStatus,
   getJobStatus,
   pingRedis,

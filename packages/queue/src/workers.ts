@@ -10,6 +10,7 @@ import {
   type PipelineJob,
   type RagIngestionJob,
   type ReflectionJob,
+  type SubagentTaskJob,
 } from "./queues.js";
 import { sendToDeadLetter } from "./helpers.js";
 
@@ -28,6 +29,7 @@ export type NotificationProcessor = (
 export type PipelineProcessor = (job: Job<PipelineJob>) => Promise<void>;
 export type RagIngestionProcessor = (job: Job<RagIngestionJob>) => Promise<void>;
 export type ReflectionProcessor = (job: Job<ReflectionJob>) => Promise<void>;
+export type SubagentTaskProcessor = (job: Job<SubagentTaskJob>) => Promise<void>;
 
 export interface WorkerProcessors {
   agentTask?: AgentTaskProcessor;
@@ -37,6 +39,7 @@ export interface WorkerProcessors {
   pipeline?: PipelineProcessor;
   ragIngestion?: RagIngestionProcessor;
   reflection?: ReflectionProcessor;
+  subagentTask?: SubagentTaskProcessor;
 }
 
 const activeWorkers: Worker[] = [];
@@ -141,6 +144,22 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.REFLECTIONS);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.subagentTask) {
+    const worker = new Worker<SubagentTaskJob>(
+      QUEUE_NAMES.SUBAGENT_TASKS,
+      processors.subagentTask,
+      {
+        connection,
+        concurrency: 3,              // up to 3 subagents in parallel
+        lockDuration: 900_000,       // 15 min — subagents run extended tool loops
+        stalledInterval: 60_000,     // check stalls every 60s
+        maxStalledCount: 1,
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.SUBAGENT_TASKS);
     activeWorkers.push(worker);
   }
 

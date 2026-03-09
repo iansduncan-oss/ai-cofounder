@@ -432,3 +432,44 @@ export interface SubmitPipelineResponse {
   status: string;
   stageCount: number;
 }
+
+/* ── Subagents ── */
+
+export type SubagentRunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
+
+export interface SubagentRun {
+  id: string;
+  parentRequestId: string | null;
+  conversationId: string | null;
+  goalId: string | null;
+  title: string;
+  instruction: string;
+  status: SubagentRunStatus;
+  output: string | null;
+  error: string | null;
+  toolRounds: number;
+  toolsUsed: string[] | null;
+  tokens: number;
+  model: string | null;
+  provider: string | null;
+  durationMs: number | null;
+  userId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SpawnSubagentInput {
+  title: string;
+  instruction: string;
+  conversationId?: string;
+  goalId?: string;
+  userId?: string;
+  priority?: "critical" | "high" | "normal" | "low";
+}
+
+export interface SpawnSubagentResponse {
+  subagentRunId: string;
+  status: string;
+  title: string;
+}

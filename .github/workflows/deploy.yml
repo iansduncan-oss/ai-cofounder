@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v3
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
@@ -27,7 +27,7 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 ian@avion-stack-01 << 'DEPLOY'
+          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 << 'DEPLOY'
           set -e
           cd /opt/ai-cofounder
 

@@ -22,7 +22,7 @@ vi.mock("@ai-cofounder/shared", () => ({
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
@@ -40,17 +40,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   completeWorkSession: vi.fn(),
   createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
   findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1" }),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({

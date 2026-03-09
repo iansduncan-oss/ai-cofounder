@@ -49,4 +49,8 @@ export type {
   MonitoringAlert,
   QueueStatus,
   ToolStat,
+  SubagentRunStatus,
+  SubagentRun,
+  SpawnSubagentInput,
+  SpawnSubagentResponse,
 } from "./types.js";

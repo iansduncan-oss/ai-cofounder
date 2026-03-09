@@ -69,6 +69,17 @@ import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { notifyApprovalCreated } from "../services/notifications.js";
+import { buildSharedToolList, executeSharedTool } from "./tool-executor.js";
+import {
+  DELEGATE_TO_SUBAGENT_TOOL,
+  DELEGATE_PARALLEL_TOOL,
+  CHECK_SUBAGENT_TOOL,
+} from "./tools/subagent-tools.js";
+import {
+  createSubagentRun,
+  getSubagentRun,
+} from "@ai-cofounder/db";
+import { enqueueSubagentTask } from "@ai-cofounder/queue";
 
 /* ── Result types ── */
 
@@ -333,28 +344,18 @@ export class Orchestrator {
 
     messages.push({ role: "user", content: message });
 
-    // Build tools array (all tools when DB available)
+    // Build tools array: orchestrator-only tools + shared tools
     const tools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL, BROWSE_WEB_TOOL]
-      : [SEARCH_WEB_TOOL, BROWSE_WEB_TOOL];
+      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
+      : [];
 
-    if (this.n8nService && this.db) {
-      tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
-    }
-
-    if (this.sandboxService?.available) {
-      tools.push(EXECUTE_CODE_TOOL);
-    }
-
-    if (this.db) {
-      tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
-    }
-
-    if (this.workspaceService) {
-      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL, DELETE_FILE_TOOL, DELETE_DIRECTORY_TOOL);
-      tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
-      tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
-    }
+    tools.push(...buildSharedToolList({
+      db: this.db,
+      embeddingService: this.embeddingService,
+      n8nService: this.n8nService,
+      sandboxService: this.sandboxService,
+      workspaceService: this.workspaceService,
+    }));
 
     try {
       let totalInputTokens = 0;
@@ -509,16 +510,15 @@ export class Orchestrator {
     messages.push({ role: "user", content: message });
 
     const tools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL, SEARCH_WEB_TOOL, BROWSE_WEB_TOOL]
-      : [SEARCH_WEB_TOOL, BROWSE_WEB_TOOL];
-    if (this.n8nService && this.db) tools.push(TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL);
-    if (this.sandboxService?.available) tools.push(EXECUTE_CODE_TOOL);
-    if (this.db) tools.push(CREATE_SCHEDULE_TOOL, LIST_SCHEDULES_TOOL, DELETE_SCHEDULE_TOOL);
-    if (this.workspaceService) {
-      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL, DELETE_FILE_TOOL, DELETE_DIRECTORY_TOOL);
-      tools.push(GIT_CLONE_TOOL, GIT_STATUS_TOOL, GIT_DIFF_TOOL, GIT_ADD_TOOL, GIT_COMMIT_TOOL, GIT_PULL_TOOL, GIT_LOG_TOOL);
-      tools.push(GIT_BRANCH_TOOL, GIT_CHECKOUT_TOOL, GIT_PUSH_TOOL, RUN_TESTS_TOOL, CREATE_PR_TOOL);
-    }
+      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
+      : [];
+    tools.push(...buildSharedToolList({
+      db: this.db,
+      embeddingService: this.embeddingService,
+      n8nService: this.n8nService,
+      sandboxService: this.sandboxService,
+      workspaceService: this.workspaceService,
+    }));
 
     try {
       let totalInputTokens = 0;
@@ -657,6 +657,7 @@ export class Orchestrator {
     conversationId: string,
     userId?: string,
   ): Promise<unknown> {
+    // Orchestrator-only tools handled here
     switch (block.name) {
       case "create_plan": {
         if (!this.db) return { error: "Database not available" };
@@ -685,91 +686,6 @@ export class Orchestrator {
           message: `Milestone created. Use create_plan with milestone_id="${milestone.id}" to add goals to it.`,
         };
       }
-      case "save_memory": {
-        if (!userId || !this.db) return { error: "No user context available" };
-        const input = block.input as {
-          category: string;
-          key: string;
-          content: string;
-        };
-        let embedding: number[] | undefined;
-        if (this.embeddingService) {
-          try {
-            embedding = await this.embeddingService.embed(`${input.key}: ${input.content}`);
-          } catch (err) {
-            this.logger.warn({ err }, "failed to generate embedding for memory, saving without");
-          }
-        }
-        const mem = await saveMemory(this.db, {
-          userId,
-          category: input.category as Parameters<typeof saveMemory>[1]["category"],
-          key: input.key,
-          content: input.content,
-          source: conversationId,
-          embedding,
-        });
-        return { saved: true, key: mem.key, category: mem.category };
-      }
-      case "recall_memories": {
-        if (!userId || !this.db) return { error: "No user context available" };
-        const input = block.input as { category?: string; query?: string };
-
-        // Use vector search when query is provided and embedding service is available
-        if (input.query && this.embeddingService) {
-          try {
-            const queryEmbedding = await this.embeddingService.embed(input.query);
-            const results = await searchMemoriesByVector(this.db, queryEmbedding, userId, 10);
-            if (results.length > 0) {
-              // Touch recalled memories async (non-fatal)
-              for (const m of results) {
-                touchMemory(this.db!, m.id).catch(() => {});
-              }
-              return results.map((m) => ({
-                key: m.key,
-                category: m.category,
-                content: m.content,
-                updatedAt: m.updated_at,
-                distance: m.distance,
-              }));
-            }
-          } catch (err) {
-            this.logger.warn({ err }, "vector search failed, falling back to text search");
-          }
-        }
-
-        // Fallback to ILIKE text search
-        const memories = await recallMemories(this.db, userId, input);
-        // Touch recalled memories async (non-fatal)
-        for (const m of memories) {
-          touchMemory(this.db!, m.id).catch(() => {});
-        }
-        const memoryResults = memories.map((m) => ({
-          key: m.key,
-          category: m.category,
-          content: m.content,
-          updatedAt: m.updatedAt,
-        }));
-
-        // Also retrieve RAG document chunks when a query is provided
-        let ragContext = "";
-        if (input.query && this.embeddingService) {
-          try {
-            const chunks = await retrieve(
-              this.db,
-              (text) => this.embeddingService!.embed(text),
-              input.query,
-              { limit: 5 },
-            );
-            ragContext = formatContext(chunks);
-          } catch (err) {
-            this.logger.warn({ err }, "RAG retrieval failed, returning memories only");
-          }
-        }
-
-        return ragContext
-          ? { memories: memoryResults, ragContext }
-          : memoryResults;
-      }
       case "request_approval": {
         if (!this.db) return { error: "Database not available" };
         const input = block.input as { task_id: string; reason: string };
@@ -778,11 +694,7 @@ export class Orchestrator {
           requestedBy: "orchestrator",
           reason: input.reason,
         });
-        this.logger.info(
-          { approvalId: approval.id, taskId: input.task_id },
-          "approval requested",
-        );
-        // Send proactive Slack notification (async, non-fatal)
+        this.logger.info({ approvalId: approval.id, taskId: input.task_id }, "approval requested");
         notifyApprovalCreated({
           approvalId: approval.id,
           taskId: input.task_id,
@@ -795,233 +707,105 @@ export class Orchestrator {
           message: `Approval requested. The user can approve with /approve ${approval.id}`,
         };
       }
-      case "search_web": {
-        const input = block.input as { query: string; max_results?: number };
-        return executeWebSearch(input.query, input.max_results);
-      }
-      case "browse_web": {
-        const input = block.input as { url: string; max_length?: number };
-        return executeBrowseWeb(input.url, input.max_length);
-      }
-      case "trigger_workflow": {
-        if (!this.n8nService || !this.db) return { error: "n8n integration not available" };
-        const input = block.input as { workflow_name: string; payload: Record<string, unknown> };
-        const workflow = await getN8nWorkflowByName(this.db, input.workflow_name);
-        if (!workflow) return { error: `Workflow "${input.workflow_name}" not found` };
-        if (workflow.direction === "inbound") {
-          return { error: `Workflow "${input.workflow_name}" is inbound-only and cannot be triggered` };
-        }
-        return this.n8nService.trigger(workflow.webhookUrl, workflow.name, input.payload);
-      }
-      case "list_workflows": {
+
+      // ── Subagent delegation tools ──
+
+      case "delegate_to_subagent": {
         if (!this.db) return { error: "Database not available" };
-        const workflows = await listN8nWorkflows(this.db, "outbound");
-        return workflows.map((w) => ({
-          name: w.name,
-          description: w.description,
-          inputSchema: w.inputSchema,
-        }));
-      }
-      case "create_schedule": {
-        if (!this.db) return { error: "Database not available" };
-        const input = block.input as { cron_expression: string; action_prompt: string; description?: string };
-        try {
-          const { CronExpressionParser } = await import("cron-parser");
-          const interval = CronExpressionParser.parse(input.cron_expression);
-          const nextRunAt = interval.next().toDate();
-          const schedule = await createSchedule(this.db, {
-            cronExpression: input.cron_expression,
-            actionPrompt: input.action_prompt,
-            description: input.description,
-            userId,
-            enabled: true,
-            nextRunAt,
-          });
-          return {
-            scheduleId: schedule.id,
-            cronExpression: schedule.cronExpression,
-            nextRunAt: nextRunAt.toISOString(),
-            message: `Schedule created: ${input.description ?? input.action_prompt}`,
-          };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: `Invalid cron expression: ${msg}` };
-        }
-      }
-      case "list_schedules": {
-        if (!this.db) return { error: "Database not available" };
-        const allSchedules = await listSchedules(this.db, userId);
-        return allSchedules.map((s) => ({
-          id: s.id,
-          cronExpression: s.cronExpression,
-          actionPrompt: s.actionPrompt,
-          description: s.description,
-          enabled: s.enabled,
-          lastRunAt: s.lastRunAt,
-          nextRunAt: s.nextRunAt,
-        }));
-      }
-      case "delete_schedule": {
-        if (!this.db) return { error: "Database not available" };
-        const input = block.input as { schedule_id: string };
-        const deleted = await deleteSchedule(this.db, input.schedule_id);
-        if (!deleted) return { error: "Schedule not found" };
-        return { deleted: true, scheduleId: input.schedule_id };
-      }
-      case "execute_code": {
-        if (!this.sandboxService?.available) return { error: "Sandbox execution not available" };
-        const input = block.input as { code: string; language: string; timeout_ms?: number; dependencies?: string[] };
-        const timeoutMs = Math.min(input.timeout_ms ?? 30_000, 60_000);
-        const result = await this.sandboxService.execute({
-          code: input.code,
-          language: input.language as "typescript" | "javascript" | "python" | "bash",
-          timeoutMs,
-          dependencies: input.dependencies,
+        const input = block.input as { title: string; instruction: string; wait_for_result?: boolean };
+        const run = await createSubagentRun(this.db, {
+          parentRequestId: this.requestId,
+          conversationId,
+          title: input.title,
+          instruction: input.instruction,
+          userId,
         });
-        // Persist execution result if DB is available
-        if (this.db) {
-          try {
-            const { hashCode } = await import("@ai-cofounder/sandbox");
-            await saveCodeExecution(this.db, {
-              language: input.language,
-              codeHash: hashCode(input.code),
-              stdout: result.stdout,
-              stderr: result.stderr,
-              exitCode: result.exitCode,
-              durationMs: result.durationMs,
-              timedOut: result.timedOut,
-            });
-          } catch (err) {
-            this.logger.warn({ err }, "failed to persist code execution result");
+        await enqueueSubagentTask({
+          subagentRunId: run.id,
+          title: input.title,
+          instruction: input.instruction,
+          conversationId,
+          userId,
+          parentRequestId: this.requestId,
+        });
+        this.logger.info({ subagentRunId: run.id, title: input.title }, "subagent delegated");
+
+        if (input.wait_for_result) {
+          // Poll for completion (up to 5 min)
+          const deadline = Date.now() + 300_000;
+          while (Date.now() < deadline) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const status = await getSubagentRun(this.db, run.id);
+            if (status?.status === "completed") {
+              return { subagentRunId: run.id, status: "completed", output: status.output };
+            }
+            if (status?.status === "failed") {
+              return { subagentRunId: run.id, status: "failed", error: status.error };
+            }
           }
+          return { subagentRunId: run.id, status: "timeout", message: "Subagent still running after 5 minutes. Use check_subagent to poll later." };
         }
+
+        return { subagentRunId: run.id, status: "queued", message: "Subagent spawned. Use check_subagent to poll for results." };
+      }
+
+      case "delegate_parallel": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as { tasks: Array<{ title: string; instruction: string }> };
+        const results = [];
+        for (const task of input.tasks.slice(0, 5)) {
+          const run = await createSubagentRun(this.db, {
+            parentRequestId: this.requestId,
+            conversationId,
+            title: task.title,
+            instruction: task.instruction,
+            userId,
+          });
+          await enqueueSubagentTask({
+            subagentRunId: run.id,
+            title: task.title,
+            instruction: task.instruction,
+            conversationId,
+            userId,
+            parentRequestId: this.requestId,
+          });
+          results.push({ subagentRunId: run.id, title: task.title, status: "queued" });
+        }
+        this.logger.info({ count: results.length }, "parallel subagents delegated");
+        return { subagents: results, message: "Use check_subagent to poll each subagent for results." };
+      }
+
+      case "check_subagent": {
+        if (!this.db) return { error: "Database not available" };
+        const input = block.input as { subagent_run_id: string };
+        const run = await getSubagentRun(this.db, input.subagent_run_id);
+        if (!run) return { error: "Subagent run not found" };
         return {
-          stdout: result.stdout,
-          stderr: result.stderr,
-          exitCode: result.exitCode,
-          durationMs: result.durationMs,
-          timedOut: result.timedOut,
-          language: result.language,
+          subagentRunId: run.id,
+          title: run.title,
+          status: run.status,
+          output: run.output,
+          error: run.error,
+          toolRounds: run.toolRounds,
+          toolsUsed: run.toolsUsed,
+          tokens: run.tokens,
+          durationMs: run.durationMs,
         };
       }
-      case "read_file": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { path: string };
-        try {
-          const content = await this.workspaceService.readFile(input.path);
-          return { path: input.path, content };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: msg };
-        }
+
+      default: {
+        // Delegate to shared tool executor
+        const result = await executeSharedTool(block, {
+          db: this.db,
+          embeddingService: this.embeddingService,
+          n8nService: this.n8nService,
+          sandboxService: this.sandboxService,
+          workspaceService: this.workspaceService,
+        }, { conversationId, userId });
+
+        if (result === null) return { error: `Unknown tool: ${block.name}` };
+        return result;
       }
-      case "write_file": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { path: string; content: string };
-        try {
-          await this.workspaceService.writeFile(input.path, input.content);
-          return { written: true, path: input.path };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: msg };
-        }
-      }
-      case "list_directory": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { path?: string };
-        try {
-          const entries = await this.workspaceService.listDirectory(input.path);
-          return { path: input.path ?? ".", entries };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: msg };
-        }
-      }
-      case "delete_file": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { path: string };
-        try {
-          await this.workspaceService.deleteFile(input.path);
-          return { deleted: true, path: input.path };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: msg };
-        }
-      }
-      case "delete_directory": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { path: string; force?: boolean };
-        try {
-          await this.workspaceService.deleteDirectory(input.path, input.force);
-          return { deleted: true, path: input.path };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return { error: msg };
-        }
-      }
-      case "git_clone": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_url: string; directory_name?: string; depth?: number };
-        const result = await this.workspaceService.gitClone(input.repo_url, input.directory_name, input.depth);
-        return { ...result, repoUrl: input.repo_url };
-      }
-      case "git_status": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string };
-        return this.workspaceService.gitStatus(input.repo_dir);
-      }
-      case "git_diff": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; staged?: boolean };
-        return this.workspaceService.gitDiff(input.repo_dir, input.staged);
-      }
-      case "git_add": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; paths: string[] };
-        return this.workspaceService.gitAdd(input.repo_dir, input.paths);
-      }
-      case "git_commit": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; message: string };
-        return this.workspaceService.gitCommit(input.repo_dir, input.message);
-      }
-      case "git_pull": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; remote?: string; branch?: string };
-        return this.workspaceService.gitPull(input.repo_dir, input.remote, input.branch);
-      }
-      case "git_log": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; max_count?: number };
-        return this.workspaceService.gitLog(input.repo_dir, input.max_count);
-      }
-      case "git_branch": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; name?: string };
-        return this.workspaceService.gitBranch(input.repo_dir, input.name);
-      }
-      case "git_checkout": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; branch: string; create?: boolean };
-        return this.workspaceService.gitCheckout(input.repo_dir, input.branch, input.create);
-      }
-      case "git_push": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; remote?: string; branch?: string };
-        return this.workspaceService.gitPush(input.repo_dir, input.remote, input.branch);
-      }
-      case "run_tests": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as { repo_dir: string; command?: string; timeout_ms?: number };
-        return this.workspaceService.runTests(input.repo_dir, input.command, input.timeout_ms);
-      }
-      case "create_pr": {
-        if (!this.workspaceService) return { error: "Workspace not available" };
-        const input = block.input as unknown as CreatePrInput;
-        return executeCreatePr(input);
-      }
-      default:
-        return { error: `Unknown tool: ${block.name}` };
     }
   }
 

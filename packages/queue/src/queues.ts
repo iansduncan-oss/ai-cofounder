@@ -68,10 +68,23 @@ export interface ReflectionJob {
   }>;
 }
 
+export interface SubagentTaskJob {
+  subagentRunId: string;
+  title: string;
+  instruction: string;
+  conversationId?: string;
+  goalId?: string;
+  userId?: string;
+  parentRequestId?: string;
+  priority?: "critical" | "high" | "normal" | "low";
+  metadata?: Record<string, unknown>;
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
   AGENT_TASKS: "agent-tasks",
+  SUBAGENT_TASKS: "subagent-tasks",
   MONITORING: "monitoring",
   BRIEFINGS: "briefings",
   NOTIFICATIONS: "notifications",
@@ -137,6 +150,10 @@ export function getRagIngestionQueue(): Queue<RagIngestionJob> {
 
 export function getReflectionQueue(): Queue<ReflectionJob> {
   return getOrCreateQueue<ReflectionJob>(QUEUE_NAMES.REFLECTIONS);
+}
+
+export function getSubagentTaskQueue(): Queue<SubagentTaskJob> {
+  return getOrCreateQueue<SubagentTaskJob>(QUEUE_NAMES.SUBAGENT_TASKS);
 }
 
 export function getDeadLetterQueue(): Queue<DeadLetterJob> {

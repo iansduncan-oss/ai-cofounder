@@ -11,7 +11,7 @@ const mockGetSchedule = vi.fn();
 const mockDeleteSchedule = vi.fn();
 const mockToggleSchedule = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
@@ -20,7 +20,6 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   getSchedule: (...args: unknown[]) => mockGetSchedule(...args),
   deleteSchedule: (...args: unknown[]) => mockDeleteSchedule(...args),
   toggleSchedule: (...args: unknown[]) => mockToggleSchedule(...args),
-  // Required by other imports
   findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1" }),
   createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
   getConversationMessages: vi.fn().mockResolvedValue([]),
@@ -63,7 +62,9 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   deleteN8nWorkflow: vi.fn(),
   findN8nWorkflowByEvent: vi.fn(),
   saveCodeExecution: vi.fn(),
-  listSchedules: (...args: unknown[]) => mockListSchedules(...args),
+  createMilestone: vi.fn(),
+  touchMemory: vi.fn(),
+  recordToolExecution: vi.fn(),
   createEvent: vi.fn().mockResolvedValue({ id: "evt-1" }),
   markEventProcessed: vi.fn(),
   listUnprocessedEvents: vi.fn().mockResolvedValue([]),
@@ -76,6 +77,9 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   getUsageSummary: vi.fn(),
   listEnabledSchedules: vi.fn().mockResolvedValue([]),
   updateScheduleLastRun: vi.fn(),
+  getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+  upsertProviderHealth: vi.fn(),
+  getToolStats: vi.fn().mockResolvedValue([]),
   goals: {},
   channelConversations: {},
   prompts: {},
@@ -83,17 +87,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   schedules: {},
   events: {},
   workSessions: {},
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({

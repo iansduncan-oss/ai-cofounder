@@ -19,6 +19,7 @@ import { createEmbeddingService } from "@ai-cofounder/llm";
 import { createSandboxService } from "@ai-cofounder/sandbox";
 import { createWorkspaceService } from "./services/workspace.js";
 import { createNotificationService } from "./services/notifications.js";
+import { SubagentRunner } from "./services/subagent.js";
 
 const logger = createLogger("worker");
 
@@ -66,11 +67,20 @@ export async function main() {
     verificationService,
   );
 
-  // NOTE: agentTask processor is registered here exclusively.
+  // Subagent runner for autonomous subagent tasks
+  const subagentRunner = new SubagentRunner(
+    llmRegistry,
+    db,
+    embeddingService,
+    undefined, // n8nService — not available in worker
+    sandboxService,
+    workspaceService,
+    redisPubSub,
+  );
+
+  // NOTE: agentTask + subagentTask processors are registered here exclusively.
   // Monitoring/briefing/notification/pipeline processors stay in the HTTP server (queue plugin).
-  // This prevents the HTTP server from blocking on long-running agent tasks.
   startWorkers({
-    // agentTask is intentionally the ONLY processor registered in this worker process
     agentTask: async (job) => {
       const { goalId, userId } = job.data;
       logger.info({ jobId: job.id, goalId, userId }, "Processing agent task");
@@ -101,6 +111,13 @@ export async function main() {
 
         throw err; // Re-throw so BullMQ marks job as failed and handles retries
       }
+    },
+
+    subagentTask: async (job) => {
+      const { subagentRunId, title } = job.data;
+      logger.info({ jobId: job.id, subagentRunId, title }, "Processing subagent task");
+      await subagentRunner.run(job.data);
+      logger.info({ jobId: job.id, subagentRunId }, "Subagent task completed");
     },
   });
 

@@ -31,6 +31,7 @@ export const agentRoleEnum = pgEnum("agent_role", [
   "debugger",
   "doc_writer",
   "verifier",
+  "subagent",
 ]);
 
 export const users = pgTable("users", {
@@ -428,6 +429,38 @@ export const personas = pgTable("personas", {
   capabilities: text("capabilities"),
   behavioralGuidelines: text("behavioral_guidelines"),
   isActive: boolean("is_active").notNull().default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Subagent Runs (autonomous subagent execution tracking) ── */
+
+export const subagentRunStatusEnum = pgEnum("subagent_run_status", [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+  "cancelled",
+]);
+
+export const subagentRuns = pgTable("subagent_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  parentRequestId: text("parent_request_id"),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  instruction: text("instruction").notNull(),
+  status: subagentRunStatusEnum("status").notNull().default("queued"),
+  output: text("output"),
+  error: text("error"),
+  toolRounds: integer("tool_rounds").notNull().default(0),
+  toolsUsed: jsonb("tools_used"),
+  tokens: integer("tokens").notNull().default(0),
+  model: text("model"),
+  provider: text("provider"),
+  durationMs: integer("duration_ms"),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -26,6 +26,7 @@ import {
   ingestionState,
   reflections,
   adminUsers,
+  subagentRuns,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -1736,4 +1737,121 @@ export async function countAdminUsers(db: Db): Promise<number> {
     .select({ count: sql<number>`count(*)::int` })
     .from(adminUsers);
   return rows[0]?.count ?? 0;
+}
+
+/* ────────────────────── Subagent Runs ─────────────────────── */
+
+export async function createSubagentRun(
+  db: Db,
+  data: {
+    parentRequestId?: string;
+    conversationId?: string;
+    goalId?: string;
+    title: string;
+    instruction: string;
+    userId?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [created] = await db
+    .insert(subagentRuns)
+    .values({
+      parentRequestId: data.parentRequestId,
+      conversationId: data.conversationId,
+      goalId: data.goalId,
+      title: data.title,
+      instruction: data.instruction,
+      userId: data.userId,
+      metadata: data.metadata,
+    })
+    .returning();
+  return created;
+}
+
+export async function updateSubagentRunStatus(
+  db: Db,
+  id: string,
+  update: {
+    status: "queued" | "running" | "completed" | "failed" | "cancelled";
+    output?: string;
+    error?: string;
+    toolRounds?: number;
+    toolsUsed?: string[];
+    tokens?: number;
+    model?: string;
+    provider?: string;
+    durationMs?: number;
+  },
+) {
+  const values: Record<string, unknown> = {
+    status: update.status,
+    updatedAt: new Date(),
+  };
+  if (update.output !== undefined) values.output = update.output;
+  if (update.error !== undefined) values.error = update.error;
+  if (update.toolRounds !== undefined) values.toolRounds = update.toolRounds;
+  if (update.toolsUsed !== undefined) values.toolsUsed = update.toolsUsed;
+  if (update.tokens !== undefined) values.tokens = update.tokens;
+  if (update.model !== undefined) values.model = update.model;
+  if (update.provider !== undefined) values.provider = update.provider;
+  if (update.durationMs !== undefined) values.durationMs = update.durationMs;
+
+  const [updated] = await db
+    .update(subagentRuns)
+    .set(values)
+    .where(eq(subagentRuns.id, id))
+    .returning();
+  return updated;
+}
+
+export async function getSubagentRun(db: Db, id: string) {
+  const rows = await db
+    .select()
+    .from(subagentRuns)
+    .where(eq(subagentRuns.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listSubagentRuns(
+  db: Db,
+  opts?: {
+    goalId?: string;
+    status?: string;
+    parentRequestId?: string;
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const conditions = [];
+  if (opts?.goalId) conditions.push(eq(subagentRuns.goalId, opts.goalId));
+  if (opts?.status) conditions.push(eq(subagentRuns.status, opts.status as "queued" | "running" | "completed" | "failed" | "cancelled"));
+  if (opts?.parentRequestId) conditions.push(eq(subagentRuns.parentRequestId, opts.parentRequestId));
+
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+
+  const data = await db
+    .select()
+    .from(subagentRuns)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(subagentRuns.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  const countResult = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(subagentRuns)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+  const total = countResult[0]?.count ?? 0;
+
+  return { data, total };
+}
+
+export async function getSubagentRunsByParentRequest(db: Db, parentRequestId: string) {
+  return db
+    .select()
+    .from(subagentRuns)
+    .where(eq(subagentRuns.parentRequestId, parentRequestId))
+    .orderBy(desc(subagentRuns.createdAt));
 }

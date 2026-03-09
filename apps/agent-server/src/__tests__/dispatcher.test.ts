@@ -15,7 +15,7 @@ const mockFailTask = vi.fn().mockResolvedValue({});
 const mockUpdateGoalStatus = vi.fn().mockResolvedValue({});
 const mockListPendingApprovals = vi.fn().mockResolvedValue([]);
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   getGoal: mockGetGoal,
   listTasksByGoal: mockListTasksByGoal,
@@ -30,17 +30,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   saveMemory: vi.fn().mockResolvedValue({}),
   recordLlmUsage: vi.fn().mockResolvedValue({}),
   saveCodeExecution: vi.fn().mockResolvedValue({}),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 const mockComplete = vi.fn().mockResolvedValue({
   content: [{ type: "text", text: "Agent output" }],

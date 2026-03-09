@@ -10,7 +10,7 @@ const mockGetSubagentRun = vi.fn();
 const mockListSubagentRuns = vi.fn();
 const mockUpdateSubagentRunStatus = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
@@ -40,6 +40,24 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   listActiveGoals: vi.fn().mockResolvedValue([]),
   countTasksByStatus: vi.fn().mockResolvedValue({}),
   listEnabledSchedules: vi.fn().mockResolvedValue([]),
+  // Table references used by route registrations
+  saveMemory: vi.fn().mockResolvedValue(null),
+  createGoal: vi.fn().mockResolvedValue(null),
+  createTask: vi.fn().mockResolvedValue(null),
+  updateGoalStatus: vi.fn(),
+  createApproval: vi.fn(),
+  createMilestone: vi.fn(),
+  getN8nWorkflowByName: vi.fn().mockResolvedValue(null),
+  saveCodeExecution: vi.fn(),
+  createSchedule: vi.fn(),
+  deleteSchedule: vi.fn(),
+  touchMemory: vi.fn(),
+  recordToolExecution: vi.fn(),
+  getProviderHealthRecords: vi.fn().mockResolvedValue([]),
+  upsertProviderHealth: vi.fn(),
+  getToolStats: vi.fn().mockResolvedValue([]),
+  recordLlmUsage: vi.fn(),
+  getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0 }),
   goals: {},
   channelConversations: {},
   prompts: {},
@@ -47,17 +65,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   schedules: {},
   events: {},
   workSessions: {},
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/queue", () => ({
   enqueueSubagentTask: vi.fn().mockResolvedValue("job-1"),

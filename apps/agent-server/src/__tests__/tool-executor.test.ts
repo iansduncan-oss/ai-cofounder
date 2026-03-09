@@ -25,7 +25,7 @@ const mockGetN8nWorkflowByName = vi.fn().mockResolvedValue(null);
 const mockListN8nWorkflows = vi.fn().mockResolvedValue([]);
 const mockSaveCodeExecution = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   saveMemory: (...args: unknown[]) => mockSaveMemory(...args),
   recallMemories: (...args: unknown[]) => mockRecallMemories(...args),
   searchMemoriesByVector: (...args: unknown[]) => mockSearchMemoriesByVector(...args),
@@ -41,17 +41,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   updateGoalStatus: vi.fn(),
   createApproval: vi.fn(),
   createMilestone: vi.fn(),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/llm", () => ({
   LlmRegistry: class {},

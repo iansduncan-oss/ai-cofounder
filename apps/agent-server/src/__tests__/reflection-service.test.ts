@@ -21,20 +21,10 @@ const mockInsertReflection = vi.fn().mockResolvedValue({
 
 const mockListReflections = vi.fn().mockResolvedValue({ data: [], total: 0 });
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   insertReflection: (...args: unknown[]) => mockInsertReflection(...args),
   listReflections: (...args: unknown[]) => mockListReflections(...args),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({

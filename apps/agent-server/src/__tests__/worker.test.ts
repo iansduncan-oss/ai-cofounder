@@ -31,20 +31,10 @@ vi.mock("@ai-cofounder/shared", () => ({
 const mockCreateDb = vi.fn().mockReturnValue({});
 const mockRunMigrations = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: (...args: unknown[]) => mockCreateDb(...args),
   runMigrations: (...args: unknown[]) => mockRunMigrations(...args),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 // --- Mock @ai-cofounder/queue ---
 const mockGetRedisConnection = vi.fn().mockReturnValue({ host: "localhost", port: 6379 });

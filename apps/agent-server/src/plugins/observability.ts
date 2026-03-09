@@ -74,6 +74,36 @@ const toolExecutionDuration = new client.Histogram({
   buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
 });
 
+// --- Subagent Metrics ---
+
+const subagentRunsTotal = new client.Counter({
+  name: "subagent_runs_total",
+  help: "Total subagent runs",
+  labelNames: ["status"] as const,
+});
+
+const subagentDurationSeconds = new client.Histogram({
+  name: "subagent_duration_seconds",
+  help: "Subagent run duration in seconds",
+  buckets: [5, 10, 30, 60, 120, 300, 600],
+});
+
+const subagentToolRounds = new client.Histogram({
+  name: "subagent_tool_rounds",
+  help: "Number of tool rounds per subagent run",
+  buckets: [1, 3, 5, 10, 15, 20, 25],
+});
+
+export function recordSubagentMetrics(data: {
+  status: string;
+  durationMs: number;
+  rounds: number;
+}) {
+  subagentRunsTotal.inc({ status: data.status });
+  subagentDurationSeconds.observe(data.durationMs / 1000);
+  subagentToolRounds.observe(data.rounds);
+}
+
 export function recordToolMetrics(data: {
   toolName: string;
   durationMs: number;

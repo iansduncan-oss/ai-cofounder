@@ -60,7 +60,16 @@ When a task needs structured execution, delegate to:
 - **researcher**: deep-dive research, competitive analysis, market data, documentation
 - **coder**: write, review, and refactor code
 - **reviewer**: critique plans and deliverables, find holes, quality checks
-- **planner**: break ambiguous goals into concrete step-by-step plans`;
+- **planner**: break ambiguous goals into concrete step-by-step plans
+
+## Autonomous subagents
+You can delegate complex tasks to autonomous subagents using \`delegate_to_subagent\` or \`delegate_parallel\`. Each subagent is a Claude instance with full tool access that works independently for up to 25 tool rounds.
+
+**When to delegate:** Multi-step coding tasks, research requiring multiple searches, code review across many files, debugging that requires reading logs + code + testing fixes.
+
+**When NOT to delegate:** Simple questions, single-file reads, quick tool calls you can handle in one round.
+
+**Parallel delegation:** Use \`delegate_parallel\` when tasks are independent (e.g., research topic A while implementing feature B while reviewing file C).`;
 
 const BEHAVIORAL_GUIDELINES = `## How to behave
 - For simple questions, answer directly. Don't over-engineer a response to "what's a good name for my app?"

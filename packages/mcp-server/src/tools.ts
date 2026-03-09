@@ -10,6 +10,8 @@ import {
   formatPipelines,
   formatMemories,
   formatProviderHealth,
+  formatSubagentRun,
+  formatSubagentRuns,
 } from "./formatters.js";
 
 export function registerTools(server: McpServer, client: ApiClient): void {
@@ -215,6 +217,66 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const data = await client.providerHealth();
         return { content: [{ type: "text" as const, text: formatProviderHealth(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "spawn_subagent",
+    "Spawn an autonomous subagent to handle a task with its own tool loop",
+    {
+      title: z.string().describe("Short title for the subagent task"),
+      instruction: z.string().describe("Detailed instruction for the subagent"),
+      conversationId: z.string().optional().describe("Conversation ID for context"),
+      goalId: z.string().optional().describe("Goal ID to associate with"),
+      userId: z.string().optional().describe("User ID"),
+      priority: z.enum(["critical", "high", "normal", "low"]).optional().describe("Queue priority"),
+    },
+    async ({ title, instruction, conversationId, goalId, userId, priority }) => {
+      try {
+        const result = await client.spawnSubagent({ title, instruction, conversationId, goalId, userId, priority });
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Subagent spawned: **${result.title}** [${result.status}] (${result.subagentRunId})`,
+          }],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_subagent",
+    "Get status and output of a subagent run",
+    {
+      id: z.string().describe("The subagent run ID"),
+    },
+    async ({ id }) => {
+      try {
+        const run = await client.getSubagentRun(id);
+        return { content: [{ type: "text" as const, text: formatSubagentRun(run) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_subagents",
+    "List subagent runs, optionally filtered by goal or status",
+    {
+      goalId: z.string().optional().describe("Filter by goal ID"),
+      status: z.enum(["queued", "running", "completed", "failed", "cancelled"]).optional().describe("Filter by status"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+    },
+    async ({ goalId, status, limit }) => {
+      try {
+        const data = await client.listSubagentRuns({ goalId, status, limit: limit ?? 20 });
+        return { content: [{ type: "text" as const, text: formatSubagentRuns(data) }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
       }

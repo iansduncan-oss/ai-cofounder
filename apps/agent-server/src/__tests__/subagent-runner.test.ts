@@ -19,22 +19,12 @@ const mockRecallMemories = vi.fn().mockResolvedValue([]);
 const mockSearchMemoriesByVector = vi.fn().mockResolvedValue([]);
 const mockRecordToolExecution = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   updateSubagentRunStatus: (...args: unknown[]) => mockUpdateSubagentRunStatus(...args),
   recallMemories: (...args: unknown[]) => mockRecallMemories(...args),
   searchMemoriesByVector: (...args: unknown[]) => mockSearchMemoriesByVector(...args),
   recordToolExecution: (...args: unknown[]) => mockRecordToolExecution(...args),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/queue", () => ({
   subagentChannel: (id: string) => `channel:sub:${id}`,

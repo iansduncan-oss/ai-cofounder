@@ -5,6 +5,7 @@ import {
   getRedisConnection,
   createSubscriber,
   goalChannel,
+  subagentChannel,
   RedisPubSub,
   type AgentEvent,
 } from "@ai-cofounder/queue";
@@ -15,6 +16,8 @@ declare module "fastify" {
     agentEvents: EventEmitter;
     subscribeGoal: (goalId: string) => Promise<void>;
     unsubscribeGoal: (goalId: string) => Promise<void>;
+    subscribeSubagent: (subagentRunId: string) => Promise<void>;
+    unsubscribeSubagent: (subagentRunId: string) => Promise<void>;
     redisPubSub: RedisPubSub;
   }
 }
@@ -34,9 +37,13 @@ export const pubsubPlugin = fp(async (app) => {
     app.decorate("agentEvents", noopEmitter);
     app.decorate("subscribeGoal", async (_goalId: string) => {});
     app.decorate("unsubscribeGoal", async (_goalId: string) => {});
+    app.decorate("subscribeSubagent", async (_subagentRunId: string) => {});
+    app.decorate("unsubscribeSubagent", async (_subagentRunId: string) => {});
     app.decorate("redisPubSub", {
       publish: async () => {},
       getHistory: async () => [] as AgentEvent[],
+      publishSubagent: async () => {},
+      getSubagentHistory: async () => [],
       close: async () => {},
     } as unknown as RedisPubSub);
 
@@ -87,9 +94,31 @@ export const pubsubPlugin = fp(async (app) => {
     }
   }
 
+  async function subscribeSubagent(subagentRunId: string): Promise<void> {
+    const channel = subagentChannel(subagentRunId);
+    if (emitter.listenerCount(channel) === 0) {
+      await subscriber.subscribe(channel);
+      logger.info({ subagentRunId, channel }, "subscribed to subagent channel");
+    }
+  }
+
+  async function unsubscribeSubagent(subagentRunId: string): Promise<void> {
+    const channel = subagentChannel(subagentRunId);
+    if (emitter.listenerCount(channel) === 0) {
+      try {
+        await subscriber.unsubscribe(channel);
+        logger.info({ subagentRunId, channel }, "unsubscribed from subagent channel");
+      } catch (err) {
+        logger.warn({ subagentRunId, err }, "failed to unsubscribe from subagent channel (non-fatal)");
+      }
+    }
+  }
+
   app.decorate("agentEvents", emitter);
   app.decorate("subscribeGoal", subscribeGoal);
   app.decorate("unsubscribeGoal", unsubscribeGoal);
+  app.decorate("subscribeSubagent", subscribeSubagent);
+  app.decorate("unsubscribeSubagent", unsubscribeSubagent);
   app.decorate("redisPubSub", redisPubSub);
 
   app.addHook("onClose", async () => {

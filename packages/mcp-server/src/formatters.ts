@@ -8,6 +8,7 @@ import type {
   QueueStatus,
   MonitoringReport,
   PaginatedResponse,
+  SubagentRun,
 } from "@ai-cofounder/api-client";
 
 export function formatDashboard(data: DashboardSummary): string {
@@ -127,6 +128,32 @@ export function formatMemories(data: PaginatedResponse<Memory>): string {
   const lines: string[] = [`# Memories (${data.data.length} of ${data.total})`, ""];
   for (const m of data.data) {
     lines.push(`- [${m.category}/${m.key}] ${m.content} (importance: ${m.importance})`);
+  }
+  return lines.join("\n");
+}
+
+export function formatSubagentRun(run: SubagentRun): string {
+  const lines: string[] = [`# Subagent: ${run.title}`, ""];
+  lines.push(`- **ID**: ${run.id}`);
+  lines.push(`- **Status**: ${run.status}`);
+  lines.push(`- **Instruction**: ${run.instruction}`);
+  if (run.model) lines.push(`- **Model**: ${run.model} (${run.provider ?? "unknown"})`);
+  if (run.toolRounds > 0) lines.push(`- **Tool Rounds**: ${run.toolRounds}`);
+  if (run.toolsUsed && run.toolsUsed.length > 0) lines.push(`- **Tools Used**: ${run.toolsUsed.join(", ")}`);
+  if (run.tokens > 0) lines.push(`- **Tokens**: ${run.tokens}`);
+  if (run.durationMs != null) lines.push(`- **Duration**: ${(run.durationMs / 1000).toFixed(1)}s`);
+  if (run.output) lines.push(`\n## Output\n\n${run.output}`);
+  if (run.error) lines.push(`\n## Error\n\n${run.error}`);
+  return lines.join("\n");
+}
+
+export function formatSubagentRuns(data: { data: SubagentRun[]; total: number }): string {
+  if (data.data.length === 0) return "No subagent runs found.";
+
+  const lines: string[] = [`# Subagent Runs (${data.data.length} of ${data.total})`, ""];
+  for (const r of data.data) {
+    const duration = r.durationMs != null ? ` ${(r.durationMs / 1000).toFixed(1)}s` : "";
+    lines.push(`- **${r.title}** [${r.status}]${duration} (${r.id})`);
   }
   return lines.join("\n");
 }

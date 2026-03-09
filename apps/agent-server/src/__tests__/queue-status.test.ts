@@ -30,7 +30,7 @@ const mockCreateDb = vi.fn().mockReturnValue({
   execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
 });
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: (...args: unknown[]) => mockCreateDb(...args),
   getGoal: (...args: unknown[]) => mockGetGoal(...args),
   // Other db fns needed for server bootstrap
@@ -117,17 +117,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   schedules: {},
   events: {},
   workSessions: {},
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 // --- Mock @ai-cofounder/queue ---
 const mockGetJobStatus = vi.fn();

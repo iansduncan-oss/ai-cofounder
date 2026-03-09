@@ -6,21 +6,11 @@ beforeAll(() => {
 
 const mockGetActivePrompt = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   getActivePrompt: (...args: unknown[]) => mockGetActivePrompt(...args),
   getActivePersona: vi.fn().mockResolvedValue(null),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 const { buildSystemPrompt } = await import("../agents/prompts/system.js");
 

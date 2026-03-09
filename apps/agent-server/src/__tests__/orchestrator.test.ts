@@ -21,7 +21,7 @@ const mockCreateApproval = vi.fn().mockResolvedValue({ id: "approval-1" });
 const mockGetN8nWorkflowByName = vi.fn();
 const mockListN8nWorkflows = vi.fn().mockResolvedValue([]);
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   createGoal: (...args: unknown[]) => mockCreateGoal(...args),
   createTask: (...args: unknown[]) => mockCreateTask(...args),
@@ -36,17 +36,7 @@ vi.mock("@ai-cofounder/db", () => new Proxy({
   getActivePersona: vi.fn().mockResolvedValue(null),
   touchMemory: vi.fn().mockResolvedValue(undefined),
   recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("@ai-cofounder/llm", () => {
   class MockLlmRegistry {

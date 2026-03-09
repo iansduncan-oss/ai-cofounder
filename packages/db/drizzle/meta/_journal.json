@@ -134,6 +134,20 @@
       "when": 1772784000000,
       "tag": "0018_add_reflections",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1772785000000,
+      "tag": "0019_add_admin_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1772786000000,
+      "tag": "0020_add_subagent_runs",
+      "breakpoints": true
     }
   ]
 }

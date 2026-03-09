@@ -19,22 +19,12 @@ const mockUpdateGoalStatus = vi.fn().mockResolvedValue({});
 const mockUpdateGoalMetadata = vi.fn().mockResolvedValue({});
 const mockSaveMemory = vi.fn().mockResolvedValue({});
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
   createDb: vi.fn().mockReturnValue({}),
   updateGoalStatus: (...args: unknown[]) => mockUpdateGoalStatus(...args),
   updateGoalMetadata: (...args: unknown[]) => mockUpdateGoalMetadata(...args),
   saveMemory: (...args: unknown[]) => mockSaveMemory(...args),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 const mockComplete = vi.fn();
 

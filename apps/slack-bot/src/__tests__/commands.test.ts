@@ -375,7 +375,7 @@ describe("slack commands", () => {
 
       const { respond } = await invokeCommand("/execute", "goal-1");
 
-      expect(mockClient.streamExecute).toHaveBeenCalledWith("goal-1", "U456");
+      expect(mockClient.streamExecute).toHaveBeenCalledWith("goal-1", { userId: "U456" });
       expect(respond).toHaveBeenCalledWith({
         blocks: expect.arrayContaining([
           expect.objectContaining({

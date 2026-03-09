@@ -9,6 +9,7 @@ import {
   getPipelineQueue,
   getRagIngestionQueue,
   getReflectionQueue,
+  getSubagentTaskQueue,
   getDeadLetterQueue,
   type AgentTaskJob,
   type MonitoringJob,
@@ -18,6 +19,7 @@ import {
   type PipelineStage,
   type RagIngestionJob,
   type ReflectionJob,
+  type SubagentTaskJob,
   type DeadLetterJob,
 } from "./queues.js";
 
@@ -110,6 +112,17 @@ export async function enqueueReflection(
   return added.id;
 }
 
+export async function enqueueSubagentTask(
+  job: SubagentTaskJob,
+): Promise<string | undefined> {
+  const queue = getSubagentTaskQueue();
+  const added = await queue.add("subagent-task", job, {
+    priority: PRIORITY_MAP[job.priority ?? "normal"],
+  });
+  logger.info({ jobId: added.id, subagentRunId: job.subagentRunId, title: job.title }, "Subagent task enqueued");
+  return added.id;
+}
+
 // ── Individual job status helper ──
 
 export interface JobStatusResult {
@@ -182,6 +195,7 @@ export interface QueueStatus {
 export async function getAllQueueStatus(): Promise<QueueStatus[]> {
   const queues = [
     { name: "agent-tasks", queue: getAgentTaskQueue() },
+    { name: "subagent-tasks", queue: getSubagentTaskQueue() },
     { name: "monitoring", queue: getMonitoringQueue() },
     { name: "briefings", queue: getBriefingQueue() },
     { name: "notifications", queue: getNotificationQueue() },
@@ -270,6 +284,7 @@ export async function retryDeadLetterJob(dlqJobId: string): Promise<{ requeued: 
   // Re-enqueue to the original queue
   const queueMap: Record<string, () => Queue> = {
     "agent-tasks": getAgentTaskQueue,
+    "subagent-tasks": getSubagentTaskQueue,
     "monitoring": getMonitoringQueue,
     "briefings": getBriefingQueue,
     "notifications": getNotificationQueue,
