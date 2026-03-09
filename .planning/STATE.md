@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Pipeline Dashboard UI
 status: completed
-stopped_at: Completed 05-pipeline-list-navigation/05-01-PLAN.md
-last_updated: "2026-03-09T14:41:32.952Z"
+stopped_at: Completed 06-pipeline-detail/06-01-PLAN.md
+last_updated: "2026-03-09T15:03:22.046Z"
 last_activity: 2026-03-09 — Phase 5 plan 01 executed, all 3 tasks committed
 progress:
   total_phases: 7
-  completed_phases: 5
-  total_plans: 10
-  completed_plans: 10
+  completed_phases: 6
+  total_plans: 11
+  completed_plans: 11
   percent: 100
 ---
 
@@ -55,6 +55,8 @@ Recent decisions affecting current work:
 - [Phase 05-pipeline-list-navigation]: PipelineStateBadge exported from pipelines.tsx for detail page reuse without circular deps
 - [Phase 05-pipeline-list-navigation]: StageProgress/StageIcon moved to components/pipelines/stage-progress.tsx for Phase 6 reuse
 - [Phase 05-pipeline-list-navigation]: Filter uses useSearchParams (URL state) matching goals.tsx pattern for consistency
+- [Phase 06-pipeline-detail]: getStageStatus extracted to top-level function to fix TypeScript control flow narrowing in nested function closures
+- [Phase 06-pipeline-detail]: formatDuration duplicated locally in pipeline-detail.tsx (not imported from pipelines.tsx) to prevent route-to-route circular dependency
 
 ### Pending Todos
 
@@ -68,6 +70,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-09T14:36:50.652Z
-Stopped at: Completed 05-pipeline-list-navigation/05-01-PLAN.md
+Last session: 2026-03-09T15:03:22.044Z
+Stopped at: Completed 06-pipeline-detail/06-01-PLAN.md
 Resume file: None

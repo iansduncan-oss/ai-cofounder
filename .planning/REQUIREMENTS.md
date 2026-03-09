@@ -33,11 +33,11 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 ### Pipeline Detail
 
-- [ ] **DETAIL-01**: User can view a pipeline's stages with per-stage status indicators (pending, active, completed, failed, skipped)
-- [ ] **DETAIL-02**: User can expand a stage to see its output text and error details
-- [ ] **DETAIL-03**: User can see timing information for each completed stage
-- [ ] **DETAIL-04**: User can see the pipeline's overall state, goal link, and created/finished timestamps
-- [ ] **DETAIL-05**: User can see active pipeline details auto-refresh every 5 seconds
+- [x] **DETAIL-01**: User can view a pipeline's stages with per-stage status indicators (pending, active, completed, failed, skipped)
+- [x] **DETAIL-02**: User can expand a stage to see its output text and error details
+- [x] **DETAIL-03**: User can see timing information for each completed stage
+- [x] **DETAIL-04**: User can see the pipeline's overall state, goal link, and created/finished timestamps
+- [x] **DETAIL-05**: User can see active pipeline details auto-refresh every 5 seconds
 
 ### Pipeline Trigger
 
@@ -114,11 +114,11 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 | LIST-02 | Phase 5 | Complete |
 | LIST-03 | Phase 5 | Complete |
 | LIST-04 | Phase 5 | Complete |
-| DETAIL-01 | Phase 6 | Pending |
-| DETAIL-02 | Phase 6 | Pending |
-| DETAIL-03 | Phase 6 | Pending |
-| DETAIL-04 | Phase 6 | Pending |
-| DETAIL-05 | Phase 6 | Pending |
+| DETAIL-01 | Phase 6 | Complete |
+| DETAIL-02 | Phase 6 | Complete |
+| DETAIL-03 | Phase 6 | Complete |
+| DETAIL-04 | Phase 6 | Complete |
+| DETAIL-05 | Phase 6 | Complete |
 | TRIGGER-01 | Phase 7 | Pending |
 | TRIGGER-02 | Phase 7 | Pending |
 | TRIGGER-03 | Phase 7 | Pending |
