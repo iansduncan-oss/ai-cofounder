@@ -47,12 +47,12 @@ Requirements for this milestone. Each maps to roadmap phases.
 
 ### Quick Wins
 
-- [ ] **QWIN-01**: deleteFile workspace tool removes a single file with path validation (no traversal outside workspace)
-- [ ] **QWIN-02**: deleteDirectory workspace tool removes a directory with recursive option and safety checks
-- [ ] **QWIN-03**: GET /api/agents/roles returns list of available agent roles with descriptions
-- [ ] **QWIN-04**: GET /api/conversations/:id/export returns full conversation with messages as JSON
-- [ ] **QWIN-05**: OpenAPI spec is auto-generated from Fastify route schemas via @fastify/swagger
-- [ ] **QWIN-06**: Swagger UI serves interactive API docs at a configurable endpoint
+- [x] **QWIN-01**: deleteFile workspace tool removes a single file with path validation (no traversal outside workspace)
+- [x] **QWIN-02**: deleteDirectory workspace tool removes a directory with recursive option and safety checks
+- [x] **QWIN-03**: GET /api/agents/roles returns list of available agent roles with descriptions
+- [x] **QWIN-04**: GET /api/conversations/:id/export returns full conversation with messages as JSON
+- [x] **QWIN-05**: OpenAPI spec is auto-generated from Fastify route schemas via @fastify/swagger
+- [x] **QWIN-06**: Swagger UI serves interactive API docs at a configurable endpoint
 
 ## v2 Requirements
 
@@ -122,12 +122,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-04 | Phase 4 | Complete |
 | TEST-05 | Phase 4 | Complete |
 | TEST-06 | Phase 4 | Complete |
-| QWIN-01 | Phase 4 | Pending |
-| QWIN-02 | Phase 4 | Pending |
-| QWIN-03 | Phase 4 | Pending |
-| QWIN-04 | Phase 4 | Pending |
-| QWIN-05 | Phase 4 | Pending |
-| QWIN-06 | Phase 4 | Pending |
+| QWIN-01 | Phase 4 | Complete |
+| QWIN-02 | Phase 4 | Complete |
+| QWIN-03 | Phase 4 | Complete |
+| QWIN-04 | Phase 4 | Complete |
+| QWIN-05 | Phase 4 | Complete |
+| QWIN-06 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 35 total

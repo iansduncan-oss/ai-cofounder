@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Queue Foundation** - Redis container, BullMQ module, worker process, job lifecycle management (completed 2026-03-08)
 - [ ] **Phase 2: SSE Migration** - Move agent execution to workers with real-time streaming via Redis pub/sub
 - [x] **Phase 3: Authentication** - JWT login, refresh tokens, protected routes, bot endpoint isolation (completed 2026-03-08)
-- [ ] **Phase 4: Tests & Quick Wins** - E2E test suite, workspace delete tools, API docs, export endpoint
+- [x] **Phase 4: Tests & Quick Wins** - E2E test suite, workspace delete tools, API docs, export endpoint (completed 2026-03-09)
 
 ## Phase Details
 
@@ -92,7 +92,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
 | 2. SSE Migration | 0/2 | Not started | - |
 | 3. Authentication | 2/2 | Complete   | 2026-03-08 |
-| 4. Tests & Quick Wins | 0/2 | Not started | - |
+| 4. Tests & Quick Wins | 2/2 | Complete   | 2026-03-09 |
 
 ---
 *Roadmap created: 2026-03-07*
