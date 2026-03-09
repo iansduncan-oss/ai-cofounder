@@ -115,6 +115,45 @@ describe("WorkspaceService", () => {
     });
   });
 
+  describe("deleteFile", () => {
+    it("deletes a file within workspace", async () => {
+      await workspace.writeFile("temp.txt", "content");
+      await workspace.deleteFile("temp.txt");
+      await expect(workspace.readFile("temp.txt")).rejects.toThrow();
+    });
+
+    it("rejects path traversal on deleteFile", async () => {
+      await expect(workspace.deleteFile("../../etc/passwd")).rejects.toThrow("Path traversal denied");
+    });
+
+    it("throws when deleting non-existent file", async () => {
+      await expect(workspace.deleteFile("does-not-exist.txt")).rejects.toThrow();
+    });
+  });
+
+  describe("deleteDirectory", () => {
+    it("deletes an empty directory", async () => {
+      await fs.mkdir(path.join(testDir, "empty-dir"), { recursive: true });
+      await workspace.deleteDirectory("empty-dir");
+      await expect(workspace.listDirectory("empty-dir")).rejects.toThrow();
+    });
+
+    it("fails to delete non-empty directory without force", async () => {
+      await workspace.writeFile("non-empty/file.txt", "content");
+      await expect(workspace.deleteDirectory("non-empty")).rejects.toThrow();
+    });
+
+    it("deletes non-empty directory with force=true", async () => {
+      await workspace.writeFile("to-remove/nested/file.txt", "content");
+      await workspace.deleteDirectory("to-remove", true);
+      await expect(workspace.listDirectory("to-remove")).rejects.toThrow();
+    });
+
+    it("rejects path traversal on deleteDirectory", async () => {
+      await expect(workspace.deleteDirectory("../../tmp")).rejects.toThrow("Path traversal denied");
+    });
+  });
+
   describe("git core operations", () => {
     let repoDir: string;
 
