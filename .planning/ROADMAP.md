@@ -115,10 +115,11 @@ Plans:
   3. User can see the duration of each completed stage displayed inline
   4. User can see the pipeline's overall state, linked goal reference, and created/finished timestamps
   5. User can see an active pipeline's detail page auto-refresh every 5 seconds
-**Plans**: 1 plan
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01-PLAN.md — Full pipeline detail page with metadata card, expandable stage rows, and tests
+- [x] 06-01-PLAN.md — Full pipeline detail page with metadata card, expandable stage rows, and tests
+- [ ] 06-02-PLAN.md — Gap closure: align ROADMAP SC3 and REQUIREMENTS DETAIL-03 with implemented overall pipeline duration
 
 ### Phase 7: Pipeline Trigger
 **Goal**: Users can submit new pipeline runs — goal-based or custom-stage — and be taken directly to the resulting run
@@ -142,7 +143,7 @@ Plans:
 | 3. Authentication | v1.0 | 2/2 | Complete | 2026-03-08 |
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
-| 6. Pipeline Detail | v1.1 | 0/1 | Not started | - |
+| 6. Pipeline Detail | v1.1 | 1/2 | In progress | - |
 | 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
 
 ---
