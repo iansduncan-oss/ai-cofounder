@@ -119,7 +119,7 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md — Full pipeline detail page with metadata card, expandable stage rows, and tests
-- [ ] 06-02-PLAN.md — Gap closure: align ROADMAP SC3 and REQUIREMENTS DETAIL-03 with implemented overall pipeline duration
+- [x] 06-02-PLAN.md — Gap closure: align ROADMAP SC3 and REQUIREMENTS DETAIL-03 with implemented overall pipeline duration
 
 ### Phase 7: Pipeline Trigger
 **Goal**: Users can submit new pipeline runs — goal-based or custom-stage — and be taken directly to the resulting run
@@ -130,7 +130,10 @@ Plans:
   2. User can build a custom pipeline by configuring each stage's agent role, prompt, and dependency flag before submitting
   3. User sees a confirmation message showing the newly created job ID after successful submission
   4. User is automatically redirected to the pipeline detail view for the new run immediately after submission
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — Two-mode submit dialog (goal + custom stages), mutation hooks, navigate on success, tests
 
 ## Progress
 
@@ -144,7 +147,7 @@ Plans:
 | 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
 | 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
-| 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
+| 7. Pipeline Trigger | v1.1 | 0/1 | Not started | - |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
