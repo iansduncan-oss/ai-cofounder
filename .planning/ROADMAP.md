@@ -112,7 +112,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can see each stage listed with a status indicator (pending, active, completed, failed, skipped)
   2. User can expand a stage to read its output text and any error details
-  3. User can see the duration of each completed stage displayed inline
+  3. User can see the overall pipeline duration for completed pipelines displayed in the metadata card
   4. User can see the pipeline's overall state, linked goal reference, and created/finished timestamps
   5. User can see an active pipeline's detail page auto-refresh every 5 seconds
 **Plans**: 2 plans

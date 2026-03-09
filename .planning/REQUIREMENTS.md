@@ -35,7 +35,7 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 - [x] **DETAIL-01**: User can view a pipeline's stages with per-stage status indicators (pending, active, completed, failed, skipped)
 - [x] **DETAIL-02**: User can expand a stage to see its output text and error details
-- [x] **DETAIL-03**: User can see timing information for each completed stage
+- [x] **DETAIL-03**: User can see overall pipeline duration for completed pipelines
 - [x] **DETAIL-04**: User can see the pipeline's overall state, goal link, and created/finished timestamps
 - [x] **DETAIL-05**: User can see active pipeline details auto-refresh every 5 seconds
 
