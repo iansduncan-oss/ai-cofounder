@@ -33,7 +33,9 @@ export {
   type PipelineStage,
   type RagIngestionJob,
   getReflectionQueue,
+  getDeadLetterQueue,
   type ReflectionJob,
+  type DeadLetterJob,
 } from "./queues.js";
 
 // Workers
@@ -65,6 +67,11 @@ export {
   getAllQueueStatus,
   getJobStatus,
   pingRedis,
+  sendToDeadLetter,
+  listDeadLetterJobs,
+  retryDeadLetterJob,
+  deleteDeadLetterJob,
   type QueueStatus,
   type JobStatusResult,
+  type DeadLetterEntry,
 } from "./helpers.js";

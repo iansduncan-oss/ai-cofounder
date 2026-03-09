@@ -132,3 +132,59 @@ export const TaskIdQuery = Type.Object({
   taskId: Type.String({ format: "uuid" }),
 });
 export type TaskIdQuery = Static<typeof TaskIdQuery>;
+
+/* ────────────────────────── Queue ────────────────────────── */
+
+export const EnqueueAgentTaskBody = Type.Object({
+  goalId: Type.String(),
+  prompt: Type.String({ minLength: 1 }),
+  conversationId: Type.Optional(Type.String()),
+  userId: Type.Optional(Type.String()),
+  priority: Type.Optional(
+    Type.Union([
+      Type.Literal("critical"),
+      Type.Literal("high"),
+      Type.Literal("normal"),
+      Type.Literal("low"),
+    ]),
+  ),
+});
+export type EnqueueAgentTaskBody = Static<typeof EnqueueAgentTaskBody>;
+
+export const EnqueueBriefingBody = Type.Object({
+  type: Type.Optional(
+    Type.Union([
+      Type.Literal("morning"),
+      Type.Literal("evening"),
+      Type.Literal("on_demand"),
+    ]),
+  ),
+  deliveryChannels: Type.Optional(
+    Type.Array(
+      Type.Union([
+        Type.Literal("slack"),
+        Type.Literal("discord"),
+        Type.Literal("voice"),
+        Type.Literal("dashboard"),
+      ]),
+    ),
+  ),
+});
+export type EnqueueBriefingBody = Static<typeof EnqueueBriefingBody>;
+
+export const EnqueueNotificationBody = Type.Object({
+  channel: Type.Union([
+    Type.Literal("slack"),
+    Type.Literal("discord"),
+    Type.Literal("all"),
+  ]),
+  type: Type.Union([
+    Type.Literal("alert"),
+    Type.Literal("info"),
+    Type.Literal("warning"),
+    Type.Literal("success"),
+  ]),
+  title: Type.String({ minLength: 1 }),
+  message: Type.String({ minLength: 1 }),
+});
+export type EnqueueNotificationBody = Static<typeof EnqueueNotificationBody>;

@@ -13,6 +13,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "turbo run test",
+    "test:coverage": "vitest run --coverage",
     "clean": "turbo run clean",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
@@ -20,11 +21,13 @@
     "db:push": "npm run db:push -w @ai-cofounder/db",
     "db:generate": "npm run db:generate -w @ai-cofounder/db",
     "db:migrate": "npm run db:migrate -w @ai-cofounder/db",
-    "db:studio": "npm run db:studio -w @ai-cofounder/db"
+    "db:studio": "npm run db:studio -w @ai-cofounder/db",
+    "db:seed": "npm run db:seed -w @ai-cofounder/db"
   },
   "packageManager": "npm@11.6.2",
   "devDependencies": {
     "@types/node": "^25.3.3",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.8.1",

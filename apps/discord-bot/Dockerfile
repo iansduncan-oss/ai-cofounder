@@ -30,8 +30,11 @@ COPY --from=base /app/packages/bot-handlers/dist/ packages/bot-handlers/dist/
 COPY --from=base /app/apps/discord-bot/package.json apps/discord-bot/
 COPY --from=base /app/apps/discord-bot/dist/ apps/discord-bot/dist/
 
-RUN npm ci --omit=dev --ignore-scripts --force
+RUN npm ci --omit=dev --ignore-scripts --force \
+    && addgroup -g 1001 appgroup \
+    && adduser -u 1001 -G appgroup -s /bin/sh -D appuser
 
 ENV NODE_ENV=production
+USER appuser
 
 CMD ["node", "apps/discord-bot/dist/index.js"]

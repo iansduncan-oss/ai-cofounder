@@ -1,0 +1,164 @@
+{
+  "name": "Deploy Failure Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "deploy-alert",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Deploy Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-conclusion",
+              "leftValue": "={{ $json.workflow_run?.conclusion }}",
+              "rightValue": "failure",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-failures",
+      "name": "Filter Failures Only",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-workflow",
+              "name": "workflowName",
+              "value": "={{ $json.workflow_run?.name || 'Unknown workflow' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-repo",
+              "name": "repo",
+              "value": "={{ $json.repository?.full_name || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-branch",
+              "name": "branch",
+              "value": "={{ $json.workflow_run?.head_branch || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-url",
+              "name": "runUrl",
+              "value": "={{ $json.workflow_run?.html_url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-actor",
+              "name": "actor",
+              "value": "={{ $json.workflow_run?.actor?.login || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-sha",
+              "name": "sha",
+              "value": "={{ ($json.workflow_run?.head_sha || '').substring(0, 7) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "extract-fields",
+      "name": "Extract Failure Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ embeds: [{ title: '🚨 Deploy Failed: ' + $json.workflowName, description: '**Repo:** ' + $json.repo + '\\n**Branch:** ' + $json.branch + '\\n**Commit:** `' + $json.sha + '`\\n**Triggered by:** ' + $json.actor, url: $json.runUrl, color: 15548997, timestamp: new Date().toISOString() }] }) }}",
+        "options": {}
+      },
+      "id": "discord-alert",
+      "name": "Discord Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/agents/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Deploy failed for workflow \"' + $json.workflowName + '\" on ' + $json.repo + ' (branch: ' + $json.branch + ', commit: ' + $json.sha + '). Investigate the failure and suggest a fix. Run URL: ' + $json.runUrl, userId: 'n8n-automation', conversationId: 'n8n-deploy-alerts' }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "trigger-investigation",
+      "name": "Trigger Agent Investigation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Deploy Webhook": {
+      "main": [
+        [{ "node": "Filter Failures Only", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Failures Only": {
+      "main": [
+        [{ "node": "Extract Failure Details", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Failure Details": {
+      "main": [
+        [
+          { "node": "Discord Alert", "type": "main", "index": 0 },
+          { "node": "Trigger Agent Investigation", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "deploy" },
+    { "name": "alerts" }
+  ]
+}

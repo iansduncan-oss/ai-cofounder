@@ -211,7 +211,7 @@ export class MonitoringService {
         "ssh",
         [
           "-o", "ConnectTimeout=10",
-          "-o", "StrictHostKeyChecking=no",
+          "-o", "StrictHostKeyChecking=accept-new",
           `${this.vpsUser}@${this.vpsHost}`,
           script,
         ],

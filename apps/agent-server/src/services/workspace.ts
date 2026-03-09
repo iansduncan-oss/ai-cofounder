@@ -103,6 +103,11 @@ export class WorkspaceService {
   }
 
   async gitClone(repoUrl: string, dirName?: string, depth?: number): Promise<GitResult> {
+    // Only allow HTTPS URLs to prevent SSRF via file://, git://, ssh:// schemes
+    if (!repoUrl.startsWith("https://")) {
+      return { stdout: "", stderr: "Only HTTPS URLs are allowed for git clone", exitCode: 1 };
+    }
+
     const targetName = dirName ?? this.repoNameFromUrl(repoUrl);
     const targetPath = this.resolveSafe(targetName);
 
@@ -181,11 +186,31 @@ export class WorkspaceService {
     return this.runGit(args, fullPath);
   }
 
+  private static readonly ALLOWED_TEST_COMMANDS = new Set([
+    "npm test",
+    "npm run test",
+    "npx vitest",
+    "npx vitest run",
+    "npx jest",
+    "node --test",
+    "pytest",
+    "python -m pytest",
+  ]);
+
   async runTests(repoDir: string, command: string = "npm test", timeoutMs: number = 300_000): Promise<GitResult> {
+    // Only allow known safe test commands to prevent arbitrary shell execution
+    if (!WorkspaceService.ALLOWED_TEST_COMMANDS.has(command)) {
+      return {
+        stdout: "",
+        stderr: `Denied: "${command}" is not an allowed test command. Allowed: ${[...WorkspaceService.ALLOWED_TEST_COMMANDS].join(", ")}`,
+        exitCode: 1,
+      };
+    }
     const safeCwd = this.resolveSafe(repoDir);
     const cappedTimeout = Math.min(timeoutMs, 300_000);
+    const parts = command.split(" ");
     return new Promise((resolve) => {
-      execFile("sh", ["-c", command], { cwd: safeCwd, timeout: cappedTimeout }, (error, stdout, stderr) => {
+      execFile(parts[0], parts.slice(1), { cwd: safeCwd, timeout: cappedTimeout }, (error, stdout, stderr) => {
         resolve({
           stdout: stdout?.toString() ?? "",
           stderr: stderr?.toString() ?? "",

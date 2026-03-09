@@ -602,7 +602,13 @@ export class Orchestrator {
       case "create_plan": return `Plan created: ${r.goalTitle ?? ""}`;
       case "search_web": return `Found results`;
       case "save_memory": return `Saved: ${r.key ?? ""}`;
-      case "recall_memories": return `Recalled ${Array.isArray(result) ? result.length : 0} memories`;
+      case "recall_memories": {
+        if (Array.isArray(result)) return `Recalled ${result.length} memories`;
+        const rm = result as Record<string, unknown>;
+        const memCount = Array.isArray(rm.memories) ? rm.memories.length : 0;
+        const hasRag = Boolean(rm.ragContext);
+        return `Recalled ${memCount} memories${hasRag ? " + RAG context" : ""}`;
+      }
       case "execute_code": return `Exit code: ${r.exitCode ?? "?"}`;
       case "read_file": return `Read: ${r.path ?? ""}`;
       case "write_file": return `Wrote: ${r.path ?? ""}`;
@@ -737,12 +743,32 @@ export class Orchestrator {
         for (const m of memories) {
           touchMemory(this.db!, m.id).catch(() => {});
         }
-        return memories.map((m) => ({
+        const memoryResults = memories.map((m) => ({
           key: m.key,
           category: m.category,
           content: m.content,
           updatedAt: m.updatedAt,
         }));
+
+        // Also retrieve RAG document chunks when a query is provided
+        let ragContext = "";
+        if (input.query && this.embeddingService) {
+          try {
+            const chunks = await retrieve(
+              this.db,
+              (text) => this.embeddingService!.embed(text),
+              input.query,
+              { limit: 5 },
+            );
+            ragContext = formatContext(chunks);
+          } catch (err) {
+            this.logger.warn({ err }, "RAG retrieval failed, returning memories only");
+          }
+        }
+
+        return ragContext
+          ? { memories: memoryResults, ragContext }
+          : memoryResults;
       }
       case "request_approval": {
         if (!this.db) return { error: "Database not available" };

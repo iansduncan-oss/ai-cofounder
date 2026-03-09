@@ -105,29 +105,22 @@ const bannedIps = new Map<string, number>(); // ip -> ban expiry timestamp
 let banEventDb: import("@ai-cofounder/db").Db | undefined;
 
 function getClientIp(request: FastifyRequest): string {
-  // Behind reverse proxy: use x-forwarded-for or x-real-ip
-  const forwarded = request.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
-  const realIp = request.headers["x-real-ip"];
-  if (typeof realIp === "string") return realIp;
+  // Use Fastify's built-in request.ip which respects trustProxy settings
+  // This properly handles X-Forwarded-For based on the trustProxy configuration
   return request.ip;
 }
 
 function isInternalRequest(request: FastifyRequest): boolean {
   const ip = getClientIp(request);
-  return (
-    ip === "127.0.0.1" ||
-    ip === "::1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("172.16.") ||
-    ip.startsWith("172.17.") ||
-    ip.startsWith("172.18.") ||
-    ip.startsWith("172.19.") ||
-    ip.startsWith("172.2") ||
-    ip.startsWith("172.3") ||
-    ip.startsWith("192.168.") ||
-    ip === "::ffff:127.0.0.1"
-  );
+  // Check RFC 1918 private ranges, loopback, and IPv6 equivalents
+  if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") return true;
+  if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true;
+  // 172.16.0.0/12 = 172.16.x.x through 172.31.x.x
+  if (ip.startsWith("172.")) {
+    const second = parseInt(ip.split(".")[1], 10);
+    if (second >= 16 && second <= 31) return true;
+  }
+  return false;
 }
 
 function isBannedIp(ip: string): boolean {

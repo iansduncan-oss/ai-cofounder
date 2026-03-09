@@ -1,0 +1,139 @@
+{
+  "name": "Weekly LLM Cost Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every Monday 9 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/usage?period=week",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-usage",
+      "name": "Fetch Weekly Usage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/health/providers/history",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "fetch-provider-health",
+      "name": "Fetch Provider Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const usage = $('Fetch Weekly Usage').item.json;\nconst health = $('Fetch Provider Health').item.json;\n\nconst totalTokens = (usage.totalInputTokens || 0) + (usage.totalOutputTokens || 0);\nconst totalCostUsd = ((usage.totalCostMicrodollars || 0) / 1_000_000).toFixed(2);\nconst requestCount = usage.requestCount || 0;\nconst avgCostPerReq = requestCount > 0 ? ((usage.totalCostMicrodollars || 0) / requestCount / 1_000_000).toFixed(4) : '0.0000';\n\n// Build provider breakdown\nconst providers = Array.isArray(health) ? health : [];\nconst providerLines = providers.map(p => {\n  const successRate = p.total_requests > 0\n    ? ((p.successful_requests / p.total_requests) * 100).toFixed(1)\n    : '0.0';\n  return `  • **${p.provider_name}**: ${p.total_requests} requests, ${successRate}% success`;\n}).join('\\n');\n\n// Build per-model breakdown from usage\nconst models = usage.byModel || [];\nconst modelLines = models.map(m => {\n  const cost = (m.costMicrodollars / 1_000_000).toFixed(4);\n  return `  • **${m.model}**: ${m.requests} req, ${m.inputTokens + m.outputTokens} tokens, $${cost}`;\n}).join('\\n');\n\nconst summary = [\n  `## 📊 Weekly LLM Cost Digest`,\n  `**Period:** ${usage.period || 'Last 7 days'}`,\n  '',\n  '### Totals',\n  `  • **Requests:** ${requestCount.toLocaleString()}`,\n  `  • **Tokens:** ${totalTokens.toLocaleString()} (${(usage.totalInputTokens || 0).toLocaleString()} in / ${(usage.totalOutputTokens || 0).toLocaleString()} out)`,\n  `  • **Cost:** $${totalCostUsd}`,\n  `  • **Avg cost/request:** $${avgCostPerReq}`,\n];\n\nif (modelLines) {\n  summary.push('', '### By Model', modelLines);\n}\n\nif (providerLines) {\n  summary.push('', '### Provider Health', providerLines);\n}\n\nreturn [{ json: { digest: summary.join('\\n'), totalCostUsd, requestCount, totalTokens } }];"
+      },
+      "id": "format-digest",
+      "name": "Format Cost Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [690, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.digest }) }}",
+        "options": {}
+      },
+      "id": "post-discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $json.digest }) }}",
+        "options": {}
+      },
+      "id": "post-slack",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 500]
+    }
+  ],
+  "connections": {
+    "Every Monday 9 AM": {
+      "main": [
+        [
+          { "node": "Fetch Weekly Usage", "type": "main", "index": 0 },
+          { "node": "Fetch Provider Health", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Weekly Usage": {
+      "main": [
+        [{ "node": "Format Cost Digest", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Provider Health": {
+      "main": [
+        [{ "node": "Format Cost Digest", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Cost Digest": {
+      "main": [
+        [
+          { "node": "Post to Discord", "type": "main", "index": 0 },
+          { "node": "Post to Slack", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "cost" },
+    { "name": "digest" },
+    { "name": "scheduled" }
+  ]
+}

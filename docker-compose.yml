@@ -4,7 +4,7 @@ services:
     container_name: ai-cofounder-db
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ai_cofounder}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
@@ -19,11 +19,11 @@ services:
       retries: 5
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.76.1
     container_name: ai-cofounder-n8n
     restart: unless-stopped
     ports:
-      - "${N8N_PORT:-5678}:5678"
+      - "127.0.0.1:${N8N_PORT:-5678}:5678"
     environment:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER:-admin}
@@ -47,12 +47,12 @@ services:
     container_name: ai-cofounder-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     volumes:
       - redisdata:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD:-localdev}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-localdev}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -78,7 +78,18 @@ export const QUEUE_NAMES = {
   PIPELINES: "pipelines",
   RAG_INGESTION: "rag-ingestion",
   REFLECTIONS: "reflections",
+  DEAD_LETTER: "dead-letter",
 } as const;
+
+export interface DeadLetterJob {
+  originalQueue: string;
+  originalJobId: string;
+  originalJobName: string;
+  originalData: unknown;
+  failedReason: string;
+  attemptsMade: number;
+  failedAt: string;
+}
 
 // ── Queue instances ──
 
@@ -126,6 +137,10 @@ export function getRagIngestionQueue(): Queue<RagIngestionJob> {
 
 export function getReflectionQueue(): Queue<ReflectionJob> {
   return getOrCreateQueue<ReflectionJob>(QUEUE_NAMES.REFLECTIONS);
+}
+
+export function getDeadLetterQueue(): Queue<DeadLetterJob> {
+  return getOrCreateQueue<DeadLetterJob>(QUEUE_NAMES.DEAD_LETTER);
 }
 
 export async function closeAllQueues(): Promise<void> {

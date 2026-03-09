@@ -80,8 +80,12 @@ export function buildServer(registry?: LlmRegistry) {
   // CORS — restrict origins in production, allow same-origin for voice UI
   // credentials: true required for cross-origin HttpOnly cookie support
   const allowedOrigins = optionalEnv("CORS_ORIGINS", "").split(",").filter(Boolean);
+  const isProduction = process.env.NODE_ENV === "production";
+  if (isProduction && allowedOrigins.length === 0) {
+    logger.warn("CORS_ORIGINS is not set in production — CORS will be restrictive (same-origin only)");
+  }
   app.register(cors, {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    origin: allowedOrigins.length > 0 ? allowedOrigins : (isProduction ? false : true),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   });

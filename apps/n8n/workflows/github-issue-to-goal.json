@@ -1,0 +1,160 @@
+{
+  "name": "GitHub Issue → Goal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "github-issue",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "GitHub Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-action",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-opened",
+      "name": "Filter Opened Issues",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-title",
+              "name": "title",
+              "value": "={{ $json.issue.title }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-description",
+              "name": "description",
+              "value": "={{ $json.issue.body || 'No description provided' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-priority",
+              "name": "priority",
+              "value": "={{ $json.issue.labels?.some(l => l.name === 'critical') ? 'critical' : $json.issue.labels?.some(l => l.name === 'high-priority') ? 'high' : 'medium' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-source",
+              "name": "source",
+              "value": "={{ 'github-issue#' + $json.issue.number + ' (' + $json.repository.full_name + ')' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-url",
+              "name": "issueUrl",
+              "value": "={{ $json.issue.html_url }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "map-fields",
+      "name": "Map Issue Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/agents/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: 'Create a goal from this GitHub issue: ' + $json.title + '\\n\\nDescription: ' + $json.description + '\\n\\nPriority: ' + $json.priority + '\\n\\nSource: ' + $json.source + '\\nURL: ' + $json.issueUrl, userId: 'n8n-automation', conversationId: 'n8n-github-issues' }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "create-goal",
+      "name": "Create Goal via Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [910, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: '📋 **New Goal from GitHub Issue**\\n> ' + $('Map Issue Fields').item.json.title + '\\n\\n' + ($json.response || 'Goal created') + '\\n\\n🔗 ' + $('Map Issue Fields').item.json.issueUrl }) }}",
+        "options": {}
+      },
+      "id": "notify-discord",
+      "name": "Notify Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "GitHub Webhook": {
+      "main": [
+        [{ "node": "Filter Opened Issues", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter Opened Issues": {
+      "main": [
+        [{ "node": "Map Issue Fields", "type": "main", "index": 0 }]
+      ]
+    },
+    "Map Issue Fields": {
+      "main": [
+        [{ "node": "Create Goal via Agent", "type": "main", "index": 0 }]
+      ]
+    },
+    "Create Goal via Agent": {
+      "main": [
+        [{ "node": "Notify Discord", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "github" },
+    { "name": "automation" }
+  ]
+}

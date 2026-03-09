@@ -1,8 +1,28 @@
 import * as cheerio from "cheerio";
+import { lookup } from "node:dns/promises";
 import type { LlmTool } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
 
 const logger = createLogger("browse-web");
+
+function isPrivateIp(ip: string): boolean {
+  // Block loopback, link-local, private ranges, and metadata endpoints
+  return (
+    ip.startsWith("127.") ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("172.16.") || ip.startsWith("172.17.") || ip.startsWith("172.18.") ||
+    ip.startsWith("172.19.") || ip.startsWith("172.20.") || ip.startsWith("172.21.") ||
+    ip.startsWith("172.22.") || ip.startsWith("172.23.") || ip.startsWith("172.24.") ||
+    ip.startsWith("172.25.") || ip.startsWith("172.26.") || ip.startsWith("172.27.") ||
+    ip.startsWith("172.28.") || ip.startsWith("172.29.") || ip.startsWith("172.30.") ||
+    ip.startsWith("172.31.") ||
+    ip.startsWith("169.254.") ||
+    ip === "0.0.0.0" ||
+    ip === "::1" ||
+    ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80")
+  );
+}
 
 export const BROWSE_WEB_TOOL: LlmTool = {
   name: "browse_web",
@@ -37,13 +57,41 @@ export async function executeBrowseWeb(
   maxLength = 10_000,
 ): Promise<BrowseResult | { error: string }> {
   try {
+    // SSRF protection: enforce HTTPS and block private/internal IPs
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return { error: "Invalid URL" };
+    }
+    if (parsedUrl.protocol !== "https:") {
+      return { error: "Only HTTPS URLs are allowed" };
+    }
+    // Resolve hostname and check for private IPs (prevents DNS rebinding)
+    try {
+      const { address } = await lookup(parsedUrl.hostname);
+      if (isPrivateIp(address)) {
+        logger.warn({ url, resolvedIp: address }, "SSRF: blocked private IP");
+        return { error: "URL resolves to a private/internal IP address" };
+      }
+    } catch {
+      return { error: `Could not resolve hostname: ${parsedUrl.hostname}` };
+    }
+
     const response = await fetch(url, {
       headers: {
         "User-Agent": "AI-Cofounder-Bot/1.0",
         Accept: "text/html,application/xhtml+xml,text/plain",
       },
+      redirect: "manual",
       signal: AbortSignal.timeout(15_000),
     });
+
+    // Handle redirects safely — don't follow to internal URLs
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      return { error: `Redirect to ${location ?? "unknown"} — not followed for security` };
+    }
 
     if (!response.ok) {
       logger.error({ status: response.status, url }, "browse fetch failed");

@@ -11,6 +11,7 @@ import {
   type RagIngestionJob,
   type ReflectionJob,
 } from "./queues.js";
+import { sendToDeadLetter } from "./helpers.js";
 
 const logger = createLogger("queue-workers");
 
@@ -159,6 +160,20 @@ function attachWorkerEvents(worker: Worker, queueName: string): void {
       { jobId: job?.id, queue: queueName, err },
       "Job failed",
     );
+
+    // Send to DLQ if all retries exhausted
+    if (job && job.attemptsMade >= (job.opts?.attempts ?? 3)) {
+      sendToDeadLetter(
+        queueName,
+        job.id ?? "unknown",
+        job.name,
+        job.data,
+        err?.message ?? "Unknown error",
+        job.attemptsMade,
+      ).catch((dlqErr) => {
+        logger.error({ dlqErr, jobId: job.id }, "Failed to send job to DLQ");
+      });
+    }
   });
 
   worker.on("stalled", (jobId) => {

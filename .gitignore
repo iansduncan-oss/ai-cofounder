@@ -9,3 +9,8 @@ dist/
 .DS_Store
 .eslintcache
 .mcp.json
+*.pem
+*.key
+*credentials*
+*.p12
+*.pfx

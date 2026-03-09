@@ -1,5 +1,5 @@
 import net from "net";
-import { Job } from "bullmq";
+import { Job, type Queue } from "bullmq";
 import { createLogger } from "@ai-cofounder/shared";
 import {
   getAgentTaskQueue,
@@ -9,6 +9,7 @@ import {
   getPipelineQueue,
   getRagIngestionQueue,
   getReflectionQueue,
+  getDeadLetterQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
@@ -17,6 +18,7 @@ import {
   type PipelineStage,
   type RagIngestionJob,
   type ReflectionJob,
+  type DeadLetterJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-helpers");
@@ -186,6 +188,7 @@ export async function getAllQueueStatus(): Promise<QueueStatus[]> {
     { name: "pipelines", queue: getPipelineQueue() },
     { name: "rag-ingestion", queue: getRagIngestionQueue() },
     { name: "reflections", queue: getReflectionQueue() },
+    { name: "dead-letter", queue: getDeadLetterQueue() },
   ];
 
   return Promise.all(
@@ -200,4 +203,96 @@ export async function getAllQueueStatus(): Promise<QueueStatus[]> {
       return { name, waiting, active, completed, failed, delayed };
     }),
   );
+}
+
+// ── Dead Letter Queue helpers ──
+
+export async function sendToDeadLetter(
+  originalQueue: string,
+  originalJobId: string,
+  originalJobName: string,
+  originalData: unknown,
+  failedReason: string,
+  attemptsMade: number,
+): Promise<string | undefined> {
+  const dlq = getDeadLetterQueue();
+  const dlJob: DeadLetterJob = {
+    originalQueue,
+    originalJobId,
+    originalJobName,
+    originalData,
+    failedReason,
+    attemptsMade,
+    failedAt: new Date().toISOString(),
+  };
+  const added = await dlq.add("dead-letter", dlJob, {
+    removeOnComplete: false,
+    removeOnFail: false,
+  });
+  logger.warn(
+    { jobId: added.id, originalQueue, originalJobId, failedReason },
+    "Job sent to dead letter queue",
+  );
+  return added.id;
+}
+
+export interface DeadLetterEntry {
+  dlqJobId: string;
+  originalQueue: string;
+  originalJobId: string;
+  originalJobName: string;
+  failedReason: string;
+  attemptsMade: number;
+  failedAt: string;
+}
+
+export async function listDeadLetterJobs(limit = 50, offset = 0): Promise<DeadLetterEntry[]> {
+  const dlq = getDeadLetterQueue();
+  const jobs = await dlq.getWaiting(offset, offset + limit - 1);
+  return jobs.map((job) => ({
+    dlqJobId: job.id ?? "",
+    originalQueue: job.data.originalQueue,
+    originalJobId: job.data.originalJobId,
+    originalJobName: job.data.originalJobName,
+    failedReason: job.data.failedReason,
+    attemptsMade: job.data.attemptsMade,
+    failedAt: job.data.failedAt,
+  }));
+}
+
+export async function retryDeadLetterJob(dlqJobId: string): Promise<{ requeued: boolean; originalQueue: string }> {
+  const dlq = getDeadLetterQueue();
+  const job = await Job.fromId(dlq, dlqJobId);
+  if (!job) throw new Error(`DLQ job ${dlqJobId} not found`);
+
+  const { originalQueue, originalJobName, originalData } = job.data;
+
+  // Re-enqueue to the original queue
+  const queueMap: Record<string, () => Queue> = {
+    "agent-tasks": getAgentTaskQueue,
+    "monitoring": getMonitoringQueue,
+    "briefings": getBriefingQueue,
+    "notifications": getNotificationQueue,
+    "pipelines": getPipelineQueue,
+    "rag-ingestion": getRagIngestionQueue,
+    "reflections": getReflectionQueue,
+  };
+
+  const getQueue = queueMap[originalQueue];
+  if (!getQueue) throw new Error(`Unknown original queue: ${originalQueue}`);
+
+  const targetQueue = getQueue();
+  await targetQueue.add(originalJobName, originalData);
+  await job.remove();
+
+  logger.info({ dlqJobId, originalQueue, originalJobName }, "DLQ job retried");
+  return { requeued: true, originalQueue };
+}
+
+export async function deleteDeadLetterJob(dlqJobId: string): Promise<void> {
+  const dlq = getDeadLetterQueue();
+  const job = await Job.fromId(dlq, dlqJobId);
+  if (!job) throw new Error(`DLQ job ${dlqJobId} not found`);
+  await job.remove();
+  logger.info({ dlqJobId }, "DLQ job deleted");
 }

@@ -37,7 +37,11 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
     if (typeof request.jwtVerify !== "function") {
-      // authPlugin not loaded (JWT_SECRET not set) — allow through for backward compat
+      if (process.env.NODE_ENV === "production") {
+        reply.code(503).send({ error: "Authentication not configured — JWT_SECRET is required in production" });
+        return;
+      }
+      // In dev, allow through when JWT_SECRET not set for easier local testing
       return;
     }
     try {

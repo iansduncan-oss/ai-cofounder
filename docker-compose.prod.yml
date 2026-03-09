@@ -5,9 +5,9 @@ services:
     restart: unless-stopped
     volumes:
       - redisdata:/data
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -19,7 +19,7 @@ services:
     container_name: ai-cofounder-agent-server
     restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     environment:
       - PORT=3100
       - HOST=0.0.0.0

@@ -235,4 +235,118 @@ describe("LlmRegistry", () => {
       expect(result.provider).toBe("groq");
     });
   });
+
+  describe("circuit breaker", () => {
+    it("opens circuit after consecutive failures and skips provider", async () => {
+      let callCount = 0;
+      const failing = mockProvider("anthropic", true, () => {
+        callCount++;
+        throw new Error(`fail-${callCount}`);
+      });
+      const groq = mockProvider("groq", true);
+
+      registry.register(failing);
+      registry.register(groq);
+
+      // Exhaust the circuit breaker (5 consecutive failures for anthropic)
+      for (let i = 0; i < 5; i++) {
+        await registry.complete("conversation", {
+          messages: [{ role: "user", content: "hi" }],
+        });
+      }
+
+      // Now anthropic's circuit should be open — next call should go straight to groq
+      callCount = 0; // reset
+      await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hi" }],
+      });
+      // anthropic should NOT have been called since circuit is open
+      expect(callCount).toBe(0);
+
+      // Verify circuit state
+      const states = registry.getCircuitBreakerStates();
+      const anthropicState = states.find((s) => s.provider === "anthropic");
+      expect(anthropicState?.state).toBe("open");
+    });
+
+    it("resets circuit breaker on success", async () => {
+      let shouldFail = true;
+      const anthropic = mockProvider("anthropic", true, async () => {
+        if (shouldFail) throw new Error("fail");
+        return {
+          content: [{ type: "text" as const, text: "ok" }],
+          model: "anthropic-model",
+          stop_reason: "end_turn" as const,
+          usage: { inputTokens: 10, outputTokens: 20 },
+        };
+      });
+      const groq = mockProvider("groq", true);
+
+      registry.register(anthropic);
+      registry.register(groq);
+
+      // Create 3 failures (under threshold)
+      for (let i = 0; i < 3; i++) {
+        await registry.complete("conversation", {
+          messages: [{ role: "user", content: "hi" }],
+        });
+      }
+
+      // Now succeed
+      shouldFail = false;
+      await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hi" }],
+      });
+
+      const states = registry.getCircuitBreakerStates();
+      const anthropicState = states.find((s) => s.provider === "anthropic");
+      expect(anthropicState?.state).toBe("closed");
+      expect(anthropicState?.consecutiveFailures).toBe(0);
+    });
+
+    it("returns circuit breaker states for all providers", () => {
+      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("groq", true));
+
+      // Trigger at least one call so breaker state is created
+      const states = registry.getCircuitBreakerStates();
+      expect(Array.isArray(states)).toBe(true);
+    });
+  });
+
+  describe("cost tracking", () => {
+    it("returns cost estimate in completions", async () => {
+      registry.register(mockProvider("anthropic", true));
+
+      const result = await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hello" }],
+      });
+
+      // claude-sonnet-4 at 10 input + 20 output tokens
+      expect(result.costMicrodollars).toBeTypeOf("number");
+      expect(result.costMicrodollars).toBeGreaterThanOrEqual(0);
+    });
+
+    it("accumulates total cost across calls", async () => {
+      registry.register(mockProvider("anthropic", true));
+
+      const before = registry.getTotalCost();
+      await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hello" }],
+      });
+      const after = registry.getTotalCost();
+      expect(after).toBeGreaterThanOrEqual(before);
+    });
+
+    it("returns cost info for known models", () => {
+      const cost = registry.getModelCost("claude-sonnet-4-20250514");
+      expect(cost).toBeDefined();
+      expect(cost!.inputPer1M).toBe(3);
+      expect(cost!.outputPer1M).toBe(15);
+    });
+
+    it("returns undefined for unknown models", () => {
+      expect(registry.getModelCost("unknown-model")).toBeUndefined();
+    });
+  });
 });

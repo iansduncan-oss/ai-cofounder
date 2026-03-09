@@ -32,7 +32,9 @@ FROM node:24-alpine
 WORKDIR /app
 
 # Install Docker CLI for sandbox code execution
-RUN apk add --no-cache docker-cli
+RUN apk add --no-cache docker-cli \
+    && addgroup -g 1001 appgroup \
+    && adduser -u 1001 -G appgroup -s /bin/sh -D appuser
 
 COPY --from=base /app/package.json /app/package-lock.json /app/turbo.json ./
 COPY --from=base /app/packages/shared/package.json packages/shared/
@@ -55,5 +57,6 @@ RUN npm ci --omit=dev --ignore-scripts --force
 
 ENV NODE_ENV=production
 EXPOSE 3100
+USER appuser
 
 CMD ["node", "apps/agent-server/dist/index.js"]

@@ -1533,21 +1533,21 @@ export async function searchChunksByVector(
   const limit = options?.limit ?? 20;
   const vectorLiteral = `[${embedding.join(",")}]`;
 
-  const conditions = [`embedding IS NOT NULL`];
-  if (options?.sourceType) {
-    conditions.push(`source_type = '${options.sourceType}'`);
+  // Build parameterized WHERE clause — never interpolate user input into sql.raw()
+  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  let whereClause = sql`embedding IS NOT NULL`;
+  if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
+    whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
   }
   if (options?.sourceId) {
-    conditions.push(`source_id = '${options.sourceId}'`);
+    whereClause = sql`${whereClause} AND source_id = ${options.sourceId}`;
   }
-
-  const whereClause = conditions.join(" AND ");
 
   const rows = await db.execute(
     sql`SELECT id, source_type, source_id, content, metadata, chunk_index, token_count, created_at,
                embedding <=> ${vectorLiteral}::vector AS distance
         FROM document_chunks
-        WHERE ${sql.raw(whereClause)}
+        WHERE ${whereClause}
         ORDER BY distance ASC
         LIMIT ${limit}`,
   );
