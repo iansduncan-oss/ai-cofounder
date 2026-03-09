@@ -108,27 +108,27 @@ Requirements for Pipeline Dashboard UI milestone. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIST-01 | — | Pending |
-| LIST-02 | — | Pending |
-| LIST-03 | — | Pending |
-| LIST-04 | — | Pending |
-| DETAIL-01 | — | Pending |
-| DETAIL-02 | — | Pending |
-| DETAIL-03 | — | Pending |
-| DETAIL-04 | — | Pending |
-| DETAIL-05 | — | Pending |
-| TRIGGER-01 | — | Pending |
-| TRIGGER-02 | — | Pending |
-| TRIGGER-03 | — | Pending |
-| TRIGGER-04 | — | Pending |
-| NAV-01 | — | Pending |
-| NAV-02 | — | Pending |
+| NAV-01 | Phase 5 | Pending |
+| NAV-02 | Phase 5 | Pending |
+| LIST-01 | Phase 5 | Pending |
+| LIST-02 | Phase 5 | Pending |
+| LIST-03 | Phase 5 | Pending |
+| LIST-04 | Phase 5 | Pending |
+| DETAIL-01 | Phase 6 | Pending |
+| DETAIL-02 | Phase 6 | Pending |
+| DETAIL-03 | Phase 6 | Pending |
+| DETAIL-04 | Phase 6 | Pending |
+| DETAIL-05 | Phase 6 | Pending |
+| TRIGGER-01 | Phase 7 | Pending |
+| TRIGGER-02 | Phase 7 | Pending |
+| TRIGGER-03 | Phase 7 | Pending |
+| TRIGGER-04 | Phase 7 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 15 total
-- Mapped to phases: 0
-- Unmapped: 15
+- Mapped to phases: 15
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-07*
-*Last updated: 2026-03-09 after v1.1 requirements definition*
+*Last updated: 2026-03-09 after v1.1 roadmap creation*

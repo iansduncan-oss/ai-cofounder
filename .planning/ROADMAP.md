@@ -1,23 +1,19 @@
-# Roadmap: AI Cofounder — Infrastructure & Reliability
+# Roadmap: AI Cofounder
 
-## Overview
+## Milestones
 
-This milestone decouples long-running agent work from HTTP request handlers via Redis + BullMQ, secures the dashboard with JWT authentication, and closes the gap on zero E2E integration tests. Work is split into four phases: queue foundation (Redis, BullMQ, worker process), the hardest integration (SSE streaming over Redis pub/sub), JWT authentication, and a cleanup phase covering E2E tests and quick-win features.
+- ✅ **v1.0 Infrastructure & Reliability** - Phases 1-4 (complete 2026-03-09)
+- 🚧 **v1.1 Pipeline Dashboard UI** - Phases 5-7 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
-
-Decimal phases appear between their surrounding integers in numeric order.
+<details>
+<summary>✅ v1.0 Infrastructure & Reliability (Phases 1-4) — COMPLETE 2026-03-09</summary>
 
 - [x] **Phase 1: Queue Foundation** - Redis container, BullMQ module, worker process, job lifecycle management (completed 2026-03-08)
 - [x] **Phase 2: SSE Migration** - Move agent execution to workers with real-time streaming via Redis pub/sub (completed 2026-03-08)
 - [x] **Phase 3: Authentication** - JWT login, refresh tokens, protected routes, bot endpoint isolation (completed 2026-03-08)
 - [x] **Phase 4: Tests & Quick Wins** - E2E test suite, workspace delete tools, API docs, export endpoint (completed 2026-03-09)
-
-## Phase Details
 
 ### Phase 1: Queue Foundation
 **Goal**: Agent tasks can be enqueued and processed by a separate worker process with full job lifecycle management
@@ -82,21 +78,67 @@ Plans:
 - [x] 04-01-PLAN.md — E2E goal lifecycle test with real DB isolation, truncation, Fastify inject, and MockLlmRegistry scripted responses
 - [x] 04-02-PLAN.md — Quick win tests: deleteFile/deleteDirectory workspace tests + route tests for roles, export, and Swagger endpoints
 
+</details>
+
+### 🚧 v1.1 Pipeline Dashboard UI (In Progress)
+
+**Milestone Goal:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
+
+- [ ] **Phase 5: Pipeline List + Navigation** - Sidebar nav entry, list page with filtering and auto-refresh, click-through to detail
+- [ ] **Phase 6: Pipeline Detail** - Per-stage status, expandable outputs, timing, metadata, auto-refresh on active runs
+- [ ] **Phase 7: Pipeline Trigger** - Goal-based and custom-stage submission forms with confirmation and redirect
+
+## Phase Details
+
+### Phase 5: Pipeline List + Navigation
+**Goal**: Users can reach the pipelines section from the sidebar and see all pipeline runs with status, filtering, and auto-refresh
+**Depends on**: Phase 4
+**Requirements**: NAV-01, NAV-02, LIST-01, LIST-02, LIST-03, LIST-04
+**Success Criteria** (what must be TRUE):
+  1. User can click "Pipelines" in the dashboard sidebar and arrive at the pipeline list page
+  2. User can see all pipeline runs with their state, stage count, and timing displayed on the list page
+  3. User can filter the list to show only runs in a selected state (waiting, active, completed, failed)
+  4. User can see the list auto-refresh every 10 seconds without any manual action
+  5. User can click a pipeline row to navigate to its detail view, with the URL updating to /pipelines/:jobId
+**Plans**: TBD
+
+### Phase 6: Pipeline Detail
+**Goal**: Users can inspect a specific pipeline run's per-stage progress, outputs, timing, and overall metadata
+**Depends on**: Phase 5
+**Requirements**: DETAIL-01, DETAIL-02, DETAIL-03, DETAIL-04, DETAIL-05
+**Success Criteria** (what must be TRUE):
+  1. User can see each stage listed with a status indicator (pending, active, completed, failed, skipped)
+  2. User can expand a stage to read its output text and any error details
+  3. User can see the duration of each completed stage displayed inline
+  4. User can see the pipeline's overall state, linked goal reference, and created/finished timestamps
+  5. User can see an active pipeline's detail page auto-refresh every 5 seconds
+**Plans**: TBD
+
+### Phase 7: Pipeline Trigger
+**Goal**: Users can submit new pipeline runs — goal-based or custom-stage — and be taken directly to the resulting run
+**Depends on**: Phase 5
+**Requirements**: TRIGGER-01, TRIGGER-02, TRIGGER-03, TRIGGER-04
+**Success Criteria** (what must be TRUE):
+  1. User can enter a goal description and submit a 3-stage pipeline (planner → coder → reviewer) with one action
+  2. User can build a custom pipeline by configuring each stage's agent role, prompt, and dependency flag before submitting
+  3. User sees a confirmation message showing the newly created job ID after successful submission
+  4. User is automatically redirected to the pipeline detail view for the new run immediately after submission
+**Plans**: TBD
+
 ## Progress
 
-**Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4
+**Execution Order:** 5 → 6 → 7
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Queue Foundation | 3/3 | Complete   | 2026-03-08 |
-| 2. SSE Migration | 2/2 | Complete   | 2026-03-08 |
-| 3. Authentication | 2/2 | Complete   | 2026-03-08 |
-| 4. Tests & Quick Wins | 2/2 | Complete   | 2026-03-09 |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Queue Foundation | v1.0 | 3/3 | Complete | 2026-03-08 |
+| 2. SSE Migration | v1.0 | 2/2 | Complete | 2026-03-08 |
+| 3. Authentication | v1.0 | 2/2 | Complete | 2026-03-08 |
+| 4. Tests & Quick Wins | v1.0 | 2/2 | Complete | 2026-03-09 |
+| 5. Pipeline List + Navigation | v1.1 | 0/TBD | Not started | - |
+| 6. Pipeline Detail | v1.1 | 0/TBD | Not started | - |
+| 7. Pipeline Trigger | v1.1 | 0/TBD | Not started | - |
 
 ---
-*Roadmap created: 2026-03-07*
-*Phase 1 planned: 2026-03-07*
-*Phase 2 planned: 2026-03-08*
-*Phase 3 planned: 2026-03-08*
-*Phase 4 planned: 2026-03-08*
+*v1.0 roadmap created: 2026-03-07*
+*v1.1 roadmap created: 2026-03-09*

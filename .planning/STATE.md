@@ -2,12 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Pipeline Dashboard UI
-status: defining_requirements
+status: ready_to_plan
 stopped_at: null
 last_updated: "2026-03-09"
-last_activity: "2026-03-09 — Milestone v1.1 started"
+last_activity: "2026-03-09 — Roadmap created, Phase 5 ready to plan"
 progress:
-  total_phases: 0
+  total_phases: 3
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -21,19 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-09)
 
 **Core value:** Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
-**Current focus:** Defining requirements for Pipeline Dashboard UI
+**Current focus:** Phase 5 — Pipeline List + Navigation
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-09 — Milestone v1.1 started
+Phase: 5 of 7 (Pipeline List + Navigation)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-03-09 — Roadmap created, Phase 5 ready to plan
+
+Progress: [░░░░░░░░░░] 0% (v1.1 milestone)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
+- Total plans completed: 0 (v1.1)
 - Average duration: —
 - Total execution time: —
 
@@ -46,10 +48,10 @@ Recent decisions affecting current work:
 
 - [v1.0]: BullMQ over raw Redis pub/sub (built-in retries, priorities, job dashboard)
 - [v1.0]: JWT over OAuth for dashboard auth (single user, fast to implement)
-- [v1.0]: Redis as Docker Compose service (self-contained, matches existing deploy pattern)
 - [v1.0]: SSE streaming via Redis pub/sub for real-time goal execution events
-- [v1.0]: In-memory token over localStorage for XSS protection
-- [v1.0]: Worker as separate container with graceful shutdown
+- [v1.1]: 3-phase structure derived from natural delivery boundaries (list → detail → trigger)
+- [v1.1]: NAV requirements merged into Phase 5 (list page IS the first nav destination)
+- [v1.1]: Polling (refetchInterval) over SSE for pipeline progress — SSE deferred to future milestone
 
 ### Pending Todos
 
@@ -57,12 +59,12 @@ None yet.
 
 ### Blockers/Concerns
 
-- Pipeline backend has no SSE streaming support yet — currently only query-based polling (GET /api/pipelines, GET /api/pipelines/:jobId)
-- Pipeline stage progress is embedded in job data (currentStage field) — no dedicated event stream for stage transitions
-- Dashboard patterns are well-established (TanStack Query, lazy routes, shadcn/ui) — follow existing conventions
+- Pipeline backend has no SSE streaming — Phase 5/6 use polling (refetchInterval) per requirements LIST-03 and DETAIL-05
+- Pipeline stage progress is in job data (currentStage field) — detail view reads from GET /api/pipelines/:jobId
+- Backend pipeline types (PipelineRun, PipelineDetail, etc.) already exist in ApiClient — use them directly
 
 ## Session Continuity
 
 Last session: 2026-03-09
-Stopped at: null
+Stopped at: Roadmap created, ready for /gsd:plan-phase 5
 Resume file: None
