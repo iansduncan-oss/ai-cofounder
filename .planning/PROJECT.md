@@ -2,21 +2,24 @@
 
 ## What This Is
 
-AI Cofounder is a multi-agent AI assistant platform that orchestrates specialist agents (Researcher, Coder, Reviewer, Planner, Debugger, DocWriter, Verifier) to execute software engineering goals. It's accessible via Discord bot, Slack bot, web dashboard, and voice UI — all backed by a Fastify API server with PostgreSQL persistence, BullMQ job queues, and Docker sandboxed code execution.
+AI Cofounder is a multi-agent AI assistant platform that orchestrates specialist agents (Researcher, Coder, Reviewer, Planner, Debugger, DocWriter, Verifier) to execute software engineering goals. It's accessible via Discord bot, Slack bot, web dashboard, and voice UI — all backed by a Fastify API server with PostgreSQL persistence, BullMQ job queues, and Docker sandboxed code execution. The dashboard includes a full pipeline management UI for visualizing, monitoring, and triggering multi-stage agent pipelines.
 
 ## Core Value
 
-Users can visualize, monitor, and trigger multi-stage agent pipelines from the dashboard with real-time progress feedback.
+An AI-powered engineering partner that autonomously plans, executes, and verifies software tasks — accessible from any interface.
 
-## Current Milestone: v1.1 Pipeline Dashboard UI
+## Current State
 
-**Goal:** Build dashboard pages for visualizing, monitoring, and triggering pipeline runs with real-time stage progress.
+**Shipped:** v1.1 Pipeline Dashboard UI (2026-03-09)
 
-**Target features:**
-- Pipeline list page showing all runs with status, progress, and timing
-- Pipeline detail view with stage-by-stage progress, logs, and timing
-- Trigger pipelines from the dashboard UI (custom stages or goal-based)
-- Real-time stage progress updates via polling/SSE
+The platform is fully operational with:
+- Multi-agent orchestration (20+ tools, agentic tool loop)
+- BullMQ job queue with worker process and SSE streaming
+- JWT-authenticated dashboard with pipeline management
+- Discord + Slack bots (8 commands each)
+- Voice UI with ElevenLabs TTS
+- ~960 tests across 65+ files, all passing
+- CI/CD with auto-deploy on green tests
 
 ## Requirements
 
@@ -27,7 +30,7 @@ Users can visualize, monitor, and trigger multi-stage agent pipelines from the d
 - ✓ Slack bot with 8 slash commands (Bolt + Socket Mode) — existing
 - ✓ Web dashboard with streaming chat, conversation persistence, sidebar — existing
 - ✓ Voice UI served at /voice/ — existing
-- ✓ PostgreSQL persistence via Drizzle ORM (goals, tasks, memories, conversations, events) — existing
+- ✓ PostgreSQL persistence via Drizzle ORM — existing
 - ✓ Docker sandboxed code execution (TS, JS, Python, Bash) — existing
 - ✓ Multi-LLM provider abstraction with task-based routing and health tracking — existing
 - ✓ Cron scheduler with daily briefing — existing
@@ -42,47 +45,49 @@ Users can visualize, monitor, and trigger multi-stage agent pipelines from the d
 - ✓ JWT authentication for dashboard (login, refresh, logout) — v1.0
 - ✓ E2E integration tests (goal lifecycle) — v1.0
 - ✓ Conversation export, OpenAPI docs, agent roles endpoint — v1.0
+- ✓ Pipeline list page with state filtering, timing, clickable navigation — v1.1
+- ✓ Pipeline detail view with stage-by-stage progress, expandable outputs — v1.1
+- ✓ Pipeline trigger from dashboard (goal-based + custom stages) — v1.1
+- ✓ Real-time pipeline progress via polling auto-refresh — v1.1
 
 ### Active
 
-- [ ] Pipeline list page with status/progress overview
-- [ ] Pipeline detail view with stage-by-stage progress and logs
-- [ ] Trigger pipelines from dashboard (custom and goal-based)
-- [ ] Real-time pipeline stage progress updates
+(Next milestone requirements TBD — run `/gsd:new-milestone`)
 
 ### Out of Scope
 
 - OAuth / SSO providers — JWT sufficient for single-user; defer to future milestone
 - Horizontal scaling — message queue enables this but actual multi-instance is future work
-- Circuit breaker pattern — existing exponential backoff and provider fallback is adequate for now
+- Circuit breaker pattern — existing exponential backoff and provider fallback is adequate
 - Database read replicas — current load doesn't warrant this complexity
 - WebSocket support — SSE streaming is working well for current needs
-- Pipeline CRUD (create/edit/delete pipeline definitions) — this milestone covers execution monitoring, not pipeline template management
 - Pipeline scheduling/recurring runs — deferred to future milestone
+- Pipeline SSE streaming — polling sufficient; SSE requires new backend endpoint
 
 ## Context
 
-- **Monorepo** (Turborepo): apps/agent-server, apps/discord-bot, apps/slack-bot, apps/dashboard, apps/voice-ui, packages/db, packages/llm, packages/sandbox, packages/api-client, packages/bot-handlers, packages/shared, packages/test-utils
+- **Monorepo** (Turborepo): apps/agent-server, apps/discord-bot, apps/slack-bot, apps/dashboard, apps/voice-ui, packages/db, packages/llm, packages/sandbox, packages/api-client, packages/bot-handlers, packages/shared, packages/test-utils, packages/queue, packages/rag, packages/mcp-server
 - **VPS**: Hetzner at 168.119.162.59, deployed via Docker Compose, CI auto-deploys on green tests
-- **Test coverage**: ~958 tests across 65 files, all passing — but zero E2E/integration tests
-- **Current pain point**: Agent tasks (especially multi-step goals with tool loops) run synchronously in request handlers, blocking the Fastify event loop during long executions
-- **Dashboard**: Currently no auth — anyone with the URL can access chat, goals, workspace
+- **Test coverage**: ~960 tests across 65+ files (108 dashboard tests), all passing
+- **Dashboard**: JWT-authenticated, pipeline management (list/detail/trigger), streaming chat, goals, workspace
 
 ## Constraints
 
-- **Stack**: Must integrate with existing Turborepo + Fastify + Drizzle + PostgreSQL stack
-- **Redis**: New dependency — needs Docker Compose addition for both dev and production
-- **Backwards compatible**: Bot commands and API endpoints must continue working during migration
+- **Stack**: Turborepo + Fastify + Drizzle + PostgreSQL + BullMQ + Redis
+- **Backwards compatible**: Bot commands and API endpoints must continue working
 - **Single user**: Auth is single-user (Ian) for now — don't over-engineer multi-tenant
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| BullMQ over raw Redis pub/sub | BullMQ provides job queues, retries, priorities, and dashboard out of the box | — Pending |
-| JWT over OAuth for v1 auth | Single user, no need for OAuth complexity; JWT is fast to implement | — Pending |
-| Redis added as Docker Compose service | Keeps infrastructure self-contained, matches existing Docker-based deploy | — Pending |
-| E2E tests use test database | Isolation from production data, can reset between test runs | — Pending |
+| BullMQ over raw Redis pub/sub | Built-in retries, priorities, job dashboard | ✓ Good — reliable job processing |
+| JWT over OAuth for v1 auth | Single user, fast to implement | ✓ Good — working well |
+| Redis added as Docker Compose service | Self-contained infrastructure | ✓ Good — clean deploy |
+| E2E tests use test database | Isolation from production data | ✓ Good — safe CI runs |
+| Polling over SSE for pipeline progress | SSE deferred, polling simpler | ✓ Good — adequate for v1.1 |
+| 3-phase structure for v1.1 (list → detail → trigger) | Natural delivery boundaries | ✓ Good — clean execution |
+| formatDuration duplicated across routes | Avoids route-to-route circular deps | ✓ Good — pragmatic |
 
 ---
-*Last updated: 2026-03-09 after v1.1 Pipeline Dashboard UI milestone started*
+*Last updated: 2026-03-09 after v1.1 milestone completion*
