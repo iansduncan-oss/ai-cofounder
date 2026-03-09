@@ -1,107 +1,96 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { toast } from "sonner";
+import { apiClient } from "@/api/client";
 
 interface SSEOptions {
   onMessage?: (data: unknown) => void;
-  onError?: (error: Event) => void;
+  onError?: (error: Error) => void;
   onComplete?: () => void;
   maxRetries?: number;
   timeoutMs?: number;
+  userId?: string;
 }
 
-export function useSSE(url: string | null, options: SSEOptions = {}) {
+export function useSSE(goalId: string | null, options: SSEOptions = {}) {
   const { maxRetries = 3, timeoutMs = 120_000 } = options;
   const [events, setEvents] = useState<unknown[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sourceRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const urlRef = useRef(url);
+  const goalIdRef = useRef(goalId);
 
-  urlRef.current = url;
+  goalIdRef.current = goalId;
 
-  const clearTimeout_ = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+  const disconnect = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+      setIsConnected(false);
     }
   }, []);
 
-  const disconnect = useCallback(() => {
-    clearTimeout_();
-    if (sourceRef.current) {
-      sourceRef.current.close();
-      sourceRef.current = null;
-      setIsConnected(false);
-    }
-  }, [clearTimeout_]);
-
   const connect = useCallback(
-    (targetUrl: string) => {
-      const baseUrl = import.meta.env.VITE_API_URL || "";
-      const fullUrl = targetUrl.startsWith("http")
-        ? targetUrl
-        : `${baseUrl}${targetUrl}`;
+    async (id: string) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-      const source = new EventSource(fullUrl);
-      sourceRef.current = source;
+      setIsConnected(true);
+      setError(null);
 
-      // Connection timeout
-      clearTimeout_();
-      timeoutRef.current = setTimeout(() => {
-        if (sourceRef.current === source) {
-          source.close();
+      const timeout = setTimeout(() => {
+        if (abortRef.current === controller) {
+          controller.abort();
           setIsConnected(false);
           setError("Connection timed out");
           toast.error("SSE connection timed out");
         }
       }, timeoutMs);
 
-      source.onopen = () => {
-        setIsConnected(true);
-        setError(null);
-        retryCountRef.current = 0;
-      };
+      try {
+        const stream = apiClient.streamExecute(id, {
+          userId: options.userId,
+          signal: controller.signal,
+        });
 
-      source.onmessage = (event) => {
-        // Reset timeout on each message
-        clearTimeout_();
-        timeoutRef.current = setTimeout(() => {
-          if (sourceRef.current === source) {
-            source.close();
-            setIsConnected(false);
-            setError("Connection timed out");
-          }
-        }, timeoutMs);
+        for await (const event of stream) {
+          if (controller.signal.aborted) break;
 
-        try {
-          const data = JSON.parse(event.data);
+          // Reset timeout on each event
+          clearTimeout(timeout);
+
+          const data = event.data;
           setEvents((prev) => [...prev, data]);
           options.onMessage?.(data);
 
-          if (data.status === "completed" || data.status === "failed") {
-            clearTimeout_();
-            source.close();
+          const status = (data as Record<string, unknown>).status;
+          if (status === "completed" || status === "failed") {
+            clearTimeout(timeout);
             setIsConnected(false);
             options.onComplete?.();
-            if (data.status === "completed") {
+            if (status === "completed") {
               toast.success("Execution completed");
-            } else if (data.status === "failed") {
-              toast.error(data.error || "Execution failed");
+            } else {
+              toast.error(
+                ((data as Record<string, unknown>).error as string) ||
+                  "Execution failed",
+              );
             }
+            return;
           }
-        } catch {
-          // Non-JSON message, ignore
         }
-      };
 
-      source.onerror = (err) => {
-        source.close();
+        // Stream ended naturally
+        clearTimeout(timeout);
         setIsConnected(false);
-        clearTimeout_();
+      } catch (err) {
+        clearTimeout(timeout);
+        if (controller.signal.aborted) return;
 
-        if (retryCountRef.current < maxRetries && urlRef.current) {
+        setIsConnected(false);
+
+        if (retryCountRef.current < maxRetries && goalIdRef.current) {
           retryCountRef.current++;
           const delay = Math.min(
             1000 * Math.pow(2, retryCountRef.current - 1),
@@ -109,29 +98,33 @@ export function useSSE(url: string | null, options: SSEOptions = {}) {
           );
           toast.error(`Connection lost, retrying in ${delay / 1000}s...`);
           setTimeout(() => {
-            if (urlRef.current) connect(urlRef.current);
+            if (goalIdRef.current) connect(goalIdRef.current);
           }, delay);
         } else {
-          setError("Connection lost");
+          const message =
+            err instanceof Error ? err.message : "Connection lost";
+          setError(message);
           toast.error("SSE connection failed after retries");
-          options.onError?.(err);
+          options.onError?.(
+            err instanceof Error ? err : new Error(message),
+          );
         }
-      };
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [maxRetries, timeoutMs, clearTimeout_],
+    [maxRetries, timeoutMs],
   );
 
   useEffect(() => {
-    if (!url) return;
+    if (!goalId) return;
     retryCountRef.current = 0;
-    connect(url);
+    connect(goalId);
 
     return () => {
       disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url]);
+  }, [goalId]);
 
   const reset = useCallback(() => {
     disconnect();

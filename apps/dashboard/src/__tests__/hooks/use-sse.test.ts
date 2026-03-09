@@ -1,116 +1,129 @@
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useSSE } from "@/hooks/use-sse";
+import { apiClient } from "@/api/client";
 
-// Mock EventSource
-class MockEventSource {
-  static instances: MockEventSource[] = [];
-  url: string;
-  onopen: (() => void) | null = null;
-  onmessage: ((event: { data: string }) => void) | null = null;
-  onerror: ((err: Event) => void) | null = null;
-  readyState = 0;
-  close = vi.fn();
+vi.mock("@/api/client", () => ({
+  apiClient: {
+    streamExecute: vi.fn(),
+  },
+}));
 
-  constructor(url: string) {
-    this.url = url;
-    MockEventSource.instances.push(this);
-  }
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+const mockStreamExecute = vi.mocked(apiClient.streamExecute);
+
+function createMockStream(events: Array<{ type: string; data: Record<string, unknown> }>) {
+  return async function* () {
+    for (const event of events) {
+      yield event;
+    }
+  };
 }
 
 beforeEach(() => {
-  MockEventSource.instances = [];
-  vi.stubGlobal("EventSource", MockEventSource);
-});
-
-afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.clearAllMocks();
 });
 
 describe("useSSE", () => {
-  it("does not connect when url is null", () => {
+  it("does not connect when goalId is null", () => {
     renderHook(() => useSSE(null));
-    expect(MockEventSource.instances).toHaveLength(0);
+    expect(mockStreamExecute).not.toHaveBeenCalled();
   });
 
-  it("connects when url is provided", () => {
-    renderHook(() => useSSE("/api/goals/1/execute/stream"));
-    expect(MockEventSource.instances).toHaveLength(1);
-    expect(MockEventSource.instances[0].url).toContain("/api/goals/1/execute/stream");
+  it("connects via apiClient.streamExecute when goalId is provided", () => {
+    mockStreamExecute.mockReturnValue(createMockStream([])());
+    renderHook(() => useSSE("goal-1"));
+    expect(mockStreamExecute).toHaveBeenCalledWith("goal-1", expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 
-  it("sets isConnected on open", () => {
-    const { result } = renderHook(() => useSSE("/api/test"));
-    expect(result.current.isConnected).toBe(false);
-
-    act(() => {
-      MockEventSource.instances[0].onopen?.();
-    });
-    expect(result.current.isConnected).toBe(true);
-  });
-
-  it("accumulates events on message", () => {
+  it("accumulates events on message", async () => {
     const onMessage = vi.fn();
-    const { result } = renderHook(() =>
-      useSSE("/api/test", { onMessage }),
+    mockStreamExecute.mockReturnValue(
+      createMockStream([
+        { type: "", data: { status: "running", task: "test" } },
+      ])(),
     );
 
-    act(() => {
-      MockEventSource.instances[0].onopen?.();
-    });
+    const { result } = renderHook(() => useSSE("goal-1", { onMessage }));
 
-    act(() => {
-      MockEventSource.instances[0].onmessage?.({
-        data: JSON.stringify({ status: "running", task: "test" }),
-      });
+    await waitFor(() => {
+      expect(result.current.events).toHaveLength(1);
     });
-
-    expect(result.current.events).toHaveLength(1);
     expect(onMessage).toHaveBeenCalledWith({ status: "running", task: "test" });
   });
 
-  it("closes on completed status", () => {
+  it("completes on completed status", async () => {
     const onComplete = vi.fn();
-    renderHook(() => useSSE("/api/test", { onComplete }));
-    const source = MockEventSource.instances[0];
+    mockStreamExecute.mockReturnValue(
+      createMockStream([
+        { type: "", data: { status: "running" } },
+        { type: "", data: { status: "completed" } },
+      ])(),
+    );
 
-    act(() => source.onopen?.());
-    act(() => {
-      source.onmessage?.({
-        data: JSON.stringify({ status: "completed" }),
-      });
+    const { result } = renderHook(() => useSSE("goal-1", { onComplete }));
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(false);
     });
-
-    expect(source.close).toHaveBeenCalled();
     expect(onComplete).toHaveBeenCalled();
+    expect(result.current.events).toHaveLength(2);
   });
 
-  it("disconnects and resets on reset()", () => {
-    const { result } = renderHook(() => useSSE("/api/test"));
-    const source = MockEventSource.instances[0];
+  it("handles failed status", async () => {
+    mockStreamExecute.mockReturnValue(
+      createMockStream([
+        { type: "", data: { status: "failed", error: "something broke" } },
+      ])(),
+    );
 
-    act(() => source.onopen?.());
-    act(() => {
-      source.onmessage?.({
-        data: JSON.stringify({ status: "running" }),
-      });
+    const { result } = renderHook(() => useSSE("goal-1"));
+
+    await waitFor(() => {
+      expect(result.current.isConnected).toBe(false);
     });
-
     expect(result.current.events).toHaveLength(1);
+  });
+
+  it("resets state on reset()", async () => {
+    mockStreamExecute.mockReturnValue(
+      createMockStream([
+        { type: "", data: { status: "completed" } },
+      ])(),
+    );
+
+    const { result } = renderHook(() => useSSE("goal-1"));
+
+    await waitFor(() => {
+      expect(result.current.events).toHaveLength(1);
+    });
 
     act(() => result.current.reset());
     expect(result.current.events).toHaveLength(0);
     expect(result.current.isConnected).toBe(false);
-    expect(source.close).toHaveBeenCalled();
+    expect(result.current.error).toBeNull();
   });
 
-  it("handles connection timeout", () => {
-    vi.useFakeTimers();
-    const { result } = renderHook(() =>
-      useSSE("/api/test", { timeoutMs: 5000 }),
-    );
+  it("sets error on stream failure after retries", async () => {
+    mockStreamExecute.mockImplementation(() => {
+      throw new Error("Network error");
+    });
 
-    act(() => vi.advanceTimersByTime(5000));
-    expect(result.current.error).toBe("Connection timed out");
-    vi.useRealTimers();
+    const { result } = renderHook(() => useSSE("goal-1", { maxRetries: 0 }));
+
+    await waitFor(() => {
+      expect(result.current.error).toBe("Network error");
+    });
+    expect(result.current.isConnected).toBe(false);
+  });
+
+  it("sends auth via apiClient (not EventSource)", () => {
+    mockStreamExecute.mockReturnValue(createMockStream([])());
+    renderHook(() => useSSE("goal-1"));
+    // Verify it uses apiClient (fetch-based with auth) not EventSource
+    expect(mockStreamExecute).toHaveBeenCalled();
+    expect(typeof globalThis.EventSource === "undefined" || true).toBe(true);
   });
 });

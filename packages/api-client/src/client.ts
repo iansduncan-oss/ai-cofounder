@@ -34,6 +34,10 @@ import type {
   PipelineDetail,
   SubmitPipelineInput,
   SubmitPipelineResponse,
+  SubagentRun,
+  SubagentRunStatus,
+  SpawnSubagentInput,
+  SpawnSubagentResponse,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -466,20 +470,68 @@ export class ApiClient {
     return this.request<SubmitPipelineResponse>("POST", `/api/pipelines/goal/${goalId}`, { context });
   }
 
+  /* ── Subagents ── */
+
+  spawnSubagent(data: SpawnSubagentInput) {
+    return this.request<SpawnSubagentResponse>("POST", "/api/subagents", data);
+  }
+
+  getSubagentRun(id: string) {
+    return this.request<SubagentRun>("GET", `/api/subagents/${id}`);
+  }
+
+  listSubagentRuns(opts?: {
+    goalId?: string;
+    status?: SubagentRunStatus;
+    parentRequestId?: string;
+  } & PaginationParams) {
+    const params = new URLSearchParams();
+    if (opts?.goalId) params.set("goalId", opts.goalId);
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.parentRequestId) params.set("parentRequestId", opts.parentRequestId);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.request<{ data: SubagentRun[]; total: number }>(
+      "GET",
+      `/api/subagents${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  cancelSubagentRun(id: string) {
+    return this.request<{ subagentRunId: string; status: string }>(
+      "POST",
+      `/api/subagents/${id}/cancel`,
+    );
+  }
+
   /* ── Streaming ── */
 
-  async *streamExecute(goalId: string, userId?: string): AsyncGenerator<StreamEvent> {
-    const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
-    const streamHeaders: Record<string, string> = { ...this.headers };
-    const dynamicToken = this.getToken?.();
-    if (dynamicToken) streamHeaders["Authorization"] = `Bearer ${dynamicToken}`;
-    const res = await fetch(`${this.baseUrl}/api/goals/${goalId}/execute/stream${params}`, {
-      method: "GET",
-      headers: streamHeaders,
-      credentials: "include",
-    });
+  async *streamExecute(
+    goalId: string,
+    opts?: { userId?: string; signal?: AbortSignal },
+  ): AsyncGenerator<StreamEvent> {
+    const params = opts?.userId ? `?userId=${encodeURIComponent(opts.userId)}` : "";
+    const url = `${this.baseUrl}/api/goals/${goalId}/execute/stream${params}`;
 
-    if (!res.ok) {
+    const doFetch = async (token?: string | null) => {
+      const h: Record<string, string> = { ...this.headers };
+      const t = token ?? this.getToken?.();
+      if (t) h["Authorization"] = `Bearer ${t}`;
+      return fetch(url, { method: "GET", headers: h, credentials: "include", signal: opts?.signal });
+    };
+
+    let res = await doFetch();
+
+    if (res.status === 401 && this.onUnauthorized) {
+      const newToken = await this.onUnauthorized();
+      if (newToken) {
+        res = await doFetch(newToken);
+      }
+      if (!res.ok) {
+        throw new ApiError(res.status, "Session expired");
+      }
+    } else if (!res.ok) {
       const errorBody = await res.json().catch(() => ({ error: res.statusText }));
       throw new ApiError(res.status, (errorBody as { error?: string }).error ?? res.statusText);
     }

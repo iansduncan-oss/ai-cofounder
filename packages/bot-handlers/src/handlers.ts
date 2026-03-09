@@ -287,7 +287,7 @@ export async function handleExecuteStreaming(
     let goalTitle = "";
     const taskStatuses: Array<{ title: string; agent: string; status: string; icon: string }> = [];
 
-    const stream = client.streamExecute(goalId, ctx.userId);
+    const stream = client.streamExecute(goalId, { userId: ctx.userId });
 
     for await (const event of stream) {
       if (event.type === "started") {

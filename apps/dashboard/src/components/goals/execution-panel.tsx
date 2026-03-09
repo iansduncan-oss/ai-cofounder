@@ -23,14 +23,14 @@ interface TaskEvent {
 }
 
 export function ExecutionPanel({ goalId, goalStatus }: ExecutionPanelProps) {
-  const [sseUrl, setSseUrl] = useState<string | null>(null);
-  const { events, isConnected, error } = useSSE(sseUrl);
+  const [activeGoalId, setActiveGoalId] = useState<string | null>(null);
+  const { events, isConnected, error } = useSSE(activeGoalId);
 
   const canExecute = goalStatus === "active" || goalStatus === "draft";
   const isRunning = isConnected;
 
   const handleExecute = () => {
-    setSseUrl(`/api/goals/${goalId}/execute/stream`);
+    setActiveGoalId(goalId);
   };
 
   const taskEvents = events as TaskEvent[];
