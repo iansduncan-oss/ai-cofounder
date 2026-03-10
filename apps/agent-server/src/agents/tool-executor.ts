@@ -54,6 +54,12 @@ import {
 import { RUN_TESTS_TOOL } from "./tools/workspace-tools.js";
 import { CREATE_PR_TOOL, executeCreatePr } from "./tools/github-tools.js";
 import type { CreatePrInput } from "./tools/github-tools.js";
+import {
+  SEND_MESSAGE_TOOL,
+  CHECK_MESSAGES_TOOL,
+  BROADCAST_UPDATE_TOOL,
+} from "./tools/messaging-tools.js";
+import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
@@ -67,6 +73,15 @@ export interface ToolExecutorServices {
   n8nService?: N8nService;
   sandboxService?: SandboxService;
   workspaceService?: WorkspaceService;
+  messagingService?: AgentMessagingService;
+}
+
+export interface ToolExecutorContext {
+  conversationId: string;
+  userId?: string;
+  agentRole?: string;
+  agentRunId?: string;
+  goalId?: string;
 }
 
 /**
@@ -126,6 +141,12 @@ export function buildSharedToolList(
     add(CREATE_PR_TOOL);
   }
 
+  if (services.messagingService) {
+    add(SEND_MESSAGE_TOOL);
+    add(CHECK_MESSAGES_TOOL);
+    add(BROADCAST_UPDATE_TOOL);
+  }
+
   return tools;
 }
 
@@ -137,9 +158,9 @@ export function buildSharedToolList(
 export async function executeSharedTool(
   block: LlmToolUseContent,
   services: ToolExecutorServices,
-  context: { conversationId: string; userId?: string },
+  context: ToolExecutorContext,
 ): Promise<unknown> {
-  const { db, embeddingService, n8nService, sandboxService, workspaceService } = services;
+  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService } = services;
 
   switch (block.name) {
     case "save_memory": {
@@ -393,6 +414,25 @@ export async function executeSharedTool(
       if (!workspaceService) return { error: "Workspace not available" };
       const input = block.input as { repo_url: string; directory_name?: string; depth?: number };
       const result = await workspaceService.gitClone(input.repo_url, input.directory_name, input.depth);
+
+      // Auto-ingest project documentation on workspace registration (MEM-03)
+      try {
+        const { enqueueRagIngestion } = await import("@ai-cofounder/queue");
+        const dirName =
+          input.directory_name ??
+          input.repo_url
+            .split("/")
+            .pop()
+            ?.replace(".git", "") ??
+          "repo";
+        enqueueRagIngestion({
+          action: "ingest_repo",
+          sourceId: dirName,
+        }).catch(() => {}); // fire-and-forget
+      } catch {
+        /* non-fatal */
+      }
+
       return { ...result, repoUrl: input.repo_url };
     }
 
@@ -460,6 +500,110 @@ export async function executeSharedTool(
       if (!workspaceService) return { error: "Workspace not available" };
       const input = block.input as unknown as CreatePrInput;
       return executeCreatePr(input);
+    }
+
+    case "send_message": {
+      if (!messagingService) return { error: "Messaging not available" };
+      const input = block.input as {
+        target_role: string;
+        message_type: "request" | "response" | "notification" | "handoff";
+        subject: string;
+        body: string;
+        in_reply_to?: string;
+        correlation_id?: string;
+        priority?: "low" | "medium" | "high" | "critical";
+      };
+      const result = await messagingService.send({
+        senderRole: context.agentRole ?? "orchestrator",
+        senderRunId: context.agentRunId,
+        targetRole: input.target_role,
+        messageType: input.message_type,
+        subject: input.subject,
+        body: input.body,
+        inReplyTo: input.in_reply_to,
+        correlationId: input.correlation_id,
+        priority: input.priority,
+        goalId: context.goalId,
+        conversationId: context.conversationId,
+        metadata: { messageDepth: 0 },
+      });
+      return {
+        sent: true,
+        messageId: result.messageId,
+        correlationId: result.correlationId,
+        message: result.correlationId
+          ? `Message sent. Use check_messages with correlation_id="${result.correlationId}" to check for a response.`
+          : "Message sent.",
+      };
+    }
+
+    case "check_messages": {
+      if (!messagingService) return { error: "Messaging not available" };
+      const input = block.input as {
+        correlation_id?: string;
+        sender_role?: string;
+        message_type?: string;
+        channel?: string;
+        unread_only?: boolean;
+      };
+
+      // If checking a broadcast channel
+      if (input.channel) {
+        const messages = await messagingService.checkBroadcast(input.channel, {
+          goalId: context.goalId,
+        });
+        return {
+          channel: input.channel,
+          count: messages.length,
+          messages: messages.map((m) => ({
+            id: m.id,
+            senderRole: m.senderRole,
+            subject: m.subject,
+            body: m.body,
+            createdAt: m.createdAt,
+          })),
+        };
+      }
+
+      // Check personal inbox
+      const messages = await messagingService.checkInbox({
+        targetRole: context.agentRole ?? "orchestrator",
+        targetRunId: context.agentRunId,
+        correlationId: input.correlation_id,
+        senderRole: input.sender_role,
+        messageType: input.message_type,
+        unreadOnly: input.unread_only,
+      });
+
+      return {
+        count: messages.length,
+        messages: messages.map((m) => ({
+          id: m.id,
+          senderRole: m.senderRole,
+          targetRole: m.targetRole,
+          messageType: m.messageType,
+          subject: m.subject,
+          body: m.body,
+          correlationId: m.correlationId,
+          inReplyTo: m.inReplyTo,
+          createdAt: m.createdAt,
+        })),
+      };
+    }
+
+    case "broadcast_update": {
+      if (!messagingService) return { error: "Messaging not available" };
+      const input = block.input as { channel: string; subject: string; body: string };
+      const result = await messagingService.broadcast({
+        senderRole: context.agentRole ?? "orchestrator",
+        senderRunId: context.agentRunId,
+        channel: input.channel,
+        subject: input.subject,
+        body: input.body,
+        goalId: context.goalId,
+        conversationId: context.conversationId,
+      });
+      return { broadcast: true, messageId: result.messageId, channel: input.channel };
     }
 
     default:
