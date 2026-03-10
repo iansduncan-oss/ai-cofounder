@@ -95,6 +95,17 @@ export const queuePlugin = fp(async (app) => {
         case "weekly_patterns":
           await reflectionService.extractWeeklyPatterns();
           break;
+        case "analyze_user_patterns":
+          await reflectionService.analyzeUserPatterns();
+          break;
+        case "extract_decision": {
+          const { DecisionExtractorService } = await import("../services/decision-extractor.js");
+          const svc = new DecisionExtractorService(app.db, app.llmRegistry, app.embeddingService);
+          if (job.data.response && job.data.userId) {
+            await svc.extractAndStore(job.data.response, job.data.userId, job.data.conversationId);
+          }
+          break;
+        }
       }
     },
 
@@ -108,18 +119,39 @@ export const queuePlugin = fp(async (app) => {
       }
       switch (action) {
         case "ingest_conversations": {
-          // Ingest recent conversations as text
-          const { getLatestConversationSummary } = await import("@ai-cofounder/db");
-          const summary = await getLatestConversationSummary(app.db, sourceId);
-          if (summary) {
-            await ingestText(
-              app.db,
-              app.embeddingService.embed.bind(app.embeddingService),
-              "conversation",
-              sourceId,
-              summary.summary,
-              { cursor: summary.id },
-            );
+          if (sourceId === "sweep") {
+            // Sweep mode: ingest recent conversation summaries that haven't been ingested
+            const { getRecentConversationSummaries } = await import("@ai-cofounder/db");
+            const { needsReingestion } = await import("@ai-cofounder/rag");
+            const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
+            const summaries = await getRecentConversationSummaries(app.db, since);
+            for (const s of summaries) {
+              const needs = await needsReingestion(app.db, "conversation", s.conversationId, s.id);
+              if (needs) {
+                await ingestText(
+                  app.db,
+                  app.embeddingService.embed.bind(app.embeddingService),
+                  "conversation",
+                  s.conversationId,
+                  s.summary,
+                  { cursor: s.id },
+                );
+              }
+            }
+          } else {
+            // Single conversation ingestion
+            const { getLatestConversationSummary } = await import("@ai-cofounder/db");
+            const summary = await getLatestConversationSummary(app.db, sourceId);
+            if (summary) {
+              await ingestText(
+                app.db,
+                app.embeddingService.embed.bind(app.embeddingService),
+                "conversation",
+                sourceId,
+                summary.summary,
+                { cursor: summary.id },
+              );
+            }
           }
           break;
         }

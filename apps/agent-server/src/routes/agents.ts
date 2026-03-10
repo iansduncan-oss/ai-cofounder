@@ -14,6 +14,7 @@ import {
   createMessage,
   recordLlmUsage,
   getTodayTokenTotal,
+  recordUserAction,
 } from "@ai-cofounder/db";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
@@ -21,6 +22,15 @@ import { ConversationIngestionService } from "../services/conversation-ingestion
 import { generateSuggestions } from "../services/suggestions.js";
 
 const logger = createLogger("agent-routes");
+
+function recordActionSafe(db: import("@ai-cofounder/db").Db, action: {
+  userId?: string;
+  actionType: "chat_message" | "goal_created" | "deploy_triggered" | "suggestion_accepted" | "approval_submitted" | "schedule_created" | "tool_executed";
+  actionDetail?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  recordUserAction(db, action).catch(() => {}); // non-fatal fire-and-forget
+}
 
 const RunBody = Type.Object({
   message: Type.String({ minLength: 1, maxLength: 32_000 }),
@@ -225,16 +235,37 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    // Record user action (fire-and-forget)
+    if (dbUserId) {
+      recordActionSafe(app.db, {
+        userId: dbUserId,
+        actionType: "chat_message",
+        actionDetail: message.slice(0, 200),
+      });
+    }
+
     // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
     const redisEnabled = !!optionalEnv("REDIS_URL", "");
     if (redisEnabled && app.embeddingService && result.conversationId) {
       conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
     }
 
-    // Generate anticipatory suggestions
+    // Fire-and-forget decision extraction (MEM-02)
+    if (redisEnabled && dbUserId) {
+      const { getReflectionQueue } = await import("@ai-cofounder/queue");
+      getReflectionQueue().add("extract-decision", {
+        action: "extract_decision",
+        response: result.response,
+        userId: dbUserId,
+        conversationId: result.conversationId,
+      }).catch(() => {}); // fire-and-forget
+    }
+
+    // Generate anticipatory suggestions (pattern-aware)
     const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
       userMessage: message,
       agentResponse: result.response,
+      userId: dbUserId,
     });
 
     return { ...result, suggestions };
@@ -375,16 +406,37 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         } catch { /* non-fatal */ }
       }
 
+      // Record user action (fire-and-forget)
+      if (dbUserId) {
+        recordActionSafe(app.db, {
+          userId: dbUserId,
+          actionType: "chat_message",
+          actionDetail: message.slice(0, 200),
+        });
+      }
+
       // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
       const streamRedisEnabled = !!optionalEnv("REDIS_URL", "");
       if (streamRedisEnabled && app.embeddingService && result.conversationId) {
         conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
       }
 
-      // Generate and emit anticipatory suggestions
+      // Fire-and-forget decision extraction (MEM-02)
+      if (streamRedisEnabled && dbUserId) {
+        const { getReflectionQueue } = await import("@ai-cofounder/queue");
+        getReflectionQueue().add("extract-decision", {
+          action: "extract_decision",
+          response: result.response,
+          userId: dbUserId,
+          conversationId: result.conversationId,
+        }).catch(() => {}); // fire-and-forget
+      }
+
+      // Generate and emit anticipatory suggestions (pattern-aware)
       const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
         userMessage: message,
         agentResponse: result.response,
+        userId: dbUserId,
       });
       if (suggestions.length > 0) {
         send("suggestions", { suggestions });

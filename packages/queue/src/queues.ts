@@ -55,7 +55,7 @@ export interface RagIngestionJob {
 }
 
 export interface ReflectionJob {
-  action: "analyze_goal" | "weekly_patterns";
+  action: "analyze_goal" | "weekly_patterns" | "analyze_user_patterns" | "extract_decision";
   goalId?: string;
   goalTitle?: string;
   status?: string;
@@ -66,6 +66,10 @@ export interface ReflectionJob {
     status: string;
     output?: string;
   }>;
+  // Used by extract_decision action (MEM-02)
+  response?: string;
+  userId?: string;
+  conversationId?: string;
 }
 
 export interface SubagentTaskJob {
