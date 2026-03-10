@@ -52,6 +52,7 @@ export function mockDbModule() {
     createApproval: vi.fn().mockResolvedValue({ id: "approval-1" }),
     getApproval: vi.fn().mockResolvedValue(null),
     listPendingApprovals: vi.fn().mockResolvedValue([]),
+    listPendingApprovalsForTasks: vi.fn().mockResolvedValue([]),
     listApprovalsByTask: vi.fn().mockResolvedValue([]),
     resolveApproval: vi.fn().mockResolvedValue({}),
     // Memories
@@ -119,6 +120,7 @@ export function mockDbModule() {
     saveConversationSummary: vi.fn().mockResolvedValue({ id: "cs-1" }),
     getLatestConversationSummary: vi.fn().mockResolvedValue(null),
     getRecentConversationSummaries: vi.fn().mockResolvedValue([]),
+    getRecentSessionSummaries: vi.fn().mockResolvedValue([]),
     // Observability
     upsertProviderHealth: vi.fn().mockResolvedValue({}),
     getProviderHealthRecords: vi.fn().mockResolvedValue([]),
@@ -186,6 +188,19 @@ export function mockDbModule() {
     reflections: {},
     adminUsers: {},
     subagentRuns: {},
+    // Agent messages
+    sendAgentMessage: vi.fn().mockResolvedValue({ id: "am-1" }),
+    getAgentInbox: vi.fn().mockResolvedValue([]),
+    getChannelMessages: vi.fn().mockResolvedValue([]),
+    getResponseToRequest: vi.fn().mockResolvedValue(null),
+    getMessageThread: vi.fn().mockResolvedValue([]),
+    markMessagesRead: vi.fn().mockResolvedValue(undefined),
+    listAgentMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    getAgentMessage: vi.fn().mockResolvedValue(null),
+    getAgentMessageStats: vi.fn().mockResolvedValue([]),
+    expireStaleMessages: vi.fn().mockResolvedValue(0),
+    listGoalMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    agentMessages: {},
   };
 }
 
@@ -224,6 +239,7 @@ export function createControllableDbMocks() {
     createApproval: vi.fn().mockResolvedValue({ id: "approval-1" }),
     getApproval: vi.fn(),
     listPendingApprovals: vi.fn().mockResolvedValue([]),
+    listPendingApprovalsForTasks: vi.fn().mockResolvedValue([]),
     listApprovalsByTask: vi.fn().mockResolvedValue([]),
     resolveApproval: vi.fn(),
     saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),

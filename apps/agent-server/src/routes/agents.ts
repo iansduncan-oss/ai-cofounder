@@ -17,6 +17,8 @@ import {
 } from "@ai-cofounder/db";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
+import { ConversationIngestionService } from "../services/conversation-ingestion.js";
+import { generateSuggestions } from "../services/suggestions.js";
 
 const logger = createLogger("agent-routes");
 
@@ -63,6 +65,13 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.n8nService,
     app.sandboxService,
     app.workspaceService,
+    app.messagingService,
+  );
+
+  const conversationIngestion = new ConversationIngestionService(
+    app.db,
+    app.llmRegistry,
+    app.embeddingService,
   );
 
   const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
@@ -216,7 +225,19 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    return result;
+    // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
+    const redisEnabled = !!optionalEnv("REDIS_URL", "");
+    if (redisEnabled && app.embeddingService && result.conversationId) {
+      conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
+    }
+
+    // Generate anticipatory suggestions
+    const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
+      userMessage: message,
+      agentResponse: result.response,
+    });
+
+    return { ...result, suggestions };
   });
 
   // SSE streaming endpoint
@@ -352,6 +373,21 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
             conversationId: result.conversationId,
           });
         } catch { /* non-fatal */ }
+      }
+
+      // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
+      const streamRedisEnabled = !!optionalEnv("REDIS_URL", "");
+      if (streamRedisEnabled && app.embeddingService && result.conversationId) {
+        conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
+      }
+
+      // Generate and emit anticipatory suggestions
+      const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
+        userMessage: message,
+        agentResponse: result.response,
+      });
+      if (suggestions.length > 0) {
+        send("suggestions", { suggestions });
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);

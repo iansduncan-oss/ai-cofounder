@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, ilike, or, sql, lte } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, lte, isNull, inArray } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import {
@@ -27,6 +27,7 @@ import {
   reflections,
   adminUsers,
   subagentRuns,
+  agentMessages,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -331,6 +332,14 @@ export async function listPendingApprovals(db: Db, limit = 50) {
     .where(eq(approvals.status, "pending"))
     .orderBy(asc(approvals.createdAt))
     .limit(limit);
+}
+
+export async function listPendingApprovalsForTasks(db: Db, taskIds: string[]) {
+  if (taskIds.length === 0) return [];
+  return db
+    .select()
+    .from(approvals)
+    .where(and(eq(approvals.status, "pending"), inArray(approvals.taskId, taskIds)));
 }
 
 export async function listApprovalsByTask(db: Db, taskId: string) {
@@ -1233,6 +1242,60 @@ export async function getLatestConversationSummary(db: Db, conversationId: strin
   return rows[0] ?? null;
 }
 
+export async function getRecentConversationSummaries(db: Db, since: Date) {
+  return db
+    .select({
+      id: conversationSummaries.id,
+      conversationId: conversationSummaries.conversationId,
+      summary: conversationSummaries.summary,
+      createdAt: conversationSummaries.createdAt,
+    })
+    .from(conversationSummaries)
+    .where(
+      sql`${conversationSummaries.createdAt} >= ${since}`,
+    )
+    .orderBy(desc(conversationSummaries.createdAt));
+}
+
+/**
+ * getRecentSessionSummaries
+ *
+ * Returns the most recent conversation summaries for a specific user.
+ * Unlike getRecentConversationSummaries (which filters by date), this function
+ * filters by userId via the conversations join — satisfying MEM-01 session context needs.
+ */
+export async function getRecentSessionSummaries(
+  db: Db,
+  userId: string,
+  limit = 3,
+): Promise<Array<{ conversationId: string; summary: string; createdAt: Date }>> {
+  // Step 1: Get the user's most recent conversations
+  const recentConvs = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(eq(conversations.userId, userId))
+    .orderBy(desc(conversations.updatedAt))
+    .limit(10);
+
+  if (recentConvs.length === 0) return [];
+
+  const convIds = recentConvs.map((c) => c.id);
+
+  // Step 2: Get the latest summary for each of those conversations
+  const summaries = await db
+    .select({
+      conversationId: conversationSummaries.conversationId,
+      summary: conversationSummaries.summary,
+      createdAt: conversationSummaries.createdAt,
+    })
+    .from(conversationSummaries)
+    .where(inArray(conversationSummaries.conversationId, convIds))
+    .orderBy(desc(conversationSummaries.createdAt))
+    .limit(limit);
+
+  return summaries;
+}
+
 /* ────────────────── Provider Health ──────────────────────── */
 
 export async function upsertProviderHealth(
@@ -1726,7 +1789,7 @@ export async function findAdminByEmail(db: Db, email: string) {
 
 export async function createAdminUser(
   db: Db,
-  data: { email: string; passwordHash: string },
+  data: { email: string; passwordHash: string | null },
 ) {
   const [created] = await db.insert(adminUsers).values(data).returning();
   return created;
@@ -1854,4 +1917,243 @@ export async function getSubagentRunsByParentRequest(db: Db, parentRequestId: st
     .from(subagentRuns)
     .where(eq(subagentRuns.parentRequestId, parentRequestId))
     .orderBy(desc(subagentRuns.createdAt));
+}
+
+/* ────────────────── Agent Messages ─────────────────── */
+
+export async function sendAgentMessage(
+  db: Db,
+  data: {
+    senderRole: string;
+    senderRunId?: string;
+    targetRole?: string;
+    targetRunId?: string;
+    channel?: string;
+    messageType: string;
+    subject: string;
+    body: string;
+    correlationId?: string;
+    inReplyTo?: string;
+    goalId?: string;
+    taskId?: string;
+    conversationId?: string;
+    priority?: string;
+    expiresAt?: Date;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [created] = await db
+    .insert(agentMessages)
+    .values({
+      senderRole: data.senderRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent",
+      senderRunId: data.senderRunId,
+      targetRole: data.targetRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent" | undefined,
+      targetRunId: data.targetRunId,
+      channel: data.channel,
+      messageType: data.messageType as "request" | "response" | "broadcast" | "notification" | "handoff",
+      subject: data.subject,
+      body: data.body,
+      correlationId: data.correlationId,
+      inReplyTo: data.inReplyTo,
+      goalId: data.goalId,
+      taskId: data.taskId,
+      conversationId: data.conversationId,
+      priority: (data.priority as "low" | "medium" | "high" | "critical") ?? "medium",
+      expiresAt: data.expiresAt,
+      metadata: data.metadata,
+    })
+    .returning();
+  return created;
+}
+
+export async function getAgentInbox(
+  db: Db,
+  opts: {
+    targetRole?: string;
+    targetRunId?: string;
+    status?: string;
+    messageType?: string;
+    senderRole?: string;
+    goalId?: string;
+    limit?: number;
+  },
+) {
+  const conditions = [];
+  if (opts.targetRole) conditions.push(eq(agentMessages.targetRole, opts.targetRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"));
+  if (opts.targetRunId) conditions.push(eq(agentMessages.targetRunId, opts.targetRunId));
+  if (opts.status) conditions.push(eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"));
+  if (opts.messageType) conditions.push(eq(agentMessages.messageType, opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff"));
+  if (opts.senderRole) conditions.push(eq(agentMessages.senderRole, opts.senderRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"));
+  if (opts.goalId) conditions.push(eq(agentMessages.goalId, opts.goalId));
+
+  // Exclude broadcast messages from inbox (those go to channels)
+  conditions.push(isNull(agentMessages.channel));
+
+  const limit = opts.limit ?? 5;
+
+  return db
+    .select()
+    .from(agentMessages)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(agentMessages.createdAt))
+    .limit(limit);
+}
+
+export async function getChannelMessages(
+  db: Db,
+  opts: {
+    channel: string;
+    goalId?: string;
+    since?: Date;
+    limit?: number;
+  },
+) {
+  const conditions = [eq(agentMessages.channel, opts.channel)];
+  if (opts.goalId) conditions.push(eq(agentMessages.goalId, opts.goalId));
+  if (opts.since) conditions.push(sql`${agentMessages.createdAt} > ${opts.since}`);
+
+  const limit = opts.limit ?? 20;
+
+  return db
+    .select()
+    .from(agentMessages)
+    .where(and(...conditions))
+    .orderBy(asc(agentMessages.createdAt))
+    .limit(limit);
+}
+
+export async function markMessagesRead(db: Db, messageIds: string[]) {
+  if (messageIds.length === 0) return;
+  const now = new Date();
+  await db
+    .update(agentMessages)
+    .set({ status: "read", readAt: now })
+    .where(sql`${agentMessages.id} = ANY(${messageIds})`);
+}
+
+export async function getResponseToRequest(db: Db, correlationId: string) {
+  const rows = await db
+    .select()
+    .from(agentMessages)
+    .where(
+      and(
+        eq(agentMessages.correlationId, correlationId),
+        eq(agentMessages.messageType, "response"),
+      ),
+    )
+    .orderBy(desc(agentMessages.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getMessageThread(db: Db, correlationId: string) {
+  return db
+    .select()
+    .from(agentMessages)
+    .where(eq(agentMessages.correlationId, correlationId))
+    .orderBy(asc(agentMessages.createdAt));
+}
+
+export async function listGoalMessages(
+  db: Db,
+  goalId: string,
+  opts?: { limit?: number; offset?: number },
+) {
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select()
+      .from(agentMessages)
+      .where(eq(agentMessages.goalId, goalId))
+      .orderBy(asc(agentMessages.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(agentMessages)
+      .where(eq(agentMessages.goalId, goalId)),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+export async function expireStaleMessages(db: Db) {
+  const now = new Date();
+  const result = await db
+    .update(agentMessages)
+    .set({ status: "expired" })
+    .where(
+      and(
+        eq(agentMessages.status, "pending"),
+        lte(agentMessages.expiresAt, now),
+      ),
+    )
+    .returning({ id: agentMessages.id });
+  return result.length;
+}
+
+export async function listAgentMessages(
+  db: Db,
+  opts?: {
+    goalId?: string;
+    role?: string;
+    messageType?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  },
+) {
+  const conditions = [];
+  if (opts?.goalId) conditions.push(eq(agentMessages.goalId, opts.goalId));
+  if (opts?.role) conditions.push(
+    or(
+      eq(agentMessages.senderRole, opts.role as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"),
+      eq(agentMessages.targetRole, opts.role as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"),
+    ),
+  );
+  if (opts?.messageType) conditions.push(eq(agentMessages.messageType, opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff"));
+  if (opts?.status) conditions.push(eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"));
+
+  const limit = opts?.limit ?? 50;
+  const offset = opts?.offset ?? 0;
+
+  const [data, countRows] = await Promise.all([
+    db
+      .select()
+      .from(agentMessages)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(agentMessages.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(agentMessages)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return { data, total: countRows[0]?.count ?? 0 };
+}
+
+export async function getAgentMessage(db: Db, id: string) {
+  const rows = await db
+    .select()
+    .from(agentMessages)
+    .where(eq(agentMessages.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getAgentMessageStats(db: Db) {
+  const rows = await db
+    .select({
+      senderRole: agentMessages.senderRole,
+      messageType: agentMessages.messageType,
+      count: sql<number>`count(*)::int`,
+      avgResponseMs: sql<number>`avg(EXTRACT(EPOCH FROM (${agentMessages.readAt} - ${agentMessages.createdAt})) * 1000)::int`,
+    })
+    .from(agentMessages)
+    .groupBy(agentMessages.senderRole, agentMessages.messageType);
+  return rows;
 }
