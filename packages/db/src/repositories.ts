@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, ilike, or, sql, lte, isNull, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, lte, isNull, inArray, gt } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import {
@@ -660,6 +660,46 @@ export async function countTasksByStatus(db: Db) {
   return counts;
 }
 
+/**
+ * Returns active goals that have at least one pending task and zero running tasks,
+ * ordered by priority (critical > high > medium > low) then staleness (oldest first).
+ * Used by the autonomous executor to deterministically pick the next goal to work on.
+ */
+export async function listGoalBacklog(db: Db, limit = 5) {
+  return db
+    .select({
+      id: goals.id,
+      title: goals.title,
+      description: goals.description,
+      status: goals.status,
+      priority: goals.priority,
+      createdAt: goals.createdAt,
+      updatedAt: goals.updatedAt,
+      taskCount: sql<number>`count(${tasks.id})::int`.as("task_count"),
+      pendingTaskCount: sql<number>`count(case when ${tasks.status} = 'pending' then 1 end)::int`.as("pending_task_count"),
+    })
+    .from(goals)
+    .leftJoin(tasks, eq(tasks.goalId, goals.id))
+    .where(eq(goals.status, "active"))
+    .groupBy(goals.id)
+    .having(
+      and(
+        gt(sql<number>`count(case when ${tasks.status} = 'pending' then 1 end)::int`, 0),
+        eq(sql<number>`count(case when ${tasks.status} = 'running' then 1 end)::int`, 0),
+      ),
+    )
+    .orderBy(
+      sql`case ${goals.priority}
+        when 'critical' then 1
+        when 'high' then 2
+        when 'medium' then 3
+        else 4
+      end`,
+      asc(goals.updatedAt),
+    )
+    .limit(limit);
+}
+
 /* ────────────────────── Prompts ─────────────────────────── */
 
 export async function getActivePrompt(db: Db, name: string) {
@@ -888,6 +928,40 @@ export async function recordLlmUsage(
     })
     .returning();
   return record;
+}
+
+/**
+ * Returns aggregated LLM cost and token usage for a specific goal.
+ * Avoids the pre-existing TS errors in getUsageSummary() by using a simple aggregate query.
+ * Note: estimatedCostUsd is stored in microdollars; divide by 1_000_000 to get USD.
+ */
+export async function getCostByGoal(
+  db: Db,
+  goalId: string,
+): Promise<{
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  requestCount: number;
+}> {
+  const rows = await db
+    .select({
+      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("total_cost_usd"),
+      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("total_input_tokens"),
+      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("total_output_tokens"),
+      requestCount: sql<number>`count(*)::int`.as("request_count"),
+    })
+    .from(llmUsage)
+    .where(eq(llmUsage.goalId, goalId));
+
+  const row = rows[0];
+  return {
+    // Convert microdollars to dollars
+    totalCostUsd: Number(row?.totalCostUsd ?? 0) / 1_000_000,
+    totalInputTokens: row?.totalInputTokens ?? 0,
+    totalOutputTokens: row?.totalOutputTokens ?? 0,
+    requestCount: row?.requestCount ?? 0,
+  };
 }
 
 export interface UsageSummary {

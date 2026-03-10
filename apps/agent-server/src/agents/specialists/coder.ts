@@ -6,20 +6,25 @@ import type { SandboxService } from "@ai-cofounder/sandbox";
 import { hashCode } from "@ai-cofounder/sandbox";
 import { SpecialistAgent, type SpecialistContext } from "./base.js";
 import { EXECUTE_CODE_TOOL } from "../tools/sandbox-tools.js";
+import { READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL } from "../tools/filesystem-tools.js";
+import type { WorkspaceService } from "../../services/workspace.js";
 
 export class CoderAgent extends SpecialistAgent {
   readonly role: AgentRole = "coder";
   readonly taskCategory = "code" as const;
 
   private sandboxService?: SandboxService;
+  private workspaceService?: WorkspaceService;
 
-  constructor(registry: LlmRegistry, db?: Db, sandboxService?: SandboxService) {
+  constructor(registry: LlmRegistry, db?: Db, sandboxService?: SandboxService, workspaceService?: WorkspaceService) {
     super("coder", registry, db);
     this.sandboxService = sandboxService;
+    this.workspaceService = workspaceService;
   }
 
   getSystemPrompt(context: SpecialistContext): string {
     const hasExecute = this.sandboxService?.available;
+    const hasWorkspace = !!this.workspaceService;
     return `You are a coding specialist agent working on a larger goal: "${context.goalTitle}".
 
 Your job is to produce high-quality code, configurations, or technical documentation as specified by the task.
@@ -33,7 +38,7 @@ Guidelines:
 - Consider edge cases and security implications
 - If the task involves modifying existing code, clearly indicate what changes to make and where
 
-You have a review_code tool — use it to self-review your code before finalizing your output.${hasExecute ? "\nYou have an execute_code tool — use it to test your code in a sandbox before delivering it." : ""}`;
+You have a review_code tool — use it to self-review your code before finalizing your output.${hasExecute ? "\nYou have an execute_code tool — use it to test your code in a sandbox before delivering it." : ""}${hasWorkspace ? "\nYou have file system tools (read_file, write_file, list_directory) — use them to read existing code, write your changes to disk, and verify the file structure." : ""}`;
   }
 
   getTools(): LlmTool[] {
@@ -61,6 +66,10 @@ You have a review_code tool — use it to self-review your code before finalizin
 
     if (this.sandboxService?.available) {
       tools.push(EXECUTE_CODE_TOOL);
+    }
+
+    if (this.workspaceService) {
+      tools.push(READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL);
     }
 
     return tools;
@@ -136,6 +145,39 @@ You have a review_code tool — use it to self-review your code before finalizin
       }
 
       return response;
+    }
+
+    if (block.name === "read_file") {
+      if (!this.workspaceService) return { error: "Workspace not available" };
+      const input = block.input as { path: string };
+      try {
+        const content = await this.workspaceService.readFile(input.path);
+        return { path: input.path, content };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    if (block.name === "write_file") {
+      if (!this.workspaceService) return { error: "Workspace not available" };
+      const input = block.input as { path: string; content: string };
+      try {
+        await this.workspaceService.writeFile(input.path, input.content);
+        return { written: true, path: input.path };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    if (block.name === "list_directory") {
+      if (!this.workspaceService) return { error: "Workspace not available" };
+      const input = block.input as { path?: string };
+      try {
+        const entries = await this.workspaceService.listDirectory(input.path);
+        return { path: input.path ?? ".", entries };
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : String(err) };
+      }
     }
 
     return { error: `Unknown tool: ${block.name}` };

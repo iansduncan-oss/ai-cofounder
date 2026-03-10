@@ -34,6 +34,7 @@ export function mockDbModule() {
     listGoalsByConversation: vi.fn().mockResolvedValue([]),
     countGoalsByConversation: vi.fn().mockResolvedValue(0),
     listActiveGoals: vi.fn().mockResolvedValue([]),
+    listGoalBacklog: vi.fn().mockResolvedValue([]),
     listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
     updateGoalStatus: vi.fn().mockResolvedValue({}),
     updateGoalMetadata: vi.fn().mockResolvedValue({}),
@@ -87,6 +88,7 @@ export function mockDbModule() {
     getTodayTokenTotal: vi.fn().mockResolvedValue(0),
     getTodayTokenUsage: vi.fn().mockResolvedValue(0),
     getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
+    getCostByGoal: vi.fn().mockResolvedValue({ totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0, requestCount: 0 }),
     // Schedules
     createSchedule: vi.fn().mockResolvedValue({ id: "sch-1" }),
     getSchedule: vi.fn().mockResolvedValue(null),
