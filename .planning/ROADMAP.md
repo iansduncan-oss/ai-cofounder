@@ -101,7 +101,11 @@ Plans:
   2. Second session attempt while one is running is rejected (no dual execution)
   3. Session aborts cleanly when token budget is exhausted (no partial commits)
   4. CI self-heal creates a PR fixing a real test failure after 2-cycle confirmation
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 11-01-PLAN.md — Recurring BullMQ schedule, DistributedLockService, token budget hard abort
+- [ ] 11-02-PLAN.md — CiSelfHealService with 2-cycle confirmation and monitoring integration
 
 ### Phase 12: Work Journal & Standup
 **Goal**: Browsable activity log of everything the agent does, with daily standup summaries delivered proactively
@@ -175,7 +179,7 @@ Plans:
 | 8. Memory & Session Foundation | 2/3 | In Progress|  | — |
 | 9. Autonomy & Approval System | 2/2 | Complete   | 2026-03-10 | — |
 | 10. Autonomous Execution Engine | 2/2 | Complete    | 2026-03-10 | — |
-| 11. Autonomous Scheduling | v2.0 | 0/0 | Pending | — |
+| 11. Autonomous Scheduling | v2.0 | 0/2 | Planned | — |
 | 12. Work Journal & Standup | v2.0 | 0/0 | Pending | — |
 | 13. Financial Tracking | v2.0 | 0/0 | Pending | — |
 | 14. Multi-Project Awareness | v2.0 | 0/0 | Pending | — |
