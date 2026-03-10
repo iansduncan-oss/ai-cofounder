@@ -69,7 +69,8 @@ import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { notifyApprovalCreated } from "../services/notifications.js";
-import { buildSharedToolList, executeSharedTool } from "./tool-executor.js";
+import { buildSharedToolList, executeSharedTool, type ToolExecutorContext } from "./tool-executor.js";
+import type { AgentMessagingService } from "../services/agent-messaging.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -103,6 +104,7 @@ export interface OrchestratorResult {
   provider?: string;
   usage?: { inputTokens: number; outputTokens: number };
   plan?: PlanResult;
+  suggestions?: string[];
 }
 
 /* ── Tool definition for LLM ── */
@@ -249,6 +251,7 @@ export class Orchestrator {
   private n8nService?: N8nService;
   private sandboxService?: SandboxService;
   private workspaceService?: WorkspaceService;
+  private messagingService?: AgentMessagingService;
   private requestId?: string;
 
   constructor(
@@ -259,6 +262,7 @@ export class Orchestrator {
     n8nService?: N8nService,
     sandboxService?: SandboxService,
     workspaceService?: WorkspaceService,
+    messagingService?: AgentMessagingService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -267,6 +271,7 @@ export class Orchestrator {
     this.n8nService = n8nService;
     this.sandboxService = sandboxService;
     this.workspaceService = workspaceService;
+    this.messagingService = messagingService;
   }
 
   async run(
@@ -316,6 +321,20 @@ export class Orchestrator {
         parts.push("General knowledge:");
         parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
       }
+
+      // Proactive decision surfacing (SESS-02): highlight decisions separately
+      if (relevantMemories.length > 0) {
+        const decisionMemories = relevantMemories.filter((m) => m.category === "decisions");
+        if (decisionMemories.length > 0) {
+          const decisionBlock = decisionMemories
+            .map((m) => `- ${m.key}: ${m.content}`)
+            .join("\n");
+          parts.push("");
+          parts.push("Past decisions relevant to this topic (reference these naturally when applicable):");
+          parts.push(decisionBlock);
+        }
+      }
+
       if (parts.length > 0) {
         memoryContext = parts.join("\n");
       }
@@ -355,6 +374,7 @@ export class Orchestrator {
       n8nService: this.n8nService,
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
+      messagingService: this.messagingService,
     }));
 
     try {
@@ -518,6 +538,7 @@ export class Orchestrator {
       n8nService: this.n8nService,
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
+      messagingService: this.messagingService,
     }));
 
     try {
@@ -801,7 +822,8 @@ export class Orchestrator {
           n8nService: this.n8nService,
           sandboxService: this.sandboxService,
           workspaceService: this.workspaceService,
-        }, { conversationId, userId });
+          messagingService: this.messagingService,
+        }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
         return result;
