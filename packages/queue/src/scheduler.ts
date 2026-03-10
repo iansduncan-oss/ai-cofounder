@@ -1,5 +1,5 @@
 import { createLogger } from "@ai-cofounder/shared";
-import { getMonitoringQueue, getBriefingQueue, getReflectionQueue } from "./queues.js";
+import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue } from "./queues.js";
 import type { MonitoringJob, BriefingJob, ReflectionJob } from "./queues.js";
 
 const logger = createLogger("queue-scheduler");
@@ -104,4 +104,53 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled weekly pattern extraction at Sunday 3 AM");
+
+  // ── User pattern analysis (Sunday 4 AM, after weekly reflections) ──
+
+  await reflectionQueue.upsertJobScheduler(
+    "user-patterns",
+    {
+      pattern: `0 4 * * 0`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "user-patterns",
+      data: {
+        action: "analyze_user_patterns",
+      } satisfies ReflectionJob,
+    },
+  );
+  logger.info("Scheduled user pattern analysis at Sunday 4 AM");
+
+  // ── Weekly memory consolidation (Sunday 4 AM) ──
+
+  await reflectionQueue.upsertJobScheduler(
+    "weekly-memory-consolidation",
+    {
+      pattern: "0 4 * * 0", // Sunday 4 AM
+      tz: briefingTimezone,
+    },
+    {
+      name: "weekly-memory-consolidation",
+      data: {
+        action: "consolidate_memories" as const,
+      } satisfies ReflectionJob,
+    },
+  );
+  logger.info("Scheduled weekly memory consolidation at Sunday 4 AM");
+
+  // ── RAG conversation sweep (every 6 hours) ──
+
+  const ragIngestionQueue = getRagIngestionQueue();
+  await ragIngestionQueue.upsertJobScheduler(
+    "recurring-conversation-sweep",
+    {
+      every: 6 * 60 * 60 * 1000, // 6 hours
+    },
+    {
+      name: "conversation-sweep",
+      data: { action: "ingest_conversations" as const, sourceId: "sweep" },
+    },
+  );
+  logger.info("Scheduled RAG conversation sweep every 6 hours");
 }

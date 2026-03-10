@@ -106,6 +106,13 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "consolidate_memories": {
+          const { MemoryConsolidationService } = await import("../services/memory-consolidation.js");
+          const svc = new MemoryConsolidationService(app.db, app.llmRegistry, app.embeddingService);
+          const result = await svc.consolidate();
+          logger.info(result, "memory consolidation complete");
+          break;
+        }
       }
     },
 
