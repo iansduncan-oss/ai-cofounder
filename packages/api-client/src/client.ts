@@ -46,6 +46,8 @@ import type {
   UserPattern,
   ToolTierConfig,
   AutonomyTier,
+  GoalBacklogItem,
+  AutonomousRunResponse,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -700,6 +702,32 @@ export class ApiClient {
 
   updateToolTier(toolName: string, data: { tier: AutonomyTier; timeoutMs?: number }) {
     return this.request<ToolTierConfig>("PUT", `/api/autonomy/tiers/${encodeURIComponent(toolName)}`, data);
+  }
+
+  /* ── Autonomous Execution ── */
+
+  listGoalBacklog(limit?: number) {
+    const query = limit != null ? `?limit=${limit}` : "";
+    return this.request<{ data: GoalBacklogItem[]; count: number }>(
+      "GET",
+      `/api/autonomous${query}`,
+    );
+  }
+
+  listAutonomousSessions(limit?: number) {
+    const query = limit != null ? `?limit=${limit}` : "";
+    return this.request<{ data: Record<string, unknown>[]; count: number }>(
+      "GET",
+      `/api/autonomous/sessions${query}`,
+    );
+  }
+
+  triggerAutonomousRun(goalId: string, opts?: { userId?: string; createPr?: boolean }) {
+    return this.request<AutonomousRunResponse>(
+      "POST",
+      `/api/autonomous/${encodeURIComponent(goalId)}/run`,
+      opts ?? {},
+    );
   }
 
   /* ── Streaming ── */

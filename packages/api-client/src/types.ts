@@ -530,6 +530,26 @@ export interface ToolTierConfig {
   updatedAt: string;
 }
 
+/* ── Autonomous Execution ── */
+
+export interface GoalBacklogItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  createdAt: string;
+  updatedAt: string;
+  taskCount: number;
+  pendingTaskCount: number;
+}
+
+export interface AutonomousRunResponse {
+  jobId: string;
+  status: "queued";
+  goalId: string;
+}
+
 export interface AgentMessageItem {
   id: string;
   senderRole: string;
