@@ -31,6 +31,7 @@ import {
   recordToolExecution,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
+import { SessionContextService } from "../services/session-context.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
@@ -288,7 +289,7 @@ export class Orchestrator {
     // Pre-load user memories for system prompt context
     let memoryContext = "";
     if (userId && this.db) {
-      const userMemories = await recallMemories(this.db, userId, { limit: 20 });
+      const userMemories = await recallMemories(this.db, userId, { limit: 10 });
 
       // Auto semantic retrieval: find memories relevant to the current message
       let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
@@ -337,6 +338,17 @@ export class Orchestrator {
 
       if (parts.length > 0) {
         memoryContext = parts.join("\n");
+      }
+
+      // Session continuity context (MEM-04, SESS-01)
+      try {
+        const sessionContextService = new SessionContextService(this.db);
+        const sessionBlock = await sessionContextService.getRecentContext(userId);
+        if (sessionBlock) {
+          memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
+        }
+      } catch (err) {
+        this.logger.warn({ err }, "session context retrieval failed (non-fatal)");
       }
     }
 
@@ -491,7 +503,7 @@ export class Orchestrator {
     // Reuse run() setup: memory loading
     let memoryContext = "";
     if (userId && this.db) {
-      const userMemories = await recallMemories(this.db, userId, { limit: 20 });
+      const userMemories = await recallMemories(this.db, userId, { limit: 10 });
       let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
       if (this.embeddingService) {
         try {
