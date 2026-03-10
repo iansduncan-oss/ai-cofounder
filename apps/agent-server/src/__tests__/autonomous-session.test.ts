@@ -128,7 +128,7 @@ describe("runAutonomousSession", () => {
     const db = {} as any;
     const registry = new LlmRegistry();
 
-    const result = await runAutonomousSession(db, registry, undefined, undefined, undefined, {
+    const result = await runAutonomousSession(db, registry, undefined, undefined, undefined, undefined, {
       trigger: "schedule",
       prompt: "Review all pending PRs",
     });
@@ -145,7 +145,7 @@ describe("runAutonomousSession", () => {
     const db = {} as any;
     const registry = new LlmRegistry();
 
-    await runAutonomousSession(db, registry, undefined, undefined, undefined, {
+    await runAutonomousSession(db, registry, undefined, undefined, undefined, undefined, {
       trigger: "schedule",
       scheduleId: "sched-1",
       eventId: "evt-1",

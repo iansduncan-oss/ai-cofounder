@@ -364,20 +364,23 @@ describe("WorkspaceService", () => {
   });
 
   describe("runTests", () => {
-    it("runs a successful command", async () => {
+    it("runs an allowed test command", async () => {
+      // npm test is in the allowed commands list
+      const result = await workspace.runTests(".");
+      // npm test will fail (no package.json) but should be allowed to run
+      expect(typeof result.exitCode).toBe("number");
+    });
+
+    it("rejects disallowed commands", async () => {
       const result = await workspace.runTests(".", "echo 'hello tests'");
-      expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("hello tests");
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain("is not an allowed test command");
     });
 
-    it("captures failure exit code", async () => {
-      const result = await workspace.runTests(".", "exit 1");
-      expect(result.exitCode).not.toBe(0);
-    });
-
-    it("respects path traversal protection", async () => {
+    it("respects path traversal protection on allowed commands", async () => {
+      // Even with an allowed command, path traversal should be denied
       await expect(
-        workspace.runTests("../../outside", "echo pwned"),
+        workspace.runTests("../../outside", "npm test"),
       ).rejects.toThrow("Path traversal denied");
     });
   });

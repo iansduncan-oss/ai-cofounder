@@ -208,3 +208,10 @@ export function usePatterns(userId?: string, includeInactive?: boolean) {
     queryFn: () => apiClient.listPatterns(userId, includeInactive),
   });
 }
+
+export function useToolTierConfig() {
+  return useQuery({
+    queryKey: queryKeys.autonomy.tiers,
+    queryFn: () => apiClient.listToolTierConfig(),
+  });
+}

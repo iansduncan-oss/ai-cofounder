@@ -221,7 +221,7 @@ describe("E2E: Full workflow — create goal → add tasks → execute", () => {
     const mRes = await app.inject({
       method: "POST",
       url: "/api/milestones",
-      payload: { title: "v0.2.0", description: "Next release" },
+      payload: { conversationId: CONV_ID, title: "v0.2.0", description: "Next release" },
     });
     expect(mRes.statusCode).toBe(201);
     expect(mRes.json().id).toBe(MILESTONE_ID);

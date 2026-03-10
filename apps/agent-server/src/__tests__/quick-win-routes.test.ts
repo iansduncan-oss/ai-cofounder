@@ -203,15 +203,16 @@ describe("GET /api/agents/roles -- QWIN-03", () => {
 
     expect(res.statusCode).toBe(200);
     const body = res.json();
-    expect(Array.isArray(body)).toBe(true);
+    const roles = body.roles;
+    expect(Array.isArray(roles)).toBe(true);
     // Each role should have role and description properties
-    expect(body[0]).toHaveProperty("role");
-    expect(body[0]).toHaveProperty("description");
+    expect(roles[0]).toHaveProperty("role");
+    expect(roles[0]).toHaveProperty("description");
     // Should include orchestrator and researcher
-    expect(body.some((r: { role: string }) => r.role === "orchestrator")).toBe(true);
-    expect(body.some((r: { role: string }) => r.role === "researcher")).toBe(true);
+    expect(roles.some((r: { role: string }) => r.role === "orchestrator")).toBe(true);
+    expect(roles.some((r: { role: string }) => r.role === "researcher")).toBe(true);
     // Should have at least 5 roles (orchestrator + 6 specialists = 7 total)
-    expect(body.length).toBeGreaterThanOrEqual(5);
+    expect(roles.length).toBeGreaterThanOrEqual(5);
   });
 });
 

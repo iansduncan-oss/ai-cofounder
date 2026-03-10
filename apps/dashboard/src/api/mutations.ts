@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -283,5 +283,17 @@ export function useAcceptSuggestion() {
   return useMutation({
     mutationFn: (data: { suggestion: string; userId?: string; patternId?: string }) =>
       apiClient.acceptSuggestion(data),
+  });
+}
+
+export function useUpdateToolTier() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { toolName: string; tier: AutonomyTier }) =>
+      apiClient.updateToolTier(data.toolName, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: queryKeys.autonomy.tiers }),
+    onError: (err) => {
+      toast.error(`Failed to update tier: ${err.message}`);
+    },
   });
 }

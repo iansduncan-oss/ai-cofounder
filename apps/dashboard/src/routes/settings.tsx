@@ -1,4 +1,6 @@
-import { useHealth, useProviderHealth } from "@/api/queries";
+import { useMemo } from "react";
+import { useHealth, useProviderHealth, useToolTierConfig } from "@/api/queries";
+import { useUpdateToolTier } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,11 +8,25 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { formatDate } from "@/lib/utils";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { AlertTriangle } from "lucide-react";
+import type { AutonomyTier } from "@ai-cofounder/api-client";
+
+const TIER_PRIORITY: Record<string, number> = { red: 0, yellow: 1, green: 2 };
 
 export function SettingsPage() {
   usePageTitle("Settings");
   const { data: health, isLoading: healthLoading, error: healthError } = useHealth();
   const { data: providers, isLoading: providersLoading, error: providersError } = useProviderHealth();
+  const { data: tiers, isLoading: tiersLoading, error: tiersError } = useToolTierConfig();
+  const updateTier = useUpdateToolTier();
+
+  const sortedTiers = useMemo(() => {
+    if (!tiers) return [];
+    return [...tiers].sort((a, b) => {
+      const tierDiff = (TIER_PRIORITY[a.tier] ?? 2) - (TIER_PRIORITY[b.tier] ?? 2);
+      if (tierDiff !== 0) return tierDiff;
+      return a.toolName.localeCompare(b.toolName);
+    });
+  }, [tiers]);
 
   return (
     <div>
@@ -116,7 +132,83 @@ export function SettingsPage() {
             )}
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Autonomy Tiers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Configure what the agent can do independently. Green tools execute
+              freely, yellow tools require your approval, red tools are blocked
+              entirely.
+            </p>
+            {tiersLoading ? (
+              <ListSkeleton rows={5} />
+            ) : tiersError ? (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <span>Failed to load tier config: {tiersError.message}</span>
+              </div>
+            ) : sortedTiers.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-muted-foreground">
+                      <th className="pb-2 pr-4">Tool</th>
+                      <th className="pb-2 pr-4">Current Tier</th>
+                      <th className="pb-2 pr-4">Change</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedTiers.map((t) => (
+                      <tr key={t.toolName} className="border-b last:border-0">
+                        <td className="py-2 pr-4 font-medium font-mono text-xs">
+                          {t.toolName}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <TierBadge tier={t.tier as AutonomyTier} />
+                        </td>
+                        <td className="py-2 pr-4">
+                          <select
+                            className="rounded border bg-background px-2 py-1 text-xs"
+                            value={t.tier}
+                            onChange={(e) =>
+                              updateTier.mutate({
+                                toolName: t.toolName,
+                                tier: e.target.value as AutonomyTier,
+                              })
+                            }
+                          >
+                            <option value="green">green</option>
+                            <option value="yellow">yellow</option>
+                            <option value="red">red</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No tools configured. Start the agent server to seed default tool
+                tiers.
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
+}
+
+function TierBadge({ tier }: { tier: AutonomyTier }) {
+  const variant =
+    tier === "green"
+      ? "success"
+      : tier === "yellow"
+        ? "warning"
+        : "destructive";
+  return <Badge variant={variant}>{tier}</Badge>;
 }

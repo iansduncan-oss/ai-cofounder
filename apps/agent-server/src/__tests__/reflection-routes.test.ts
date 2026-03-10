@@ -211,27 +211,28 @@ describe("Reflection routes", () => {
       mockGetReflection.mockResolvedValue(null);
 
       const { app } = buildServer();
-      const res = await app.inject({ method: "GET", url: "/api/reflections/nonexistent-id" });
+      const res = await app.inject({ method: "GET", url: "/api/reflections/00000000-0000-0000-0000-000000000001" });
       await app.close();
 
       expect(res.statusCode).toBe(404);
     });
 
     it("returns reflection when found", async () => {
+      const refId = "00000000-0000-0000-0000-000000000002";
       mockGetReflection.mockResolvedValue({
-        id: "ref-1",
+        id: refId,
         reflectionType: "goal_completion",
         content: "Test reflection",
         lessons: [{ lesson: "Test", category: "technical", confidence: 0.9 }],
       });
 
       const { app } = buildServer();
-      const res = await app.inject({ method: "GET", url: "/api/reflections/ref-1" });
+      const res = await app.inject({ method: "GET", url: `/api/reflections/${refId}` });
       await app.close();
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.id).toBe("ref-1");
+      expect(body.id).toBe(refId);
       expect(body.lessons).toHaveLength(1);
     });
   });

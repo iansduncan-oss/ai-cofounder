@@ -69,4 +69,7 @@ export const queryKeys = {
     all: ["patterns"] as const,
     list: (userId?: string) => ["patterns", "list", userId ?? "all"] as const,
   },
+  autonomy: {
+    tiers: ["autonomy", "tiers"] as const,
+  },
 };
