@@ -13,6 +13,8 @@ import {
   recallMemories,
   searchMemoriesByVector,
   createApproval,
+  getApproval,
+  resolveApproval,
   getN8nWorkflowByName,
   listN8nWorkflows,
   saveCodeExecution,
@@ -22,6 +24,7 @@ import {
   createMilestone,
   touchMemory,
 } from "@ai-cofounder/db";
+import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
@@ -74,6 +77,7 @@ export interface ToolExecutorServices {
   sandboxService?: SandboxService;
   workspaceService?: WorkspaceService;
   messagingService?: AgentMessagingService;
+  autonomyTierService?: AutonomyTierService;
 }
 
 export interface ToolExecutorContext {
@@ -90,14 +94,21 @@ export interface ToolExecutorContext {
  *
  * @param services - available services
  * @param exclude - tool names to exclude (e.g. delegation tools for subagents)
+ * @param tierService - optional AutonomyTierService to exclude red-tier tools
  */
 export function buildSharedToolList(
   services: ToolExecutorServices,
   exclude?: Set<string>,
+  tierService?: AutonomyTierService,
 ): LlmTool[] {
   const tools: LlmTool[] = [];
+  // Compute the effective exclude set: user-provided exclusions + red-tier tools
+  const redTierExclude = tierService ? new Set(tierService.getAllRed()) : new Set<string>();
+  const effectiveExclude = exclude
+    ? new Set([...exclude, ...redTierExclude])
+    : redTierExclude.size > 0 ? redTierExclude : undefined;
   const add = (tool: LlmTool) => {
-    if (!exclude?.has(tool.name)) tools.push(tool);
+    if (!effectiveExclude?.has(tool.name)) tools.push(tool);
   };
 
   // Always available
@@ -148,6 +159,100 @@ export function buildSharedToolList(
   }
 
   return tools;
+}
+
+/**
+ * Execute a yellow-tier tool: create approval, notify, poll until resolved or timeout.
+ */
+async function executeYellowTierTool(
+  block: LlmToolUseContent,
+  services: ToolExecutorServices,
+  context: ToolExecutorContext,
+): Promise<unknown> {
+  const { db, autonomyTierService } = services;
+  if (!db) return { error: "Database not available for approval workflow" };
+
+  const timeoutMs = autonomyTierService?.getTimeoutMs(block.name) ?? 300_000;
+  const reason = `Tool "${block.name}" requires approval before execution (yellow tier). Input: ${JSON.stringify(block.input).slice(0, 200)}`;
+
+  const approval = await createApproval(db, {
+    taskId: context.goalId ?? undefined,
+    requestedBy: (context.agentRole ?? "orchestrator") as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner",
+    reason,
+  });
+
+  // Notify via available channels (fire-and-forget)
+  notifyApprovalCreated({
+    approvalId: approval.id,
+    taskId: approval.taskId ?? "ad-hoc",
+    reason,
+    requestedBy: context.agentRole ?? "orchestrator",
+  }).catch(() => {});
+
+  logger.info({ approvalId: approval.id, toolName: block.name, timeoutMs }, "yellow-tier approval requested");
+
+  // Poll until approved/rejected/timeout
+  const deadline = Date.now() + timeoutMs;
+  const POLL_INTERVAL = 2000;
+
+  while (Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+
+    const current = await getApproval(db, approval.id);
+    if (!current) break;
+
+    if (current.status === "approved") {
+      logger.info({ approvalId: approval.id, toolName: block.name }, "yellow-tier tool approved, executing");
+      return executeSharedTool(block, services, context);
+    }
+
+    if (current.status === "rejected") {
+      logger.info({ approvalId: approval.id, toolName: block.name }, "yellow-tier tool rejected");
+      return { error: `Tool "${block.name}" was rejected by the user. Reason: ${current.decision ?? "No reason provided"}` };
+    }
+  }
+
+  // Timeout — auto-deny
+  await resolveApproval(db, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
+  logger.warn({ approvalId: approval.id, toolName: block.name, timeoutMs }, "yellow-tier tool timed out");
+  return { error: `Tool "${block.name}" approval timed out after ${Math.round(timeoutMs / 1000)}s. The request has been auto-denied.` };
+}
+
+/**
+ * Tier-aware tool execution wrapper.
+ * - Green: passes directly to executeSharedTool
+ * - Yellow: creates approval record, polls until resolved
+ * - Red: blocks with error (defense-in-depth even if LLM somehow calls a red tool)
+ *
+ * Falls through to executeSharedTool when no autonomyTierService is provided (backward compat).
+ */
+export async function executeWithTierCheck(
+  block: LlmToolUseContent,
+  services: ToolExecutorServices,
+  context: ToolExecutorContext,
+): Promise<unknown> {
+  const { autonomyTierService } = services;
+
+  // Backward compat: no tier service — behave as if all tools are green
+  if (!autonomyTierService) {
+    return executeSharedTool(block, services, context);
+  }
+
+  const tier = autonomyTierService.getTier(block.name);
+
+  if (tier === "red") {
+    logger.warn({ toolName: block.name }, "red-tier tool execution blocked");
+    return {
+      error: `Tool "${block.name}" is in the red tier and cannot be executed. This operation has been blocked for safety.`,
+    };
+  }
+
+  if (tier === "yellow") {
+    return executeYellowTierTool(block, services, context);
+  }
+
+  // Green — pass through immediately
+  return executeSharedTool(block, services, context);
 }
 
 /**
