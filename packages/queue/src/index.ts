@@ -37,6 +37,7 @@ export {
   getPipelineQueue,
   getRagIngestionQueue,
   getSubagentTaskQueue,
+  getAutonomousSessionQueue,
   closeAllQueues,
   type AgentTaskJob,
   type MonitoringJob,
@@ -52,6 +53,7 @@ export {
   type SubagentTaskJob,
   type DeployVerificationJob,
   type DeadLetterJob,
+  type AutonomousSessionJob,
 } from "./queues.js";
 
 // Workers
@@ -68,6 +70,7 @@ export {
   type ReflectionProcessor,
   type SubagentTaskProcessor,
   type DeployVerificationProcessor,
+  type AutonomousSessionProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)
@@ -83,6 +86,7 @@ export {
   enqueueRagIngestion,
   enqueueReflection,
   enqueueSubagentTask,
+  enqueueAutonomousSession,
   getAllQueueStatus,
   getJobStatus,
   pingRedis,

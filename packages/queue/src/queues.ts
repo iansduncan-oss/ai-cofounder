@@ -91,6 +91,13 @@ export interface DeployVerificationJob {
   errorLog?: string;
 }
 
+export interface AutonomousSessionJob {
+  trigger: "schedule" | "manual" | "ci-heal";
+  tokenBudget?: number;
+  timeBudgetMs?: number;
+  prompt?: string;
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
@@ -104,6 +111,7 @@ export const QUEUE_NAMES = {
   REFLECTIONS: "reflections",
   DEPLOY_VERIFICATION: "deploy-verification",
   DEAD_LETTER: "dead-letter",
+  AUTONOMOUS_SESSIONS: "autonomous-sessions",
 } as const;
 
 export interface DeadLetterJob {
@@ -174,6 +182,10 @@ export function getDeployVerificationQueue(): Queue<DeployVerificationJob> {
 
 export function getDeadLetterQueue(): Queue<DeadLetterJob> {
   return getOrCreateQueue<DeadLetterJob>(QUEUE_NAMES.DEAD_LETTER);
+}
+
+export function getAutonomousSessionQueue(): Queue<AutonomousSessionJob> {
+  return getOrCreateQueue<AutonomousSessionJob>(QUEUE_NAMES.AUTONOMOUS_SESSIONS);
 }
 
 export async function closeAllQueues(): Promise<void> {

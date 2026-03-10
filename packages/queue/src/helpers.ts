@@ -11,6 +11,7 @@ import {
   getReflectionQueue,
   getSubagentTaskQueue,
   getDeadLetterQueue,
+  getAutonomousSessionQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
@@ -21,6 +22,7 @@ import {
   type ReflectionJob,
   type SubagentTaskJob,
   type DeadLetterJob,
+  type AutonomousSessionJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-helpers");
@@ -120,6 +122,15 @@ export async function enqueueSubagentTask(
     priority: PRIORITY_MAP[job.priority ?? "normal"],
   });
   logger.info({ jobId: added.id, subagentRunId: job.subagentRunId, title: job.title }, "Subagent task enqueued");
+  return added.id;
+}
+
+export async function enqueueAutonomousSession(
+  job: AutonomousSessionJob,
+): Promise<string | undefined> {
+  const queue = getAutonomousSessionQueue();
+  const added = await queue.add("autonomous-session", job);
+  logger.info({ jobId: added.id, trigger: job.trigger }, "Autonomous session enqueued");
   return added.id;
 }
 
