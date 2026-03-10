@@ -76,6 +76,20 @@ export const channelConversations = pgTable("channel_conversations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Autonomy tier enum + tool tier config ── */
+
+export const autonomyTierEnum = pgEnum("autonomy_tier", ["green", "yellow", "red"]);
+
+export const toolTierConfig = pgTable("tool_tier_config", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  toolName: text("tool_name").notNull().unique(),
+  tier: autonomyTierEnum("tier").notNull().default("green"),
+  timeoutMs: integer("timeout_ms").notNull().default(300000),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Goal / Task / Approval enums ── */
 
 export const goalStatusEnum = pgEnum("goal_status", ["draft", "active", "completed", "cancelled", "needs_review"]);
@@ -208,7 +222,6 @@ export const prompts = pgTable("prompts", {
 export const approvals = pgTable("approvals", {
   id: uuid("id").primaryKey().defaultRandom(),
   taskId: uuid("task_id")
-    .notNull()
     .references(() => tasks.id),
   requestedBy: agentRoleEnum("requested_by").notNull(),
   status: approvalStatusEnum("status").notNull().default("pending"),
@@ -415,7 +428,7 @@ export const ingestionState = pgTable("ingestion_state", {
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  passwordHash: text("password_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -434,7 +447,118 @@ export const personas = pgTable("personas", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── User Actions (action tracking for pattern learning) ── */
+
+export const userActionTypeEnum = pgEnum("user_action_type", [
+  "chat_message",
+  "goal_created",
+  "deploy_triggered",
+  "suggestion_accepted",
+  "approval_submitted",
+  "schedule_created",
+  "tool_executed",
+]);
+
+export const userActions = pgTable("user_actions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  actionType: userActionTypeEnum("action_type").notNull(),
+  actionDetail: text("action_detail"),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun..6=Sat
+  hourOfDay: integer("hour_of_day").notNull(), // 0-23
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── User Patterns (learned behavioral patterns) ── */
+
+export const userPatterns = pgTable("user_patterns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  patternType: text("pattern_type").notNull(), // "time_preference", "sequence", "recurring_action"
+  description: text("description").notNull(), // human-readable: "deploys on Fridays around 3 PM"
+  triggerCondition: jsonb("trigger_condition").notNull(), // { dayOfWeek?: number, hourRange?: [start,end], afterAction?: string }
+  suggestedAction: text("suggested_action").notNull(), // "Run the test suite before deploying"
+  confidence: integer("confidence").notNull().default(50), // 0-100
+  hitCount: integer("hit_count").notNull().default(0),
+  acceptCount: integer("accept_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Deployments (deploy tracking & self-healing) ── */
+
+export const deployStatusEnum = pgEnum("deploy_status", [
+  "started",
+  "building",
+  "deploying",
+  "verifying",
+  "healthy",
+  "failed",
+  "rolled_back",
+]);
+
+export const deployments = pgTable("deployments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  commitSha: text("commit_sha").notNull(),
+  shortSha: text("short_sha").notNull(),
+  branch: text("branch").notNull().default("main"),
+  status: deployStatusEnum("status").notNull().default("started"),
+  services: jsonb("services"), // ["agent-server", "discord-bot", "slack-bot"]
+  previousSha: text("previous_sha"),
+  triggeredBy: text("triggered_by").notNull().default("ci"), // "ci" | "manual"
+  healthChecks: jsonb("health_checks"), // [{service, status, latencyMs}]
+  errorLog: text("error_log"),
+  rootCauseAnalysis: text("root_cause_analysis"),
+  rolledBack: boolean("rolled_back").notNull().default(false),
+  rollbackSha: text("rollback_sha"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
 /* ── Subagent Runs (autonomous subagent execution tracking) ── */
+
+/* ── Agent-to-Agent Messaging ── */
+
+export const agentMessageTypeEnum = pgEnum("agent_message_type", [
+  "request",
+  "response",
+  "broadcast",
+  "notification",
+  "handoff",
+]);
+
+export const agentMessageStatusEnum = pgEnum("agent_message_status", [
+  "pending",
+  "delivered",
+  "read",
+  "expired",
+]);
+
+export const agentMessages = pgTable("agent_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  senderRole: agentRoleEnum("sender_role").notNull(),
+  senderRunId: text("sender_run_id"),
+  targetRole: agentRoleEnum("target_role"),
+  targetRunId: text("target_run_id"),
+  channel: text("channel"),
+  messageType: agentMessageTypeEnum("message_type").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  correlationId: uuid("correlation_id"),
+  inReplyTo: uuid("in_reply_to"),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  status: agentMessageStatusEnum("status").notNull().default("pending"),
+  priority: goalPriorityEnum("priority").notNull().default("medium"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const subagentRunStatusEnum = pgEnum("subagent_run_status", [
   "queued",

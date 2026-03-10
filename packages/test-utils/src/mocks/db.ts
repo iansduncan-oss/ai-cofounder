@@ -201,6 +201,32 @@ export function mockDbModule() {
     expireStaleMessages: vi.fn().mockResolvedValue(0),
     listGoalMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     agentMessages: {},
+    // User actions & patterns
+    recordUserAction: vi.fn().mockResolvedValue({ id: "ua-1", actionType: "chat_message" }),
+    getUserActionsSince: vi.fn().mockResolvedValue([]),
+    deleteOldUserActions: vi.fn().mockResolvedValue(0),
+    upsertUserPattern: vi.fn().mockResolvedValue({ id: "up-1", patternType: "time_preference" }),
+    getActiveUserPatterns: vi.fn().mockResolvedValue([]),
+    getTriggeredPatterns: vi.fn().mockResolvedValue([]),
+    incrementPatternAcceptCount: vi.fn().mockResolvedValue({ id: "up-1" }),
+    getRecentUserActionSummary: vi.fn().mockResolvedValue([]),
+    getLastUserMessageTimestamp: vi.fn().mockResolvedValue(null),
+    getRecentDecisionMemories: vi.fn().mockResolvedValue([]),
+    userActions: {},
+    userPatterns: {},
+    // Deployments
+    createDeployment: vi.fn().mockResolvedValue({ id: "deploy-1", commitSha: "abc1234", shortSha: "abc1234", status: "started" }),
+    updateDeploymentStatus: vi.fn().mockResolvedValue({ id: "deploy-1" }),
+    getLatestDeployment: vi.fn().mockResolvedValue(null),
+    listDeployments: vi.fn().mockResolvedValue([]),
+    getDeploymentBySha: vi.fn().mockResolvedValue(null),
+    deployments: {},
+    // Tool tier config
+    listToolTierConfigs: vi.fn().mockResolvedValue([]),
+    getToolTierConfig: vi.fn().mockResolvedValue(null),
+    upsertToolTierConfig: vi.fn().mockResolvedValue({ id: "ttc-1", toolName: "test_tool", tier: "green" }),
+    listExpiredPendingApprovals: vi.fn().mockResolvedValue([]),
+    toolTierConfig: {},
   };
 }
 

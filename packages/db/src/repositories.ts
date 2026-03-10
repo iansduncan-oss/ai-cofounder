@@ -28,6 +28,10 @@ import {
   adminUsers,
   subagentRuns,
   agentMessages,
+  userActions,
+  userPatterns,
+  deployments,
+  toolTierConfig,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -311,12 +315,17 @@ export async function failTask(db: Db, id: string, error: string) {
 export async function createApproval(
   db: Db,
   data: {
-    taskId: string;
+    taskId?: string;
     requestedBy: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
     reason: string;
   },
 ) {
-  const [approval] = await db.insert(approvals).values(data).returning();
+  const values: { requestedBy: typeof data.requestedBy; reason: string; taskId?: string } = {
+    requestedBy: data.requestedBy,
+    reason: data.reason,
+  };
+  if (data.taskId !== undefined) values.taskId = data.taskId;
+  const [approval] = await db.insert(approvals).values(values).returning();
   return approval;
 }
 
@@ -1499,6 +1508,35 @@ export async function getLatestUserMessageTime(db: Db): Promise<Date | null> {
   return rows[0]?.latest ?? null;
 }
 
+export async function getLastUserMessageTimestamp(db: Db, userId: string): Promise<Date | null> {
+  const rows = await db
+    .select({ latest: sql<Date>`max(${messages.createdAt})` })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(
+      and(
+        eq(conversations.userId, userId),
+        eq(messages.role, "user"),
+      ),
+    );
+  return rows[0]?.latest ?? null;
+}
+
+export async function getRecentDecisionMemories(db: Db, userId: string, since: Date) {
+  return db
+    .select()
+    .from(memories)
+    .where(
+      and(
+        eq(memories.userId, userId),
+        eq(memories.category, "decisions"),
+        sql`${memories.createdAt} >= ${since}`,
+      ),
+    )
+    .orderBy(desc(memories.createdAt))
+    .limit(10);
+}
+
 /* ────────────────── Personas ──────────────── */
 
 export async function getActivePersona(db: Db) {
@@ -2156,4 +2194,366 @@ export async function getAgentMessageStats(db: Db) {
     .from(agentMessages)
     .groupBy(agentMessages.senderRole, agentMessages.messageType);
   return rows;
+}
+
+/* ────────────────── User Actions (Pattern Learning) ─────────────── */
+
+type UserActionType = "chat_message" | "goal_created" | "deploy_triggered" | "suggestion_accepted" | "approval_submitted" | "schedule_created" | "tool_executed";
+
+export async function recordUserAction(
+  db: Db,
+  data: {
+    userId?: string;
+    actionType: UserActionType;
+    actionDetail?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const now = new Date();
+  const [row] = await db
+    .insert(userActions)
+    .values({
+      userId: data.userId,
+      actionType: data.actionType,
+      actionDetail: data.actionDetail,
+      dayOfWeek: now.getDay(),
+      hourOfDay: now.getHours(),
+      metadata: data.metadata,
+    })
+    .returning();
+  return row;
+}
+
+export async function getUserActionsSince(db: Db, userId: string, since: Date) {
+  return db
+    .select()
+    .from(userActions)
+    .where(
+      and(
+        eq(userActions.userId, userId),
+        sql`${userActions.createdAt} >= ${since}`,
+      ),
+    )
+    .orderBy(desc(userActions.createdAt));
+}
+
+export async function getRecentUserActionSummary(db: Db, userId: string, since: Date) {
+  return db
+    .select({
+      actionType: userActions.actionType,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(userActions)
+    .where(
+      and(
+        eq(userActions.userId, userId),
+        sql`${userActions.createdAt} >= ${since}`,
+      ),
+    )
+    .groupBy(userActions.actionType)
+    .orderBy(sql`count(*) desc`);
+}
+
+export async function deleteOldUserActions(db: Db, olderThan: Date) {
+  const result = await db
+    .delete(userActions)
+    .where(lte(userActions.createdAt, olderThan))
+    .returning({ id: userActions.id });
+  return result.length;
+}
+
+/* ────────────────── User Patterns ─────────────── */
+
+export async function upsertUserPattern(
+  db: Db,
+  data: {
+    userId?: string;
+    patternType: string;
+    description: string;
+    triggerCondition: Record<string, unknown>;
+    suggestedAction: string;
+    confidence?: number;
+  },
+) {
+  // Check for existing pattern with same user + type + description
+  const existing = await db
+    .select()
+    .from(userPatterns)
+    .where(
+      and(
+        data.userId ? eq(userPatterns.userId, data.userId) : isNull(userPatterns.userId),
+        eq(userPatterns.patternType, data.patternType),
+        eq(userPatterns.description, data.description),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    const [updated] = await db
+      .update(userPatterns)
+      .set({
+        triggerCondition: data.triggerCondition,
+        suggestedAction: data.suggestedAction,
+        confidence: data.confidence ?? existing[0].confidence,
+        isActive: true,
+        updatedAt: new Date(),
+      })
+      .where(eq(userPatterns.id, existing[0].id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db
+    .insert(userPatterns)
+    .values({
+      userId: data.userId,
+      patternType: data.patternType,
+      description: data.description,
+      triggerCondition: data.triggerCondition,
+      suggestedAction: data.suggestedAction,
+      confidence: data.confidence ?? 50,
+    })
+    .returning();
+  return created;
+}
+
+export async function getActiveUserPatterns(db: Db, userId: string) {
+  return db
+    .select()
+    .from(userPatterns)
+    .where(
+      and(
+        eq(userPatterns.userId, userId),
+        eq(userPatterns.isActive, true),
+        or(
+          isNull(userPatterns.expiresAt),
+          sql`${userPatterns.expiresAt} > now()`,
+        ),
+      ),
+    )
+    .orderBy(desc(userPatterns.confidence));
+}
+
+export async function getTriggeredPatterns(
+  db: Db,
+  userId: string,
+  context: { dayOfWeek: number; hourOfDay: number },
+) {
+  // Fetch all active patterns for this user, then filter in-app
+  // (JSONB field filtering is simpler in JS than in SQL for nested conditions)
+  const patterns = await getActiveUserPatterns(db, userId);
+
+  return patterns.filter((p) => {
+    const trigger = p.triggerCondition as Record<string, unknown> | null;
+    if (!trigger) return false;
+
+    // Check dayOfWeek match
+    if (trigger.dayOfWeek !== undefined && trigger.dayOfWeek !== context.dayOfWeek) {
+      return false;
+    }
+
+    // Check hourRange match
+    if (Array.isArray(trigger.hourRange) && trigger.hourRange.length === 2) {
+      const [start, end] = trigger.hourRange as [number, number];
+      if (context.hourOfDay < start || context.hourOfDay > end) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+export async function incrementPatternAcceptCount(db: Db, patternId: string) {
+  const [updated] = await db
+    .update(userPatterns)
+    .set({
+      acceptCount: sql`${userPatterns.acceptCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userPatterns.id, patternId))
+    .returning();
+  return updated;
+}
+
+export async function listPatterns(
+  db: Db,
+  opts?: { userId?: string; includeInactive?: boolean },
+) {
+  const conditions = [];
+  if (opts?.userId) {
+    conditions.push(eq(userPatterns.userId, opts.userId));
+  }
+  if (!opts?.includeInactive) {
+    conditions.push(eq(userPatterns.isActive, true));
+  }
+
+  return db
+    .select()
+    .from(userPatterns)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(userPatterns.confidence));
+}
+
+export async function togglePatternActive(db: Db, id: string, isActive: boolean) {
+  const [updated] = await db
+    .update(userPatterns)
+    .set({ isActive, updatedAt: new Date() })
+    .where(eq(userPatterns.id, id))
+    .returning();
+  return updated;
+}
+
+export async function deletePattern(db: Db, id: string) {
+  const result = await db
+    .delete(userPatterns)
+    .where(eq(userPatterns.id, id))
+    .returning({ id: userPatterns.id });
+  return result.length > 0;
+}
+
+/* ────────────────── Deployments ─────────────── */
+
+export async function createDeployment(
+  db: Db,
+  data: {
+    commitSha: string;
+    shortSha: string;
+    branch?: string;
+    services?: string[];
+    previousSha?: string;
+    triggeredBy?: string;
+  },
+) {
+  const [row] = await db
+    .insert(deployments)
+    .values({
+      commitSha: data.commitSha,
+      shortSha: data.shortSha,
+      branch: data.branch ?? "main",
+      services: data.services,
+      previousSha: data.previousSha,
+      triggeredBy: data.triggeredBy ?? "ci",
+    })
+    .returning();
+  return row;
+}
+
+export async function updateDeploymentStatus(
+  db: Db,
+  id: string,
+  data: {
+    status: string;
+    healthChecks?: unknown;
+    errorLog?: string;
+    rootCauseAnalysis?: string;
+    rolledBack?: boolean;
+    rollbackSha?: string;
+    completedAt?: Date;
+  },
+) {
+  const [row] = await db
+    .update(deployments)
+    .set({
+      status: data.status as typeof deployments.$inferSelect["status"],
+      healthChecks: data.healthChecks,
+      errorLog: data.errorLog,
+      rootCauseAnalysis: data.rootCauseAnalysis,
+      rolledBack: data.rolledBack,
+      rollbackSha: data.rollbackSha,
+      completedAt: data.completedAt,
+    })
+    .where(eq(deployments.id, id))
+    .returning();
+  return row;
+}
+
+export async function getLatestDeployment(db: Db) {
+  const rows = await db
+    .select()
+    .from(deployments)
+    .orderBy(desc(deployments.startedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listDeployments(db: Db, limit = 20) {
+  return db
+    .select()
+    .from(deployments)
+    .orderBy(desc(deployments.startedAt))
+    .limit(limit);
+}
+
+export async function getDeploymentBySha(db: Db, commitSha: string) {
+  const rows = await db
+    .select()
+    .from(deployments)
+    .where(eq(deployments.commitSha, commitSha))
+    .orderBy(desc(deployments.startedAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/* ────────────────── Tool Tier Config ─────────────── */
+
+export async function listToolTierConfigs(db: Db) {
+  return db
+    .select()
+    .from(toolTierConfig)
+    .orderBy(asc(toolTierConfig.toolName));
+}
+
+export async function getToolTierConfig(db: Db, toolName: string) {
+  const rows = await db
+    .select()
+    .from(toolTierConfig)
+    .where(eq(toolTierConfig.toolName, toolName))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertToolTierConfig(
+  db: Db,
+  data: {
+    toolName: string;
+    tier: "green" | "yellow" | "red";
+    timeoutMs?: number;
+    updatedBy?: string;
+  },
+) {
+  const [row] = await db
+    .insert(toolTierConfig)
+    .values({
+      toolName: data.toolName,
+      tier: data.tier,
+      timeoutMs: data.timeoutMs ?? 300000,
+      updatedBy: data.updatedBy,
+    })
+    .onConflictDoUpdate({
+      target: toolTierConfig.toolName,
+      set: {
+        tier: data.tier,
+        timeoutMs: data.timeoutMs ?? 300000,
+        updatedBy: data.updatedBy,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function listExpiredPendingApprovals(db: Db) {
+  // Returns approvals that have been pending for more than 300 seconds (default timeout)
+  // The per-tool timeout sweep in Plan 02 will refine this with per-tool values
+  return db
+    .select()
+    .from(approvals)
+    .where(
+      and(
+        eq(approvals.status, "pending"),
+        sql`${approvals.createdAt} < (now() - interval '300 seconds')`,
+      ),
+    )
+    .orderBy(asc(approvals.createdAt));
 }
