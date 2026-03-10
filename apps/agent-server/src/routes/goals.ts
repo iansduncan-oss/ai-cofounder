@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
-import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus } from "@ai-cofounder/db";
+import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, createTask } from "@ai-cofounder/db";
 import { getJobStatus } from "@ai-cofounder/queue";
-import { CreateGoalBody, UpdateGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
+import { CreateGoalBody, UpdateGoalStatusBody, BulkGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
@@ -54,6 +54,20 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  /* PATCH /bulk-status — update status for multiple goals */
+  app.patch<{ Body: typeof BulkGoalStatusBody.static }>(
+    "/bulk-status",
+    { schema: { tags: ["goals"], body: BulkGoalStatusBody } },
+    async (request) => {
+      let updated = 0;
+      for (const { id, status } of request.body.updates) {
+        const result = await updateGoalStatus(app.db, id, status);
+        if (result) updated++;
+      }
+      return { updated };
+    },
+  );
+
   /* GET /:id/queue-status — query BullMQ job state for this goal */
   app.get<{ Params: typeof IdParams.static }>(
     "/:id/queue-status",
@@ -81,6 +95,40 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
         finishedOn: jobStatus.finishedOn,
         failedReason: jobStatus.failedReason,
       };
+    },
+  );
+
+  /* POST /:id/clone — duplicate a goal with its tasks */
+  app.post<{ Params: typeof IdParams.static }>(
+    "/:id/clone",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const original = await getGoal(app.db, request.params.id);
+      if (!original) return reply.status(404).send({ error: "Goal not found" });
+
+      const cloned = await createGoal(app.db, {
+        conversationId: original.conversationId,
+        title: `${original.title} (copy)`,
+        description: original.description ?? undefined,
+        priority: original.priority,
+        milestoneId: original.milestoneId ?? undefined,
+      });
+
+      // Clone all tasks with reset statuses
+      const tasks = await listTasksByGoal(app.db, original.id);
+      for (const task of tasks) {
+        await createTask(app.db, {
+          goalId: cloned.id,
+          title: task.title,
+          description: task.description ?? undefined,
+          assignedAgent: (task.assignedAgent ?? undefined) as Parameters<typeof createTask>[1]["assignedAgent"],
+          orderIndex: task.orderIndex,
+          parallelGroup: task.parallelGroup ?? undefined,
+          input: task.input ?? undefined,
+        });
+      }
+
+      return reply.status(201).send(cloned);
     },
   );
 
