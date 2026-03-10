@@ -53,7 +53,7 @@
   3. Conversation ingestion completes within 30s of conversation end
   4. Project documentation is auto-ingested on project registration
   5. Related memories are periodically consolidated into coherent knowledge entries
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 08-01-PLAN.md — Conversation auto-ingestion pipeline and project docs trigger
@@ -164,7 +164,7 @@ Plans:
 | 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
 | 7. Pipeline Trigger | v1.1 | 1/1 | Complete | 2026-03-09 |
-| 8. Memory & Session Foundation | 1/3 | In Progress|  | — |
+| 8. Memory & Session Foundation | 2/3 | In Progress|  | — |
 | 9. Autonomy & Approval System | v2.0 | 0/0 | Pending | — |
 | 10. Autonomous Execution Engine | v2.0 | 0/0 | Pending | — |
 | 11. Autonomous Scheduling | v2.0 | 0/0 | Pending | — |
