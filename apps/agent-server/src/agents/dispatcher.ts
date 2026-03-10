@@ -1,6 +1,6 @@
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
-import { createLogger } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import {
@@ -10,6 +10,7 @@ import {
   startTask,
   completeTask,
   failTask,
+  blockTask,
   updateGoalStatus,
   listPendingApprovalsForTasks,
   recordLlmUsage,
@@ -73,7 +74,7 @@ export class TaskDispatcher {
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
-      ["coder", new CoderAgent(registry, db, sandboxService)],
+      ["coder", new CoderAgent(registry, db, sandboxService, workspaceService)],
       ["reviewer", new ReviewerAgent(registry, db)],
       ["planner", new PlannerAgent(registry, db)],
       ["debugger", new DebuggerAgent(registry, db, embeddingService, sandboxService)],
@@ -106,65 +107,19 @@ export class TaskDispatcher {
 
     await updateGoalStatus(this.db, goalId, "active");
 
-    const previousOutputs: string[] = [];
-    const taskResults: DispatcherProgress["tasks"] = [];
-    let completedCount = 0;
-    const retryCounts = new Map<string, number>();
+    // Route to DAG executor when any task has explicit dependencies
+    const hasDAGDeps = tasks.some((t) => (t as { dependsOn?: string[] | null }).dependsOn?.length);
+    let taskResults: DispatcherProgress["tasks"];
+    let completedCount: number;
 
-    // Group tasks by parallelGroup. Tasks without a group get their own implicit sequential group.
-    const groups = this.groupTasks(tasks);
-    let stopped = false;
-
-    // Batch-fetch all pending approvals for this goal's tasks (single query instead of N)
-    const allTaskIds = tasks.map((t) => t.id);
-    const pendingApprovals = await listPendingApprovalsForTasks(this.db, allTaskIds);
-
-    for (const group of groups) {
-      if (stopped) break;
-
-      // Check for pending approvals on any task in this group
-      let groupBlocked = false;
-      for (const task of group) {
-        const taskApproval = pendingApprovals.find(
-          (a) => a.taskId === task.id,
-        );
-        if (taskApproval) {
-          this.logger.info({ taskId: task.id }, "task awaiting approval, skipping");
-          taskResults.push({
-            id: task.id,
-            title: task.title,
-            agent: (task.assignedAgent ?? "researcher") as string,
-            status: "awaiting_approval",
-          });
-          groupBlocked = true;
-          stopped = true;
-          break;
-        }
-      }
-      if (groupBlocked) break;
-
-      // Snapshot previousOutputs for this group (all tasks in group see same context)
-      const groupPreviousOutputs = [...previousOutputs];
-
-      // Execute all tasks in this group concurrently
-      const groupPromises = group.map((task) =>
-        this.executeTask(task, goalId, goal.title, groupPreviousOutputs, tasks.length, completedCount, userId, onProgress, retryCounts),
-      );
-
-      const results = await Promise.allSettled(groupPromises);
-
-      // Collect results from this group
-      for (const result of results) {
-        if (result.status === "fulfilled") {
-          taskResults.push(result.value.taskResult);
-          if (result.value.taskResult.status === "completed" && result.value.output) {
-            previousOutputs.push(result.value.output);
-            completedCount++;
-          } else if (result.value.taskResult.status === "failed") {
-            // failed tasks don't increment completedCount
-          }
-        }
-      }
+    if (hasDAGDeps) {
+      const dagResult = await this.runGoalDAG(tasks, goalId, goal.title, userId, onProgress);
+      taskResults = dagResult.taskResults;
+      completedCount = dagResult.completedCount;
+    } else {
+      const groupResult = await this.runGoalGrouped(tasks, goalId, goal.title, userId, onProgress);
+      taskResults = groupResult.taskResults;
+      completedCount = groupResult.completedCount;
     }
 
     // Update goal status based on results
@@ -282,6 +237,210 @@ export class TaskDispatcher {
     // Sort: explicit groups by group number, then implicit by insertion order
     result.sort((a, b) => a.sortKey - b.sortKey);
     return result.map((r) => r.tasks);
+  }
+
+  /** Legacy group-based execution path (used when no task has dependsOn) */
+  private async runGoalGrouped(
+    tasks: Array<{ id: string; title: string; description?: string | null; assignedAgent?: string | null; orderIndex: number; parallelGroup?: number | null }>,
+    goalId: string,
+    goalTitle: string,
+    userId?: string,
+    onProgress?: TaskProgressCallback,
+  ): Promise<{ taskResults: DispatcherProgress["tasks"]; completedCount: number }> {
+    const previousOutputs: string[] = [];
+    const taskResults: DispatcherProgress["tasks"] = [];
+    let completedCount = 0;
+    const retryCounts = new Map<string, number>();
+
+    const groups = this.groupTasks(tasks);
+    let stopped = false;
+
+    const allTaskIds = tasks.map((t) => t.id);
+    const pendingApprovals = await listPendingApprovalsForTasks(this.db, allTaskIds);
+
+    for (const group of groups) {
+      if (stopped) break;
+
+      let groupBlocked = false;
+      for (const task of group) {
+        const taskApproval = pendingApprovals.find((a) => a.taskId === task.id);
+        if (taskApproval) {
+          this.logger.info({ taskId: task.id }, "task awaiting approval, skipping");
+          taskResults.push({
+            id: task.id,
+            title: task.title,
+            agent: (task.assignedAgent ?? "researcher") as string,
+            status: "awaiting_approval",
+          });
+          groupBlocked = true;
+          stopped = true;
+          break;
+        }
+      }
+      if (groupBlocked) break;
+
+      const groupPreviousOutputs = [...previousOutputs];
+      const groupPromises = group.map((task) =>
+        this.executeTask(task, goalId, goalTitle, groupPreviousOutputs, tasks.length, completedCount, userId, onProgress, retryCounts),
+      );
+
+      const results = await Promise.allSettled(groupPromises);
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          taskResults.push(result.value.taskResult);
+          if (result.value.taskResult.status === "completed" && result.value.output) {
+            previousOutputs.push(result.value.output);
+            completedCount++;
+          }
+        }
+      }
+    }
+
+    return { taskResults, completedCount };
+  }
+
+  /** DAG-based execution: tasks run as soon as their dependencies are satisfied */
+  private async runGoalDAG(
+    tasks: Array<{ id: string; title: string; description?: string | null; assignedAgent?: string | null; orderIndex: number; dependsOn?: string[] | null }>,
+    goalId: string,
+    goalTitle: string,
+    userId?: string,
+    onProgress?: TaskProgressCallback,
+  ): Promise<{ taskResults: DispatcherProgress["tasks"]; completedCount: number }> {
+    const maxConcurrency = parseInt(optionalEnv("MAX_TASK_CONCURRENCY", "3"), 10);
+    const retryCounts = new Map<string, number>();
+
+    // Build task map and state tracking
+    const taskMap = new Map(tasks.map((t) => [t.id, t]));
+    const outputMap = new Map<string, string>(); // taskId → output
+    const completed = new Set<string>();
+    const failed = new Set<string>();
+    const blocked = new Set<string>();
+    const running = new Set<string>();
+    const taskResults: DispatcherProgress["tasks"] = [];
+
+    // Build reverse dependency map for cascade blocking
+    const reverseDeps = new Map<string, string[]>();
+    for (const task of tasks) {
+      const deps = task.dependsOn;
+      if (!deps) continue;
+      for (const depId of deps) {
+        if (!reverseDeps.has(depId)) reverseDeps.set(depId, []);
+        reverseDeps.get(depId)!.push(task.id);
+      }
+    }
+
+    // Check approvals up front
+    const allTaskIds = tasks.map((t) => t.id);
+    const pendingApprovals = await listPendingApprovalsForTasks(this.db, allTaskIds);
+    const approvalBlockedIds = new Set(pendingApprovals.map((a) => a.taskId).filter(Boolean));
+
+    // Find tasks that are ready to execute
+    const getReadyTasks = (): typeof tasks => {
+      return tasks.filter((t) => {
+        if (completed.has(t.id) || failed.has(t.id) || blocked.has(t.id) || running.has(t.id)) return false;
+        if (approvalBlockedIds.has(t.id)) return false;
+        const deps = t.dependsOn;
+        if (!deps || deps.length === 0) return true;
+        return deps.every((depId) => completed.has(depId));
+      });
+    };
+
+    // Cascade block all transitive dependents of a failed task
+    const blockDownstream = async (failedTaskId: string): Promise<void> => {
+      const queue = [failedTaskId];
+      const visited = new Set<string>();
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        const dependents = reverseDeps.get(current) ?? [];
+        for (const depId of dependents) {
+          if (visited.has(depId) || completed.has(depId) || failed.has(depId) || blocked.has(depId)) continue;
+          visited.add(depId);
+          blocked.add(depId);
+          await blockTask(this.db, depId, `Blocked: dependency ${failedTaskId} failed`);
+          taskResults.push({
+            id: depId,
+            title: taskMap.get(depId)?.title ?? "unknown",
+            agent: (taskMap.get(depId)?.assignedAgent ?? "researcher") as string,
+            status: "blocked",
+          });
+          this.logger.info({ taskId: depId, failedDep: failedTaskId }, "task blocked due to dependency failure");
+          queue.push(depId);
+        }
+      }
+    };
+
+    // Main execution loop
+    while (true) {
+      const ready = getReadyTasks();
+
+      if (ready.length === 0 && running.size === 0) break; // Nothing left to do
+
+      // Take up to maxConcurrency tasks
+      const batch = ready.slice(0, maxConcurrency - running.size);
+      if (batch.length === 0 && running.size === 0) break; // Safety valve: deadlock prevention
+
+      for (const t of batch) running.add(t.id);
+
+      const completedCount = completed.size;
+
+      const batchPromises = batch.map(async (task) => {
+        // Build previousOutputs from direct dependencies only
+        const depOutputs: string[] = [];
+        const deps = task.dependsOn;
+        if (deps) {
+          for (const depId of deps) {
+            const out = outputMap.get(depId);
+            if (out) depOutputs.push(out);
+          }
+        }
+
+        const result = await this.executeTask(
+          task, goalId, goalTitle, depOutputs, tasks.length, completedCount, userId, onProgress, retryCounts,
+        );
+        return { taskId: task.id, ...result };
+      });
+
+      const results = await Promise.allSettled(batchPromises);
+
+      for (const result of results) {
+        if (result.status === "fulfilled") {
+          const { taskId, taskResult, output } = result.value;
+          running.delete(taskId);
+          taskResults.push(taskResult);
+
+          if (taskResult.status === "completed") {
+            completed.add(taskId);
+            if (output) outputMap.set(taskId, output);
+          } else if (taskResult.status === "failed") {
+            failed.add(taskId);
+            await blockDownstream(taskId);
+          }
+        } else {
+          // Promise.allSettled rejected — shouldn't happen since executeTask catches errors
+          // but handle defensively
+          this.logger.error({ error: result.reason }, "unexpected batch execution error");
+        }
+      }
+    }
+
+    // Mark approval-blocked tasks in results
+    for (const taskId of approvalBlockedIds) {
+      if (!completed.has(taskId) && !failed.has(taskId) && !blocked.has(taskId)) {
+        const t = taskMap.get(taskId);
+        if (t) {
+          taskResults.push({
+            id: t.id,
+            title: t.title,
+            agent: (t.assignedAgent ?? "researcher") as string,
+            status: "awaiting_approval",
+          });
+        }
+      }
+    }
+
+    return { taskResults, completedCount: completed.size };
   }
 
   /** Execute a single task with retry logic, notifications, and progress callbacks */

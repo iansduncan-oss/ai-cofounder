@@ -207,7 +207,7 @@ export async function runAutonomousSession(
           },
         });
 
-        totalTokens = progress.tasks.reduce((sum, t) => sum + (t.tokensUsed ?? 0), 0);
+        totalTokens = progress.tasks.reduce((sum, t) => sum + ((t as Record<string, unknown>).tokensUsed as number ?? 0), 0);
         status = progress.status === "completed" ? "completed" : "failed";
         summary = `Executed goal "${topGoal.title}" — ${progress.completedTasks}/${progress.totalTasks} tasks completed`;
 
