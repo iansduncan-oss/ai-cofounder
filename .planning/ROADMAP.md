@@ -70,7 +70,7 @@ Plans:
   3. Red-tier tools are refused with explanation — no execution path exists
   4. Tier config changes from dashboard take effect immediately
   5. Approval timeout auto-denies after configurable period
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 09-01-PLAN.md — DB schema, AutonomyTierService, and tier enforcement in tool executor
@@ -169,7 +169,7 @@ Plans:
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
 | 7. Pipeline Trigger | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 8. Memory & Session Foundation | 2/3 | In Progress|  | — |
-| 9. Autonomy & Approval System | v2.0 | 0/2 | Pending | — |
+| 9. Autonomy & Approval System | 1/2 | In Progress|  | — |
 | 10. Autonomous Execution Engine | v2.0 | 0/0 | Pending | — |
 | 11. Autonomous Scheduling | v2.0 | 0/0 | Pending | — |
 | 12. Work Journal & Standup | v2.0 | 0/0 | Pending | — |

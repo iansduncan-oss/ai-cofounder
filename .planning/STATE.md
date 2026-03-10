@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 08-03-PLAN.md
-last_updated: "2026-03-10T12:39:16.479Z"
+stopped_at: Completed 09-01-PLAN.md
+last_updated: "2026-03-10T14:26:25.175Z"
 last_activity: "2026-03-10 — Phase 8 Plan 03 complete: SessionContextService + MemoryConsolidationService"
 progress:
   total_phases: 9
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -55,6 +55,10 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - recallMemories limit reduced from 20 to 10 to compensate for added session context tokens (~180 tokens for 3 x 250-char summaries)
 - Per-user scoping for consolidation ensures composite memories always have an unambiguous userId — never mix users in a cluster
 - Use COALESCE jsonb merge operator to safely update metadata flag without overwriting existing metadata fields
+- [Phase 09]: approvals.taskId nullable — yellow-tier tools can fire outside goal execution context
+- [Phase 09]: Default tier for unconfigured tools is green — backward compatible, zero-latency
+- [Phase 09]: Defense-in-depth: red tools stripped from LLM tool list AND blocked in executor
+- [Phase 09]: Seed 33 known tools at green on first server start — dashboard settings not empty
 
 ### Pending Todos
 
@@ -71,9 +75,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 08 | 01 | 35 min | 2/2 | 8 |
 | 08 | 02 | 20 min | 2/2 | 7 |
 | 08 | 03 | 20 min | 2/2 | 8 |
+| Phase 09 P01 | 41 | 2 tasks | 17 files |
 
 ## Session Continuity
 
-Last session: 2026-03-10
-Stopped at: Completed 08-03-PLAN.md
+Last session: 2026-03-10T14:26:25.161Z
+Stopped at: Completed 09-01-PLAN.md
 Resume file: None
