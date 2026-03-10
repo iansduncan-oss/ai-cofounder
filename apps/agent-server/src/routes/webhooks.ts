@@ -78,6 +78,7 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
   app.post(
     "/github",
     {
+      schema: { tags: ["webhooks"] },
       config: { rawBody: true },
       // Parse body as raw buffer for signature verification, then as JSON
       preHandler: async (request, reply) => {
@@ -122,7 +123,7 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
 
       // Only trigger autonomous processing for actionable events
       if (isActionableEvent(type)) {
-        processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService, app.workspaceService).catch(
+        processEvent(app.db, app.llmRegistry, event, app.embeddingService, app.sandboxService, app.workspaceService, app.messagingService).catch(
           (err) => {
             logger.error({ err, eventId: event.id }, "background GitHub event processing failed");
           },

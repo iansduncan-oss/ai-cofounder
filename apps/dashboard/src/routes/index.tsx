@@ -47,14 +47,24 @@ const PipelineDetailPage = lazy(() =>
 const PersonaPage = lazy(() =>
   import("./persona").then((m) => ({ default: m.PersonaPage })),
 );
+const PatternsPage = lazy(() =>
+  import("./patterns").then((m) => ({ default: m.PatternsPage })),
+);
 const LoginPage = lazy(() =>
   import("./login").then((m) => ({ default: m.LoginPage })),
+);
+const AuthCallbackPage = lazy(() =>
+  import("./auth-callback").then((m) => ({ default: m.AuthCallbackPage })),
 );
 
 export const router = createBrowserRouter([
   {
     path: "/dashboard/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/dashboard/auth/callback",
+    element: <AuthCallbackPage />,
   },
   {
     path: "/dashboard",
@@ -74,6 +84,7 @@ export const router = createBrowserRouter([
       { path: "pipelines", element: <PipelinesPage /> },
       { path: "pipelines/:jobId", element: <PipelineDetailPage /> },
       { path: "persona", element: <PersonaPage /> },
+      { path: "patterns", element: <PatternsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

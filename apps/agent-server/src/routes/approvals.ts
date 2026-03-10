@@ -14,6 +14,7 @@ import {
   ListPendingQuery,
 } from "../schemas.js";
 import { notifyApprovalCreated } from "../services/notifications.js";
+import { recordActionSafe } from "../services/action-recorder.js";
 
 export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create an approval request */
@@ -78,6 +79,11 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
         request.body.decidedBy,
       );
       if (!approval) return reply.status(404).send({ error: "Approval not found" });
+      recordActionSafe(app.db, {
+        userId: request.body.decidedBy,
+        actionType: "approval_submitted",
+        actionDetail: `${request.body.status}: ${request.body.decision.slice(0, 150)}`,
+      });
       return approval;
     },
   );

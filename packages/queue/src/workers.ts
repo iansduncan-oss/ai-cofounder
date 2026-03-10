@@ -11,6 +11,7 @@ import {
   type RagIngestionJob,
   type ReflectionJob,
   type SubagentTaskJob,
+  type DeployVerificationJob,
 } from "./queues.js";
 import { sendToDeadLetter } from "./helpers.js";
 
@@ -30,6 +31,7 @@ export type PipelineProcessor = (job: Job<PipelineJob>) => Promise<void>;
 export type RagIngestionProcessor = (job: Job<RagIngestionJob>) => Promise<void>;
 export type ReflectionProcessor = (job: Job<ReflectionJob>) => Promise<void>;
 export type SubagentTaskProcessor = (job: Job<SubagentTaskJob>) => Promise<void>;
+export type DeployVerificationProcessor = (job: Job<DeployVerificationJob>) => Promise<void>;
 
 export interface WorkerProcessors {
   agentTask?: AgentTaskProcessor;
@@ -40,6 +42,7 @@ export interface WorkerProcessors {
   ragIngestion?: RagIngestionProcessor;
   reflection?: ReflectionProcessor;
   subagentTask?: SubagentTaskProcessor;
+  deployVerification?: DeployVerificationProcessor;
 }
 
 const activeWorkers: Worker[] = [];
@@ -160,6 +163,20 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.SUBAGENT_TASKS);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.deployVerification) {
+    const worker = new Worker<DeployVerificationJob>(
+      QUEUE_NAMES.DEPLOY_VERIFICATION,
+      processors.deployVerification,
+      {
+        connection,
+        concurrency: 1,
+        lockDuration: 300_000, // 5 min — health checks + rollback can be slow
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.DEPLOY_VERIFICATION);
     activeWorkers.push(worker);
   }
 

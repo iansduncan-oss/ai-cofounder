@@ -15,7 +15,7 @@ const mockStartTask = vi.fn();
 const mockCompleteTask = vi.fn();
 const mockFailTask = vi.fn();
 const mockUpdateGoalStatus = vi.fn();
-const mockListPendingApprovals = vi.fn().mockResolvedValue([]);
+const mockListPendingApprovalsForTasks = vi.fn().mockResolvedValue([]);
 const mockRecordLlmUsage = vi.fn().mockResolvedValue({ id: "usage-1" });
 const mockGetUsageSummary = vi.fn().mockResolvedValue({
   totalInputTokens: 100,
@@ -53,7 +53,7 @@ vi.mock("@ai-cofounder/db", () => ({
   failTask: mockFailTask,
   createApproval: vi.fn(),
   getApproval: vi.fn(),
-  listPendingApprovals: mockListPendingApprovals,
+  listPendingApprovalsForTasks: mockListPendingApprovalsForTasks,
   listApprovalsByTask: vi.fn().mockResolvedValue([]),
   resolveApproval: vi.fn(),
   saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
@@ -133,7 +133,7 @@ const GOAL_ID = "00000000-0000-0000-0000-000000000001";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockListPendingApprovals.mockResolvedValue([]);
+  mockListPendingApprovalsForTasks.mockResolvedValue([]);
 });
 
 describe("E2E goal execution flow — queue-backed", () => {

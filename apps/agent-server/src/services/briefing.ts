@@ -218,7 +218,7 @@ function buildBriefingPrompt(data: BriefingData): string {
 }
 
 /** Generate a briefing using LLM, falling back to static format on error */
-async function generateLlmBriefing(registry: LlmRegistry, data: BriefingData): Promise<string> {
+export async function generateLlmBriefing(registry: LlmRegistry, data: BriefingData): Promise<string> {
   try {
     const response = await registry.complete("simple", {
       system:

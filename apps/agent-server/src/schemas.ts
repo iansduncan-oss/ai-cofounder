@@ -297,6 +297,19 @@ export const RagDeleteSourceParams = Type.Object({
 });
 export type RagDeleteSourceParams = Static<typeof RagDeleteSourceParams>;
 
+/* ────────────────────────── Patterns ────────────────────────── */
+
+export const PatternListQuery = Type.Object({
+  userId: Type.Optional(Type.String({ format: "uuid" })),
+  includeInactive: Type.Optional(Type.Boolean()),
+});
+export type PatternListQuery = Static<typeof PatternListQuery>;
+
+export const TogglePatternBody = Type.Object({
+  isActive: Type.Boolean(),
+});
+export type TogglePatternBody = Static<typeof TogglePatternBody>;
+
 /* ────────────────────────── Reflections ────────────────────────── */
 
 export const ReflectionListQuery = Type.Object({

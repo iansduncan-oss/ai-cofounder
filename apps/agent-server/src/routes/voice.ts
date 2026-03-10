@@ -31,6 +31,8 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
     app.n8nService,
     app.sandboxService,
     app.workspaceService,
+    app.messagingService,
+    app.autonomyTierService,
   );
 
   // ── Original non-streaming chat endpoint ──

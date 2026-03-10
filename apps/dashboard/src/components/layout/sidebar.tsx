@@ -19,6 +19,7 @@ import {
   LogOut,
   Bot,
   GitBranch,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -41,6 +42,7 @@ const navItems = [
   { to: "/dashboard/workspace", icon: FolderOpen, label: "Workspace" },
   { to: "/dashboard/pipelines", icon: GitBranch, label: "Pipelines" },
   { to: "/dashboard/persona", icon: Bot, label: "Persona" },
+  { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 

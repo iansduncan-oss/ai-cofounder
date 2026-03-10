@@ -30,6 +30,7 @@ interface StreamState {
   model?: string;
   provider?: string;
   plan?: PlanInfo;
+  suggestions?: string[];
 }
 
 type StreamAction =
@@ -45,6 +46,7 @@ type StreamAction =
       provider?: string;
       plan?: PlanInfo;
     }
+  | { type: "suggestions"; suggestions: string[] }
   | { type: "error"; message: string }
   | { type: "reset" };
 
@@ -84,6 +86,8 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
         thinkingMessage: null,
         accumulatedText: state.accumulatedText + action.text,
       };
+    case "suggestions":
+      return { ...state, suggestions: action.suggestions };
     case "done":
       return {
         ...state,
@@ -148,6 +152,12 @@ export function useStreamChat() {
               break;
             case "text_delta":
               dispatch({ type: "text_delta", text: (event.data.text as string) ?? "" });
+              break;
+            case "suggestions":
+              dispatch({
+                type: "suggestions",
+                suggestions: (event.data.suggestions as string[]) ?? [],
+              });
               break;
             case "done":
               dispatch({

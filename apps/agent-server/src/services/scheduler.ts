@@ -21,6 +21,7 @@ import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./workspace.js";
 import { sendDailyBriefing } from "./briefing.js";
 import type { NotificationService } from "./notifications.js";
+import type { AgentMessagingService } from "./agent-messaging.js";
 
 const logger = createLogger("scheduler");
 
@@ -32,6 +33,7 @@ export interface SchedulerConfig {
   sandboxService: SandboxService;
   workspaceService: WorkspaceService;
   notificationService?: NotificationService;
+  messagingService?: AgentMessagingService;
   pollIntervalMs?: number;
   briefingHour?: number;
   briefingTimezone?: string;
@@ -46,6 +48,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     sandboxService,
     workspaceService,
     notificationService,
+    messagingService,
     pollIntervalMs = 60_000,
     briefingHour = 8,
     briefingTimezone = "America/New_York",
@@ -219,6 +222,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             n8nService,
             sandboxService,
             workspaceService,
+            messagingService,
           );
 
           // Create a system user + conversation for scheduled tasks

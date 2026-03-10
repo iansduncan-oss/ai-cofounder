@@ -22,6 +22,21 @@ jobs:
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
+      - name: Notify deploy started
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          SHORT_SHA="${COMMIT_SHA:0:7}"
+          PREVIOUS_SHA=$(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ian@avion-stack-01 \
+            "sudo docker inspect --format='{{index .Config.Labels \"git.sha\"}}' ai-cofounder-agent-server:latest 2>/dev/null" || echo "")
+          curl -sf -X POST "${DEPLOY_WEBHOOK_URL}/api/deploys/webhook" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
+            -d "{\"event\":\"deploy_started\",\"commitSha\":\"${COMMIT_SHA}\",\"shortSha\":\"${SHORT_SHA}\",\"branch\":\"main\",\"previousSha\":\"${PREVIOUS_SHA}\",\"services\":[\"agent-server\",\"discord-bot\",\"slack-bot\"],\"triggeredBy\":\"ci\"}" \
+            || true
+
       - name: Deploy via SSH
         id: deploy
         env:
@@ -79,6 +94,32 @@ jobs:
 
           echo "==> Deploy complete (${SHORT_SHA})!"
           DEPLOY
+
+      - name: Notify deploy completed
+        if: success()
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          curl -sf -X POST "${DEPLOY_WEBHOOK_URL}/api/deploys/webhook" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
+            -d "{\"event\":\"deploy_completed\",\"commitSha\":\"${COMMIT_SHA}\"}" \
+            || true
+
+      - name: Notify deploy failed
+        if: failure()
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          curl -sf -X POST "${DEPLOY_WEBHOOK_URL}/api/deploys/webhook" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
+            -d "{\"event\":\"deploy_failed\",\"commitSha\":\"${COMMIT_SHA}\",\"error\":\"Deploy step failed — check GitHub Actions logs\"}" \
+            || true
 
       - name: Notify Discord — Success
         if: success()

@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useListPipelines } from "@/api/queries";
+import { apiClient } from "@/api/client";
+import { queryKeys } from "@/lib/query-keys";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge, type BadgeProps } from "@/components/ui/badge";
@@ -37,6 +40,18 @@ function formatDuration(startIso: string, endIso: string): string {
   if (ms < 3_600_000)
     return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
   return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
+}
+
+/* ── GoalTitle ── */
+
+function GoalTitle({ goalId }: { goalId: string }) {
+  const { data } = useQuery({
+    queryKey: queryKeys.goals.detail(goalId),
+    queryFn: () => apiClient.getGoal(goalId),
+    enabled: !!goalId,
+    staleTime: Infinity,
+  });
+  return <>{data?.title ?? goalId.slice(0, 8)}</>;
 }
 
 /* ── PipelinesPage ── */
@@ -143,7 +158,7 @@ export function PipelinesPage() {
                     Pipeline {run.pipelineId.slice(0, 8)}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    Goal: {run.goalId.slice(0, 8)} &middot; {run.stageCount} stages
+                    Goal: <GoalTitle goalId={run.goalId} /> &middot; {run.stageCount} stages
                     {run.createdAt && (
                       <>
                         {" "}

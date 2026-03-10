@@ -14,7 +14,7 @@ const mockStartTask = vi.fn().mockResolvedValue({});
 const mockCompleteTask = vi.fn().mockResolvedValue({});
 const mockFailTask = vi.fn().mockResolvedValue({});
 const mockUpdateGoalStatus = vi.fn().mockResolvedValue({});
-const mockListPendingApprovals = vi.fn().mockResolvedValue([]);
+const mockListPendingApprovalsForTasks = vi.fn().mockResolvedValue([]);
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
@@ -26,7 +26,7 @@ vi.mock("@ai-cofounder/db", () => ({
   completeTask: mockCompleteTask,
   failTask: mockFailTask,
   updateGoalStatus: mockUpdateGoalStatus,
-  listPendingApprovals: mockListPendingApprovals,
+  listPendingApprovalsForTasks: mockListPendingApprovalsForTasks,
   recallMemories: vi.fn().mockResolvedValue([]),
   searchMemoriesByVector: vi.fn().mockResolvedValue([]),
   saveMemory: vi.fn().mockResolvedValue({}),
@@ -195,7 +195,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
         { id: "t-1", title: "Blocked", assignedAgent: "coder", orderIndex: 0 },
         { id: "t-2", title: "After", assignedAgent: "reviewer", orderIndex: 1 },
       ]);
-      mockListPendingApprovals.mockResolvedValueOnce([
+      mockListPendingApprovalsForTasks.mockResolvedValueOnce([
         { id: "a-1", taskId: "t-1", status: "pending" },
       ]);
 

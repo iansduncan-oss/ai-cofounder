@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router";
-import { usePipeline } from "@/api/queries";
+import { useParams, Link, useNavigate } from "react-router";
+import { usePipeline, useGoal } from "@/api/queries";
+import { useCancelPipeline, useRetryPipeline } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { PipelineStateBadge } from "@/routes/pipelines";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, XCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StageIcon } from "@/components/pipelines/stage-progress";
 import { formatDate } from "@/lib/utils";
@@ -35,7 +36,11 @@ export function PipelineDetailPage() {
   const { jobId } = useParams<{ jobId: string }>();
   usePageTitle("Pipeline Detail");
 
+  const navigate = useNavigate();
   const { data, isLoading, error } = usePipeline(jobId ?? null);
+  const { data: goal } = useGoal(data?.goalId ?? "");
+  const cancelMutation = useCancelPipeline();
+  const retryMutation = useRetryPipeline();
 
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -63,12 +68,45 @@ export function PipelineDetailPage() {
         title={`Pipeline ${shortId}`}
         description="Pipeline run detail"
         actions={
-          <Link to="/dashboard/pipelines">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-              Back to Pipelines
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {data && (data.state === "active" || data.state === "waiting" || data.state === "delayed") && (
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={cancelMutation.isPending}
+                onClick={() => {
+                  if (window.confirm("Cancel this pipeline run?")) {
+                    cancelMutation.mutate(jobId!);
+                  }
+                }}
+              >
+                <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                {cancelMutation.isPending ? "Cancelling…" : "Cancel"}
+              </Button>
+            )}
+            {data?.state === "failed" && (
+              <Button
+                size="sm"
+                disabled={retryMutation.isPending}
+                onClick={() => {
+                  retryMutation.mutate(jobId!, {
+                    onSuccess: (result) => {
+                      navigate(`/dashboard/pipelines/${result.jobId}`);
+                    },
+                  });
+                }}
+              >
+                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                {retryMutation.isPending ? "Retrying…" : "Retry"}
+              </Button>
+            )}
+            <Link to="/dashboard/pipelines">
+              <Button variant="outline" size="sm">
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                Back to Pipelines
+              </Button>
+            </Link>
+          </div>
         }
       />
 
@@ -98,9 +136,9 @@ export function PipelineDetailPage() {
                   <span className="text-muted-foreground">Goal:</span>
                   <Link
                     to={`/dashboard/goals/${data.goalId}`}
-                    className="font-mono text-primary hover:underline truncate"
+                    className="text-primary hover:underline truncate"
                   >
-                    {data.goalId.slice(0, 8)}
+                    {goal?.title ?? data.goalId.slice(0, 8)}
                   </Link>
                 </div>
               )}

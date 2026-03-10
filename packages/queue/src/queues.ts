@@ -84,6 +84,13 @@ export interface SubagentTaskJob {
   metadata?: Record<string, unknown>;
 }
 
+export interface DeployVerificationJob {
+  deploymentId: string;
+  commitSha: string;
+  previousSha?: string;
+  errorLog?: string;
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
@@ -95,6 +102,7 @@ export const QUEUE_NAMES = {
   PIPELINES: "pipelines",
   RAG_INGESTION: "rag-ingestion",
   REFLECTIONS: "reflections",
+  DEPLOY_VERIFICATION: "deploy-verification",
   DEAD_LETTER: "dead-letter",
 } as const;
 
@@ -158,6 +166,10 @@ export function getReflectionQueue(): Queue<ReflectionJob> {
 
 export function getSubagentTaskQueue(): Queue<SubagentTaskJob> {
   return getOrCreateQueue<SubagentTaskJob>(QUEUE_NAMES.SUBAGENT_TASKS);
+}
+
+export function getDeployVerificationQueue(): Queue<DeployVerificationJob> {
+  return getOrCreateQueue<DeployVerificationJob>(QUEUE_NAMES.DEPLOY_VERIFICATION);
 }
 
 export function getDeadLetterQueue(): Queue<DeadLetterJob> {

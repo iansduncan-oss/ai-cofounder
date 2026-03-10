@@ -11,6 +11,9 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
   const cookieSecret = optionalEnv("COOKIE_SECRET", "");
 
   if (!jwtSecret || !cookieSecret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("JWT_SECRET and COOKIE_SECRET must be set in production");
+    }
     logger.warn("JWT_SECRET or COOKIE_SECRET not set — auth plugin disabled (set both in production)");
     return;
   }

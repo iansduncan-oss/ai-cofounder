@@ -6,6 +6,7 @@ const goalStatusConfig: Record<GoalStatus, { label: string; variant: "default" |
   active: { label: "Active", variant: "default" },
   completed: { label: "Completed", variant: "success" },
   cancelled: { label: "Cancelled", variant: "destructive" },
+  needs_review: { label: "Needs Review", variant: "warning" },
 };
 
 const taskStatusConfig: Record<TaskStatus, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }> = {

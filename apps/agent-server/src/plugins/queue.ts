@@ -116,6 +116,28 @@ export const queuePlugin = fp(async (app) => {
       }
     },
 
+    deployVerification: async (job) => {
+      const { deploymentId, commitSha, previousSha } = job.data;
+      logger.info({ jobId: job.id, deploymentId, commitSha: commitSha?.slice(0, 7) }, "Running deploy verification");
+      const { DeployHealthService } = await import("../services/deploy-health.js");
+      const deployHealthService = new DeployHealthService(
+        app.db,
+        app.llmRegistry,
+        app.notificationService,
+        app.monitoringService,
+      );
+
+      if (job.name === "analyze-failure") {
+        await deployHealthService.handleDeployFailure(
+          deploymentId,
+          commitSha,
+          previousSha,
+        );
+      } else {
+        await deployHealthService.verifyDeployment(deploymentId, commitSha, previousSha);
+      }
+    },
+
     ragIngestion: async (job) => {
       const { action, sourceId } = job.data;
       logger.info({ jobId: job.id, action, sourceId }, "Running RAG ingestion");

@@ -153,10 +153,81 @@ export class RedisPubSub {
     return items.map((item) => JSON.parse(item) as SubagentProgressEvent);
   }
 
+  /**
+   * Publish an agent-to-agent message notification to the target's role channel.
+   * Also appends to a history list for late-joiners.
+   */
+  async publishAgentMessage(event: AgentMessageEvent): Promise<void> {
+    const payload = JSON.stringify(event);
+
+    if (event.targetRole) {
+      const channel = agentMsgChannel(event.targetRole);
+      const histKey = `${AGENT_MSG_HISTORY_PREFIX}${event.targetRole}`;
+      await Promise.all([
+        this.publisher.publish(channel, payload),
+        this.publisher.rpush(histKey, payload),
+        this.publisher.expire(histKey, AGENT_MSG_HISTORY_TTL),
+      ]);
+    }
+  }
+
+  /**
+   * Publish a broadcast message notification to the broadcast channel.
+   */
+  async publishBroadcast(channel: string, event: AgentMessageEvent): Promise<void> {
+    const redisChan = agentBroadcastChannel(channel);
+    const histKey = `${AGENT_MSG_HISTORY_PREFIX}broadcast:${channel}`;
+    const payload = JSON.stringify(event);
+    await Promise.all([
+      this.publisher.publish(redisChan, payload),
+      this.publisher.rpush(histKey, payload),
+      this.publisher.expire(histKey, AGENT_MSG_HISTORY_TTL),
+    ]);
+  }
+
+  /**
+   * Retrieve agent message history for a role (for late-joiners).
+   */
+  async getAgentMessageHistory(role: string): Promise<AgentMessageEvent[]> {
+    const histKey = `${AGENT_MSG_HISTORY_PREFIX}${role}`;
+    const items = await this.publisher.lrange(histKey, 0, -1);
+    return items.map((item) => JSON.parse(item) as AgentMessageEvent);
+  }
+
   /** Close the publisher connection cleanly */
   async close(): Promise<void> {
     await this.publisher.quit();
   }
+}
+
+// ── Agent-to-agent messaging channels ──
+
+export const AGENT_MSG_PREFIX = "agent-msg:role:";
+export const AGENT_BROADCAST_PREFIX = "agent-msg:broadcast:";
+export const AGENT_MSG_HISTORY_PREFIX = "agent-msg:history:";
+export const AGENT_MSG_HISTORY_TTL = 3600; // 1 hour
+
+/** Lightweight notification event published when a new agent message is inserted */
+export interface AgentMessageEvent {
+  messageId: string;
+  senderRole: string;
+  targetRole?: string;
+  channel?: string;
+  messageType: string;
+  subject: string;
+  correlationId?: string;
+  goalId?: string;
+  timestamp: number;
+}
+
+/** Redis channel for a specific agent role (optionally scoped to a run) */
+export function agentMsgChannel(role: string, runId?: string): string {
+  return runId ? `${AGENT_MSG_PREFIX}${role}:${runId}` : `${AGENT_MSG_PREFIX}${role}`;
+}
+
+/** Redis channel for broadcast messages */
+export function agentBroadcastChannel(channel: string): string {
+  return `${AGENT_BROADCAST_PREFIX}${channel}`;
 }
 
 // ── Subscriber factory ──

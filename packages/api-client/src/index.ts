@@ -53,4 +53,5 @@ export type {
   SubagentRun,
   SpawnSubagentInput,
   SpawnSubagentResponse,
+  UserPattern,
 } from "./types.js";

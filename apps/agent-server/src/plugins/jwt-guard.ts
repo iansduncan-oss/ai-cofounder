@@ -23,6 +23,10 @@ import { ragRoutes } from "../routes/rag.js";
 import { personaRoutes } from "../routes/persona.js";
 import { reflectionRoutes } from "../routes/reflections.js";
 import { subagentRoutes } from "../routes/subagents.js";
+import { agentMessageRoutes } from "../routes/agent-messages.js";
+import { agentInfoRoutes } from "../routes/agent-info.js";
+import { deployRoutes } from "../routes/deploys.js";
+import { patternRoutes } from "../routes/patterns.js";
 
 /**
  * JWT Guard Plugin — scoped Fastify plugin (NOT wrapped with fp()) so its
@@ -77,4 +81,8 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(personaRoutes, { prefix: "/api/persona" });
   app.register(reflectionRoutes, { prefix: "/api/reflections" });
   app.register(subagentRoutes, { prefix: "/api/subagents" });
+  app.register(agentMessageRoutes, { prefix: "/api/agent-messages" });
+  app.register(agentInfoRoutes, { prefix: "/api/agents" });
+  app.register(deployRoutes, { prefix: "/api/deploys" });
+  app.register(patternRoutes, { prefix: "/api/patterns" });
 }

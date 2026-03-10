@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
@@ -267,7 +268,12 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       const shouldCheck = jwtSecret ? isBotRoute : true;
       if (shouldCheck) {
         const authHeader = request.headers.authorization;
-        if (!authHeader || authHeader !== `Bearer ${apiSecret}`) {
+        const expected = `Bearer ${apiSecret}`;
+        if (
+          !authHeader ||
+          authHeader.length !== expected.length ||
+          !crypto.timingSafeEqual(Buffer.from(authHeader), Buffer.from(expected))
+        ) {
           reply.code(401).send({ error: "Unauthorized" });
           return;
         }

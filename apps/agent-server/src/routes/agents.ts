@@ -14,23 +14,15 @@ import {
   createMessage,
   recordLlmUsage,
   getTodayTokenTotal,
-  recordUserAction,
+  incrementPatternAcceptCount,
 } from "@ai-cofounder/db";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
 import { ConversationIngestionService } from "../services/conversation-ingestion.js";
 import { generateSuggestions } from "../services/suggestions.js";
+import { recordActionSafe } from "../services/action-recorder.js";
 
 const logger = createLogger("agent-routes");
-
-function recordActionSafe(db: import("@ai-cofounder/db").Db, action: {
-  userId?: string;
-  actionType: "chat_message" | "goal_created" | "deploy_triggered" | "suggestion_accepted" | "approval_submitted" | "schedule_created" | "tool_executed";
-  actionDetail?: string;
-  metadata?: Record<string, unknown>;
-}) {
-  recordUserAction(db, action).catch(() => {}); // non-fatal fire-and-forget
-}
 
 const RunBody = Type.Object({
   message: Type.String({ minLength: 1, maxLength: 32_000 }),
@@ -61,6 +53,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.sandboxService,
     app.workspaceService,
     app.messagingService,
+    app.autonomyTierService,
   );
 
   const conversationIngestion = new ConversationIngestionService(
@@ -433,4 +426,32 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       reply.raw.end();
     }
   });
+
+  /* POST /accept-suggestion — record that a user clicked a suggestion chip */
+  const AcceptSuggestionBody = Type.Object({
+    suggestion: Type.String({ minLength: 1 }),
+    userId: Type.Optional(Type.String()),
+    patternId: Type.Optional(Type.String({ format: "uuid" })),
+  });
+
+  app.post<{ Body: typeof AcceptSuggestionBody.static }>(
+    "/accept-suggestion",
+    { schema: { tags: ["agents"], body: AcceptSuggestionBody } },
+    async (request) => {
+      const { suggestion, userId, patternId } = request.body;
+
+      recordActionSafe(app.db, {
+        userId,
+        actionType: "suggestion_accepted",
+        actionDetail: suggestion.slice(0, 200),
+        metadata: patternId ? { patternId } : undefined,
+      });
+
+      if (patternId) {
+        incrementPatternAcceptCount(app.db, patternId).catch(() => {});
+      }
+
+      return { ok: true };
+    },
+  );
 };

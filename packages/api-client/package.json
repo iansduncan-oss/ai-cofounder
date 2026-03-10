@@ -11,6 +11,9 @@
     "test": "vitest run",
     "clean": "rm -rf dist"
   },
+  "dependencies": {
+    "@ai-cofounder/shared": "*"
+  },
   "devDependencies": {
     "@types/node": "^25.3.3"
   }

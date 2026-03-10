@@ -5,39 +5,38 @@ import {
   upsertPersona,
   deletePersona,
 } from "@ai-cofounder/db";
+import { UpsertPersonaBody, IdParams } from "../schemas.js";
 
 export async function personaRoutes(app: FastifyInstance): Promise<void> {
   // GET /api/persona — get the active persona
-  app.get("/", async () => {
+  app.get("/", { schema: { tags: ["persona"] } }, async () => {
     const persona = await getActivePersona(app.db);
     return { persona };
   });
 
   // GET /api/persona/all — list all personas
-  app.get("/all", async () => {
+  app.get("/all", { schema: { tags: ["persona"] } }, async () => {
     const all = await listPersonas(app.db);
     return { personas: all };
   });
 
   // PUT /api/persona — create or update a persona
-  app.put<{
-    Body: {
-      id?: string;
-      name: string;
-      voiceId?: string;
-      corePersonality: string;
-      capabilities?: string;
-      behavioralGuidelines?: string;
-      isActive?: boolean;
-    };
-  }>("/", async (request) => {
-    const persona = await upsertPersona(app.db, request.body);
-    return { persona };
-  });
+  app.put<{ Body: typeof UpsertPersonaBody.static }>(
+    "/",
+    { schema: { tags: ["persona"], body: UpsertPersonaBody } },
+    async (request) => {
+      const persona = await upsertPersona(app.db, request.body);
+      return { persona };
+    },
+  );
 
   // DELETE /api/persona/:id — delete a persona
-  app.delete<{ Params: { id: string } }>("/:id", async (request) => {
-    await deletePersona(app.db, request.params.id);
-    return { deleted: true };
-  });
+  app.delete<{ Params: typeof IdParams.static }>(
+    "/:id",
+    { schema: { tags: ["persona"], params: IdParams } },
+    async (request) => {
+      await deletePersona(app.db, request.params.id);
+      return { deleted: true };
+    },
+  );
 }

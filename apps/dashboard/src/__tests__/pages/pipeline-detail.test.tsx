@@ -1,6 +1,7 @@
 vi.mock("@/api/queries", () => ({
   useListPipelines: vi.fn(),
   usePipeline: vi.fn(),
+  useGoal: vi.fn(() => ({ data: null })),
 }));
 
 vi.mock("@/api/mutations", () => ({
@@ -8,11 +9,20 @@ vi.mock("@/api/mutations", () => ({
     mutate: vi.fn(),
     isPending: false,
   })),
+  useCancelPipeline: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
+  useRetryPipeline: vi.fn(() => ({
+    mutate: vi.fn(),
+    isPending: false,
+  })),
 }));
 
+const mockNavigate = vi.fn();
 vi.mock("react-router", async () => {
   const actual = await vi.importActual("react-router");
-  return { ...actual, useParams: vi.fn(() => ({ jobId: "job-test-1234" })) };
+  return { ...actual, useParams: vi.fn(() => ({ jobId: "job-test-1234" })), useNavigate: () => mockNavigate };
 });
 
 import { screen, fireEvent } from "@testing-library/react";

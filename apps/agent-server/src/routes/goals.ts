@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, createTask } from "@ai-cofounder/db";
 import { getJobStatus } from "@ai-cofounder/queue";
 import { CreateGoalBody, UpdateGoalStatusBody, BulkGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
+import { recordActionSafe } from "../services/action-recorder.js";
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
@@ -10,6 +11,11 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["goals"], body: CreateGoalBody } },
     async (request, reply) => {
       const goal = await createGoal(app.db, request.body);
+      recordActionSafe(app.db, {
+        userId: request.body.createdBy,
+        actionType: "goal_created",
+        actionDetail: request.body.title.slice(0, 200),
+      });
       return reply.status(201).send(goal);
     },
   );

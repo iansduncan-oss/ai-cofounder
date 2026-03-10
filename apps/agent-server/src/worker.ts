@@ -20,6 +20,7 @@ import { createSandboxService } from "@ai-cofounder/sandbox";
 import { createWorkspaceService } from "./services/workspace.js";
 import { createNotificationService } from "./services/notifications.js";
 import { SubagentRunner } from "./services/subagent.js";
+import { AgentMessagingService } from "./services/agent-messaging.js";
 
 const logger = createLogger("worker");
 
@@ -67,6 +68,9 @@ export async function main() {
     verificationService,
   );
 
+  // Agent messaging service
+  const messagingService = new AgentMessagingService(db, redisPubSub);
+
   // Subagent runner for autonomous subagent tasks
   const subagentRunner = new SubagentRunner(
     llmRegistry,
@@ -76,6 +80,7 @@ export async function main() {
     sandboxService,
     workspaceService,
     redisPubSub,
+    messagingService,
   );
 
   // NOTE: agentTask + subagentTask processors are registered here exclusively.

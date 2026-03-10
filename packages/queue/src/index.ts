@@ -18,6 +18,13 @@ export {
   type AgentLifecycleEvent,
   type SubagentProgressEvent,
   type AgentEvent,
+  type AgentMessageEvent,
+  agentMsgChannel,
+  agentBroadcastChannel,
+  AGENT_MSG_PREFIX,
+  AGENT_BROADCAST_PREFIX,
+  AGENT_MSG_HISTORY_PREFIX,
+  AGENT_MSG_HISTORY_TTL,
 } from "./pubsub.js";
 
 // Queues & job types
@@ -39,9 +46,11 @@ export {
   type PipelineStage,
   type RagIngestionJob,
   getReflectionQueue,
+  getDeployVerificationQueue,
   getDeadLetterQueue,
   type ReflectionJob,
   type SubagentTaskJob,
+  type DeployVerificationJob,
   type DeadLetterJob,
 } from "./queues.js";
 
@@ -58,6 +67,7 @@ export {
   type RagIngestionProcessor,
   type ReflectionProcessor,
   type SubagentTaskProcessor,
+  type DeployVerificationProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)

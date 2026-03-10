@@ -16,7 +16,8 @@ import {
   updateSubagentRunStatus,
 } from "@ai-cofounder/db";
 import type { RedisPubSub, SubagentProgressEvent } from "@ai-cofounder/queue";
-import { buildSharedToolList, executeSharedTool } from "../agents/tool-executor.js";
+import { buildSharedToolList, executeSharedTool, type ToolExecutorContext } from "../agents/tool-executor.js";
+import type { AgentMessagingService } from "./agent-messaging.js";
 import { recordToolMetrics, recordSubagentMetrics } from "../plugins/observability.js";
 import { recordToolExecution } from "@ai-cofounder/db";
 import type { N8nService } from "./n8n.js";
@@ -65,6 +66,7 @@ export class SubagentRunner {
   private sandboxService?: SandboxService;
   private workspaceService?: WorkspaceService;
   private redisPubSub?: RedisPubSub;
+  private messagingService?: AgentMessagingService;
 
   constructor(
     registry: LlmRegistry,
@@ -74,6 +76,7 @@ export class SubagentRunner {
     sandboxService?: SandboxService,
     workspaceService?: WorkspaceService,
     redisPubSub?: RedisPubSub,
+    messagingService?: AgentMessagingService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -82,6 +85,7 @@ export class SubagentRunner {
     this.sandboxService = sandboxService;
     this.workspaceService = workspaceService;
     this.redisPubSub = redisPubSub;
+    this.messagingService = messagingService;
   }
 
   async run(params: SubagentRunParams): Promise<SubagentResult> {
@@ -115,6 +119,7 @@ export class SubagentRunner {
           n8nService: this.n8nService,
           sandboxService: this.sandboxService,
           workspaceService: this.workspaceService,
+          messagingService: this.messagingService,
         },
         EXCLUDED_TOOLS,
       );
@@ -165,10 +170,14 @@ export class SubagentRunner {
                 n8nService: this.n8nService,
                 sandboxService: this.sandboxService,
                 workspaceService: this.workspaceService,
+                messagingService: this.messagingService,
               }, {
                 conversationId: params.conversationId ?? params.subagentRunId,
                 userId: params.userId,
-              });
+                agentRole: "subagent",
+                agentRunId: params.subagentRunId,
+                goalId: params.goalId,
+              } as ToolExecutorContext);
 
               // null means unknown tool
               if (result === null) {

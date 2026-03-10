@@ -203,6 +203,36 @@ export function useUpsertPersona() {
   });
 }
 
+export function useCancelPipeline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobId: string) => apiClient.cancelPipeline(jobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+      toast.success("Pipeline cancelled");
+    },
+    onError: (err) => {
+      toast.error(`Failed to cancel pipeline: ${err.message}`);
+    },
+  });
+}
+
+export function useRetryPipeline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobId: string) => apiClient.retryPipeline(jobId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+      toast.success(`Pipeline retried — Job ${data.jobId.slice(0, 8)}`);
+    },
+    onError: (err) => {
+      toast.error(`Failed to retry pipeline: ${err.message}`);
+    },
+  });
+}
+
 export function useDeletePersona() {
   const queryClient = useQueryClient();
 
@@ -215,5 +245,43 @@ export function useDeletePersona() {
     onError: (err) => {
       toast.error(`Failed to delete persona: ${err.message}`);
     },
+  });
+}
+
+export function useTogglePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiClient.togglePattern(id, isActive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern updated");
+    },
+    onError: (err) => {
+      toast.error(`Failed to toggle pattern: ${err.message}`);
+    },
+  });
+}
+
+export function useDeletePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deletePattern(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete pattern: ${err.message}`);
+    },
+  });
+}
+
+export function useAcceptSuggestion() {
+  return useMutation({
+    mutationFn: (data: { suggestion: string; userId?: string; patternId?: string }) =>
+      apiClient.acceptSuggestion(data),
   });
 }

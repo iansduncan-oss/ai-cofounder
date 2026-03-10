@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback, useEffect } from "react";
 import {
   useHealth,
   useProviderHealth,
@@ -8,6 +9,7 @@ import {
   usePendingTasks,
   usePendingApprovals,
 } from "@/api/queries";
+import { apiClient } from "@/api/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,9 +26,12 @@ import {
   GitPullRequest,
   HardDrive,
   Layers,
+  Loader2,
   MemoryStick,
   Server,
   Shield,
+  Square,
+  Volume2,
   Wrench,
   XCircle,
   FileText,
@@ -73,6 +78,92 @@ function MetricCard({
         {subtext && (
           <p className="text-xs text-muted-foreground">{subtext}</p>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function BriefingCard({ text }: { text: string }) {
+  const [audioState, setAudioState] = useState<"idle" | "loading" | "playing">("idle");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  const cleanup = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cleanup, [cleanup]);
+
+  const handlePlay = useCallback(async () => {
+    setAudioState("loading");
+    try {
+      const blob = await apiClient.getBriefingAudio();
+      const url = URL.createObjectURL(blob);
+      blobUrlRef.current = url;
+      const audio = new Audio(url);
+      audio.onended = () => {
+        setAudioState("idle");
+        cleanup();
+      };
+      audioRef.current = audio;
+      await audio.play();
+      setAudioState("playing");
+    } catch {
+      setAudioState("idle");
+      cleanup();
+    }
+  }, [cleanup]);
+
+  const handleStop = useCallback(() => {
+    cleanup();
+    setAudioState("idle");
+  }, [cleanup]);
+
+  return (
+    <Card className="mt-6">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-medium">
+          <span className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Latest Briefing
+          </span>
+          {audioState === "idle" && (
+            <button
+              onClick={handlePlay}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Volume2 className="h-3.5 w-3.5" />
+              Play
+            </button>
+          )}
+          {audioState === "loading" && (
+            <span className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Loading...
+            </span>
+          )}
+          {audioState === "playing" && (
+            <button
+              onClick={handleStop}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            >
+              <Square className="h-3.5 w-3.5" />
+              Stop
+            </button>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
+          {text}
+        </div>
       </CardContent>
     </Card>
   );
@@ -449,19 +540,7 @@ export function HudPage() {
 
           {/* Briefing section */}
           {briefing?.briefing && (
-            <Card className="mt-6">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                  <FileText className="h-4 w-4" />
-                  Latest Briefing
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
-                  {briefing.briefing}
-                </div>
-              </CardContent>
-            </Card>
+            <BriefingCard text={briefing.briefing} />
           )}
         </>
       )}

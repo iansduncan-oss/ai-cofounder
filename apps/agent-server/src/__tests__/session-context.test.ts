@@ -12,13 +12,25 @@ vi.mock("@ai-cofounder/shared", () => ({
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
 
-// 2. Mock @ai-cofounder/db with mockDbModule spread + custom getRecentSessionSummaries mock
+// 2. Mock @ai-cofounder/db with mockDbModule spread + custom mocks
 const mockGetRecentSessionSummaries = vi.fn().mockResolvedValue([]);
+const mockGetLastUserMessageTimestamp = vi.fn().mockResolvedValue(null);
+const mockGetRecentDecisionMemories = vi.fn().mockResolvedValue([]);
+const mockListRecentlyCompletedGoals = vi.fn().mockResolvedValue([]);
+const mockListReflections = vi.fn().mockResolvedValue({ data: [], total: 0 });
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
   getRecentSessionSummaries: (...args: unknown[]) =>
     mockGetRecentSessionSummaries(...args),
+  getLastUserMessageTimestamp: (...args: unknown[]) =>
+    mockGetLastUserMessageTimestamp(...args),
+  getRecentDecisionMemories: (...args: unknown[]) =>
+    mockGetRecentDecisionMemories(...args),
+  listRecentlyCompletedGoals: (...args: unknown[]) =>
+    mockListRecentlyCompletedGoals(...args),
+  listReflections: (...args: unknown[]) =>
+    mockListReflections(...args),
 }));
 
 // 3. Mock @ai-cofounder/llm
@@ -148,5 +160,160 @@ describe("session context", () => {
     const combined = contextBlock! + "\n\n" + existingMemoryContext;
     expect(combined.indexOf("## Recent Sessions")).toBeLessThan(combined.indexOf("General knowledge:"));
     expect(combined.indexOf("## Recent Sessions")).toBe(0); // Session context is prepended first
+  });
+
+  describe("getReturnContext", () => {
+    it("returns null when no last message exists", async () => {
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(null);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+      expect(result).toBeNull();
+    });
+
+    it("returns null when gap is less than 2 hours", async () => {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(oneHourAgo);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+      expect(result).toBeNull();
+    });
+
+    it("returns context block when gap is 2+ hours", async () => {
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(threeHoursAgo);
+      mockGetRecentSessionSummaries.mockResolvedValueOnce([
+        { conversationId: "c-1", summary: "Worked on deploy pipeline", createdAt: new Date() },
+      ]);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).toContain("## Since You Were Last Here");
+      expect(result).toContain("3 hours ago");
+      expect(result).toContain("**Last session:**");
+      expect(result).toContain("Worked on deploy pipeline");
+    });
+
+    it("formats multi-day gap correctly", async () => {
+      const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(twoDaysAgo);
+      mockGetRecentSessionSummaries.mockResolvedValueOnce([
+        { conversationId: "c-1", summary: "Old session", createdAt: new Date() },
+      ]);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+      expect(result).toContain("2 days ago");
+    });
+
+    it("includes decisions made since last message", async () => {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
+      mockGetRecentDecisionMemories.mockResolvedValueOnce([
+        { id: "d-1", key: "Use PostgreSQL", content: "Chose PostgreSQL for relational data", createdAt: new Date() },
+      ]);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).toContain("**Decisions recorded:**");
+      expect(result).toContain("Use PostgreSQL: Chose PostgreSQL for relational data");
+    });
+
+    it("includes completed goals since last message", async () => {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
+      mockListRecentlyCompletedGoals.mockResolvedValueOnce([
+        { id: "g-1", title: "Deploy monitoring stack" },
+      ]);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).toContain("**Goals completed:**");
+      expect(result).toContain("Deploy monitoring stack");
+    });
+
+    it("includes reflections with lessons", async () => {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
+      mockListReflections.mockResolvedValueOnce({
+        data: [
+          {
+            id: "r-1",
+            createdAt: new Date(),
+            lessons: [{ lesson: "Always run tests before deploying" }],
+          },
+        ],
+        total: 1,
+      });
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).toContain("**Lessons learned:**");
+      expect(result).toContain("Always run tests before deploying");
+    });
+
+    it("returns null when only header is present (no content)", async () => {
+      const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(threeHoursAgo);
+      mockGetRecentSessionSummaries.mockResolvedValueOnce([]);
+      mockGetRecentDecisionMemories.mockResolvedValueOnce([]);
+      mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
+      mockListReflections.mockResolvedValueOnce({ data: [], total: 0 });
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+      expect(result).toBeNull();
+    });
+
+    it("limits decisions to 5", async () => {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
+      const manyDecisions = Array.from({ length: 8 }, (_, i) => ({
+        id: `d-${i}`, key: `Decision ${i}`, content: `Content ${i}`, createdAt: new Date(),
+      }));
+      mockGetRecentDecisionMemories.mockResolvedValueOnce(manyDecisions);
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).toContain("Decision 4");
+      expect(result).not.toContain("Decision 5");
+    });
+
+    it("gracefully handles DB errors", async () => {
+      mockGetLastUserMessageTimestamp.mockRejectedValueOnce(new Error("db down"));
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+      expect(result).toBeNull();
+    });
+
+    it("skips reflections that pre-date last message", async () => {
+      const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+      mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
+      mockGetRecentSessionSummaries.mockResolvedValueOnce([
+        { conversationId: "c-1", summary: "A session", createdAt: new Date() },
+      ]);
+      mockListReflections.mockResolvedValueOnce({
+        data: [
+          {
+            id: "r-old",
+            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // older than gap
+            lessons: [{ lesson: "Old lesson" }],
+          },
+        ],
+        total: 1,
+      });
+
+      const service = new SessionContextService(mockDb);
+      const result = await service.getReturnContext("user-1");
+
+      expect(result).not.toContain("**Lessons learned:**");
+    });
   });
 });

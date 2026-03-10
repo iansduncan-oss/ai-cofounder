@@ -34,10 +34,16 @@ import type {
   PipelineDetail,
   SubmitPipelineInput,
   SubmitPipelineResponse,
+  CancelPipelineResponse,
+  RetryPipelineResponse,
   SubagentRun,
   SubagentRunStatus,
   SpawnSubagentInput,
   SpawnSubagentResponse,
+  AgentMessageItem,
+  AgentRoleInfo,
+  AgentCapability,
+  UserPattern,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -110,6 +116,45 @@ export class ApiClient {
     return res.json() as Promise<T>;
   }
 
+  private async requestBlob(method: string, path: string): Promise<Blob> {
+    const requestHeaders: Record<string, string> = { ...this.headers };
+    const dynamicToken = this.getToken?.();
+    if (dynamicToken) {
+      requestHeaders["Authorization"] = `Bearer ${dynamicToken}`;
+    }
+
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: requestHeaders,
+      credentials: "include",
+    });
+
+    if (res.status === 401 && this.onUnauthorized) {
+      const newToken = await this.onUnauthorized();
+      if (newToken) {
+        const retryHeaders: Record<string, string> = { ...this.headers };
+        retryHeaders["Authorization"] = `Bearer ${newToken}`;
+        const retryRes = await fetch(`${this.baseUrl}${path}`, {
+          method,
+          headers: retryHeaders,
+          credentials: "include",
+        });
+        if (!retryRes.ok) {
+          throw new ApiError(retryRes.status, retryRes.statusText);
+        }
+        return retryRes.blob();
+      }
+      throw new ApiError(401, "Session expired");
+    }
+
+    if (!res.ok) {
+      const errorBody = await res.json().catch(() => ({ error: res.statusText }));
+      throw new ApiError(res.status, (errorBody as { error?: string }).error ?? res.statusText);
+    }
+
+    return res.blob();
+  }
+
   /* ── Health ── */
 
   health() {
@@ -133,6 +178,16 @@ export class ApiClient {
     history?: Array<{ role: "user" | "agent" | "system"; content: string }>;
   }) {
     return this.request<AgentRunResult>("POST", "/api/agents/run", data);
+  }
+
+  /* ── Agent Info ── */
+
+  listAgentRoles() {
+    return this.request<{ roles: AgentRoleInfo[] }>("GET", "/api/agents/roles");
+  }
+
+  listAgentCapabilities() {
+    return this.request<{ agents: AgentCapability[] }>("GET", "/api/agents/capabilities");
   }
 
   /* ── Goals ── */
@@ -160,6 +215,10 @@ export class ApiClient {
 
   updateGoalStatus(id: string, status: GoalStatus) {
     return this.request<Goal>("PATCH", `/api/goals/${id}/status`, { status });
+  }
+
+  cloneGoal(id: string) {
+    return this.request<Goal>("POST", `/api/goals/${id}/clone`);
   }
 
   /* ── Tasks ── */
@@ -369,6 +428,10 @@ export class ApiClient {
     return this.request<BriefingResponse>("GET", `/api/briefing${query}`);
   }
 
+  getBriefingAudio(): Promise<Blob> {
+    return this.requestBlob("GET", "/api/briefing/audio");
+  }
+
   /* ── Conversations ── */
 
   listConversations(userId: string, pagination?: PaginationParams) {
@@ -470,6 +533,14 @@ export class ApiClient {
     return this.request<SubmitPipelineResponse>("POST", `/api/pipelines/goal/${goalId}`, { context });
   }
 
+  cancelPipeline(jobId: string) {
+    return this.request<CancelPipelineResponse>("DELETE", `/api/pipelines/${jobId}`);
+  }
+
+  retryPipeline(jobId: string) {
+    return this.request<RetryPipelineResponse>("POST", `/api/pipelines/${jobId}/retry`);
+  }
+
   /* ── Subagents ── */
 
   spawnSubagent(data: SpawnSubagentInput) {
@@ -502,6 +573,120 @@ export class ApiClient {
     return this.request<{ subagentRunId: string; status: string }>(
       "POST",
       `/api/subagents/${id}/cancel`,
+    );
+  }
+
+  /* ── RAG ── */
+
+  ragSearch(query: string, opts?: { limit?: number; sourceType?: string; minScore?: number }) {
+    return this.request<{ results: Array<Record<string, unknown>>; query: string }>(
+      "POST",
+      "/api/rag/search",
+      { query, ...opts },
+    );
+  }
+
+  ragStatus() {
+    return this.request<{ totalChunks: number; sources: Array<Record<string, unknown>> }>(
+      "GET",
+      "/api/rag/status",
+    );
+  }
+
+  ragIngest(action: string, sourceId: string, opts?: { cursor?: string; content?: string }) {
+    return this.request<{ jobId: string | undefined; action: string; sourceId: string }>(
+      "POST",
+      "/api/rag/ingest",
+      { action, sourceId, ...opts },
+    );
+  }
+
+  ragChunkCount(sourceType?: string) {
+    const query = sourceType ? `?sourceType=${encodeURIComponent(sourceType)}` : "";
+    return this.request<{ count: number; sourceType: string }>(
+      "GET",
+      `/api/rag/chunks/count${query}`,
+    );
+  }
+
+  ragDeleteSource(sourceType: string, sourceId: string) {
+    return this.request<{ deleted: boolean; sourceType: string; sourceId: string }>(
+      "DELETE",
+      `/api/rag/sources/${encodeURIComponent(sourceType)}/${encodeURIComponent(sourceId)}`,
+    );
+  }
+
+  /* ── Agent Messages ── */
+
+  listAgentMessages(opts?: {
+    goalId?: string;
+    role?: string;
+    type?: string;
+    status?: string;
+  } & PaginationParams) {
+    const params = new URLSearchParams();
+    if (opts?.goalId) params.set("goalId", opts.goalId);
+    if (opts?.role) params.set("role", opts.role);
+    if (opts?.type) params.set("type", opts.type);
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.request<{ data: AgentMessageItem[]; total: number }>(
+      "GET",
+      `/api/agent-messages${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  getAgentMessage(id: string) {
+    return this.request<AgentMessageItem>("GET", `/api/agent-messages/${id}`);
+  }
+
+  getMessageThread(correlationId: string) {
+    return this.request<AgentMessageItem[]>("GET", `/api/agent-messages/thread/${correlationId}`);
+  }
+
+  getGoalMessages(goalId: string, opts?: PaginationParams) {
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.request<{ data: AgentMessageItem[]; total: number }>(
+      "GET",
+      `/api/agent-messages/goal/${goalId}${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  /* ── Patterns ── */
+
+  listPatterns(userId?: string, includeInactive?: boolean) {
+    const params = new URLSearchParams();
+    if (userId) params.set("userId", userId);
+    if (includeInactive) params.set("includeInactive", "true");
+    const qs = params.toString();
+    return this.request<{ data: UserPattern[] }>(
+      "GET",
+      `/api/patterns${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  togglePattern(id: string, isActive: boolean) {
+    return this.request<UserPattern>(
+      "PATCH",
+      `/api/patterns/${id}/toggle`,
+      { isActive },
+    );
+  }
+
+  deletePattern(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/patterns/${id}`);
+  }
+
+  acceptSuggestion(data: { suggestion: string; userId?: string; patternId?: string }) {
+    return this.request<{ ok: boolean }>(
+      "POST",
+      "/api/agents/accept-suggestion",
+      data,
     );
   }
 

@@ -65,4 +65,8 @@ export const queryKeys = {
     list: ["pipelines", "list"] as const,
     detail: (jobId: string) => ["pipelines", "detail", jobId] as const,
   },
+  patterns: {
+    all: ["patterns"] as const,
+    list: (userId?: string) => ["patterns", "list", userId ?? "all"] as const,
+  },
 };

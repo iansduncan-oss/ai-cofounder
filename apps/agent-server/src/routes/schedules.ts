@@ -9,6 +9,7 @@ import {
 } from "@ai-cofounder/db";
 import { CronExpressionParser } from "cron-parser";
 import { IdParams } from "../schemas.js";
+import { recordActionSafe } from "../services/action-recorder.js";
 
 const CreateScheduleBody = Type.Object({
   cronExpression: Type.String({ minLength: 1, maxLength: 100 }),
@@ -41,6 +42,11 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
           userId,
           enabled: true,
           nextRunAt,
+        });
+        recordActionSafe(app.db, {
+          userId,
+          actionType: "schedule_created",
+          actionDetail: `${cronExpression}: ${actionPrompt.slice(0, 150)}`,
         });
         return reply.status(201).send(schedule);
       } catch (err) {

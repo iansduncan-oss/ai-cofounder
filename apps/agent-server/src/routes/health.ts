@@ -3,7 +3,8 @@ import { sql } from "drizzle-orm";
 import { getProviderHealthHistory, getToolStats } from "@ai-cofounder/db";
 import { pingRedis } from "@ai-cofounder/queue";
 import { optionalEnv } from "@ai-cofounder/shared";
-import { gatherBriefingData, formatBriefing, sendDailyBriefing } from "../services/briefing.js";
+import { gatherBriefingData, formatBriefing, generateLlmBriefing, sendDailyBriefing } from "../services/briefing.js";
+import { getActivePersona } from "@ai-cofounder/db";
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
   app.get("/health", { schema: { tags: ["health"] } }, async (_request, reply) => {
@@ -83,8 +84,32 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
       }
 
       const data = await gatherBriefingData(app.db);
-      const text = formatBriefing(data);
+      const text = app.llmRegistry
+        ? await generateLlmBriefing(app.llmRegistry, data)
+        : formatBriefing(data);
       return { sent: false, briefing: text, data };
     },
   );
+
+  /** GET /api/briefing/audio — synthesize briefing as MP3 via TTS */
+  app.get("/api/briefing/audio", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    if (!app.ttsService?.isConfigured()) {
+      return reply.code(503).send({ error: "TTS service not configured" });
+    }
+
+    const data = await gatherBriefingData(app.db);
+    const narrative = app.llmRegistry
+      ? await generateLlmBriefing(app.llmRegistry, data)
+      : formatBriefing(data);
+
+    const persona = await getActivePersona(app.db);
+    const voiceId = persona?.voiceId ?? undefined;
+
+    const buffer = await app.ttsService.synthesize(narrative, voiceId);
+    if (!buffer) {
+      return reply.code(500).send({ error: "TTS synthesis failed" });
+    }
+
+    return reply.header("Content-Type", "audio/mpeg").send(buffer);
+  });
 };

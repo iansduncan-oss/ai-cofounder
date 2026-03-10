@@ -201,3 +201,10 @@ export function useListPersonas() {
     queryFn: () => apiClient.listPersonas(),
   });
 }
+
+export function usePatterns(userId?: string, includeInactive?: boolean) {
+  return useQuery({
+    queryKey: queryKeys.patterns.list(userId),
+    queryFn: () => apiClient.listPatterns(userId, includeInactive),
+  });
+}

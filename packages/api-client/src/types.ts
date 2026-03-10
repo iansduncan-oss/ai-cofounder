@@ -1,7 +1,7 @@
 /* ── API response types ── */
 
-export type AgentRole = "orchestrator" | "researcher" | "coder" | "reviewer" | "planner";
-export type GoalStatus = "draft" | "active" | "completed" | "cancelled";
+import type { AgentRole, GoalStatus } from "@ai-cofounder/shared";
+export type { AgentRole, GoalStatus } from "@ai-cofounder/shared";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
 export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
@@ -92,6 +92,7 @@ export interface AgentRunResult {
     goalTitle: string;
     tasks: Array<{ id: string; title: string; assignedAgent: AgentRole; orderIndex: number }>;
   };
+  suggestions?: string[];
 }
 
 export interface ExecutionProgress {
@@ -108,7 +109,7 @@ export interface ExecutionProgress {
 
 export type StreamEventType =
   | "thinking" | "tool_call" | "tool_result" | "text_delta" | "done" | "error"
-  | "started" | "progress" | "completed";
+  | "started" | "progress" | "completed" | "suggestions";
 
 export interface StreamEvent {
   type: StreamEventType;
@@ -433,6 +434,16 @@ export interface SubmitPipelineResponse {
   stageCount: number;
 }
 
+export interface CancelPipelineResponse {
+  cancelled: boolean;
+}
+
+export interface RetryPipelineResponse {
+  jobId: string;
+  status: string;
+  stageCount: number;
+}
+
 /* ── Subagents ── */
 
 export type SubagentRunStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
@@ -472,4 +483,62 @@ export interface SpawnSubagentResponse {
   subagentRunId: string;
   status: string;
   title: string;
+}
+
+/* ── Agent Messages ── */
+
+export type AgentMessageType = "request" | "response" | "broadcast" | "notification" | "handoff";
+export type AgentMessageStatus = "pending" | "delivered" | "read" | "expired";
+
+/* ── Agent Info ── */
+
+export interface AgentRoleInfo {
+  role: AgentRole;
+  description: string;
+}
+
+export interface AgentCapability {
+  role: AgentRole;
+  description: string;
+  tools: string[];
+  specialties: string[];
+}
+
+export interface UserPattern {
+  id: string;
+  userId: string | null;
+  patternType: string;
+  description: string;
+  triggerCondition: Record<string, unknown>;
+  suggestedAction: string;
+  confidence: number;
+  hitCount: number;
+  acceptCount: number;
+  isActive: boolean;
+  expiresAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentMessageItem {
+  id: string;
+  senderRole: string;
+  senderRunId: string | null;
+  targetRole: string | null;
+  targetRunId: string | null;
+  channel: string | null;
+  messageType: AgentMessageType;
+  subject: string;
+  body: string;
+  correlationId: string | null;
+  inReplyTo: string | null;
+  goalId: string | null;
+  taskId: string | null;
+  conversationId: string | null;
+  status: AgentMessageStatus;
+  priority: string;
+  expiresAt: string | null;
+  readAt: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
 }

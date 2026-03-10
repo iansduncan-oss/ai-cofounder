@@ -8,7 +8,7 @@ import type {
   TaskCategory,
   EmbeddingService,
 } from "@ai-cofounder/llm";
-import { createLogger } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { retrieve, formatContext } from "@ai-cofounder/rag";
@@ -32,7 +32,9 @@ import {
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
+import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
+import { recordActionSafe } from "../services/action-recorder.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
@@ -70,8 +72,9 @@ import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { notifyApprovalCreated } from "../services/notifications.js";
-import { buildSharedToolList, executeSharedTool, type ToolExecutorContext } from "./tool-executor.js";
+import { buildSharedToolList, executeSharedTool, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
+import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -253,6 +256,7 @@ export class Orchestrator {
   private sandboxService?: SandboxService;
   private workspaceService?: WorkspaceService;
   private messagingService?: AgentMessagingService;
+  private autonomyTierService?: AutonomyTierService;
   private requestId?: string;
 
   constructor(
@@ -264,6 +268,7 @@ export class Orchestrator {
     sandboxService?: SandboxService,
     workspaceService?: WorkspaceService,
     messagingService?: AgentMessagingService,
+    autonomyTierService?: AutonomyTierService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -273,6 +278,7 @@ export class Orchestrator {
     this.sandboxService = sandboxService;
     this.workspaceService = workspaceService;
     this.messagingService = messagingService;
+    this.autonomyTierService = autonomyTierService;
   }
 
   async run(
@@ -340,12 +346,30 @@ export class Orchestrator {
         memoryContext = parts.join("\n");
       }
 
+      // Contextual awareness: inject time-of-day, recent activity, tone guidance
+      try {
+        const awarenessService = new ContextualAwarenessService(this.db, {
+          timezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
+        });
+        const contextBlock = await awarenessService.getContextBlock(userId);
+        if (contextBlock) {
+          memoryContext = contextBlock + (memoryContext ? "\n\n" + memoryContext : "");
+        }
+      } catch (err) {
+        this.logger.warn({ err }, "contextual awareness failed (non-fatal)");
+      }
+
       // Session continuity context (MEM-04, SESS-01)
       try {
         const sessionContextService = new SessionContextService(this.db);
-        const sessionBlock = await sessionContextService.getRecentContext(userId);
-        if (sessionBlock) {
-          memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
+        const returnBlock = await sessionContextService.getReturnContext(userId);
+        if (returnBlock) {
+          memoryContext = returnBlock + (memoryContext ? "\n\n" + memoryContext : "");
+        } else {
+          const sessionBlock = await sessionContextService.getRecentContext(userId);
+          if (sessionBlock) {
+            memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
+          }
         }
       } catch (err) {
         this.logger.warn({ err }, "session context retrieval failed (non-fatal)");
@@ -387,7 +411,7 @@ export class Orchestrator {
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
       messagingService: this.messagingService,
-    }));
+    }, undefined, this.autonomyTierService));
 
     try {
       let totalInputTokens = 0;
@@ -525,6 +549,31 @@ export class Orchestrator {
         parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
       }
       if (parts.length > 0) memoryContext = parts.join("\n");
+
+      // Contextual awareness for streaming
+      try {
+        const awarenessService = new ContextualAwarenessService(this.db, {
+          timezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
+        });
+        const contextBlock = await awarenessService.getContextBlock(userId);
+        if (contextBlock) {
+          memoryContext = contextBlock + (memoryContext ? "\n\n" + memoryContext : "");
+        }
+      } catch { /* non-fatal */ }
+
+      // Session continuity for streaming
+      try {
+        const sessionContextService = new SessionContextService(this.db);
+        const returnBlock = await sessionContextService.getReturnContext(userId);
+        if (returnBlock) {
+          memoryContext = returnBlock + (memoryContext ? "\n\n" + memoryContext : "");
+        } else {
+          const sessionBlock = await sessionContextService.getRecentContext(userId);
+          if (sessionBlock) {
+            memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
+          }
+        }
+      } catch { /* non-fatal */ }
     }
 
     // RAG retrieval: find relevant document chunks
@@ -551,7 +600,7 @@ export class Orchestrator {
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
       messagingService: this.messagingService,
-    }));
+    }, undefined, this.autonomyTierService));
 
     try {
       let totalInputTokens = 0;
@@ -677,6 +726,12 @@ export class Orchestrator {
           requestId: this.requestId,
         }).catch((err) => {
           this.logger.warn({ err, tool: block.name }, "failed to persist tool execution (non-fatal)");
+        });
+        recordActionSafe(this.db, {
+          userId,
+          actionType: "tool_executed",
+          actionDetail: block.name,
+          metadata: { durationMs, success },
         });
       }
       if (durationMs > 5000) {
@@ -827,14 +882,15 @@ export class Orchestrator {
       }
 
       default: {
-        // Delegate to shared tool executor
-        const result = await executeSharedTool(block, {
+        // Delegate to shared tool executor with tier enforcement
+        const result = await executeWithTierCheck(block, {
           db: this.db,
           embeddingService: this.embeddingService,
           n8nService: this.n8nService,
           sandboxService: this.sandboxService,
           workspaceService: this.workspaceService,
           messagingService: this.messagingService,
+          autonomyTierService: this.autonomyTierService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

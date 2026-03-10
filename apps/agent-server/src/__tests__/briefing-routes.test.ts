@@ -170,8 +170,9 @@ describe("Briefing routes", () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.sent).toBe(false);
-      expect(body.briefing).toContain("Daily Briefing");
-      expect(body.briefing).toContain("Build API");
+      // LLM narrative is used when llmRegistry is available (returns mock LLM text)
+      expect(body.briefing).toBeDefined();
+      expect(typeof body.briefing).toBe("string");
       expect(body.data).toBeDefined();
       expect(body.data.activeGoals).toHaveLength(1);
     });
@@ -194,7 +195,8 @@ describe("Briefing routes", () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.sent).toBe(false);
-      expect(body.briefing).toContain("No active goals");
+      expect(body.briefing).toBeDefined();
+      expect(body.data.activeGoals).toHaveLength(0);
     });
 
     it("sends briefing when send=true", async () => {
@@ -218,7 +220,7 @@ describe("Briefing routes", () => {
       expect(body.briefing).toBeDefined();
     });
 
-    it("includes cost data in briefing text", async () => {
+    it("includes cost data in briefing data", async () => {
       mockListActiveGoals.mockResolvedValue([]);
       mockListRecentlyCompletedGoals.mockResolvedValue([]);
       mockCountTasksByStatus.mockResolvedValue({});
@@ -235,11 +237,11 @@ describe("Briefing routes", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.briefing).toContain("$2.50");
-      expect(body.briefing).toContain("42 requests");
+      expect(body.data.costsSinceYesterday.totalCostUsd).toBe(2.50);
+      expect(body.data.costsSinceYesterday.requestCount).toBe(42);
     });
 
-    it("includes completed yesterday in briefing", async () => {
+    it("includes completed yesterday in briefing data", async () => {
       mockListActiveGoals.mockResolvedValue([]);
       mockListRecentlyCompletedGoals.mockResolvedValue([
         { title: "Deploy v1.0" },
@@ -259,9 +261,9 @@ describe("Briefing routes", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.briefing).toContain("Deploy v1.0");
-      expect(body.briefing).toContain("Fix auth bug");
-      expect(body.briefing).toContain("Completed Yesterday (2)");
+      expect(body.data.completedYesterday).toHaveLength(2);
+      expect(body.data.completedYesterday[0].title).toBe("Deploy v1.0");
+      expect(body.data.completedYesterday[1].title).toBe("Fix auth bug");
     });
   });
 });

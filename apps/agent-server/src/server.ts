@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import fastifyStatic from "@fastify/static";
@@ -25,6 +26,7 @@ import { healthRoutes } from "./routes/health.js";
 import { channelRoutes } from "./routes/channels.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { voiceRoutes } from "./routes/voice.js";
+import { deployWebhookRoute } from "./routes/deploys.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
@@ -39,8 +41,27 @@ import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox
 import {
   upsertProviderHealth,
   getProviderHealthRecords,
+  listToolTierConfigs,
+  upsertToolTierConfig,
 } from "@ai-cofounder/db";
 import { startScheduler } from "./services/scheduler.js";
+import { AutonomyTierService } from "./services/autonomy-tier.js";
+
+/** All known tool names — seeded at green tier on first server start */
+const DEFAULT_TOOLS = [
+  "save_memory", "recall_memories", "search_web", "browse_web",
+  "trigger_workflow", "list_workflows",
+  "create_schedule", "list_schedules", "delete_schedule",
+  "execute_code",
+  "read_file", "write_file", "list_directory", "delete_file", "delete_directory",
+  "git_clone", "git_status", "git_diff", "git_add", "git_commit", "git_pull",
+  "git_log", "git_branch", "git_checkout", "git_push",
+  "run_tests", "create_pr",
+  "send_message", "check_messages", "broadcast_update",
+  "create_plan", "create_milestone", "request_approval",
+] as const;
+import { AgentMessagingService } from "./services/agent-messaging.js";
+import type { RedisPubSub } from "@ai-cofounder/queue";
 
 /** Create and configure the LLM registry with all available providers */
 export function createLlmRegistry(): LlmRegistry {
@@ -90,6 +111,22 @@ export function buildServer(registry?: LlmRegistry) {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   });
 
+  // Security headers
+  app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+  });
+
   // OpenAPI spec generation
   app.register(fastifySwagger, {
     openapi: {
@@ -122,6 +159,11 @@ export function buildServer(registry?: LlmRegistry) {
         { name: "dashboard", description: "Dashboard summary" },
         { name: "queue", description: "Background task queue" },
         { name: "monitoring", description: "Proactive system monitoring" },
+        { name: "persona", description: "AI persona management" },
+        { name: "pipelines", description: "Multi-agent pipeline execution" },
+        { name: "rag", description: "RAG ingestion and search" },
+        { name: "reflections", description: "Self-improvement reflections" },
+        { name: "patterns", description: "User pattern management" },
       ],
     },
   });
@@ -168,9 +210,43 @@ export function buildServer(registry?: LlmRegistry) {
   const ttsService = createTTSService();
   app.decorate("ttsService", ttsService);
 
+  // Agent-to-agent messaging service (created after db is ready via onReady hook)
+  // Decorated as undefined initially, wired with db in onReady
+  app.decorate("messagingService", undefined as unknown as AgentMessagingService);
+
+  // Autonomy tier service (created after db is ready via onReady hook)
+  app.decorate("autonomyTierService", undefined as unknown as AutonomyTierService);
+
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
   app.addHook("onReady", async () => {
+    // Wire messaging service now that db is available
+    // redisPubSub is optional — wired via pubsubPlugin decorator if available
+    const redisPubSub = (app as unknown as Record<string, unknown>).redisPubSub as RedisPubSub | undefined;
+    app.messagingService = new AgentMessagingService(app.db, redisPubSub);
+    logger.info("agent messaging service initialized");
+
+    // Wire autonomy tier service and seed default tool tiers on first start
+    const tierService = new AutonomyTierService(app.db);
+    await tierService.load();
+    app.autonomyTierService = tierService;
+    logger.info("autonomy tier service initialized");
+
+    // Seed default tool tiers if table is empty (first server start)
+    try {
+      const existing = await listToolTierConfigs(app.db);
+      if (existing.length === 0) {
+        for (const toolName of DEFAULT_TOOLS) {
+          await upsertToolTierConfig(app.db, { toolName, tier: "green" });
+        }
+        logger.info({ count: DEFAULT_TOOLS.length }, "seeded default tool tier configs (green)");
+        // Reload in-memory cache to reflect seeded data
+        await tierService.reload();
+      }
+    } catch (err) {
+      logger.warn({ err }, "failed to seed default tool tier configs (non-fatal)");
+    }
+
     try {
       const records = await getProviderHealthRecords(app.db);
       if (records.length > 0) {
@@ -201,6 +277,7 @@ export function buildServer(registry?: LlmRegistry) {
       sandboxService,
       workspaceService,
       notificationService,
+      messagingService: app.messagingService,
       pollIntervalMs: 60_000,
       briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
       briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
@@ -254,6 +331,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(channelRoutes, { prefix: "/api/channels" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
+  app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
 
   // Register all protected API routes inside jwtGuardPlugin scope
   // The guard applies onRequest JWT verification to everything inside its scope
@@ -326,5 +404,7 @@ declare module "fastify" {
     notificationService: NotificationService;
     monitoringService: MonitoringService;
     ttsService: TTSService;
+    messagingService: AgentMessagingService;
+    autonomyTierService: AutonomyTierService;
   }
 }

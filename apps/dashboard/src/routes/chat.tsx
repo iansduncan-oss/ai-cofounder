@@ -6,8 +6,10 @@ import ReactMarkdown from "react-markdown";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useStreamChat } from "@/hooks/use-stream-chat";
 import { useDashboardUser, useConversationMessages } from "@/api/queries";
+import { useAcceptSuggestion } from "@/api/mutations";
 import { StreamingMessage } from "@/components/chat/streaming-message";
 import { PlanCard } from "@/components/chat/plan-card";
+import { SuggestionChips } from "@/components/chat/suggestion-chips";
 import { ConversationSidebar } from "@/components/chat/conversation-sidebar";
 import type { PlanInfo, ToolCallInfo } from "@/hooks/use-stream-chat";
 import {
@@ -25,6 +27,7 @@ interface Message {
   model?: string;
   provider?: string;
   plan?: PlanInfo;
+  suggestions?: string[];
   isStreaming?: boolean;
   toolCalls?: ToolCallInfo[];
   thinkingPhase?: string;
@@ -45,6 +48,7 @@ export function ChatPage() {
 
   const { data: dashboardUser } = useDashboardUser();
   const stream = useStreamChat();
+  const acceptSuggestion = useAcceptSuggestion();
 
   // Load conversation history from backend
   const { data: historyData } = useConversationMessages(conversationId);
@@ -96,6 +100,7 @@ export function ChatPage() {
             model: stream.model,
             provider: stream.provider,
             plan: stream.plan,
+            suggestions: stream.suggestions,
             toolCalls: stream.toolCalls.length > 0 ? stream.toolCalls : undefined,
           },
         ]);
@@ -134,14 +139,22 @@ export function ChatPage() {
     setShowScrollButton(false);
   };
 
-  const handleSend = () => {
-    const trimmed = input.trim();
+  const handleSend = (text?: string) => {
+    const trimmed = (text ?? input).trim();
     if (!trimmed || stream.isStreaming) return;
 
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
-    setInput("");
+    if (!text) setInput("");
 
     stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
+  };
+
+  const handleSuggestionSelect = (suggestion: string) => {
+    acceptSuggestion.mutate({
+      suggestion,
+      userId: dashboardUser?.id,
+    });
+    handleSend(suggestion);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -182,51 +195,80 @@ export function ChatPage() {
     stream.reset();
   };
 
+  // Find the index of the last assistant message for suggestion chip rendering
+  const lastAssistantIndex = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") return i;
+    }
+    return -1;
+  }, [messages]);
+
   // Memoize the rendering of static messages
   const renderedMessages = useMemo(
     () =>
-      messages.map((msg, i) => (
-        <div
-          key={i}
-          className={`flex gap-3 animate-slide-up ${
-            msg.role === "user" ? "justify-end" : ""
-          }`}
-        >
-          {msg.role === "assistant" && (
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
-              <Bot className="h-4 w-4 text-primary-foreground" />
-            </div>
-          )}
+      messages.flatMap((msg, i) => {
+        const elements = [
           <div
-            className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
-              msg.role === "user"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted"
+            key={i}
+            className={`flex gap-3 animate-slide-up ${
+              msg.role === "user" ? "justify-end" : ""
             }`}
           >
-            {msg.role === "assistant" ? (
-              <div className="prose prose-sm prose-invert max-w-none">
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+            {msg.role === "assistant" && (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary">
+                <Bot className="h-4 w-4 text-primary-foreground" />
               </div>
-            ) : (
-              <p className="whitespace-pre-wrap">{msg.content}</p>
             )}
-            {msg.plan && <PlanCard plan={msg.plan} />}
-            {msg.model && (
-              <p className="mt-1 text-xs opacity-60">
-                {msg.model}
-                {msg.provider && ` via ${msg.provider}`}
-              </p>
-            )}
-          </div>
-          {msg.role === "user" && (
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
-              <User className="h-4 w-4" />
+            <div
+              className={`max-w-[75%] rounded-lg px-4 py-2 text-sm ${
+                msg.role === "user"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted"
+              }`}
+            >
+              {msg.role === "assistant" ? (
+                <div className="prose prose-sm prose-invert max-w-none">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
+              {msg.plan && <PlanCard plan={msg.plan} />}
+              {msg.model && (
+                <p className="mt-1 text-xs opacity-60">
+                  {msg.model}
+                  {msg.provider && ` via ${msg.provider}`}
+                </p>
+              )}
             </div>
-          )}
-        </div>
-      )),
-    [messages],
+            {msg.role === "user" && (
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary">
+                <User className="h-4 w-4" />
+              </div>
+            )}
+          </div>,
+        ];
+
+        // Show suggestion chips only on the last assistant message
+        if (
+          i === lastAssistantIndex &&
+          msg.suggestions &&
+          msg.suggestions.length > 0 &&
+          !stream.isStreaming
+        ) {
+          elements.push(
+            <SuggestionChips
+              key={`suggestions-${i}`}
+              suggestions={msg.suggestions}
+              onSelect={handleSuggestionSelect}
+            />,
+          );
+        }
+
+        return elements;
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages, lastAssistantIndex, stream.isStreaming],
   );
 
   return (
@@ -327,7 +369,7 @@ export function ChatPage() {
             disabled={stream.isStreaming}
           />
           <Button
-            onClick={handleSend}
+            onClick={() => handleSend()}
             disabled={!input.trim() || stream.isStreaming}
             className="self-end"
             aria-label="Send message"

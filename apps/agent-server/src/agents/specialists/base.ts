@@ -20,6 +20,8 @@ export interface SpecialistContext {
   goalTitle: string;
   previousOutputs?: string[];
   userId?: string;
+  goalId?: string;
+  messagingService?: unknown; // AgentMessagingService — kept as unknown to avoid circular dep
 }
 
 export interface SpecialistResult {

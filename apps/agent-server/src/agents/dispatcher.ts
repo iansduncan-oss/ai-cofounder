@@ -11,7 +11,7 @@ import {
   completeTask,
   failTask,
   updateGoalStatus,
-  listPendingApprovals,
+  listPendingApprovalsForTasks,
   recordLlmUsage,
   saveMemory,
 } from "@ai-cofounder/db";
@@ -115,15 +115,18 @@ export class TaskDispatcher {
     const groups = this.groupTasks(tasks);
     let stopped = false;
 
+    // Batch-fetch all pending approvals for this goal's tasks (single query instead of N)
+    const allTaskIds = tasks.map((t) => t.id);
+    const pendingApprovals = await listPendingApprovalsForTasks(this.db, allTaskIds);
+
     for (const group of groups) {
       if (stopped) break;
 
       // Check for pending approvals on any task in this group
-      const pendingApprovals = await listPendingApprovals(this.db);
       let groupBlocked = false;
       for (const task of group) {
         const taskApproval = pendingApprovals.find(
-          (a) => a.taskId === task.id && a.status === "pending",
+          (a) => a.taskId === task.id,
         );
         if (taskApproval) {
           this.logger.info({ taskId: task.id }, "task awaiting approval, skipping");

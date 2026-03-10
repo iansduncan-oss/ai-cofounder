@@ -1,7 +1,13 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { Db } from "@ai-cofounder/db";
-import { insertReflection, listReflections } from "@ai-cofounder/db";
+import {
+  insertReflection,
+  listReflections,
+  getUserActionsSince,
+  upsertUserPattern,
+  deleteOldUserActions,
+} from "@ai-cofounder/db";
 
 const logger = createLogger("reflection-service");
 
@@ -254,6 +260,170 @@ LESSONS:
     );
 
     return reflection;
+  }
+
+  /**
+   * Analyze user actions over the past 30 days to identify behavioral patterns.
+   * Patterns are upserted into userPatterns for anticipatory suggestions.
+   */
+  async analyzeUserPatterns() {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    // Fetch actions for all users (userId can be null for anonymous)
+    // We use a generic query — getUserActionsSince requires a userId,
+    // so we'll call it per-user. For now, analyze global patterns.
+    let actions: Array<{
+      actionType: string;
+      actionDetail: string | null;
+      dayOfWeek: number;
+      hourOfDay: number;
+      userId: string | null;
+      createdAt: Date;
+    }>;
+
+    try {
+      // Get all recent actions via a direct query approach
+      const { userActions } = await import("@ai-cofounder/db");
+      const { sql: sqlTag } = await import("drizzle-orm");
+      actions = await this.db
+        .select()
+        .from(userActions)
+        .where(sqlTag`${userActions.createdAt} >= ${thirtyDaysAgo}`)
+        .orderBy(sqlTag`${userActions.createdAt} ASC`);
+    } catch (err) {
+      logger.warn({ err }, "failed to fetch user actions for pattern analysis");
+      return [];
+    }
+
+    if (actions.length < 5) {
+      logger.info(
+        { count: actions.length },
+        "not enough user actions for pattern analysis (need ≥5)",
+      );
+      return [];
+    }
+
+    // Build a summary of actions by day/hour
+    const dayCounts: Record<number, number> = {};
+    const hourCounts: Record<number, number> = {};
+    const actionTypeCounts: Record<string, number> = {};
+    const dayHourActions: Record<string, string[]> = {};
+
+    for (const a of actions) {
+      dayCounts[a.dayOfWeek] = (dayCounts[a.dayOfWeek] ?? 0) + 1;
+      hourCounts[a.hourOfDay] = (hourCounts[a.hourOfDay] ?? 0) + 1;
+      actionTypeCounts[a.actionType] = (actionTypeCounts[a.actionType] ?? 0) + 1;
+      const key = `${a.dayOfWeek}-${a.hourOfDay}`;
+      (dayHourActions[key] ??= []).push(a.actionType + (a.actionDetail ? `: ${a.actionDetail}` : ""));
+    }
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+    const summary = `Action counts by day: ${Object.entries(dayCounts)
+      .map(([d, c]) => `${dayNames[Number(d)]}: ${c}`)
+      .join(", ")}
+Action counts by hour: ${Object.entries(hourCounts)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([h, c]) => `${h}:00: ${c}`)
+      .join(", ")}
+Action type counts: ${Object.entries(actionTypeCounts)
+      .map(([t, c]) => `${t}: ${c}`)
+      .join(", ")}
+Total actions analyzed: ${actions.length}`;
+
+    const prompt = `You are analyzing user behavioral patterns over the past 30 days to enable anticipatory suggestions.
+
+${summary}
+
+Identify recurring patterns such as:
+1. Time-based preferences (e.g., "usually active on weekday mornings", "deploys on Fridays")
+2. Action sequences (e.g., "after creating a goal, usually sends a chat message within an hour")
+3. Recurring activities (e.g., "frequently uses deploy on Wednesdays around 3 PM")
+
+For each pattern, provide:
+- A human-readable description
+- The trigger condition (dayOfWeek 0-6, hourRange [start, end])
+- A suggested anticipatory action
+
+Format as JSON array:
+[
+  {
+    "patternType": "time_preference" | "sequence" | "recurring_action",
+    "description": "human-readable description",
+    "triggerCondition": { "dayOfWeek": 5, "hourRange": [14, 16] },
+    "suggestedAction": "Run the test suite before deploying",
+    "confidence": 75
+  }
+]
+
+Return ONLY the JSON array, no other text. Return an empty array [] if no clear patterns are found.`;
+
+    try {
+      const response = await this.llmRegistry.complete("simple", {
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const responseText = response.content
+        .filter((b): b is { type: "text"; text: string } => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+
+      const match = responseText.match(/\[[\s\S]*\]/);
+      if (!match) {
+        logger.info("no patterns found in LLM response");
+        return [];
+      }
+
+      const patterns = JSON.parse(match[0]) as Array<{
+        patternType: string;
+        description: string;
+        triggerCondition: Record<string, unknown>;
+        suggestedAction: string;
+        confidence: number;
+      }>;
+
+      if (!Array.isArray(patterns)) return [];
+
+      // Upsert each pattern
+      const results = [];
+      for (const p of patterns) {
+        try {
+          const result = await upsertUserPattern(this.db, {
+            patternType: p.patternType,
+            description: p.description,
+            triggerCondition: p.triggerCondition,
+            suggestedAction: p.suggestedAction,
+            confidence: Math.min(100, Math.max(0, p.confidence)),
+          });
+          results.push(result);
+        } catch (err) {
+          logger.warn({ err, pattern: p.description }, "failed to upsert pattern");
+        }
+      }
+
+      // Clean up old actions (> 90 days)
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+      try {
+        const deleted = await deleteOldUserActions(this.db, ninetyDaysAgo);
+        if (deleted > 0) {
+          logger.info({ deleted }, "cleaned up old user actions");
+        }
+      } catch {
+        // cleanup failure is non-fatal
+      }
+
+      logger.info(
+        { patternsFound: results.length, actionsAnalyzed: actions.length },
+        "user pattern analysis complete",
+      );
+
+      return results;
+    } catch (err) {
+      logger.warn({ err }, "user pattern analysis LLM call failed");
+      return [];
+    }
   }
 
   private buildReflectionPrompt(

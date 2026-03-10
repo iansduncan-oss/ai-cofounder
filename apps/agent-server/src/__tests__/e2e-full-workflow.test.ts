@@ -48,6 +48,7 @@ vi.mock("@ai-cofounder/db", () => ({
   createApproval: vi.fn(),
   getApproval: vi.fn(),
   listPendingApprovals: vi.fn().mockResolvedValue([]),
+  listPendingApprovalsForTasks: vi.fn().mockResolvedValue([]),
   listApprovalsByTask: vi.fn().mockResolvedValue([]),
   resolveApproval: vi.fn(),
   saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
