@@ -2,15 +2,10 @@ import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
 import { Orchestrator } from "../agents/orchestrator.js";
-import { summarizeMessages } from "../agents/summarizer.js";
 import type { StreamCallback } from "../agents/stream-events.js";
 import {
   findOrCreateUser,
   createConversation,
-  getConversationMessages,
-  getConversationMessageCount,
-  getLatestConversationSummary,
-  saveConversationSummary,
   createMessage,
   recordLlmUsage,
   getTodayTokenTotal,
@@ -19,6 +14,7 @@ import {
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
 import { ConversationIngestionService } from "../services/conversation-ingestion.js";
+import { ContextWindowManager } from "../services/context-window.js";
 import { generateSuggestions } from "../services/suggestions.js";
 import { recordActionSafe } from "../services/action-recorder.js";
 
@@ -62,6 +58,8 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     app.embeddingService,
   );
 
+  const contextWindow = new ContextWindowManager(app.db, app.llmRegistry);
+
   const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
 
   app.post<{ Body: RunBody }>("/run", { schema: { tags: ["agents"], body: RunBody } }, async (request, reply) => {
@@ -93,68 +91,20 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    // Load history from DB if not provided by caller
+    // Load history from DB (with automatic summarization for long conversations)
     let resolvedHistory = history;
-    if (!resolvedHistory && convId) {
-      const dbMessages = await getConversationMessages(app.db, convId, 50);
-      resolvedHistory = dbMessages.reverse().map((m) => ({
-        id: m.id,
-        conversationId: m.conversationId,
-        role: m.role as "user" | "agent" | "system",
-        agentRole: m.agentRole ?? undefined,
-        content: m.content,
-        metadata: m.metadata as Record<string, unknown> | undefined,
-        createdAt: m.createdAt,
-      }));
-    }
-
-    // Lazy conversation summarization for long conversations
-    if (convId && resolvedHistory) {
+    if (convId) {
       try {
-        const totalMessages = await getConversationMessageCount(app.db, convId);
-        if (totalMessages > 30) {
-          const existingSummary = await getLatestConversationSummary(app.db, convId);
-          const isStale = !existingSummary || existingSummary.messageCount < totalMessages - 10;
-
-          if (isStale) {
-            // Fetch older messages beyond the 50-message window
-            const olderMessages = await getConversationMessages(app.db, convId, 50, 50);
-            if (olderMessages.length > 0) {
-              const olderFormatted = olderMessages.reverse().map((m) => ({
-                role: m.role as "user" | "agent" | "system",
-                content: m.content,
-              }));
-              const summaryText = await summarizeMessages(app.llmRegistry, olderFormatted as AgentMessage[]);
-              await saveConversationSummary(app.db, {
-                conversationId: convId,
-                summary: summaryText,
-                messageCount: totalMessages,
-                fromMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
-                toMessageCreatedAt: olderMessages[0]?.createdAt,
-              });
-
-              // Prepend summary as a synthetic system message at start of history
-              resolvedHistory = [
-                {
-                  role: "system" as const,
-                  content: `[Previous conversation summary]\n${summaryText}`,
-                },
-                ...resolvedHistory,
-              ];
-            }
-          } else {
-            // Use existing summary
-            resolvedHistory = [
-              {
-                role: "system" as const,
-                content: `[Previous conversation summary]\n${existingSummary.summary}`,
-              },
-              ...resolvedHistory,
-            ];
-          }
+        const prepared = await contextWindow.prepareHistory(
+          convId,
+          resolvedHistory as AgentMessage[] | undefined,
+        );
+        resolvedHistory = prepared.messages;
+        if (prepared.wasSummarized) {
+          logger.info({ convId, totalMessages: prepared.totalDbMessages, estimatedTokens: prepared.estimatedTokens }, "context window managed");
         }
       } catch (err) {
-        logger.warn({ err, convId }, "conversation summarization failed (non-fatal)");
+        logger.warn({ err, convId }, "context window management failed (non-fatal)");
       }
     }
 
@@ -278,56 +228,15 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     let resolvedHistory = history;
-    if (!resolvedHistory && convId) {
-      const dbMessages = await getConversationMessages(app.db, convId, 50);
-      resolvedHistory = dbMessages.reverse().map((m) => ({
-        id: m.id,
-        conversationId: m.conversationId,
-        role: m.role as "user" | "agent" | "system",
-        agentRole: m.agentRole ?? undefined,
-        content: m.content,
-        metadata: m.metadata as Record<string, unknown> | undefined,
-        createdAt: m.createdAt,
-      }));
-    }
-
-    if (convId && resolvedHistory) {
+    if (convId) {
       try {
-        const totalMessages = await getConversationMessageCount(app.db, convId);
-        if (totalMessages > 30) {
-          const existingSummary = await getLatestConversationSummary(app.db, convId);
-          const isStale = !existingSummary || existingSummary.messageCount < totalMessages - 10;
-
-          if (isStale) {
-            const olderMessages = await getConversationMessages(app.db, convId, 50, 50);
-            if (olderMessages.length > 0) {
-              const olderFormatted = olderMessages.reverse().map((m) => ({
-                role: m.role as "user" | "agent" | "system",
-                content: m.content,
-              }));
-              const summaryText = await summarizeMessages(app.llmRegistry, olderFormatted as AgentMessage[]);
-              await saveConversationSummary(app.db, {
-                conversationId: convId,
-                summary: summaryText,
-                messageCount: totalMessages,
-                fromMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
-                toMessageCreatedAt: olderMessages[0]?.createdAt,
-              });
-
-              resolvedHistory = [
-                { role: "system" as const, content: `[Previous conversation summary]\n${summaryText}` },
-                ...resolvedHistory,
-              ];
-            }
-          } else {
-            resolvedHistory = [
-              { role: "system" as const, content: `[Previous conversation summary]\n${existingSummary.summary}` },
-              ...resolvedHistory,
-            ];
-          }
-        }
+        const prepared = await contextWindow.prepareHistory(
+          convId,
+          resolvedHistory as AgentMessage[] | undefined,
+        );
+        resolvedHistory = prepared.messages;
       } catch (err) {
-        logger.warn({ err, convId }, "conversation summarization failed (non-fatal)");
+        logger.warn({ err, convId }, "context window management failed (non-fatal)");
       }
     }
 
