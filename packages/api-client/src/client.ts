@@ -44,6 +44,8 @@ import type {
   AgentRoleInfo,
   AgentCapability,
   UserPattern,
+  ToolTierConfig,
+  AutonomyTier,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -688,6 +690,16 @@ export class ApiClient {
       "/api/agents/accept-suggestion",
       data,
     );
+  }
+
+  /* ── Autonomy Tiers ── */
+
+  listToolTierConfig() {
+    return this.request<ToolTierConfig[]>("GET", "/api/autonomy/tiers");
+  }
+
+  updateToolTier(toolName: string, data: { tier: AutonomyTier; timeoutMs?: number }) {
+    return this.request<ToolTierConfig>("PUT", `/api/autonomy/tiers/${encodeURIComponent(toolName)}`, data);
   }
 
   /* ── Streaming ── */

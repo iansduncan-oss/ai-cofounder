@@ -42,6 +42,17 @@ export const queuePlugin = fp(async (app) => {
         case "vps_containers":
           await app.monitoringService.checkVPSHealth();
           break;
+        case "approval_timeout_sweep": {
+          const { listExpiredPendingApprovals, resolveApproval } = await import("@ai-cofounder/db");
+          const expired = await listExpiredPendingApprovals(app.db);
+          for (const approval of expired) {
+            await resolveApproval(app.db, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
+          }
+          if (expired.length > 0) {
+            logger.info({ count: expired.length }, "Auto-denied expired pending approvals");
+          }
+          break;
+        }
         default:
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();

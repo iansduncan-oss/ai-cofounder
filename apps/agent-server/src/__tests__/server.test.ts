@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 // Set env before any imports that read it
 beforeAll(() => {
@@ -7,67 +8,12 @@ beforeAll(() => {
 });
 
 // Mock the DB package so tests don't need a real Postgres connection
-vi.mock("@ai-cofounder/db", () => {
-  const mocks: Record<string, unknown> = {
-    createDb: vi.fn().mockReturnValue({
-      execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-    }),
-    findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1", externalId: "ext-1" }),
-    createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
-    getConversationMessages: vi.fn().mockResolvedValue([]),
-    createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
-    createGoal: vi.fn().mockResolvedValue({ id: "goal-1", title: "Test Goal" }),
-    createTask: vi.fn().mockResolvedValue({
-      id: "task-1",
-      title: "Test Task",
-      assignedAgent: "researcher",
-      orderIndex: 0,
-    }),
-    updateGoalStatus: vi.fn().mockResolvedValue({}),
-    saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
-    recallMemories: vi.fn().mockResolvedValue([]),
-    searchMemoriesByVector: vi.fn().mockResolvedValue([]),
-    getGoal: vi.fn(),
-    listGoalsByConversation: vi.fn().mockResolvedValue([]),
-    getTask: vi.fn(),
-    listTasksByGoal: vi.fn().mockResolvedValue([]),
-    listPendingTasks: vi.fn().mockResolvedValue([]),
-    assignTask: vi.fn(),
-    startTask: vi.fn(),
-    completeTask: vi.fn(),
-    failTask: vi.fn(),
-    createApproval: vi.fn(),
-    getApproval: vi.fn(),
-    listPendingApprovals: vi.fn().mockResolvedValue([]),
-    listApprovalsByTask: vi.fn().mockResolvedValue([]),
-    resolveApproval: vi.fn(),
-    listMemoriesByUser: vi.fn().mockResolvedValue([]),
-    deleteMemory: vi.fn(),
-    getChannelConversation: vi.fn(),
-    upsertChannelConversation: vi.fn(),
-    getConversation: vi.fn(),
-    findUserByPlatform: vi.fn().mockResolvedValue(null),
-    getActivePrompt: vi.fn().mockResolvedValue(null),
-    getActivePersona: vi.fn().mockResolvedValue(null),
-    getPromptVersion: vi.fn().mockResolvedValue(null),
-    listPromptVersions: vi.fn().mockResolvedValue([]),
-    createPromptVersion: vi.fn().mockResolvedValue({ id: "p-1", name: "test", version: 1 }),
-    goals: {},
-    channelConversations: {},
-    prompts: {},
-  };
-  return new Proxy(mocks, {
-    get(target, prop, receiver) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  });
-});
+vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
+}));
 
 // Mock the LLM package with a fake registry
 vi.mock("@ai-cofounder/llm", () => {
@@ -86,6 +32,7 @@ vi.mock("@ai-cofounder/llm", () => {
     getProvider = vi.fn();
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
+    getProviderHealth = vi.fn().mockReturnValue([]);
   }
 
   return {

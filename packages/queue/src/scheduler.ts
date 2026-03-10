@@ -153,4 +153,18 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled RAG conversation sweep every 6 hours");
+
+  // ── Approval timeout sweep (every 60 seconds) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "approval-timeout-sweep",
+    {
+      every: 60_000,
+    },
+    {
+      name: "approval-timeout-sweep",
+      data: { check: "approval_timeout_sweep" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled approval timeout sweep every 60s");
 }

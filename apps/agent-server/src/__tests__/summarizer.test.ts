@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -27,39 +28,15 @@ const mockGetConversationMessages = vi.fn();
 const mockRecallMemories = vi.fn();
 const mockSearchMemoriesByVector = vi.fn();
 
-vi.mock("@ai-cofounder/db", () => new Proxy({
+vi.mock("@ai-cofounder/db", () => ({
+  ...mockDbModule(),
   getConversationMessageCount: (...args: unknown[]) => mockGetConversationMessageCount(...args),
   getLatestConversationSummary: (...args: unknown[]) => mockGetLatestConversationSummary(...args),
   saveConversationSummary: (...args: unknown[]) => mockSaveConversationSummary(...args),
   getConversationMessages: (...args: unknown[]) => mockGetConversationMessages(...args),
   recallMemories: (...args: unknown[]) => mockRecallMemories(...args),
   searchMemoriesByVector: (...args: unknown[]) => mockSearchMemoriesByVector(...args),
-  touchMemory: vi.fn(),
-  createGoal: vi.fn(),
-  createTask: vi.fn(),
-  updateGoalStatus: vi.fn(),
-  saveMemory: vi.fn(),
-  createApproval: vi.fn(),
-  getN8nWorkflowByName: vi.fn(),
-  listN8nWorkflows: vi.fn(),
-  saveCodeExecution: vi.fn(),
-  createSchedule: vi.fn(),
-  listSchedules: vi.fn(),
-  deleteSchedule: vi.fn(),
-  createMilestone: vi.fn(),
-  getActivePrompt: vi.fn().mockResolvedValue(null),
-  getActivePersona: vi.fn().mockResolvedValue(null),
-}, {
-    get(target: Record<string, unknown>, prop: string | symbol, receiver: unknown) {
-      if (typeof prop === "string" && !(prop in target)) {
-        const fn = vi.fn().mockResolvedValue(null);
-        target[prop] = fn;
-        return fn;
-      }
-      return Reflect.get(target, prop, receiver);
-    },
-    has() { return true; },
-  }));
+}));
 
 vi.mock("../services/notifications.js", () => ({
   notifyApprovalCreated: vi.fn().mockResolvedValue(undefined),

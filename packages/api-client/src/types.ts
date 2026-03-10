@@ -520,6 +520,16 @@ export interface UserPattern {
   updatedAt: string;
 }
 
+export type AutonomyTier = "green" | "yellow" | "red";
+
+export interface ToolTierConfig {
+  toolName: string;
+  tier: AutonomyTier;
+  timeoutMs: number;
+  updatedBy: string | null;
+  updatedAt: string;
+}
+
 export interface AgentMessageItem {
   id: string;
   senderRole: string;
