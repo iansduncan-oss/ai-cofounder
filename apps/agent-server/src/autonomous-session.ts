@@ -2,6 +2,7 @@ import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import {
   listActiveGoals,
+  listGoalBacklog,
   listRecentWorkSessions,
   countTasksByStatus,
   createWorkSession,
@@ -180,6 +181,82 @@ export async function runAutonomousSession(
   let summary = "";
 
   try {
+    // Attempt deterministic goal pickup from backlog
+    const backlog = await listGoalBacklog(db, 1);
+    if (backlog.length > 0) {
+      const topGoal = backlog[0];
+      logger.info({ goalId: topGoal.id, goalTitle: topGoal.title }, "picked goal from backlog");
+
+      // Use dynamic import to avoid circular dependency issues
+      const { AutonomousExecutorService } = await import("./services/autonomous-executor.js");
+      const { TaskDispatcher } = await import("./agents/dispatcher.js");
+
+      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService);
+      const executor = new AutonomousExecutorService(dispatcher, workspaceService, db, registry);
+
+      try {
+        const { progress, actions } = await executor.executeGoal({
+          goalId: topGoal.id,
+          userId: "system-autonomous",
+          workSessionId: session.id,
+          repoDir: workspaceService ? optionalEnv("WORKSPACE_DIR", "/tmp/ai-cofounder-workspace") : undefined,
+          createPr: true,
+          onProgress: async (_event) => {
+            // Progress events are published through the BullMQ worker path
+            // when triggered via enqueueAgentTask; no-op here for direct execution
+          },
+        });
+
+        totalTokens = progress.tasks.reduce((sum, t) => sum + (t.tokensUsed ?? 0), 0);
+        status = progress.status === "completed" ? "completed" : "failed";
+        summary = `Executed goal "${topGoal.title}" — ${progress.completedTasks}/${progress.totalTasks} tasks completed`;
+
+        await completeWorkSession(db, session.id, {
+          tokensUsed: totalTokens,
+          durationMs: Date.now() - startTime,
+          actionsTaken: { actions, goalId: topGoal.id, goalTitle: topGoal.title },
+          status,
+          summary,
+        });
+
+        logger.info(
+          { sessionId: session.id, status, goalId: topGoal.id, tokensUsed: totalTokens },
+          "backlog-driven autonomous session completed",
+        );
+
+        if (webhookUrl) {
+          const color = status === "completed" ? 3066993 : 15158332; // green or red
+          await sendWebhook(webhookUrl, {
+            embeds: [
+              {
+                title: `Session ${status}`,
+                description: summary.slice(0, 1500),
+                color,
+                fields: [
+                  { name: "Duration", value: `${Math.round((Date.now() - startTime) / 1000)}s`, inline: true },
+                  { name: "Tokens", value: String(totalTokens), inline: true },
+                  { name: "Trigger", value: trigger, inline: true },
+                ],
+                footer: { text: `Session ${session.id}` },
+              },
+            ],
+          });
+        }
+
+        return {
+          sessionId: session.id,
+          status,
+          summary,
+          tokensUsed: totalTokens,
+          durationMs: Date.now() - startTime,
+        };
+      } catch (err) {
+        // Fall through to freeform orchestrator as fallback
+        logger.warn({ err, goalId: topGoal.id }, "backlog executor failed, falling back to freeform orchestrator");
+      }
+    }
+
+    // Freeform orchestrator fallback — used when no backlog goals exist or backlog path fails
     const contextPrompt = await buildContextPrompt(db, options?.prompt);
 
     // Check time budget
