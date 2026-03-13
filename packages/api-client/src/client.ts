@@ -44,10 +44,13 @@ import type {
   AgentRoleInfo,
   AgentCapability,
   UserPattern,
+  PatternAnalytics,
   ToolTierConfig,
   AutonomyTier,
+  DeadLetterEntry,
   GoalBacklogItem,
   AutonomousRunResponse,
+  Deployment,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -219,6 +222,10 @@ export class ApiClient {
 
   updateGoalStatus(id: string, status: GoalStatus) {
     return this.request<Goal>("PATCH", `/api/goals/${id}/status`, { status });
+  }
+
+  bulkUpdateGoalStatus(updates: Array<{ id: string; status: GoalStatus }>) {
+    return this.request<{ updated: number }>("PATCH", "/api/goals/bulk-status", { updates });
   }
 
   cloneGoal(id: string) {
@@ -485,6 +492,30 @@ export class ApiClient {
     return this.request<{ queues: QueueStatus[] }>("GET", "/api/queue/status");
   }
 
+  /* ── Dead Letter Queue ── */
+
+  listDlqJobs(opts?: { limit?: number; offset?: number }) {
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.request<{ jobs: DeadLetterEntry[]; count: number }>(
+      "GET",
+      `/api/queue/dlq${qs ? `?${qs}` : ""}`,
+    );
+  }
+
+  retryDlqJob(dlqJobId: string) {
+    return this.request<{ requeued: boolean; originalQueue: string }>(
+      "POST",
+      `/api/queue/dlq/${encodeURIComponent(dlqJobId)}/retry`,
+    );
+  }
+
+  deleteDlqJob(dlqJobId: string) {
+    return this.request<void>("DELETE", `/api/queue/dlq/${encodeURIComponent(dlqJobId)}`);
+  }
+
   /* ── Tool Stats ── */
 
   getToolStats() {
@@ -686,6 +717,11 @@ export class ApiClient {
     return this.request<{ deleted: boolean }>("DELETE", `/api/patterns/${id}`);
   }
 
+  getPatternAnalytics(userId?: string) {
+    const params = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return this.request<PatternAnalytics>("GET", `/api/patterns/analytics${params}`);
+  }
+
   acceptSuggestion(data: { suggestion: string; userId?: string; patternId?: string }) {
     return this.request<{ ok: boolean }>(
       "POST",
@@ -728,6 +764,19 @@ export class ApiClient {
       `/api/autonomous/${encodeURIComponent(goalId)}/run`,
       opts ?? {},
     );
+  }
+
+  /* ── Deployments ── */
+
+  listDeployments(limit = 20) {
+    return this.request<{ data: Deployment[]; total: number }>(
+      "GET",
+      `/api/deploys?limit=${limit}`,
+    );
+  }
+
+  getLatestDeployment() {
+    return this.request<{ data: Deployment | null }>("GET", "/api/deploys/latest");
   }
 
   /* ── Streaming ── */

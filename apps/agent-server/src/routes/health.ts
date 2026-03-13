@@ -37,6 +37,62 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
     };
   });
 
+  /** GET /health/full — aggregated health check across all subsystems */
+  app.get("/health/full", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    // Core: Database
+    let dbStatus = "ok";
+    try {
+      await app.db.execute(sql`SELECT 1`);
+    } catch {
+      dbStatus = "unreachable";
+    }
+
+    // Core: Redis
+    let redisStatus = "disabled";
+    const redisUrl = optionalEnv("REDIS_URL", "");
+    if (redisUrl) {
+      redisStatus = await pingRedis();
+    }
+
+    // LLM Providers
+    const providers = app.llmRegistry.getProviderHealth();
+    const llmTotal = providers.length;
+    const llmAvailable = providers.filter((p) => p.available).length;
+    const llmStatus = llmTotal === 0 ? "none" : llmAvailable === llmTotal ? "ok" : "degraded";
+
+    // External services — config detection only (no active probing)
+    const github = !!(optionalEnv("GITHUB_TOKEN", "") && optionalEnv("GITHUB_MONITORED_REPOS", ""));
+    const vps = !!(optionalEnv("VPS_HOST", "") && optionalEnv("VPS_USER", ""));
+    const tts = !!app.ttsService?.isConfigured();
+
+    // Overall: ok if DB+Redis healthy, degraded otherwise
+    const coreHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
+
+    if (!coreHealthy) {
+      reply.code(503);
+    }
+
+    return {
+      status: coreHealthy ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      core: {
+        database: dbStatus,
+        redis: redisStatus,
+      },
+      llm: {
+        status: llmStatus,
+        available: llmAvailable,
+        total: llmTotal,
+      },
+      external: {
+        github: github ? "configured" : "not_configured",
+        vps: vps ? "configured" : "not_configured",
+        tts: tts ? "configured" : "not_configured",
+      },
+    };
+  });
+
   /** GET /health/providers — LLM provider health status */
   app.get("/health/providers", { schema: { tags: ["health"] } }, async () => {
     const providers = app.llmRegistry.getProviderHealth();

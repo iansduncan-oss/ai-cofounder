@@ -80,7 +80,7 @@ export const DELETE_DIRECTORY_TOOL: LlmTool = {
 export const LIST_DIRECTORY_TOOL: LlmTool = {
   name: "list_directory",
   description:
-    "List files and subdirectories in a workspace directory. Returns names and types (file/directory). " +
+    "List files and subdirectories in a workspace directory. Returns names, types (file/directory), and file sizes in bytes. " +
     "The path is relative to the workspace root directory. Use '.' or omit for the workspace root.",
   input_schema: {
     type: "object",
