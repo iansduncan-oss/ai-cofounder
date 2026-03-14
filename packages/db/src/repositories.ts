@@ -32,6 +32,8 @@ import {
   userPatterns,
   deployments,
   toolTierConfig,
+  deployCircuitBreaker,
+  sessionEngagement,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -2486,6 +2488,134 @@ export async function deletePattern(db: Db, id: string) {
   return result.length > 0;
 }
 
+export async function createPattern(
+  db: Db,
+  data: {
+    userId?: string;
+    patternType: string;
+    description: string;
+    suggestedAction: string;
+    triggerCondition?: unknown;
+    confidence?: number;
+  },
+) {
+  const [created] = await db
+    .insert(userPatterns)
+    .values({
+      userId: data.userId,
+      patternType: data.patternType,
+      description: data.description,
+      suggestedAction: data.suggestedAction,
+      triggerCondition: data.triggerCondition ?? {},
+      confidence: data.confidence ?? 50,
+    })
+    .returning();
+  return created;
+}
+
+export async function updatePattern(
+  db: Db,
+  id: string,
+  data: {
+    description?: string;
+    suggestedAction?: string;
+    triggerCondition?: unknown;
+    confidence?: number;
+    isActive?: boolean;
+  },
+) {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.description !== undefined) set.description = data.description;
+  if (data.suggestedAction !== undefined) set.suggestedAction = data.suggestedAction;
+  if (data.triggerCondition !== undefined) set.triggerCondition = data.triggerCondition;
+  if (data.confidence !== undefined) set.confidence = data.confidence;
+  if (data.isActive !== undefined) set.isActive = data.isActive;
+
+  const [updated] = await db
+    .update(userPatterns)
+    .set(set)
+    .where(eq(userPatterns.id, id))
+    .returning();
+  return updated;
+}
+
+export async function adjustPatternConfidence(db: Db, patternId: string, delta: number) {
+  const [updated] = await db
+    .update(userPatterns)
+    .set({
+      confidence: sql`GREATEST(0, LEAST(100, ${userPatterns.confidence} + ${delta}))`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userPatterns.id, patternId))
+    .returning();
+  return updated;
+}
+
+export async function deactivateLowConfidencePatterns(db: Db, threshold = 10, minHits = 5) {
+  const result = await db
+    .update(userPatterns)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userPatterns.isActive, true),
+        sql`${userPatterns.confidence} <= ${threshold}`,
+        sql`${userPatterns.hitCount} >= ${minHits}`,
+      ),
+    )
+    .returning({ id: userPatterns.id });
+  return result.length;
+}
+
+export async function incrementPatternHitCount(db: Db, patternId: string) {
+  const [updated] = await db
+    .update(userPatterns)
+    .set({
+      hitCount: sql`${userPatterns.hitCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userPatterns.id, patternId))
+    .returning();
+  return updated;
+}
+
+export async function getPatternAnalytics(db: Db, userId?: string) {
+  const conditions = [];
+  if (userId) conditions.push(eq(userPatterns.userId, userId));
+
+  const patterns = await db
+    .select()
+    .from(userPatterns)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(userPatterns.updatedAt));
+
+  const totalPatterns = patterns.length;
+  const activePatterns = patterns.filter((p) => p.isActive).length;
+  const totalHits = patterns.reduce((s, p) => s + p.hitCount, 0);
+  const totalAccepts = patterns.reduce((s, p) => s + p.acceptCount, 0);
+  const overallAcceptRate = totalHits > 0 ? (totalAccepts / totalHits) * 100 : 0;
+  const avgConfidence =
+    totalPatterns > 0
+      ? patterns.reduce((s, p) => s + p.confidence, 0) / totalPatterns
+      : 0;
+
+  // Group by type
+  const byType: Record<string, number> = {};
+  for (const p of patterns) {
+    byType[p.patternType] = (byType[p.patternType] ?? 0) + 1;
+  }
+
+  return {
+    totalPatterns,
+    activePatterns,
+    totalHits,
+    totalAccepts,
+    overallAcceptRate: Math.round(overallAcceptRate * 10) / 10,
+    avgConfidence: Math.round(avgConfidence * 10) / 10,
+    byType,
+    patterns,
+  };
+}
+
 /* ────────────────── Deployments ─────────────── */
 
 export async function createDeployment(
@@ -2630,4 +2760,158 @@ export async function listExpiredPendingApprovals(db: Db) {
       ),
     )
     .orderBy(asc(approvals.createdAt));
+}
+
+/* ────────────────── Deploy Circuit Breaker ─────────────── */
+
+export async function getDeployCircuitBreaker(db: Db) {
+  const rows = await db.select().from(deployCircuitBreaker).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertDeployCircuitBreaker(
+  db: Db,
+  data: {
+    isPaused: boolean;
+    pausedAt: Date | null;
+    pausedReason: string | null;
+    failureCount: number;
+    failureWindowStart: Date | null;
+  },
+) {
+  const existing = await getDeployCircuitBreaker(db);
+  if (existing) {
+    const [row] = await db
+      .update(deployCircuitBreaker)
+      .set({
+        isPaused: data.isPaused,
+        pausedAt: data.pausedAt,
+        pausedReason: data.pausedReason,
+        failureCount: data.failureCount,
+        failureWindowStart: data.failureWindowStart,
+        updatedAt: new Date(),
+      })
+      .where(eq(deployCircuitBreaker.id, existing.id))
+      .returning();
+    return row;
+  }
+  const [row] = await db
+    .insert(deployCircuitBreaker)
+    .values({
+      isPaused: data.isPaused,
+      pausedAt: data.pausedAt,
+      pausedReason: data.pausedReason,
+      failureCount: data.failureCount,
+      failureWindowStart: data.failureWindowStart,
+    })
+    .returning();
+  return row;
+}
+
+export async function resetCircuitBreaker(db: Db, resumedBy?: string) {
+  const existing = await getDeployCircuitBreaker(db);
+  if (!existing) return;
+  await db
+    .update(deployCircuitBreaker)
+    .set({
+      isPaused: false,
+      pausedAt: null,
+      pausedReason: null,
+      failureCount: 0,
+      failureWindowStart: null,
+      resumedAt: new Date(),
+      resumedBy: resumedBy ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(deployCircuitBreaker.id, existing.id));
+}
+
+export async function getRecentFailedDeployments(db: Db, windowHours: number) {
+  const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
+  return db
+    .select()
+    .from(deployments)
+    .where(
+      and(
+        eq(deployments.status, "failed"),
+        sql`${deployments.startedAt} >= ${since}`,
+      ),
+    )
+    .orderBy(desc(deployments.startedAt));
+}
+
+/* ────────────────── Session Engagement ─────────────── */
+
+export async function upsertSessionEngagement(
+  db: Db,
+  data: {
+    id?: string;
+    userId: string;
+    sessionStart?: Date;
+    messageCount: number;
+    avgMessageLength: number;
+    avgResponseIntervalMs: number;
+    complexityScore: number;
+    energyLevel: string;
+    lastMessageAt: Date;
+  },
+) {
+  if (data.id) {
+    const [row] = await db
+      .update(sessionEngagement)
+      .set({
+        messageCount: data.messageCount,
+        avgMessageLength: data.avgMessageLength,
+        avgResponseIntervalMs: data.avgResponseIntervalMs,
+        complexityScore: data.complexityScore,
+        energyLevel: data.energyLevel,
+        lastMessageAt: data.lastMessageAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(sessionEngagement.id, data.id))
+      .returning();
+    return row;
+  }
+  const [row] = await db
+    .insert(sessionEngagement)
+    .values({
+      userId: data.userId,
+      sessionStart: data.sessionStart ?? new Date(),
+      messageCount: data.messageCount,
+      avgMessageLength: data.avgMessageLength,
+      avgResponseIntervalMs: data.avgResponseIntervalMs,
+      complexityScore: data.complexityScore,
+      energyLevel: data.energyLevel,
+      lastMessageAt: data.lastMessageAt,
+    })
+    .returning();
+  return row;
+}
+
+export async function getLatestSessionEngagement(db: Db, userId: string) {
+  const rows = await db
+    .select()
+    .from(sessionEngagement)
+    .where(eq(sessionEngagement.userId, userId))
+    .orderBy(desc(sessionEngagement.sessionStart))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/* ────────────────── User Timezone ─────────────── */
+
+export async function getUserTimezone(db: Db, userId: string) {
+  const rows = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return rows[0]?.timezone ?? null;
+}
+
+export async function setUserTimezone(db: Db, userId: string, timezone: string) {
+  await db
+    .update(users)
+    .set({ timezone })
+    .where(eq(users.id, userId));
 }

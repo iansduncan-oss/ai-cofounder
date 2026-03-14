@@ -31,7 +31,7 @@
 
 **Milestone Goal:** Transform the AI Cofounder from a reactive tool into an autonomous engineering partner that works independently, remembers everything, and manages all systems.
 
-- [ ] **Phase 8: Memory & Session Foundation** — RAG auto-ingestion, decision tagging, session continuity
+- [x] **Phase 8: Memory & Session Foundation** — RAG auto-ingestion, decision tagging, session continuity (completed 2026-03-10)
 - [x] **Phase 9: Autonomy & Approval System** — Three-tier approval (green/yellow/red) with configurable per-tool controls (completed 2026-03-10)
 - [x] **Phase 10: Autonomous Execution Engine** — Task pickup, chained tool execution, auto-commit, auto-PR (completed 2026-03-10)
 - [ ] **Phase 11: Autonomous Scheduling** — Recurring execution loop, distributed lock, token budget, self-healing
@@ -53,12 +53,12 @@
   3. Conversation ingestion completes within 30s of conversation end
   4. Project documentation is auto-ingested on project registration
   5. Related memories are periodically consolidated into coherent knowledge entries
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] 08-01-PLAN.md — Conversation auto-ingestion pipeline and project docs trigger
-- [ ] 08-02-PLAN.md — Decision auto-detection and proactive decision surfacing
-- [ ] 08-03-PLAN.md — Session context injection and memory consolidation
+- [x] 08-01-PLAN.md — Conversation auto-ingestion pipeline and project docs trigger
+- [x] 08-02-PLAN.md — Decision auto-detection and proactive decision surfacing
+- [x] 08-03-PLAN.md — Session context injection and memory consolidation
 
 ### Phase 9: Autonomy & Approval System
 **Goal**: Three-tier system (green/yellow/red) controls what the agent can do freely, what needs approval, and what's forbidden — with real-time approval flow via Slack/Discord
@@ -176,7 +176,7 @@ Plans:
 | 5. Pipeline List + Navigation | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
 | 7. Pipeline Trigger | v1.1 | 1/1 | Complete | 2026-03-09 |
-| 8. Memory & Session Foundation | 2/3 | In Progress|  | — |
+| 8. Memory & Session Foundation | v2.0 | 3/3 | Complete | 2026-03-10 |
 | 9. Autonomy & Approval System | 2/2 | Complete   | 2026-03-10 | — |
 | 10. Autonomous Execution Engine | 2/2 | Complete    | 2026-03-10 | — |
 | 11. Autonomous Scheduling | v2.0 | 0/2 | Planned | — |

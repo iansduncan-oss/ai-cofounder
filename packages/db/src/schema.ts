@@ -39,6 +39,7 @@ export const users = pgTable("users", {
   externalId: text("external_id").notNull().unique(),
   platform: text("platform").notNull(), // "discord", "web", etc.
   displayName: text("display_name"),
+  timezone: text("timezone"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -457,6 +458,8 @@ export const userActionTypeEnum = pgEnum("user_action_type", [
   "approval_submitted",
   "schedule_created",
   "tool_executed",
+  "goal_viewed",
+  "goal_executed",
 ]);
 
 export const userActions = pgTable("user_actions", {
@@ -514,8 +517,46 @@ export const deployments = pgTable("deployments", {
   rootCauseAnalysis: text("root_cause_analysis"),
   rolledBack: boolean("rolled_back").notNull().default(false),
   rollbackSha: text("rollback_sha"),
+  soakStatus: text("soak_status"),
+  soakStartedAt: timestamp("soak_started_at", { withTimezone: true }),
+  soakCompletedAt: timestamp("soak_completed_at", { withTimezone: true }),
+  soakMetrics: jsonb("soak_metrics"),
+  remediationActions: jsonb("remediation_actions"),
+  gitDiffSummary: text("git_diff_summary"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
+});
+
+/* ── Deploy Circuit Breaker ── */
+
+export const deployCircuitBreaker = pgTable("deploy_circuit_breaker", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  isPaused: boolean("is_paused").notNull().default(false),
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
+  pausedReason: text("paused_reason"),
+  failureCount: integer("failure_count").notNull().default(0),
+  failureWindowStart: timestamp("failure_window_start", { withTimezone: true }),
+  resumedAt: timestamp("resumed_at", { withTimezone: true }),
+  resumedBy: text("resumed_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Session Engagement ── */
+
+export const sessionEngagement = pgTable("session_engagement", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  sessionStart: timestamp("session_start", { withTimezone: true }).notNull().defaultNow(),
+  messageCount: integer("message_count").notNull().default(0),
+  avgMessageLength: integer("avg_message_length").notNull().default(0),
+  avgResponseIntervalMs: integer("avg_response_interval_ms").notNull().default(0),
+  complexityScore: integer("complexity_score").notNull().default(50),
+  energyLevel: text("energy_level").notNull().default("normal"),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /* ── Subagent Runs (autonomous subagent execution tracking) ── */

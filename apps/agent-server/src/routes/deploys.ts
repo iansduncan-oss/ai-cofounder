@@ -60,6 +60,20 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
 
     switch (body.event) {
       case "deploy_started": {
+        // Check circuit breaker before allowing deploy
+        if (app.deployCircuitBreakerService) {
+          const paused = await app.deployCircuitBreakerService.isDeployPaused();
+          if (paused) {
+            const status = await app.deployCircuitBreakerService.getStatus();
+            logger.warn({ sha: shortSha, reason: status.pausedReason }, "deploy blocked by circuit breaker");
+            return reply.code(503).send({
+              error: "Deploy paused by circuit breaker",
+              reason: status.pausedReason,
+              failureCount: status.failureCount,
+            });
+          }
+        }
+
         const deployment = await createDeployment(db, {
           commitSha: body.commitSha,
           shortSha,
@@ -117,13 +131,20 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
         });
         logger.warn({ deploymentId: existing.id, error: body.error }, "deploy failed");
 
+        // Record failure in circuit breaker
+        if (app.deployCircuitBreakerService) {
+          await app.deployCircuitBreakerService.recordFailure(body.commitSha, body.error).catch((err: unknown) => {
+            logger.warn({ err }, "circuit breaker failure recording failed");
+          });
+        }
+
         // Enqueue root cause analysis job
         try {
           const { getDeployVerificationQueue } = await import("@ai-cofounder/queue");
           await getDeployVerificationQueue().add("analyze-failure", {
             deploymentId: existing.id,
             commitSha: body.commitSha,
-            previousSha: existing.previousSha,
+            previousSha: existing.previousSha ?? undefined,
             errorLog: body.error,
           });
         } catch {
@@ -158,5 +179,25 @@ export async function deployRoutes(app: FastifyInstance): Promise<void> {
       return { data: null };
     }
     return { data: latest };
+  });
+
+  // GET /api/deploys/circuit-breaker — get circuit breaker status
+  app.get("/circuit-breaker", { schema: { tags: ["deploys"] } }, async (_request, reply) => {
+    if (!app.deployCircuitBreakerService) {
+      return reply.code(503).send({ error: "Circuit breaker service not available" });
+    }
+    const status = await app.deployCircuitBreakerService.getStatus();
+    return { data: status };
+  });
+
+  // POST /api/deploys/circuit-breaker/resume — resume auto-deploys
+  app.post("/circuit-breaker/resume", { schema: { tags: ["deploys"] } }, async (request, reply) => {
+    if (!app.deployCircuitBreakerService) {
+      return reply.code(503).send({ error: "Circuit breaker service not available" });
+    }
+    const body = request.body as { resumedBy?: string } | undefined;
+    await app.deployCircuitBreakerService.resume(body?.resumedBy ?? "dashboard");
+    app.agentEvents?.emit("ws:deploys");
+    return { status: "resumed" };
   });
 }

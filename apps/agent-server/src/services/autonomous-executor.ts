@@ -8,6 +8,24 @@ import { executeCreatePr } from "../agents/tools/github-tools.js";
 
 const logger = createLogger("autonomous-executor");
 
+/**
+ * Thrown when cumulative token usage across task execution exceeds the configured budget.
+ * Caught by runAutonomousSession() to abort cleanly between tasks.
+ */
+export class TokenBudgetExceededError extends Error {
+  readonly tokensUsed: number;
+  readonly budget: number;
+  readonly lastTaskTitle?: string;
+
+  constructor(tokensUsed: number, budget: number, lastTaskTitle?: string) {
+    super(`Token budget exceeded: ${tokensUsed} used of ${budget} budget`);
+    this.name = "TokenBudgetExceededError";
+    this.tokensUsed = tokensUsed;
+    this.budget = budget;
+    this.lastTaskTitle = lastTaskTitle;
+  }
+}
+
 /** Structured entry in the work log actionsTaken array */
 export interface WorkLogAction {
   type: "task_progress" | "git_branch" | "git_add" | "git_commit" | "git_push" | "create_pr" | "error";
@@ -74,8 +92,9 @@ export class AutonomousExecutorService {
     workSessionId: string;
     repoDir?: string;
     createPr?: boolean;
+    tokenBudget?: number;
     onProgress?: TaskProgressCallback;
-  }): Promise<{ progress: DispatcherProgress; actions: WorkLogAction[]; costSummary?: { totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number; requestCount: number } }> {
+  }): Promise<{ progress: DispatcherProgress; actions: WorkLogAction[]; tokensUsed: number; costSummary?: { totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number; requestCount: number } }> {
     const actions: WorkLogAction[] = [];
 
     // 1. Create feature branch if workspace + repo directory provided
@@ -93,6 +112,7 @@ export class AutonomousExecutorService {
     }
 
     // 2. Run goal tasks via TaskDispatcher
+    let cumulativeTokens = 0;
     const progress = await this.dispatcher.runGoal(opts.goalId, opts.userId, async (event) => {
       actions.push({
         type: "task_progress",
@@ -103,6 +123,23 @@ export class AutonomousExecutorService {
         status: event.status,
         output: event.output?.slice(0, 500),
       });
+
+      // Check token budget between tasks
+      if (event.status === "completed" && opts.tokenBudget) {
+        try {
+          const cost = await getCostByGoal(this.db, opts.goalId);
+          if (cost) {
+            cumulativeTokens = cost.totalInputTokens + cost.totalOutputTokens;
+            if (cumulativeTokens > opts.tokenBudget) {
+              throw new TokenBudgetExceededError(cumulativeTokens, opts.tokenBudget, event.taskTitle);
+            }
+          }
+        } catch (err) {
+          if (err instanceof TokenBudgetExceededError) throw err;
+          this.logger.warn({ err }, "failed to check token budget (non-fatal)");
+        }
+      }
+
       await opts.onProgress?.(event);
     });
 
@@ -121,7 +158,7 @@ export class AutonomousExecutorService {
       this.logger.warn({ err, goalId: opts.goalId }, "failed to fetch cost summary");
     }
 
-    return { progress, actions, costSummary };
+    return { progress, actions, tokensUsed: cumulativeTokens, costSummary };
   }
 
   /**

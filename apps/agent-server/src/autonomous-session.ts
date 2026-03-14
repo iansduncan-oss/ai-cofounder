@@ -14,6 +14,8 @@ import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./services/workspace.js";
 import type { AgentMessagingService } from "./services/agent-messaging.js";
 import { Orchestrator } from "./agents/orchestrator.js";
+import { DistributedLockService, AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
+import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
 
 const logger = createLogger("autonomous-session");
 
@@ -36,7 +38,7 @@ export interface SessionOptions {
 
 export interface SessionResult {
   sessionId: string;
-  status: "completed" | "failed" | "timeout";
+  status: "completed" | "failed" | "timeout" | "skipped" | "aborted";
   summary: string;
   tokensUsed: number;
   durationMs: number;
@@ -123,6 +125,7 @@ export async function runAutonomousSession(
   sandboxService?: SandboxService,
   workspaceService?: WorkspaceService,
   messagingService?: AgentMessagingService,
+  lockService?: DistributedLockService,
   options?: SessionOptions,
 ): Promise<SessionResult> {
   const timeBudgetMs = options?.timeBudgetMs ?? parseInt(optionalEnv("SESSION_TIME_BUDGET_MS", "900000"), 10);
@@ -131,6 +134,54 @@ export async function runAutonomousSession(
   const webhookUrl = options?.webhookUrl ?? optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
 
   const startTime = Date.now();
+
+  // Acquire distributed lock to prevent concurrent sessions
+  let lockToken: string | null = null;
+  if (lockService) {
+    const lockTtlMs = timeBudgetMs + 120_000; // 2-minute buffer over time budget
+    lockToken = await lockService.acquire(AUTONOMOUS_SESSION_LOCK, lockTtlMs);
+    if (lockToken === null) {
+      logger.warn({ trigger }, "another autonomous session is already running, skipping");
+      return {
+        sessionId: "",
+        status: "skipped",
+        summary: "Another autonomous session is already running",
+        tokensUsed: 0,
+        durationMs: Date.now() - startTime,
+      };
+    }
+    logger.info("distributed lock acquired for autonomous session");
+  }
+
+  try {
+    return await _runSessionBody(db, registry, embeddingService, sandboxService, workspaceService, messagingService, {
+      timeBudgetMs, tokenBudget, trigger, webhookUrl, startTime, options,
+    });
+  } finally {
+    if (lockService && lockToken) {
+      await lockService.release(AUTONOMOUS_SESSION_LOCK, lockToken);
+      logger.info("distributed lock released");
+    }
+  }
+}
+
+async function _runSessionBody(
+  db: Db,
+  registry: LlmRegistry,
+  embeddingService: EmbeddingService | undefined,
+  sandboxService: SandboxService | undefined,
+  workspaceService: WorkspaceService | undefined,
+  messagingService: AgentMessagingService | undefined,
+  ctx: {
+    timeBudgetMs: number;
+    tokenBudget: number;
+    trigger: string;
+    webhookUrl: string;
+    startTime: number;
+    options?: SessionOptions;
+  },
+): Promise<SessionResult> {
+  const { timeBudgetMs, tokenBudget, trigger, webhookUrl, startTime, options } = ctx;
 
   // Check daily token limit before starting
   const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
@@ -195,19 +246,20 @@ export async function runAutonomousSession(
       const executor = new AutonomousExecutorService(dispatcher, workspaceService, db, registry);
 
       try {
-        const { progress, actions } = await executor.executeGoal({
+        const { progress, actions, tokensUsed: execTokens } = await executor.executeGoal({
           goalId: topGoal.id,
           userId: "system-autonomous",
           workSessionId: session.id,
           repoDir: workspaceService ? optionalEnv("WORKSPACE_DIR", "/tmp/ai-cofounder-workspace") : undefined,
           createPr: true,
+          tokenBudget,
           onProgress: async (_event) => {
             // Progress events are published through the BullMQ worker path
             // when triggered via enqueueAgentTask; no-op here for direct execution
           },
         });
 
-        totalTokens = progress.tasks.reduce((sum, t) => sum + ((t as Record<string, unknown>).tokensUsed as number ?? 0), 0);
+        totalTokens = execTokens || progress.tasks.reduce((sum, t) => sum + ((t as Record<string, unknown>).tokensUsed as number ?? 0), 0);
         status = progress.status === "completed" ? "completed" : "failed";
         summary = `Executed goal "${topGoal.title}" — ${progress.completedTasks}/${progress.totalTasks} tasks completed`;
 
@@ -251,6 +303,43 @@ export async function runAutonomousSession(
           durationMs: Date.now() - startTime,
         };
       } catch (err) {
+        // Token budget exceeded — abort cleanly between tasks
+        if (err instanceof TokenBudgetExceededError) {
+          totalTokens = err.tokensUsed;
+          const abortSummary = `Session aborted: token budget (${tokenBudget}) exceeded after task "${err.lastTaskTitle ?? "unknown"}". ${err.tokensUsed} tokens used of ${err.budget} budget.`;
+          await completeWorkSession(db, session.id, {
+            tokensUsed: totalTokens,
+            durationMs: Date.now() - startTime,
+            status: "aborted",
+            summary: abortSummary,
+          });
+          logger.warn({ tokensUsed: err.tokensUsed, budget: err.budget }, "session aborted due to token budget");
+
+          if (webhookUrl) {
+            await sendWebhook(webhookUrl, {
+              embeds: [{
+                title: "Session aborted",
+                description: abortSummary.slice(0, 1500),
+                color: 16098851, // amber
+                fields: [
+                  { name: "Duration", value: `${Math.round((Date.now() - startTime) / 1000)}s`, inline: true },
+                  { name: "Tokens", value: String(totalTokens), inline: true },
+                  { name: "Trigger", value: trigger, inline: true },
+                ],
+                footer: { text: `Session ${session.id}` },
+              }],
+            });
+          }
+
+          return {
+            sessionId: session.id,
+            status: "aborted",
+            summary: abortSummary,
+            tokensUsed: totalTokens,
+            durationMs: Date.now() - startTime,
+          };
+        }
+
         // Fall through to freeform orchestrator as fallback
         logger.warn({ err, goalId: topGoal.id }, "backlog executor failed, falling back to freeform orchestrator");
       }

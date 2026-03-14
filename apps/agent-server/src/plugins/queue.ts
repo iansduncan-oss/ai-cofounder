@@ -28,13 +28,24 @@ export const queuePlugin = fp(async (app) => {
   const processors: WorkerProcessors = {
     // agentTask: intentionally omitted — handled by worker.ts
     monitoring: async (job) => {
-      const { check } = job.data;
+      const check = job.data.check as string;
       logger.info({ check, jobId: job.id }, "Running monitoring check");
 
       switch (check) {
-        case "github_ci":
-          await app.monitoringService.checkGitHubCI();
+        case "github_ci": {
+          const ciResults = await app.monitoringService.checkGitHubCI();
+          // Feed CI results to self-heal service for failure tracking (SCHED-04)
+          if (app.ciSelfHealService) {
+            for (const ci of ciResults) {
+              if (ci.status === "failure") {
+                await app.ciSelfHealService.recordFailure(ci.repo, ci.branch, ci.url);
+              } else if (ci.status === "success") {
+                await app.ciSelfHealService.recordSuccess(ci.repo, ci.branch);
+              }
+            }
+          }
           break;
+        }
         case "github_prs":
           await app.monitoringService.checkGitHubPRs();
           break;
@@ -42,6 +53,23 @@ export const queuePlugin = fp(async (app) => {
         case "vps_containers":
           await app.monitoringService.checkVPSHealth();
           break;
+        case "soak_check": {
+          // Check deployments in soak period
+          const { getLatestDeployment, updateDeploymentStatus } = await import("@ai-cofounder/db");
+          const latest = await getLatestDeployment(app.db);
+          if (latest?.soakStatus === "soaking" && latest.soakStartedAt) {
+            const soakAge = Date.now() - new Date(latest.soakStartedAt).getTime();
+            const SOAK_DURATION = 10 * 60 * 1000; // 10 minutes
+            if (soakAge >= SOAK_DURATION) {
+              await updateDeploymentStatus(app.db, latest.id, {
+                status: "healthy",
+                completedAt: new Date(),
+              });
+              logger.info({ deploymentId: latest.id }, "soak period completed successfully");
+            }
+          }
+          break;
+        }
         case "approval_timeout_sweep": {
           const { listExpiredPendingApprovals, resolveApproval } = await import("@ai-cofounder/db");
           const expired = await listExpiredPendingApprovals(app.db);
@@ -124,6 +152,13 @@ export const queuePlugin = fp(async (app) => {
           logger.info(result, "memory consolidation complete");
           break;
         }
+        case "process_pattern_feedback": {
+          const { PatternFeedbackProcessor } = await import("../services/pattern-feedback.js");
+          const processor = new PatternFeedbackProcessor(app.db);
+          const result = await processor.processConfidenceAdjustments();
+          logger.info(result, "pattern feedback processing complete");
+          break;
+        }
       }
     },
 
@@ -144,6 +179,12 @@ export const queuePlugin = fp(async (app) => {
           commitSha,
           previousSha,
         );
+        // Record failure in circuit breaker
+        if (app.deployCircuitBreakerService) {
+          await app.deployCircuitBreakerService.recordFailure(commitSha, job.data.errorLog).catch((err: unknown) => {
+            logger.warn({ err }, "circuit breaker failure recording failed");
+          });
+        }
       } else {
         await deployHealthService.verifyDeployment(deploymentId, commitSha, previousSha);
       }
@@ -253,6 +294,7 @@ export const queuePlugin = fp(async (app) => {
     briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
     briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
     monitoringIntervalMinutes: 5,
+    autonomousSessionIntervalMinutes: Number(optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30")),
   });
 
   // Shutdown cleanup

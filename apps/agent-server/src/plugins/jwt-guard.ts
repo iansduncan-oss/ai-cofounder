@@ -29,6 +29,7 @@ import { deployRoutes } from "../routes/deploys.js";
 import { patternRoutes } from "../routes/patterns.js";
 import { autonomyRoutes } from "../routes/autonomy.js";
 import { autonomousRoutes } from "../routes/autonomous.js";
+import { contextRoutes } from "../routes/context.js";
 
 /**
  * JWT Guard Plugin — scoped Fastify plugin (NOT wrapped with fp()) so its
@@ -89,4 +90,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(patternRoutes, { prefix: "/api/patterns" });
   app.register(autonomyRoutes, { prefix: "/api/autonomy/tiers" });
   app.register(autonomousRoutes, { prefix: "/api/autonomous" });
+  app.register(contextRoutes, { prefix: "/api/context" });
 }

@@ -279,6 +279,53 @@ export function useDeletePattern() {
   });
 }
 
+export function useCreatePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      patternType: string;
+      description: string;
+      suggestedAction: string;
+      userId?: string;
+      triggerCondition?: Record<string, unknown>;
+      confidence?: number;
+    }) => apiClient.createPattern(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern created");
+    },
+    onError: (err) => {
+      toast.error(`Failed to create pattern: ${err.message}`);
+    },
+  });
+}
+
+export function useUpdatePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...data
+    }: {
+      id: string;
+      description?: string;
+      suggestedAction?: string;
+      triggerCondition?: Record<string, unknown>;
+      confidence?: number;
+      isActive?: boolean;
+    }) => apiClient.updatePattern(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern updated");
+    },
+    onError: (err) => {
+      toast.error(`Failed to update pattern: ${err.message}`);
+    },
+  });
+}
+
 export function useAcceptSuggestion() {
   return useMutation({
     mutationFn: (data: { suggestion: string; userId?: string; patternId?: string }) =>

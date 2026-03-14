@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/dialog";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
+import { CreatePatternDialog } from "@/components/patterns/create-pattern-dialog";
+import { EditPatternDialog } from "@/components/patterns/edit-pattern-dialog";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { AlertTriangle, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { AlertTriangle, Trash2, ToggleLeft, ToggleRight, Plus, Pencil } from "lucide-react";
 import type { UserPattern } from "@ai-cofounder/api-client";
 
 type PatternType = "all" | "time_preference" | "sequence" | "recurring_action";
@@ -31,6 +33,8 @@ export function PatternsPage() {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserPattern | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<UserPattern | null>(null);
 
   const patterns = (data?.data ?? []).filter(
     (p) => filterType === "all" || p.patternType === filterType,
@@ -66,6 +70,12 @@ export function PatternsPage() {
       <PageHeader
         title="Patterns"
         description="Learned behavioral patterns that power anticipatory suggestions"
+        actions={
+          <Button onClick={() => setCreateDialogOpen(true)}>
+            <Plus className="mr-1 h-4 w-4" />
+            Create Pattern
+          </Button>
+        }
       />
 
       {/* Filters */}
@@ -107,7 +117,7 @@ export function PatternsPage() {
         ) : patterns.length === 0 ? (
           <EmptyState
             title="No patterns yet"
-            description="Patterns are learned automatically as you interact with the system. Keep using the AI and patterns will emerge over time."
+            description="Patterns are learned automatically as you interact with the system, or create one manually."
           />
         ) : (
           patterns.map((p) => (
@@ -121,6 +131,14 @@ export function PatternsPage() {
                   {!p.isActive && <Badge variant="secondary">Inactive</Badge>}
                 </div>
                 <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditTarget(p)}
+                    title="Edit"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -177,6 +195,21 @@ export function PatternsPage() {
           ))
         )}
       </div>
+
+      {/* Create Dialog */}
+      <CreatePatternDialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+      />
+
+      {/* Edit Dialog */}
+      {editTarget && (
+        <EditPatternDialog
+          open={!!editTarget}
+          onClose={() => setEditTarget(null)}
+          pattern={editTarget}
+        />
+      )}
 
       {/* Delete Confirmation */}
       <Dialog

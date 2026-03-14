@@ -214,6 +214,15 @@ export function mockDbModule() {
     getRecentUserActionSummary: vi.fn().mockResolvedValue([]),
     getLastUserMessageTimestamp: vi.fn().mockResolvedValue(null),
     getRecentDecisionMemories: vi.fn().mockResolvedValue([]),
+    listPatterns: vi.fn().mockResolvedValue([]),
+    togglePatternActive: vi.fn().mockResolvedValue({ id: "up-1", isActive: true }),
+    deletePattern: vi.fn().mockResolvedValue(true),
+    createPattern: vi.fn().mockResolvedValue({ id: "up-new", patternType: "recurring_action", description: "Test", suggestedAction: "Do something", triggerCondition: {}, confidence: 50, hitCount: 0, acceptCount: 0, isActive: true }),
+    updatePattern: vi.fn().mockResolvedValue({ id: "up-1", description: "Updated" }),
+    adjustPatternConfidence: vi.fn().mockResolvedValue({ id: "up-1", confidence: 55 }),
+    deactivateLowConfidencePatterns: vi.fn().mockResolvedValue(0),
+    incrementPatternHitCount: vi.fn().mockResolvedValue({ id: "up-1", hitCount: 1 }),
+    getPatternAnalytics: vi.fn().mockResolvedValue({ totalPatterns: 0, activePatterns: 0, totalHits: 0, totalAccepts: 0, overallAcceptRate: 0, avgConfidence: 0, byType: {}, patterns: [] }),
     userActions: {},
     userPatterns: {},
     // Deployments
@@ -229,6 +238,19 @@ export function mockDbModule() {
     upsertToolTierConfig: vi.fn().mockResolvedValue({ id: "ttc-1", toolName: "test_tool", tier: "green" }),
     listExpiredPendingApprovals: vi.fn().mockResolvedValue([]),
     toolTierConfig: {},
+    // Deploy circuit breaker
+    getDeployCircuitBreaker: vi.fn().mockResolvedValue(null),
+    upsertDeployCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false }),
+    resetCircuitBreaker: vi.fn().mockResolvedValue(undefined),
+    getRecentFailedDeployments: vi.fn().mockResolvedValue([]),
+    deployCircuitBreaker: {},
+    // Session engagement
+    upsertSessionEngagement: vi.fn().mockResolvedValue({ id: "se-1", messageCount: 1 }),
+    getLatestSessionEngagement: vi.fn().mockResolvedValue(null),
+    sessionEngagement: {},
+    // User timezone
+    getUserTimezone: vi.fn().mockResolvedValue(null),
+    setUserTimezone: vi.fn().mockResolvedValue(undefined),
   };
 }
 

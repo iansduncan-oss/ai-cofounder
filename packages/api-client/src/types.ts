@@ -520,6 +520,17 @@ export interface UserPattern {
   updatedAt: string;
 }
 
+export interface PatternAnalytics {
+  totalPatterns: number;
+  activePatterns: number;
+  totalHits: number;
+  totalAccepts: number;
+  overallAcceptRate: number;
+  avgConfidence: number;
+  byType: Record<string, number>;
+  patterns: UserPattern[];
+}
+
 export type AutonomyTier = "green" | "yellow" | "red";
 
 export interface ToolTierConfig {
@@ -548,6 +559,34 @@ export interface AutonomousRunResponse {
   jobId: string;
   status: "queued";
   goalId: string;
+}
+
+export interface DeadLetterEntry {
+  id: string;
+  queue: string;
+  jobName: string;
+  jobData: Record<string, unknown>;
+  failedReason: string;
+  failedAt: string;
+  attemptsMade: number;
+}
+
+export interface Deployment {
+  id: string;
+  commitSha: string;
+  shortSha: string;
+  branch: string;
+  status: string;
+  services: string[] | null;
+  previousSha: string | null;
+  triggeredBy: string;
+  healthChecks: unknown | null;
+  errorLog: string | null;
+  rootCauseAnalysis: string | null;
+  rolledBack: boolean;
+  rollbackSha: string | null;
+  startedAt: string;
+  completedAt: string | null;
 }
 
 export interface AgentMessageItem {

@@ -54,6 +54,7 @@ export type {
   SpawnSubagentInput,
   SpawnSubagentResponse,
   UserPattern,
+  PatternAnalytics,
   AutonomyTier,
   ToolTierConfig,
 } from "./types.js";

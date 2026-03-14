@@ -14,3 +14,8 @@ dist/
 *credentials*
 *.p12
 *.pfx
+
+# Claude Code session files
+.claude/primer.md
+.claude/git-state.md
+.claude/commit-log.md

@@ -34,7 +34,7 @@ export async function processEvent(
     `**Payload:**\n\`\`\`json\n${JSON.stringify(event.payload, null, 2)}\n\`\`\``;
 
   try {
-    const result = await runAutonomousSession(db, registry, embeddingService, sandboxService, workspaceService, messagingService, {
+    const result = await runAutonomousSession(db, registry, embeddingService, sandboxService, workspaceService, messagingService, undefined, {
       trigger: "event",
       eventId: event.id,
       prompt,

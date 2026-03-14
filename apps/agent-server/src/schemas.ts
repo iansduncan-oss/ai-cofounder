@@ -310,6 +310,25 @@ export const TogglePatternBody = Type.Object({
 });
 export type TogglePatternBody = Static<typeof TogglePatternBody>;
 
+export const CreatePatternBody = Type.Object({
+  userId: Type.Optional(Type.String({ format: "uuid" })),
+  patternType: Type.String({ minLength: 1 }),
+  description: Type.String({ minLength: 1 }),
+  suggestedAction: Type.String({ minLength: 1 }),
+  triggerCondition: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  confidence: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+});
+export type CreatePatternBody = Static<typeof CreatePatternBody>;
+
+export const UpdatePatternBody = Type.Object({
+  description: Type.Optional(Type.String({ minLength: 1 })),
+  suggestedAction: Type.Optional(Type.String({ minLength: 1 })),
+  triggerCondition: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  confidence: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+  isActive: Type.Optional(Type.Boolean()),
+});
+export type UpdatePatternBody = Static<typeof UpdatePatternBody>;
+
 /* ────────────────────────── Reflections ────────────────────────── */
 
 export const ReflectionListQuery = Type.Object({

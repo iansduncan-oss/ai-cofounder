@@ -713,6 +713,27 @@ export class ApiClient {
     );
   }
 
+  createPattern(data: {
+    patternType: string;
+    description: string;
+    suggestedAction: string;
+    userId?: string;
+    triggerCondition?: Record<string, unknown>;
+    confidence?: number;
+  }) {
+    return this.request<UserPattern>("POST", "/api/patterns", data);
+  }
+
+  updatePattern(id: string, data: {
+    description?: string;
+    suggestedAction?: string;
+    triggerCondition?: Record<string, unknown>;
+    confidence?: number;
+    isActive?: boolean;
+  }) {
+    return this.request<UserPattern>("PATCH", `/api/patterns/${id}`, data);
+  }
+
   deletePattern(id: string) {
     return this.request<{ deleted: boolean }>("DELETE", `/api/patterns/${id}`);
   }

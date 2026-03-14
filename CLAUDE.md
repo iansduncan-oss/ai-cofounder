@@ -2,6 +2,29 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Session Workflow
+
+At the **start** of each session:
+1. Read `.claude/primer.md` for context from the previous session
+2. Read `.claude/git-state.md` for current repository state (includes staleness warnings and session metadata)
+3. Read `.claude/commit-log.md` for recent commit history
+4. If git-state.md has **staleness warnings**, mention them proactively to the user
+5. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
+
+At the **end** of each session (**MANDATORY** — always do this before the session ends):
+1. Completely rewrite `.claude/primer.md` with all sections below
+2. The first line after the `# Session Primer` heading MUST be the metadata line:
+   `**Session #N** | **Last Updated:** YYYY-MM-DD HH:MM UTC`
+   (increment N from previous value, or start at 1 for first session)
+3. Required sections:
+   - **Current State** — branch, milestone, what the project looks like right now
+   - **Last Session Work** — what was accomplished this session
+   - **Next Steps** — exact next actions to take
+   - **Open Blockers** — anything unresolved or stuck
+   - **Files Modified** — key files changed this session
+
+**Session-end detection**: If the user says "bye", "done", "that's it", "thanks", wraps up, or seems to be ending the conversation, **proactively offer to update the primer** before the session ends. Do not wait to be asked.
+
 ## Project Overview
 
 AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrates AI agents that collaborate on business tasks, exposed through Discord, Slack, a voice UI, and a React dashboard. Automated via n8n workflows and BullMQ job queues.

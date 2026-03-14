@@ -1,6 +1,6 @@
 import { createLogger } from "@ai-cofounder/shared";
-import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue } from "./queues.js";
-import type { MonitoringJob, BriefingJob, ReflectionJob } from "./queues.js";
+import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue, getAutonomousSessionQueue } from "./queues.js";
+import type { MonitoringJob, BriefingJob, ReflectionJob, AutonomousSessionJob } from "./queues.js";
 
 const logger = createLogger("queue-scheduler");
 
@@ -12,6 +12,7 @@ export async function setupRecurringJobs(options?: {
   briefingHour?: number;
   briefingTimezone?: string;
   monitoringIntervalMinutes?: number;
+  autonomousSessionIntervalMinutes?: number;
 }): Promise<void> {
   const {
     briefingHour = 9,
@@ -122,6 +123,23 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled user pattern analysis at Sunday 4 AM");
 
+  // ── Daily pattern feedback processing (2 AM) ──
+
+  await reflectionQueue.upsertJobScheduler(
+    "daily-pattern-feedback",
+    {
+      pattern: `0 2 * * *`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "daily-pattern-feedback",
+      data: {
+        action: "process_pattern_feedback",
+      } satisfies ReflectionJob,
+    },
+  );
+  logger.info("Scheduled daily pattern feedback processing at 2 AM");
+
   // ── Weekly memory consolidation (Sunday 4 AM) ──
 
   await reflectionQueue.upsertJobScheduler(
@@ -167,4 +185,21 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled approval timeout sweep every 60s");
+
+  // ── Recurring autonomous session (configurable interval, default 30 min) ──
+
+  const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes
+    ?? Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
+  const autonomousSessionQueue = getAutonomousSessionQueue();
+  await autonomousSessionQueue.upsertJobScheduler(
+    "recurring-autonomous-session",
+    {
+      every: autonomousIntervalMin * 60 * 1000,
+    },
+    {
+      name: "autonomous-session",
+      data: { trigger: "schedule" } satisfies AutonomousSessionJob,
+    },
+  );
+  logger.info({ intervalMin: autonomousIntervalMin }, "Scheduled recurring autonomous session");
 }

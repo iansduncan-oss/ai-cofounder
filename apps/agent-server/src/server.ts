@@ -46,6 +46,12 @@ import {
 } from "@ai-cofounder/db";
 import { startScheduler } from "./services/scheduler.js";
 import { AutonomyTierService } from "./services/autonomy-tier.js";
+import { DeployCircuitBreakerService } from "./services/deploy-circuit-breaker.js";
+import { SessionEngagementService } from "./services/session-engagement.js";
+import { websocketPlugin } from "./plugins/websocket.js";
+import { wsEmitterPlugin } from "./plugins/ws-emitter.js";
+import { CiSelfHealService } from "./services/ci-self-heal.js";
+import Redis from "ioredis";
 
 /** All known tool names — seeded at green tier on first server start */
 const DEFAULT_TOOLS = [
@@ -217,6 +223,15 @@ export function buildServer(registry?: LlmRegistry) {
   // Autonomy tier service (created after db is ready via onReady hook)
   app.decorate("autonomyTierService", undefined as unknown as AutonomyTierService);
 
+  // Deploy circuit breaker service (created after db is ready via onReady hook)
+  app.decorate("deployCircuitBreakerService", undefined as unknown as DeployCircuitBreakerService);
+
+  // Session engagement service (created after db is ready via onReady hook)
+  app.decorate("sessionEngagementService", undefined as unknown as SessionEngagementService);
+
+  // CI self-heal service (created after Redis + notification check, via onReady hook)
+  app.decorate("ciSelfHealService", undefined as unknown as CiSelfHealService | undefined);
+
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
   app.addHook("onReady", async () => {
@@ -225,6 +240,22 @@ export function buildServer(registry?: LlmRegistry) {
     const redisPubSub = (app as unknown as Record<string, unknown>).redisPubSub as RedisPubSub | undefined;
     app.messagingService = new AgentMessagingService(app.db, redisPubSub);
     logger.info("agent messaging service initialized");
+
+    // Wire deploy circuit breaker service
+    app.deployCircuitBreakerService = new DeployCircuitBreakerService(app.db, notificationService);
+    logger.info("deploy circuit breaker service initialized");
+
+    // Wire session engagement service
+    app.sessionEngagementService = new SessionEngagementService(app.db);
+    logger.info("session engagement service initialized");
+
+    // Wire CI self-heal service (requires Redis + notification service)
+    const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
+    if (ciHealRedisUrl) {
+      const ciHealRedis = new Redis(ciHealRedisUrl);
+      app.ciSelfHealService = new CiSelfHealService(ciHealRedis, notificationService);
+      logger.info("CI self-heal service initialized");
+    }
 
     // Wire autonomy tier service and seed default tool tiers on first start
     const tierService = new AutonomyTierService(app.db);
@@ -343,6 +374,10 @@ export function buildServer(registry?: LlmRegistry) {
   // Pub/sub bridge: shared Redis subscriber + EventEmitter routing for SSE endpoint
   app.register(pubsubPlugin);
 
+  // WebSocket real-time push for dashboard
+  app.register(websocketPlugin);
+  app.register(wsEmitterPlugin);
+
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
   const candidates = [
@@ -406,5 +441,8 @@ declare module "fastify" {
     ttsService: TTSService;
     messagingService: AgentMessagingService;
     autonomyTierService: AutonomyTierService;
+    deployCircuitBreakerService: DeployCircuitBreakerService;
+    sessionEngagementService: SessionEngagementService;
+    ciSelfHealService?: CiSelfHealService;
   }
 }
