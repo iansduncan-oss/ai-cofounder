@@ -251,6 +251,12 @@ export function mockDbModule() {
     // User timezone
     getUserTimezone: vi.fn().mockResolvedValue(null),
     setUserTimezone: vi.fn().mockResolvedValue(undefined),
+    // Journal entries
+    createJournalEntry: vi.fn().mockResolvedValue({ id: "je-1", entryType: "work_session", title: "Test" }),
+    getJournalEntry: vi.fn().mockResolvedValue(null),
+    listJournalEntries: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    listWorkSessionsFiltered: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    journalEntries: {},
   };
 }
 

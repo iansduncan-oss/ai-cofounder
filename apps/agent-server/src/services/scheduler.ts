@@ -12,6 +12,7 @@ import {
   listPendingApprovals,
   listActiveGoals,
   getLatestUserMessageTime,
+  createJournalEntry,
 } from "@ai-cofounder/db";
 import type { Db } from "@ai-cofounder/db";
 import { Orchestrator } from "../agents/orchestrator.js";
@@ -251,6 +252,14 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             status: "completed",
             summary: typeof result.response === "string" ? result.response.slice(0, 500) : "Completed",
           });
+
+          void createJournalEntry(db, {
+            entryType: "work_session",
+            title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 80)}`,
+            summary: typeof result.response === "string" ? result.response.slice(0, 300) : "Completed",
+            workSessionId: session.id,
+            details: { scheduleId: schedule.id, durationMs, tokensUsed: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0) },
+          }).catch((err) => logger.warn({ err }, "journal entry write failed"));
 
           logger.info(
             { scheduleId: schedule.id, durationMs, nextRunAt },

@@ -34,6 +34,7 @@ import {
   toolTierConfig,
   deployCircuitBreaker,
   sessionEngagement,
+  journalEntries,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -1169,6 +1170,7 @@ export async function createWorkSession(
     trigger: string;
     scheduleId?: string;
     eventId?: string;
+    goalId?: string;
     context?: unknown;
   },
 ) {
@@ -2914,4 +2916,128 @@ export async function setUserTimezone(db: Db, userId: string, timezone: string) 
     .update(users)
     .set({ timezone })
     .where(eq(users.id, userId));
+}
+
+/* ────────────────── Journal Entries ─────────────────────── */
+
+type JournalEntryType =
+  | "goal_started" | "goal_completed" | "goal_failed"
+  | "task_completed" | "task_failed"
+  | "git_commit" | "pr_created"
+  | "reflection" | "work_session" | "subagent_run" | "deployment";
+
+export async function createJournalEntry(
+  db: Db,
+  data: {
+    entryType: JournalEntryType;
+    title: string;
+    summary?: string;
+    goalId?: string;
+    taskId?: string;
+    workSessionId?: string;
+    details?: Record<string, unknown>;
+    occurredAt?: Date;
+  },
+) {
+  const [entry] = await db
+    .insert(journalEntries)
+    .values({
+      entryType: data.entryType,
+      title: data.title,
+      summary: data.summary,
+      goalId: data.goalId,
+      taskId: data.taskId,
+      workSessionId: data.workSessionId,
+      details: data.details,
+      occurredAt: data.occurredAt ?? new Date(),
+    })
+    .returning();
+  return entry;
+}
+
+export async function getJournalEntry(db: Db, id: string) {
+  const rows = await db
+    .select()
+    .from(journalEntries)
+    .where(eq(journalEntries.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listJournalEntries(
+  db: Db,
+  opts: {
+    since?: Date;
+    until?: Date;
+    goalId?: string;
+    entryType?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+) {
+  const { since, until, goalId, entryType, search, limit = 50, offset = 0 } = opts;
+  const conditions = [];
+
+  if (since) conditions.push(sql`${journalEntries.occurredAt} >= ${since}`);
+  if (until) conditions.push(sql`${journalEntries.occurredAt} <= ${until}`);
+  if (goalId) conditions.push(eq(journalEntries.goalId, goalId));
+  if (entryType) conditions.push(sql`${journalEntries.entryType} = ${entryType}`);
+  if (search) {
+    conditions.push(sql`"journal_entries"."search_text" @@ plainto_tsquery('english', ${search})`);
+  }
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [data, countResult] = await Promise.all([
+    db
+      .select()
+      .from(journalEntries)
+      .where(where)
+      .orderBy(desc(journalEntries.occurredAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(journalEntries)
+      .where(where),
+  ]);
+
+  return { data, total: countResult[0]?.count ?? 0 };
+}
+
+export async function listWorkSessionsFiltered(
+  db: Db,
+  opts: {
+    since?: Date;
+    until?: Date;
+    goalId?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+) {
+  const { since, until, goalId, limit = 50, offset = 0 } = opts;
+  const conditions = [];
+
+  if (since) conditions.push(sql`${workSessions.createdAt} >= ${since}`);
+  if (until) conditions.push(sql`${workSessions.createdAt} <= ${until}`);
+  if (goalId) conditions.push(eq(workSessions.goalId, goalId));
+
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [data, countResult] = await Promise.all([
+    db
+      .select()
+      .from(workSessions)
+      .where(where)
+      .orderBy(desc(workSessions.createdAt))
+      .limit(limit)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(workSessions)
+      .where(where),
+  ]);
+
+  return { data, total: countResult[0]?.count ?? 0 };
 }

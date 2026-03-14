@@ -20,6 +20,7 @@ import {
   Bot,
   GitBranch,
   Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -43,6 +44,7 @@ const navItems = [
   { to: "/dashboard/pipelines", icon: GitBranch, label: "Pipelines" },
   { to: "/dashboard/persona", icon: Bot, label: "Persona" },
   { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
+  { to: "/dashboard/journal", icon: BookOpen, label: "Journal" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];
 

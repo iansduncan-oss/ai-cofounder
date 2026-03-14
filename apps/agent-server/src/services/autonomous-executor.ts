@@ -1,6 +1,6 @@
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import type { LlmRegistry } from "@ai-cofounder/llm";
-import { getGoal, getCostByGoal } from "@ai-cofounder/db";
+import { getGoal, getCostByGoal, createJournalEntry } from "@ai-cofounder/db";
 import type { Db } from "@ai-cofounder/db";
 import type { TaskDispatcher, DispatcherProgress, TaskProgressCallback } from "../agents/dispatcher.js";
 import type { WorkspaceService } from "./workspace.js";
@@ -203,6 +203,14 @@ export class AutonomousExecutorService {
     });
     this.logger.info({ goalId: opts.goalId, commitMsg }, "committed changes");
 
+    void createJournalEntry(this.db, {
+      entryType: "git_commit",
+      title: `Commit: ${commitMsg.slice(0, 80)}`,
+      summary: commitMsg,
+      goalId: opts.goalId,
+      details: { sha: commitResult.stdout?.trim(), branch: `autonomous/${opts.goalId.slice(0, 8)}` },
+    }).catch((err) => logger.warn({ err }, "journal write failed"));
+
     // Optionally push and create PR
     if (opts.createPr) {
       const owner = optionalEnv("GITHUB_REPO_OWNER", "");
@@ -237,6 +245,14 @@ export class AutonomousExecutorService {
         result: prResult as Record<string, unknown>,
       });
       this.logger.info({ goalId: opts.goalId, owner, repo }, "pull request created");
+
+      void createJournalEntry(this.db, {
+        entryType: "pr_created",
+        title: `PR created: ${goal?.title ?? "Autonomous task"}`,
+        summary: `PR for ${branchName} → ${baseBranch}`,
+        goalId: opts.goalId,
+        details: { prUrl: (prResult as Record<string, unknown>)?.html_url, branch: branchName, base: baseBranch },
+      }).catch((err) => logger.warn({ err }, "journal write failed"));
     }
   }
 

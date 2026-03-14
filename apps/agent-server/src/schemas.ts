@@ -344,3 +344,21 @@ export const ReflectionListQuery = Type.Object({
   offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
 });
 export type ReflectionListQuery = Static<typeof ReflectionListQuery>;
+
+/* ────────────────────────── Journal ────────────────────────── */
+
+export const JournalListQuery = Type.Object({
+  since: Type.Optional(Type.String({ format: "date-time" })),
+  until: Type.Optional(Type.String({ format: "date-time" })),
+  goalId: Type.Optional(Type.String({ format: "uuid" })),
+  entryType: Type.Optional(Type.String()),
+  search: Type.Optional(Type.String()),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200, default: 50 })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
+});
+export type JournalListQuery = Static<typeof JournalListQuery>;
+
+export const StandupQuery = Type.Object({
+  date: Type.Optional(Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" })),
+});
+export type StandupQuery = Static<typeof StandupQuery>;

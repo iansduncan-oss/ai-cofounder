@@ -67,6 +67,7 @@ const DEFAULT_TOOLS = [
   "create_plan", "create_milestone", "request_approval",
 ] as const;
 import { AgentMessagingService } from "./services/agent-messaging.js";
+import { createJournalService, type JournalService } from "./services/journal.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
 /** Create and configure the LLM registry with all available providers */
@@ -232,6 +233,9 @@ export function buildServer(registry?: LlmRegistry) {
   // CI self-heal service (created after Redis + notification check, via onReady hook)
   app.decorate("ciSelfHealService", undefined as unknown as CiSelfHealService | undefined);
 
+  // Journal service (created after db is ready via onReady hook)
+  app.decorate("journalService", undefined as unknown as JournalService);
+
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
   app.addHook("onReady", async () => {
@@ -248,6 +252,10 @@ export function buildServer(registry?: LlmRegistry) {
     // Wire session engagement service
     app.sessionEngagementService = new SessionEngagementService(app.db);
     logger.info("session engagement service initialized");
+
+    // Wire journal service
+    app.journalService = createJournalService(app.db, llmRegistry, app.agentEvents);
+    logger.info("journal service initialized");
 
     // Wire CI self-heal service (requires Redis + notification service)
     const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
@@ -444,5 +452,6 @@ declare module "fastify" {
     deployCircuitBreakerService: DeployCircuitBreakerService;
     sessionEngagementService: SessionEngagementService;
     ciSelfHealService?: CiSelfHealService;
+    journalService: JournalService;
   }
 }

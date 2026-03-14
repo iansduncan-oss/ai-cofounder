@@ -15,6 +15,7 @@ import {
   listPendingApprovalsForTasks,
   recordLlmUsage,
   saveMemory,
+  createJournalEntry,
 } from "@ai-cofounder/db";
 import type { SpecialistAgent, SpecialistContext } from "./specialists/base.js";
 import { ResearcherAgent } from "./specialists/researcher.js";
@@ -128,9 +129,23 @@ export class TaskDispatcher {
 
     if (allCompleted) {
       await updateGoalStatus(this.db, goalId, "completed");
+      void createJournalEntry(this.db, {
+        entryType: "goal_completed",
+        title: `Goal completed: ${goal.title}`,
+        summary: `${completedCount}/${tasks.length} tasks completed`,
+        goalId,
+        details: { completedTasks: completedCount, totalTasks: tasks.length },
+      }).catch((err) => this.logger.warn({ err }, "journal write failed"));
     } else if (anyFailed && completedCount === 0) {
       // Only mark cancelled if nothing succeeded
       await updateGoalStatus(this.db, goalId, "cancelled");
+      void createJournalEntry(this.db, {
+        entryType: "goal_failed",
+        title: `Goal failed: ${goal.title}`,
+        summary: `All ${tasks.length} tasks failed`,
+        goalId,
+        details: { completedTasks: 0, totalTasks: tasks.length },
+      }).catch((err) => this.logger.warn({ err }, "journal write failed"));
     }
     // Otherwise leave as active (partially complete or awaiting approval)
 

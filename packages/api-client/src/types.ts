@@ -589,6 +589,41 @@ export interface Deployment {
   completedAt: string | null;
 }
 
+/* ── Journal ── */
+
+export type JournalEntryType =
+  | "goal_started" | "goal_completed" | "goal_failed"
+  | "task_completed" | "task_failed"
+  | "git_commit" | "pr_created"
+  | "reflection" | "work_session" | "subagent_run" | "deployment";
+
+export interface JournalEntry {
+  id: string;
+  entryType: JournalEntryType;
+  goalId: string | null;
+  taskId: string | null;
+  workSessionId: string | null;
+  title: string;
+  summary: string | null;
+  details: Record<string, unknown> | null;
+  occurredAt: string;
+  createdAt: string;
+}
+
+export interface StandupData {
+  date: string;
+  entryCounts: Record<string, number>;
+  highlights: string[];
+  totalEntries: number;
+  costUsd: number;
+}
+
+export interface StandupResponse {
+  date: string;
+  narrative: string;
+  data: StandupData;
+}
+
 export interface AgentMessageItem {
   id: string;
   senderRole: string;

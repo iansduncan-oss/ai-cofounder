@@ -51,6 +51,8 @@ import type {
   GoalBacklogItem,
   AutonomousRunResponse,
   Deployment,
+  JournalEntry,
+  StandupResponse,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -785,6 +787,41 @@ export class ApiClient {
       `/api/autonomous/${encodeURIComponent(goalId)}/run`,
       opts ?? {},
     );
+  }
+
+  /* ── Journal ── */
+
+  listJournalEntries(params?: {
+    since?: string;
+    until?: string;
+    goalId?: string;
+    entryType?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const qs = new URLSearchParams();
+    if (params?.since) qs.set("since", params.since);
+    if (params?.until) qs.set("until", params.until);
+    if (params?.goalId) qs.set("goalId", params.goalId);
+    if (params?.entryType) qs.set("entryType", params.entryType);
+    if (params?.search) qs.set("search", params.search);
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.offset) qs.set("offset", String(params.offset));
+    const query = qs.toString();
+    return this.request<{ data: JournalEntry[]; total: number }>(
+      "GET",
+      `/api/journal${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getJournalEntry(id: string) {
+    return this.request<JournalEntry>("GET", `/api/journal/${encodeURIComponent(id)}`);
+  }
+
+  getStandup(date?: string) {
+    const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+    return this.request<StandupResponse>("GET", `/api/journal/standup${qs}`);
   }
 
   /* ── Deployments ── */

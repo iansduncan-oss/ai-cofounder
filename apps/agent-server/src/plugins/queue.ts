@@ -1,5 +1,6 @@
 import fp from "fastify-plugin";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import { createJournalEntry } from "@ai-cofounder/db";
 import {
   getRedisConnection,
   startWorkers,
@@ -128,6 +129,13 @@ export const queuePlugin = fp(async (app) => {
           const { goalId, goalTitle, status, taskResults } = job.data;
           if (goalId && goalTitle && status && taskResults) {
             await reflectionService.reflectOnGoal(goalId, goalTitle, status, taskResults);
+            void createJournalEntry(app.db, {
+              entryType: "reflection",
+              title: `Reflection: ${goalTitle}`,
+              summary: `${status} goal analyzed`,
+              goalId,
+              details: { status, taskCount: taskResults.length },
+            }).catch((err) => logger.warn({ err }, "journal write failed"));
           }
           break;
         }

@@ -301,6 +301,7 @@ export const workSessions = pgTable("work_sessions", {
   trigger: text("trigger").notNull(), // "schedule", "event", "manual"
   scheduleId: uuid("schedule_id").references(() => schedules.id),
   eventId: uuid("event_id").references(() => events.id),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   context: jsonb("context"),
   tokensUsed: integer("tokens_used").notNull().default(0),
   durationMs: integer("duration_ms").notNull().default(0),
@@ -629,4 +630,33 @@ export const subagentRuns = pgTable("subagent_runs", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Journal Entries (unified activity timeline) ── */
+
+export const journalEntryTypeEnum = pgEnum("journal_entry_type", [
+  "goal_started",
+  "goal_completed",
+  "goal_failed",
+  "task_completed",
+  "task_failed",
+  "git_commit",
+  "pr_created",
+  "reflection",
+  "work_session",
+  "subagent_run",
+  "deployment",
+]);
+
+export const journalEntries = pgTable("journal_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  entryType: journalEntryTypeEnum("entry_type").notNull(),
+  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  workSessionId: uuid("work_session_id").references(() => workSessions.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  summary: text("summary"),
+  details: jsonb("details"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

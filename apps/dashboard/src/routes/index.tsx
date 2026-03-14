@@ -50,6 +50,9 @@ const PersonaPage = lazy(() =>
 const PatternsPage = lazy(() =>
   import("./patterns").then((m) => ({ default: m.PatternsPage })),
 );
+const JournalPage = lazy(() =>
+  import("./journal").then((m) => ({ default: m.JournalPage })),
+);
 const LoginPage = lazy(() =>
   import("./login").then((m) => ({ default: m.LoginPage })),
 );
@@ -85,6 +88,7 @@ export const router = createBrowserRouter([
       { path: "pipelines/:jobId", element: <PipelineDetailPage /> },
       { path: "persona", element: <PersonaPage /> },
       { path: "patterns", element: <PatternsPage /> },
+      { path: "journal", element: <JournalPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },
