@@ -127,7 +127,11 @@ Plans:
   2. Dashboard shows cost breakdown by any dimension (day, goal, model, agent)
   3. Budget alert fires within 1 minute of threshold breach
   4. Cost optimization suggestions generated based on usage patterns
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Data layer + alerting: getCostByDay DB function, BudgetAlertService, BullMQ budget-check wiring
+- [ ] 13-02-PLAN.md — API routes + dashboard UI: daily trend endpoint, budget status endpoint, LineChart + budget gauge + suggestions
 
 ### Phase 14: Multi-Project Awareness
 **Goal**: Agent understands all your projects, infrastructure, and how they relate — can switch context and reason across projects
@@ -181,7 +185,7 @@ Plans:
 | 10. Autonomous Execution Engine | 2/2 | Complete    | 2026-03-10 | — |
 | 11. Autonomous Scheduling | v2.0 | 0/2 | Planned | — |
 | 12. Work Journal & Standup | v2.0 | 0/0 | Pending | — |
-| 13. Financial Tracking | v2.0 | 0/0 | Pending | — |
+| 13. Financial Tracking | v2.0 | 0/2 | Planned | — |
 | 14. Multi-Project Awareness | v2.0 | 0/0 | Pending | — |
 | 15. Content Automations | v2.0 | 0/0 | Pending | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
