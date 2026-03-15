@@ -52,6 +52,7 @@ import type {
   DeadLetterEntry,
   GoalBacklogItem,
   AutonomousRunResponse,
+  WorkSession,
   Deployment,
   JournalEntry,
   StandupResponse,
@@ -849,7 +850,7 @@ export class ApiClient {
 
   listAutonomousSessions(limit?: number) {
     const query = limit != null ? `?limit=${limit}` : "";
-    return this.request<{ data: Record<string, unknown>[]; count: number }>(
+    return this.request<{ data: WorkSession[]; count: number }>(
       "GET",
       `/api/autonomous/sessions${query}`,
     );

@@ -71,6 +71,7 @@ export type {
   CreateProjectDependencyInput,
   ProjectLanguage,
   DeadLetterEntry,
+  WorkSession,
   JournalEntry,
   JournalEntryType,
   DailyCostResponse,

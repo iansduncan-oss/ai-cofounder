@@ -74,6 +74,10 @@ export const queryKeys = {
   autonomy: {
     tiers: ["autonomy", "tiers"] as const,
   },
+  autonomous: {
+    all: ["autonomous"] as const,
+    sessions: ["autonomous", "sessions"] as const,
+  },
   journal: {
     all: ["journal"] as const,
     list: (params?: string) => ["journal", "list", params ?? ""] as const,

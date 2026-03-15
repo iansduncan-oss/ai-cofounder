@@ -270,3 +270,11 @@ export function useSettings() {
     queryFn: () => apiClient.getSettings(),
   });
 }
+
+export function useAutonomousSessions(limit = 20) {
+  return useQuery({
+    queryKey: queryKeys.autonomous.sessions,
+    queryFn: () => apiClient.listAutonomousSessions(limit),
+    refetchInterval: 30_000,
+  });
+}

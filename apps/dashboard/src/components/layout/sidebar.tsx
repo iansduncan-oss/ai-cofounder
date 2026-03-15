@@ -23,6 +23,7 @@ import {
   BookOpen,
   Workflow,
   Bell,
+  PlayCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -49,6 +50,7 @@ const navItems = [
   { to: "/dashboard/persona", icon: Bot, label: "Persona" },
   { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
   { to: "/dashboard/journal", icon: BookOpen, label: "Journal" },
+  { to: "/dashboard/autonomous", icon: PlayCircle, label: "Autonomous" },
   { to: "/dashboard/notifications", icon: Bell, label: "Notifications" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];

@@ -65,6 +65,9 @@ const N8nWorkflowsPage = lazy(() =>
 const NotificationsPage = lazy(() =>
   import("./notifications").then((m) => ({ default: m.NotificationsPage })),
 );
+const AutonomousSessionsPage = lazy(() =>
+  import("./autonomous-sessions").then((m) => ({ default: m.AutonomousSessionsPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -97,6 +100,7 @@ export const router = createBrowserRouter([
       { path: "patterns", element: <PatternsPage /> },
       { path: "journal", element: <JournalPage /> },
       { path: "notifications", element: <NotificationsPage /> },
+      { path: "autonomous", element: <AutonomousSessionsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

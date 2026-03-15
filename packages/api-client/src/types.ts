@@ -589,6 +589,24 @@ export interface Deployment {
   completedAt: string | null;
 }
 
+/* ── Work Sessions ── */
+
+export interface WorkSession {
+  id: string;
+  trigger: string;
+  scheduleId: string | null;
+  eventId: string | null;
+  goalId: string | null;
+  status: "running" | "completed" | "failed" | "timeout" | "skipped" | "aborted";
+  tokensUsed: number | null;
+  durationMs: number | null;
+  actionsTaken: Record<string, unknown> | null;
+  summary: string | null;
+  context: Record<string, unknown> | null;
+  createdAt: string;
+  completedAt: string | null;
+}
+
 /* ── Journal ── */
 
 export type JournalEntryType =
