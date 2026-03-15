@@ -191,7 +191,7 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. Dashboard has an autonomous work sessions page showing execution history from GET /api/autonomous/sessions
   2. content_pipeline journal entries render with correct icon and "Content Pipeline" label
-  3. Project switcher in dashboard header causes API queries to scope data by active project
+  3. Project switcher in dashboard header changes workspace browsing root to active project's workspacePath
   4. Scheduled autonomous sessions pass through tier enforcement (autonomyTierService wired in scheduler.ts)
 **Plans:** 2 plans
 
