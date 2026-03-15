@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 15-03-PLAN.md
-last_updated: "2026-03-15T18:40:15.003Z"
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-03-15T22:35:59.488Z"
 last_activity: "2026-03-15 — Phase 15 Plan 02 complete: pipeline template routes, n8n executions route, PipelineExecutor journal + n8n wiring, YouTube Shorts template seed"
 progress:
   total_phases: 9
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 12
+  total_plans: 17
+  completed_plans: 13
 ---
 
 # Project State
@@ -103,6 +103,8 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - afterAll cleanup of REDIS_URL scoped to trigger describe block avoids affecting CRUD tests
 - [Phase 15]: PipelineTemplate, N8nExecution, TriggerTemplateResponse types defined in client.ts and re-exported from index.ts — consistent with existing ClientOptions export pattern
 - [Phase 15]: Quick Launch section hidden when templates array empty — avoids noise for users without pipeline templates configured
+- [Phase 16]: Migration numbered 0029 (not 0022 as planned) — 0022 was already taken by 0022_add_memory_agent_role.sql
+- [Phase 16]: DB-first config reads: getAppSetting(db, key) ?? parseFloat(optionalEnv(name, '0')) — use this pattern for all future configurable thresholds
 
 ### Pending Todos
 
@@ -131,9 +133,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 15 | 01 | 2.5 min | 2/2 | 5 |
 | 15 | 02 | 7 min | 2/2 | 8 |
 | Phase 15 P03 | 3.5 min | 2 tasks | 6 files |
+| Phase 16 P01 | 15 min | 2 tasks | 13 files |
 
 ## Session Continuity
 
-Last session: 2026-03-15T18:30:54.936Z
-Stopped at: Completed 15-03-PLAN.md
+Last session: 2026-03-15T22:35:59.486Z
+Stopped at: Completed 16-01-PLAN.md
 Resume file: None
