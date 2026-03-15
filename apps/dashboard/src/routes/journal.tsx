@@ -95,10 +95,18 @@ const entryTypes: JournalEntryType[] = [
   "subagent_run", "deployment",
 ];
 
+function toDateString(date: Date): string {
+  return date.toISOString().split("T")[0];
+}
+
 export function JournalPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [fromDate, setFromDate] = useState(() =>
+    toDateString(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
+  );
+  const [toDate, setToDate] = useState(() => toDateString(new Date()));
 
   // Debounce search
   useMemo(() => {
@@ -117,6 +125,17 @@ export function JournalPage() {
     queryKey: queryKeys.journal.list(paramsKey),
     queryFn: () => apiClient.listJournalEntries(params),
   });
+
+  // Client-side date range filtering
+  const filteredEntries = useMemo(() => {
+    if (!journal?.data) return [];
+    return journal.data.filter((entry) => {
+      const entryDate = entry.occurredAt.split("T")[0];
+      if (fromDate && entryDate < fromDate) return false;
+      if (toDate && entryDate > toDate) return false;
+      return true;
+    });
+  }, [journal?.data, fromDate, toDate]);
 
   const { data: standup } = useQuery({
     queryKey: queryKeys.journal.standup(),
@@ -165,6 +184,26 @@ export function JournalPage() {
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          From
+          <input
+            type="date"
+            aria-label="From"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="rounded border bg-card border-border px-3 py-2 text-sm"
+          />
+        </label>
+        <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          To
+          <input
+            type="date"
+            aria-label="To"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="rounded border bg-card border-border px-3 py-2 text-sm"
+          />
+        </label>
       </div>
 
       {isLoading ? (
@@ -173,9 +212,9 @@ export function JournalPage() {
             <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
           ))}
         </div>
-      ) : journal?.data && journal.data.length > 0 ? (
+      ) : filteredEntries.length > 0 ? (
         <div className="relative">
-          {journal.data.map((entry) => (
+          {filteredEntries.map((entry) => (
             <EntryCard key={entry.id} entry={entry} />
           ))}
         </div>

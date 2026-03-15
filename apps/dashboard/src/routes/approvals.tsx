@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { usePendingApprovals } from "@/api/queries";
+import { usePendingApprovals, useToolTierConfig } from "@/api/queries";
 import { useResolveApproval } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -20,10 +21,45 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { ShieldCheck, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
 import type { Approval } from "@ai-cofounder/api-client";
 
+function extractToolName(reason: string): string | null {
+  // Match text between single quotes: Tool 'write_file' requires approval
+  const match = reason.match(/'([^']+)'/);
+  if (match) return match[1];
+  // Fallback: match first word after "Tool "
+  const fallback = reason.match(/[Tt]ool\s+(\S+)/);
+  if (fallback) return fallback[1];
+  return null;
+}
+
+function TierBadge({ approvalId, toolName, tierData }: {
+  approvalId: string;
+  toolName: string | null;
+  tierData: Array<{ toolName: string; tier: string }> | undefined;
+}) {
+  const tier = toolName
+    ? tierData?.find((t) => t.toolName === toolName)?.tier ?? "yellow"
+    : "yellow";
+
+  const variant =
+    tier === "red" ? "destructive" :
+    tier === "yellow" ? "warning" :
+    "success";
+
+  return (
+    <Badge
+      variant={variant}
+      data-testid={`tier-badge-${approvalId}`}
+    >
+      {tier}
+    </Badge>
+  );
+}
+
 export function ApprovalsPage() {
   usePageTitle("Approvals");
 
   const { data: approvals, isLoading, error } = usePendingApprovals();
+  const { data: tierConfig } = useToolTierConfig();
   const resolveApproval = useResolveApproval();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -77,11 +113,16 @@ export function ApprovalsPage() {
             <Card key={approval.id}>
               <CardContent className="flex items-start justify-between p-4">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-sm font-medium">
                       Approval Request
                     </h3>
                     <ApprovalStatusBadge status={approval.status} />
+                    <TierBadge
+                      approvalId={approval.id}
+                      toolName={extractToolName(approval.reason)}
+                      tierData={tierConfig}
+                    />
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {approval.reason}
