@@ -68,6 +68,7 @@ const DEFAULT_TOOLS = [
 ] as const;
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { createJournalService, type JournalService } from "./services/journal.js";
+import { BudgetAlertService } from "./services/budget-alert.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
 /** Create and configure the LLM registry with all available providers */
@@ -236,6 +237,9 @@ export function buildServer(registry?: LlmRegistry) {
   // Journal service (created after db is ready via onReady hook)
   app.decorate("journalService", undefined as unknown as JournalService);
 
+  // Budget alert service (created after db is ready via onReady hook)
+  app.decorate("budgetAlertService", undefined as unknown as BudgetAlertService);
+
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
   app.addHook("onReady", async () => {
@@ -256,6 +260,10 @@ export function buildServer(registry?: LlmRegistry) {
     // Wire journal service
     app.journalService = createJournalService(app.db, llmRegistry, app.agentEvents);
     logger.info("journal service initialized");
+
+    // Wire budget alert service
+    app.budgetAlertService = new BudgetAlertService(app.db, notificationService);
+    logger.info("budget alert service initialized");
 
     // Wire CI self-heal service (requires Redis + notification service)
     const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
@@ -453,5 +461,6 @@ declare module "fastify" {
     sessionEngagementService: SessionEngagementService;
     ciSelfHealService?: CiSelfHealService;
     journalService: JournalService;
+    budgetAlertService: BudgetAlertService;
   }
 }

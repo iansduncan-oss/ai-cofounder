@@ -186,6 +186,18 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled approval timeout sweep every 60s");
 
+  // ── Budget check (every 60 seconds) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "budget-check",
+    { every: 60_000 },
+    {
+      name: "budget-check",
+      data: { check: "budget_check" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled budget check every 60s");
+
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 
   const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes

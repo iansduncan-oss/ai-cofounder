@@ -82,6 +82,12 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "budget_check": {
+          if (app.budgetAlertService) {
+            await app.budgetAlertService.checkBudgets();
+          }
+          break;
+        }
         default:
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();
