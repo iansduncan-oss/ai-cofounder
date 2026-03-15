@@ -49,6 +49,7 @@ export const conversations = pgTable("conversations", {
     .notNull()
     .references(() => users.id),
   title: text("title"),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

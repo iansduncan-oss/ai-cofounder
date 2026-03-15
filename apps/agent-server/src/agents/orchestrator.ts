@@ -30,6 +30,7 @@ import {
   touchMemory,
   recordToolExecution,
   updateTaskDependencies,
+  getConversation,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
@@ -76,6 +77,8 @@ import { notifyApprovalCreated } from "../services/notifications.js";
 import { buildSharedToolList, executeSharedTool, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
+import type { ProjectRegistryService } from "../services/project-registry.js";
+import type { MonitoringService } from "../services/monitoring.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -309,6 +312,8 @@ export class Orchestrator {
   private workspaceService?: WorkspaceService;
   private messagingService?: AgentMessagingService;
   private autonomyTierService?: AutonomyTierService;
+  private projectRegistryService?: ProjectRegistryService;
+  private monitoringService?: MonitoringService;
   private requestId?: string;
 
   constructor(
@@ -321,6 +326,8 @@ export class Orchestrator {
     workspaceService?: WorkspaceService,
     messagingService?: AgentMessagingService,
     autonomyTierService?: AutonomyTierService,
+    projectRegistryService?: ProjectRegistryService,
+    monitoringService?: MonitoringService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -331,6 +338,8 @@ export class Orchestrator {
     this.workspaceService = workspaceService;
     this.messagingService = messagingService;
     this.autonomyTierService = autonomyTierService;
+    this.projectRegistryService = projectRegistryService;
+    this.monitoringService = monitoringService;
   }
 
   async run(
@@ -428,8 +437,21 @@ export class Orchestrator {
       }
     }
 
-    // RAG retrieval: find relevant document chunks
-    const ragContext = await this.retrieveRagContext(message);
+    // Resolve active project from conversation metadata
+    let activeProjectSlug: string | undefined;
+    if (this.db && conversationId) {
+      try {
+        const conv = await getConversation(this.db, conversationId);
+        const meta = conv?.metadata as { activeProjectId?: string } | null;
+        if (meta?.activeProjectId && this.projectRegistryService) {
+          const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
+          activeProjectSlug = proj?.slug;
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // RAG retrieval: find relevant document chunks (scoped to active project if set)
+    const ragContext = await this.retrieveRagContext(message, activeProjectSlug);
     if (ragContext) {
       memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
@@ -463,6 +485,8 @@ export class Orchestrator {
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
       messagingService: this.messagingService,
+      projectRegistryService: this.projectRegistryService,
+      monitoringService: this.monitoringService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -630,8 +654,21 @@ export class Orchestrator {
       } catch { /* non-fatal */ }
     }
 
-    // RAG retrieval: find relevant document chunks
-    const ragContext = await this.retrieveRagContext(message);
+    // Resolve active project from conversation metadata
+    let activeProjectSlugStream: string | undefined;
+    if (this.db && conversationId) {
+      try {
+        const conv = await getConversation(this.db, conversationId);
+        const meta = conv?.metadata as { activeProjectId?: string } | null;
+        if (meta?.activeProjectId && this.projectRegistryService) {
+          const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
+          activeProjectSlugStream = proj?.slug;
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // RAG retrieval: find relevant document chunks (scoped to active project if set)
+    const ragContext = await this.retrieveRagContext(message, activeProjectSlugStream);
     if (ragContext) {
       memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
@@ -654,6 +691,8 @@ export class Orchestrator {
       sandboxService: this.sandboxService,
       workspaceService: this.workspaceService,
       messagingService: this.messagingService,
+      projectRegistryService: this.projectRegistryService,
+      monitoringService: this.monitoringService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -945,6 +984,8 @@ export class Orchestrator {
           workspaceService: this.workspaceService,
           messagingService: this.messagingService,
           autonomyTierService: this.autonomyTierService,
+          projectRegistryService: this.projectRegistryService,
+          monitoringService: this.monitoringService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
@@ -953,13 +994,14 @@ export class Orchestrator {
     }
   }
 
-  private async retrieveRagContext(query: string): Promise<string | null> {
+  private async retrieveRagContext(query: string, sourceId?: string): Promise<string | null> {
     if (!this.db || !this.embeddingService) return null;
     try {
       const chunks = await retrieve(this.db, this.embeddingService.embed.bind(this.embeddingService), query, {
         limit: 5,
         minScore: 0.3,
         diversifySources: true,
+        ...(sourceId ? { sourceId } : {}),
       });
       if (chunks.length === 0) return null;
       return formatContext(chunks);

@@ -19,6 +19,7 @@ export function mockDbModule() {
     // Conversations
     createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
     getConversation: vi.fn().mockResolvedValue(null),
+    updateConversationMetadata: vi.fn().mockResolvedValue({ id: "conv-1" }),
     getConversationMessages: vi.fn().mockResolvedValue([]),
     getConversationMessageCount: vi.fn().mockResolvedValue(0),
     createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),

@@ -111,6 +111,19 @@ export async function getConversation(db: Db, id: string) {
   return rows[0] ?? null;
 }
 
+export async function updateConversationMetadata(
+  db: Db,
+  id: string,
+  metadata: Record<string, unknown>,
+) {
+  const [updated] = await db
+    .update(conversations)
+    .set({ metadata })
+    .where(eq(conversations.id, id))
+    .returning();
+  return updated ?? null;
+}
+
 /* ────────────────────── Messages ────────────────────────── */
 
 export async function createMessage(

@@ -25,6 +25,8 @@ import {
   touchMemory,
 } from "@ai-cofounder/db";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
+import type { ProjectRegistryService } from "../services/project-registry.js";
+import type { MonitoringService } from "../services/monitoring.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
@@ -62,6 +64,20 @@ import {
   CHECK_MESSAGES_TOOL,
   BROADCAST_UPDATE_TOOL,
 } from "./tools/messaging-tools.js";
+import {
+  REGISTER_PROJECT_TOOL,
+  SWITCH_PROJECT_TOOL,
+  LIST_PROJECTS_TOOL,
+  ANALYZE_CROSS_PROJECT_IMPACT_TOOL,
+} from "./tools/project-tools.js";
+import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
+import {
+  createRegisteredProject,
+  getRegisteredProjectByName,
+  updateConversationMetadata,
+  listProjectDependencies,
+  getRegisteredProjectById,
+} from "@ai-cofounder/db";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
@@ -78,6 +94,8 @@ export interface ToolExecutorServices {
   workspaceService?: WorkspaceService;
   messagingService?: AgentMessagingService;
   autonomyTierService?: AutonomyTierService;
+  projectRegistryService?: ProjectRegistryService;
+  monitoringService?: MonitoringService;
 }
 
 export interface ToolExecutorContext {
@@ -156,6 +174,17 @@ export function buildSharedToolList(
     add(SEND_MESSAGE_TOOL);
     add(CHECK_MESSAGES_TOOL);
     add(BROADCAST_UPDATE_TOOL);
+  }
+
+  if (services.projectRegistryService && services.db) {
+    add(REGISTER_PROJECT_TOOL);
+    add(SWITCH_PROJECT_TOOL);
+    add(LIST_PROJECTS_TOOL);
+    add(ANALYZE_CROSS_PROJECT_IMPACT_TOOL);
+  }
+
+  if (services.monitoringService) {
+    add(QUERY_VPS_TOOL);
   }
 
   return tools;
@@ -265,7 +294,7 @@ export async function executeSharedTool(
   services: ToolExecutorServices,
   context: ToolExecutorContext,
 ): Promise<unknown> {
-  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService } = services;
+  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService, projectRegistryService, monitoringService } = services;
 
   switch (block.name) {
     case "save_memory": {
@@ -709,6 +738,132 @@ export async function executeSharedTool(
         conversationId: context.conversationId,
       });
       return { broadcast: true, messageId: result.messageId, channel: input.channel };
+    }
+
+    case "register_project": {
+      if (!projectRegistryService || !db) return { error: "Project registry not available" };
+      const input = block.input as {
+        name: string;
+        workspace_path: string;
+        repo_url?: string;
+        description?: string;
+        language?: "typescript" | "python" | "javascript" | "go" | "other";
+        test_command?: string;
+        default_branch?: string;
+      };
+
+      if (!projectRegistryService.validateProjectPath(input.workspace_path)) {
+        return { error: `Path "${input.workspace_path}" is outside allowed base directories. Configure PROJECTS_BASE_DIR to allow this path.` };
+      }
+
+      const slug = input.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      const project = await createRegisteredProject(db, {
+        name: input.name,
+        slug,
+        workspacePath: input.workspace_path,
+        repoUrl: input.repo_url,
+        description: input.description,
+        language: input.language ?? "typescript",
+        defaultBranch: input.default_branch ?? "main",
+        testCommand: input.test_command,
+      });
+
+      try {
+        await projectRegistryService.registerProject({
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          workspacePath: project.workspacePath,
+          repoUrl: project.repoUrl,
+          description: project.description,
+          language: project.language ?? "typescript",
+          defaultBranch: project.defaultBranch ?? "main",
+          testCommand: project.testCommand,
+          config: project.config as Record<string, unknown> | null,
+        });
+      } catch (err) {
+        logger.warn({ err, projectId: project.id }, "failed to register project workspace (non-fatal)");
+      }
+
+      // Optionally enqueue RAG ingestion (fire-and-forget)
+      try {
+        const { enqueueRagIngestion } = await import("@ai-cofounder/queue");
+        enqueueRagIngestion({ action: "ingest_repo", sourceId: slug }).catch(() => {});
+      } catch { /* non-fatal */ }
+
+      return { projectId: project.id, name: project.name, slug, message: `Project "${project.name}" registered successfully. Use switch_project to make it active.` };
+    }
+
+    case "switch_project": {
+      if (!projectRegistryService || !db) return { error: "Project registry not available" };
+      const input = block.input as { project_name: string };
+
+      const project = await getRegisteredProjectByName(db, input.project_name);
+      if (!project) {
+        const available = projectRegistryService.listProjects().map((p) => p.name);
+        return { error: `Project "${input.project_name}" not found. Available projects: ${available.join(", ") || "none registered yet"}` };
+      }
+
+      await updateConversationMetadata(db, context.conversationId, { activeProjectId: project.id });
+      return { switched: true, projectId: project.id, name: project.name, slug: project.slug, message: `Switched to project "${project.name}". RAG retrieval and workspace operations are now scoped to this project.` };
+    }
+
+    case "list_projects": {
+      if (!projectRegistryService) return { error: "Project registry not available" };
+      const projects = projectRegistryService.listProjects();
+      return {
+        count: projects.length,
+        projects: projects.map((p) => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          language: p.language,
+          workspacePath: p.workspacePath,
+          description: p.description,
+          defaultBranch: p.defaultBranch,
+        })),
+      };
+    }
+
+    case "analyze_cross_project_impact": {
+      if (!projectRegistryService || !db) return { error: "Project registry not available" };
+      const input = block.input as { project_name: string; change_description: string };
+
+      const project = await getRegisteredProjectByName(db, input.project_name);
+      if (!project) {
+        return { error: `Project "${input.project_name}" not found` };
+      }
+
+      const deps = await listProjectDependencies(db, project.id);
+      const dependencyDetails = await Promise.all(
+        deps.map(async (dep) => {
+          const targetId = dep.sourceProjectId === project.id ? dep.targetProjectId : dep.sourceProjectId;
+          const direction = dep.sourceProjectId === project.id ? "depends_on" : "depended_on_by";
+          const targetProject = await getRegisteredProjectById(db, targetId);
+          return {
+            targetProjectId: targetId,
+            targetProjectName: targetProject?.name ?? "unknown",
+            direction,
+            dependencyType: dep.dependencyType,
+            description: dep.description,
+          };
+        }),
+      );
+
+      return {
+        project: { id: project.id, name: project.name, slug: project.slug, description: project.description },
+        change_description: input.change_description,
+        dependency_count: deps.length,
+        dependencies: dependencyDetails,
+        analysis_note: "Review all 'depended_on_by' projects to assess impact of your change.",
+      };
+    }
+
+    case "query_vps": {
+      if (!monitoringService) return { error: "Monitoring service not available" };
+      const health = await monitoringService.checkVPSHealth();
+      if (!health) return { error: "VPS is not configured or health check failed" };
+      return health;
     }
 
     default:
