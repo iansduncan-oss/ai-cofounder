@@ -37,7 +37,7 @@
 - [x] **Phase 11: Autonomous Scheduling** — Recurring execution loop, distributed lock, token budget, self-healing (completed 2026-03-14)
 - [x] **Phase 12: Work Journal & Standup** — Browsable activity log, daily standup summaries (completed 2026-03-15)
 - [x] **Phase 13: Financial Tracking** — Per-request cost tracking, aggregation, budget alerts (completed 2026-03-15)
-- [ ] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state (next)
+- [x] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state (completed 2026-03-15)
 - [ ] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks
 - [ ] **Phase 16: Dashboard Command Center** — Journal, approvals, costs, projects, notifications, settings
 
@@ -147,7 +147,7 @@ Plans:
 
 Plans:
 - [x] 14-01-PLAN.md — DB schema + migration + repository CRUD + ProjectRegistryService + Fastify plugin
-- [ ] 14-02-PLAN.md — Orchestrator tools + RAG scoping + VPS monitoring extension + REST API routes
+- [x] 14-02-PLAN.md — Orchestrator tools + RAG scoping + VPS monitoring extension + REST API routes
 
 ### Phase 15: Content Automations
 **Goal**: YouTube pipeline and n8n workflows are managed tasks the agent can trigger, monitor, and report on
@@ -191,7 +191,7 @@ Plans:
 | 11. Autonomous Scheduling | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 14. Multi-Project Awareness | v2.0 | 1/2 | In Progress | — |
+| 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
 | 15. Content Automations | v2.0 | 0/0 | Pending | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 

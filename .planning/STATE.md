@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-03-15T16:57:30Z"
-last_activity: "2026-03-15 — Phase 14 Plan 01 complete: multi-project DB schema + ProjectRegistryService + Fastify plugin"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-03-15T17:15:15Z"
+last_activity: "2026-03-15 — Phase 14 Plan 02 complete: orchestrator tools, RAG scoping, VPS monitoring extension, project CRUD REST API"
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 14 (Multi-Project Awareness) — Plan 1 of 2 complete
-Plan: 1 of 2
+Phase: 14 (Multi-Project Awareness) — Plan 2 of 2 complete (phase complete)
+Plan: 2 of 2
 Status: active
-Last activity: 2026-03-15 — Phase 14 Plan 01 complete: multi-project DB schema + ProjectRegistryService + Fastify plugin
+Last activity: 2026-03-15 — Phase 14 Plan 02 complete: orchestrator tools, RAG scoping, VPS monitoring extension, project CRUD REST API
 
 ## Milestones Shipped
 
@@ -86,6 +86,12 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - importOriginal pattern for node:fs/promises mock — vitest 4.x requires default export to be present in mocked node built-ins
 - PROJECTS_BASE_DIR defaults to WORKSPACE_DIR env for backward compatibility with existing single-project deployments
 
+**Phase 14 Plan 02 Decisions:**
+- monitoringService added to Orchestrator constructor as 11th positional param (after projectRegistryService) — maintains the positional pattern established by all previous services
+- projectRegistryPlugin must be registered before jwtGuardPlugin in server.ts so app.projectRegistry is available when route handlers initialize their orchestrators
+- analyze_cross_project_impact returns structured JSON for LLM reasoning rather than performing nested LLM analysis — avoids token cost and latency
+- Docker stats SSH timeout increased to 30s (from 15s) — docker stats --no-stream can take extra seconds on busy hosts
+
 ### Pending Todos
 
 None.
@@ -109,9 +115,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 13 | 02 | 4 min | 2/2 | 6 |
 | Phase 13 P03 | 6 | 2 tasks | 9 files |
 | 14 | 01 | 4 min | 2/2 | 7 |
+| 14 | 02 | 14 min | 2/2 | 12 |
 
 ## Session Continuity
 
-Last session: 2026-03-15T16:57:30Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-03-15T17:15:15Z
+Stopped at: Completed 14-02-PLAN.md
 Resume file: None
