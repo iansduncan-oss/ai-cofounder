@@ -53,6 +53,7 @@ import { SessionEngagementService } from "./services/session-engagement.js";
 import { websocketPlugin } from "./plugins/websocket.js";
 import { wsEmitterPlugin } from "./plugins/ws-emitter.js";
 import { CiSelfHealService } from "./services/ci-self-heal.js";
+import { projectRegistryPlugin } from "./plugins/project-registry.js";
 import Redis from "ioredis";
 
 /** All known tool names — seeded at green tier on first server start */
@@ -400,6 +401,9 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
+
+  // Project registry plugin — loads registered projects from DB and decorates app.projectRegistry
+  app.register(projectRegistryPlugin);
 
   // Register all protected API routes inside jwtGuardPlugin scope
   // The guard applies onRequest JWT verification to everything inside its scope

@@ -666,3 +666,62 @@ export interface AgentMessageItem {
   metadata: Record<string, unknown> | null;
   createdAt: string;
 }
+
+/* ── Registered Projects ── */
+
+export type ProjectLanguage = "typescript" | "python" | "javascript" | "go" | "other";
+
+export interface RegisteredProject {
+  id: string;
+  name: string;
+  slug: string;
+  workspacePath: string;
+  repoUrl?: string | null;
+  description?: string | null;
+  language: ProjectLanguage;
+  defaultBranch: string;
+  testCommand?: string | null;
+  isActive: boolean;
+  config?: Record<string, unknown> | null;
+  lastIngestedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectDependency {
+  id: string;
+  sourceProjectId: string;
+  targetProjectId: string;
+  dependencyType: string;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface CreateProjectInput {
+  name: string;
+  workspacePath: string;
+  repoUrl?: string;
+  description?: string;
+  language?: ProjectLanguage;
+  defaultBranch?: string;
+  testCommand?: string;
+  config?: Record<string, unknown>;
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  workspacePath?: string;
+  repoUrl?: string | null;
+  description?: string | null;
+  language?: ProjectLanguage;
+  defaultBranch?: string;
+  testCommand?: string | null;
+  isActive?: boolean;
+  config?: Record<string, unknown> | null;
+}
+
+export interface CreateProjectDependencyInput {
+  targetProjectId: string;
+  dependencyType: string;
+  description?: string;
+}

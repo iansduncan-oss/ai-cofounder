@@ -55,6 +55,11 @@ import type {
   Deployment,
   JournalEntry,
   StandupResponse,
+  RegisteredProject,
+  ProjectDependency,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CreateProjectDependencyInput,
 } from "./types.js";
 
 export interface ClientOptions {
@@ -960,6 +965,36 @@ export class ApiClient {
     } finally {
       reader.releaseLock();
     }
+  }
+
+  /* ── Registered Projects ── */
+
+  async listProjects(): Promise<RegisteredProject[]> {
+    return this.request<RegisteredProject[]>("GET", "/api/projects");
+  }
+
+  async createProject(data: CreateProjectInput): Promise<RegisteredProject> {
+    return this.request<RegisteredProject>("POST", "/api/projects", data);
+  }
+
+  async getProject(id: string): Promise<RegisteredProject> {
+    return this.request<RegisteredProject>("GET", `/api/projects/${id}`);
+  }
+
+  async updateProject(id: string, data: UpdateProjectInput): Promise<RegisteredProject> {
+    return this.request<RegisteredProject>("PUT", `/api/projects/${id}`, data);
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await this.request<unknown>("DELETE", `/api/projects/${id}`);
+  }
+
+  async listProjectDependencies(id: string): Promise<ProjectDependency[]> {
+    return this.request<ProjectDependency[]>("GET", `/api/projects/${id}/dependencies`);
+  }
+
+  async createProjectDependency(projectId: string, data: CreateProjectDependencyInput): Promise<ProjectDependency> {
+    return this.request<ProjectDependency>("POST", `/api/projects/${projectId}/dependencies`, data);
   }
 }
 

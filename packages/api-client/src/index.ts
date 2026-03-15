@@ -57,4 +57,10 @@ export type {
   PatternAnalytics,
   AutonomyTier,
   ToolTierConfig,
+  RegisteredProject,
+  ProjectDependency,
+  CreateProjectInput,
+  UpdateProjectInput,
+  CreateProjectDependencyInput,
+  ProjectLanguage,
 } from "./types.js";

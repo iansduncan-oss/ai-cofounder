@@ -44,6 +44,9 @@ export interface ContainerStatus {
   status: string;
   health: string;
   uptime: string;
+  cpuPercent?: number;
+  memUsage?: string;
+  memPercent?: number;
 }
 
 export interface MonitoringReport {
@@ -205,6 +208,7 @@ export class MonitoringService {
         "cat /proc/loadavg | awk '{print $1,$2,$3}'",
         "uptime -p",
         "docker ps --format '{{.Names}}|{{.Status}}' 2>/dev/null || echo 'no-docker'",
+        "docker stats --no-stream --format '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}' 2>/dev/null || echo 'no-stats'",
       ].join(" && echo '---SEPARATOR---' && ");
 
       const { stdout } = await execFileAsync(
@@ -215,7 +219,7 @@ export class MonitoringService {
           `${this.vpsUser}@${this.vpsHost}`,
           script,
         ],
-        { timeout: 15_000 },
+        { timeout: 30_000 },
       );
 
       const parts = stdout.split("---SEPARATOR---").map((s) => s.trim());
@@ -225,17 +229,38 @@ export class MonitoringService {
       const loadParts = (parts[2] ?? "0 0 0").split(" ").map(Number);
       const uptimeStr = parts[3] ?? "unknown";
       const containerLines = (parts[4] ?? "").split("\n").filter(Boolean);
+      const statsLines = (parts[5] ?? "").split("\n").filter(Boolean);
+
+      // Build a lookup map from container name → resource stats
+      const statsMap = new Map<string, { cpuPercent: number; memUsage: string; memPercent: number }>();
+      for (const line of statsLines) {
+        if (line === "no-stats") continue;
+        const [name, cpuPerc, memUsage, memPerc] = line.split("|");
+        if (!name) continue;
+        statsMap.set(name.trim(), {
+          cpuPercent: parseFloat((cpuPerc ?? "0").replace("%", "")),
+          memUsage: memUsage?.trim() ?? "",
+          memPercent: parseFloat((memPerc ?? "0").replace("%", "")),
+        });
+      }
 
       const containers: ContainerStatus[] = containerLines
         .filter((l) => l !== "no-docker")
         .map((line) => {
           const [name, status] = line.split("|");
+          const containerName = name ?? "unknown";
           const isHealthy = status?.includes("(healthy)") ?? false;
+          const stats = statsMap.get(containerName);
           return {
-            name: name ?? "unknown",
+            name: containerName,
             status: status ?? "unknown",
             health: isHealthy ? "healthy" : status?.includes("(unhealthy)") ? "unhealthy" : "none",
             uptime: status ?? "",
+            ...(stats ? {
+              cpuPercent: stats.cpuPercent,
+              memUsage: stats.memUsage,
+              memPercent: stats.memPercent,
+            } : {}),
           };
         });
 
