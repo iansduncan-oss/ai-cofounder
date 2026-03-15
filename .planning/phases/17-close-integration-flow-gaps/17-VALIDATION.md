@@ -38,10 +38,10 @@ created: 2026-03-15
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 17-01-01 | 01 | 1 | TERM-01, TERM-05 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose --testPathPattern="autonomous-sessions"` | ❌ W0 | ⬜ pending |
-| 17-02-01 | 02 | 1 | CONT-04, DASH-01 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose --testPathPattern="journal"` | ❌ W0 | ⬜ pending |
-| 17-03-01 | 03 | 1 | PROJ-01, DASH-04 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose --testPathPattern="project"` | ❌ W0 | ⬜ pending |
-| 17-04-01 | 04 | 1 | AUTO-01, AUTO-02, AUTO-03, SCHED-01 | unit | `npm run test -w @ai-cofounder/agent-server -- --reporter=verbose --testPathPattern="scheduler"` | ❌ W0 | ⬜ pending |
+| 17-01-T1 | 01 | 1 | CONT-04, DASH-01 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose --testPathPattern="journal"` | ❌ W0 | ⬜ pending |
+| 17-01-T2 | 01 | 1 | AUTO-01, AUTO-02, AUTO-03, SCHED-01 | unit | `npm run test -w @ai-cofounder/agent-server -- --reporter=verbose --testPathPattern="scheduler"` | ❌ W0 | ⬜ pending |
+| 17-02-T1 | 02 | 2 | TERM-01, TERM-05, DASH-01 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose --testPathPattern="autonomous-sessions"` | ❌ W0 | ⬜ pending |
+| 17-02-T2 | 02 | 2 | PROJ-01, DASH-04 | unit | `npm run test -w @ai-cofounder/dashboard -- --reporter=verbose` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
