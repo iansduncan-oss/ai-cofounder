@@ -1,4 +1,4 @@
-import { Worker, Job } from "bullmq";
+import { Worker, type Job } from "bullmq";
 import { createLogger } from "@ai-cofounder/shared";
 import { getRedisConnection } from "./connection.js";
 import {
