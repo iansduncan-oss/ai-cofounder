@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 14-02-PLAN.md
-last_updated: "2026-03-15T17:24:38.423Z"
-last_activity: "2026-03-15 — Phase 14 Plan 02 complete: orchestrator tools, RAG scoping, VPS monitoring extension, project CRUD REST API"
+stopped_at: Completed 15-01-PLAN.md
+last_updated: "2026-03-15T18:11:46Z"
+last_activity: "2026-03-15 — Phase 15 Plan 01 complete: DB migration, pipelineTemplates schema + CRUD repository, N8nService listExecutions"
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 11
-  completed_plans: 9
+  total_plans: 14
+  completed_plans: 10
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 14 (Multi-Project Awareness) — Plan 2 of 2 complete (phase complete)
-Plan: 2 of 2
+Phase: 15 (Content Automations) — Plan 1 of 3 complete
+Plan: 1 of 3
 Status: active
-Last activity: 2026-03-15 — Phase 14 Plan 02 complete: orchestrator tools, RAG scoping, VPS monitoring extension, project CRUD REST API
+Last activity: 2026-03-15 — Phase 15 Plan 01 complete: DB migration, pipelineTemplates schema + CRUD repository, N8nService listExecutions
 
 ## Milestones Shipped
 
@@ -92,6 +92,11 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - analyze_cross_project_impact returns structured JSON for LLM reasoning rather than performing nested LLM analysis — avoids token cost and latency
 - Docker stats SSH timeout increased to 30s (from 15s) — docker stats --no-stream can take extra seconds on busy hosts
 
+**Phase 15 Plan 01 Decisions:**
+- stages column typed as generic jsonb in Drizzle schema — type assertion happens in repository/route layer
+- listExecutions returns [] when N8N_API_KEY not configured — graceful no-op for optional integrations
+- listPipelineTemplates defaults activeOnly=true — consistent with listN8nWorkflows pattern
+
 ### Pending Todos
 
 None.
@@ -116,9 +121,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | Phase 13 P03 | 6 | 2 tasks | 9 files |
 | 14 | 01 | 4 min | 2/2 | 7 |
 | 14 | 02 | 14 min | 2/2 | 12 |
+| 15 | 01 | 2.5 min | 2/2 | 5 |
 
 ## Session Continuity
 
-Last session: 2026-03-15T17:15:15Z
-Stopped at: Completed 14-02-PLAN.md
+Last session: 2026-03-15T18:11:46Z
+Stopped at: Completed 15-01-PLAN.md
 Resume file: None
