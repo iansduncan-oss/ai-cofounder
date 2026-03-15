@@ -88,6 +88,16 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "dlq_check": {
+          const { listDeadLetterJobs } = await import("@ai-cofounder/queue");
+          const dlqJobs = await listDeadLetterJobs(10);
+          const threshold = Number(optionalEnv("DLQ_ALERT_THRESHOLD", "3"));
+          if (dlqJobs.length >= threshold) {
+            await app.notificationService.notifyDlqAlert(dlqJobs.length, dlqJobs);
+            logger.warn({ count: dlqJobs.length }, "DLQ threshold exceeded — alert sent");
+          }
+          break;
+        }
         default:
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();

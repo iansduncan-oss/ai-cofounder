@@ -198,6 +198,18 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled budget check every 60s");
 
+  // ── Dead-letter queue check (every 5 minutes) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "dlq-check",
+    { every: 5 * 60 * 1000 },
+    {
+      name: "dlq-check",
+      data: { check: "dlq_check" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled DLQ check every 5 minutes");
+
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 
   const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes

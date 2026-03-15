@@ -207,7 +207,7 @@ describe("AnthropicProvider", () => {
       expect(mockAnthropicCreate).toHaveBeenCalledWith({
         model: "claude-opus-4-20250514",
         max_tokens: 1024,
-        system: "You are a pirate.",
+        system: [{ type: "text", text: "You are a pirate.", cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: "Ahoy" }],
         tools: undefined,
         temperature: 0.5,
@@ -267,6 +267,7 @@ describe("AnthropicProvider", () => {
             },
             required: ["query"],
           },
+          cache_control: { type: "ephemeral" },
         },
       ]);
     });

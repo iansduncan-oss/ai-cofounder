@@ -71,6 +71,10 @@ export interface LlmCompletionResponse {
   usage: {
     inputTokens: number;
     outputTokens: number;
+    /** Tokens written to the prompt cache (Anthropic only) */
+    cacheCreationInputTokens?: number;
+    /** Tokens read from the prompt cache (Anthropic only) */
+    cacheReadInputTokens?: number;
   };
 }
 

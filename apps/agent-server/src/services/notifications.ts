@@ -376,6 +376,41 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
+  /** Alert when dead-letter queue exceeds a threshold */
+  async notifyDlqAlert(count: number, recentJobs: Array<{ originalQueue: string; failedReason: string; failedAt: string }>): Promise<void> {
+    const jobList = recentJobs
+      .slice(0, 5)
+      .map((j) => `- \`${j.originalQueue}\`: ${j.failedReason.slice(0, 100)} (${j.failedAt})`)
+      .join("\n");
+
+    const text = `Dead-letter queue has **${count}** unresolved job(s):\n\n${jobList}\n\nReview at /dashboard/dlq or use the API to retry/delete.`;
+
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(this.slackChannel, text, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "DLQ Alert" },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text },
+          },
+        ])
+      : Promise.resolve();
+
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: "Dead-Letter Queue Alert",
+            description: text,
+            color: 0xed4245, // red
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
   /** Send a daily briefing to configured channels */
   async sendBriefing(text: string): Promise<void> {
     const slackPromise = this.hasSlack()

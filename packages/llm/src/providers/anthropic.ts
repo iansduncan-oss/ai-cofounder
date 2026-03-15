@@ -32,24 +32,38 @@ export class AnthropicProvider implements LlmProvider {
 
     const model = request.model ?? this.defaultModel;
     const messages = request.messages.map((m) => this.toAnthropicMessage(m));
-    const tools = request.tools?.map((t) => this.toAnthropicTool(t));
+    const tools = request.tools?.map((t, i, arr) => this.toAnthropicTool(t, i === arr.length - 1));
+
+    // Use structured system content with cache_control for prompt caching.
+    // This caches the system prompt across multi-turn tool loops, reducing
+    // input token costs by up to 90% on subsequent rounds.
+    const system: Anthropic.MessageCreateParams["system"] = request.system
+      ? [{ type: "text" as const, text: request.system, cache_control: { type: "ephemeral" as const } }]
+      : undefined;
 
     const response = await this.client.messages.create({
       model,
       max_tokens: request.max_tokens ?? 4096,
-      system: request.system,
+      system,
       messages,
       tools,
       ...(request.temperature != null ? { temperature: request.temperature } : {}),
     });
+
+    const usage = response.usage as Anthropic.Usage & {
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
 
     return {
       content: response.content.map((block) => this.fromAnthropicBlock(block)),
       model: response.model,
       stop_reason: this.mapStopReason(response.stop_reason),
       usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
+        inputTokens: usage.input_tokens,
+        outputTokens: usage.output_tokens,
+        cacheCreationInputTokens: usage.cache_creation_input_tokens,
+        cacheReadInputTokens: usage.cache_read_input_tokens,
       },
     };
   }
@@ -84,7 +98,7 @@ export class AnthropicProvider implements LlmProvider {
     return { role: msg.role, content: blocks };
   }
 
-  private toAnthropicTool(tool: LlmTool): Anthropic.Tool {
+  private toAnthropicTool(tool: LlmTool, isLast = false): Anthropic.Tool {
     return {
       name: tool.name,
       description: tool.description,
@@ -93,6 +107,8 @@ export class AnthropicProvider implements LlmProvider {
         properties: tool.input_schema.properties,
         required: tool.input_schema.required,
       },
+      // Cache breakpoint on the last tool — caches the entire system + tools prefix
+      ...(isLast ? { cache_control: { type: "ephemeral" as const } } : {}),
     };
   }
 
