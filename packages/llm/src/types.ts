@@ -44,6 +44,15 @@ export interface LlmTool {
   };
 }
 
+/** Optional metadata passed through to onCompletion hook for usage attribution */
+export interface CompletionMetadata {
+  agentRole?: string;
+  goalId?: string;
+  taskId?: string;
+  conversationId?: string;
+  [key: string]: unknown;
+}
+
 export interface LlmCompletionRequest {
   model?: string;
   system?: string;
@@ -51,6 +60,8 @@ export interface LlmCompletionRequest {
   tools?: LlmTool[];
   max_tokens?: number;
   temperature?: number;
+  /** Optional metadata passed through to onCompletion hook (ignored by LLM providers) */
+  metadata?: CompletionMetadata;
 }
 
 export interface LlmCompletionResponse {

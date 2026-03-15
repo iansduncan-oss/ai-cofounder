@@ -9,6 +9,7 @@ export type {
   LlmCompletionRequest,
   LlmCompletionResponse,
   TaskCategory,
+  CompletionMetadata,
 } from "./types.js";
 
 export type { LlmProvider } from "./provider.js";
@@ -17,6 +18,8 @@ export {
   LlmRegistry,
   type ProviderHealth,
   type ProviderStatsSnapshot,
+  type CompletionEvent,
+  type OnCompletionCallback,
 } from "./registry.js";
 
 export { AnthropicProvider } from "./providers/anthropic.js";

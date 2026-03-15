@@ -1,6 +1,19 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmProvider } from "./provider.js";
-import type { LlmCompletionRequest, LlmCompletionResponse, TaskCategory } from "./types.js";
+import type { LlmCompletionRequest, LlmCompletionResponse, TaskCategory, CompletionMetadata } from "./types.js";
+
+/** Data passed to the onCompletion callback after every successful complete() */
+export interface CompletionEvent {
+  task: TaskCategory;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  costMicrodollars: number;
+  metadata?: CompletionMetadata;
+}
+
+export type OnCompletionCallback = (event: CompletionEvent) => void | Promise<void>;
 
 interface ModelRoute {
   provider: string;
@@ -118,6 +131,9 @@ export class LlmRegistry {
   private stats = new Map<string, ProviderStats>();
   private breakers = new Map<string, CircuitBreaker>();
   private totalCostMicrodollars = 0;
+
+  /** Optional callback fired after every successful complete() call */
+  onCompletion?: OnCompletionCallback;
 
   constructor(routes?: Record<TaskCategory, ModelRoute[]>) {
     this.routes = routes ?? DEFAULT_ROUTES;
@@ -337,6 +353,28 @@ export class LlmRegistry {
           },
           "completion succeeded",
         );
+
+        // Fire onCompletion hook (fire-and-forget, errors caught to protect caller)
+        if (this.onCompletion) {
+          try {
+            const hookResult = this.onCompletion({
+              task,
+              provider: route.provider,
+              model: response.model,
+              inputTokens: response.usage.inputTokens,
+              outputTokens: response.usage.outputTokens,
+              costMicrodollars,
+              metadata: (request as LlmCompletionRequest).metadata,
+            });
+            if (hookResult instanceof Promise) {
+              hookResult.catch((err: unknown) => {
+                this.logger.warn({ err }, "onCompletion hook error (async)");
+              });
+            }
+          } catch (err) {
+            this.logger.warn({ err }, "onCompletion hook error (sync)");
+          }
+        }
 
         return { ...response, provider: route.provider, costMicrodollars };
       } catch (err) {

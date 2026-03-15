@@ -15,6 +15,7 @@ import {
   GeminiProvider,
   createEmbeddingService,
   type EmbeddingService,
+  type CompletionEvent,
 } from "@ai-cofounder/llm";
 import { dbPlugin } from "./plugins/db.js";
 import { authPlugin } from "./plugins/auth.js";
@@ -43,6 +44,7 @@ import {
   getProviderHealthRecords,
   listToolTierConfigs,
   upsertToolTierConfig,
+  recordLlmUsage,
 } from "@ai-cofounder/db";
 import { startScheduler } from "./services/scheduler.js";
 import { AutonomyTierService } from "./services/autonomy-tier.js";
@@ -96,6 +98,25 @@ export function buildServer(registry?: LlmRegistry) {
     logger: false,
     trustProxy: true, // required behind reverse proxy for correct IP detection
   });
+
+  // Automatic LLM usage recording for every registry.complete() call.
+  // The hook fires during request handling (after server is ready), so app.db is always available.
+  llmRegistry.onCompletion = (event: CompletionEvent) => {
+    recordLlmUsage(app.db, {
+      provider: event.provider,
+      model: event.model,
+      taskCategory: event.task,
+      agentRole: event.metadata?.agentRole as import("@ai-cofounder/shared").AgentRole | undefined,
+      inputTokens: event.inputTokens,
+      outputTokens: event.outputTokens,
+      goalId: event.metadata?.goalId as string | undefined,
+      taskId: event.metadata?.taskId as string | undefined,
+      conversationId: event.metadata?.conversationId as string | undefined,
+      metadata: event.metadata,
+    }).catch(() => {
+      // Usage tracking failures are non-fatal
+    });
+  };
 
   // Request tracing: generate x-request-id if not present, attach to logger context
   app.addHook("onRequest", async (request, reply) => {
