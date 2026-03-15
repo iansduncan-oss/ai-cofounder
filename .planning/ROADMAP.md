@@ -175,7 +175,12 @@ Plans:
   3. Settings changes take effect immediately without server restart
   4. Multi-project switcher correctly changes workspace context
   5. Notification center shows real-time updates
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 16-01-PLAN.md — Backend settings persistence (appSettings DB table, settings API) + journal date-range filter + approvals tier badge
+- [ ] 16-02-PLAN.md — Project switcher component + notification center page
+- [ ] 16-03-PLAN.md — Settings page extensions: budget threshold config + project registration UI
 
 ## Progress
 
@@ -196,9 +201,9 @@ Plans:
 | 11. Autonomous Scheduling | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 14. Multi-Project Awareness | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
-| 15. Content Automations | 3/3 | Complete    | 2026-03-15 | — |
-| 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
+| 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
+| 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
+| 16. Dashboard Command Center | v2.0 | 0/3 | Pending | — |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
