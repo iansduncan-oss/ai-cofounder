@@ -353,6 +353,7 @@ export function buildServer(registry?: LlmRegistry) {
       workspaceService,
       notificationService,
       messagingService: app.messagingService,
+      autonomyTierService: app.autonomyTierService,
       pollIntervalMs: 60_000,
       briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
       briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),

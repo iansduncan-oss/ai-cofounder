@@ -23,6 +23,7 @@ import type { WorkspaceService } from "./workspace.js";
 import { sendDailyBriefing } from "./briefing.js";
 import type { NotificationService } from "./notifications.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
+import type { AutonomyTierService } from "./autonomy-tier.js";
 
 const logger = createLogger("scheduler");
 
@@ -35,6 +36,7 @@ export interface SchedulerConfig {
   workspaceService: WorkspaceService;
   notificationService?: NotificationService;
   messagingService?: AgentMessagingService;
+  autonomyTierService?: AutonomyTierService;
   pollIntervalMs?: number;
   briefingHour?: number;
   briefingTimezone?: string;
@@ -50,6 +52,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     workspaceService,
     notificationService,
     messagingService,
+    autonomyTierService,
     pollIntervalMs = 60_000,
     briefingHour = 8,
     briefingTimezone = "America/New_York",
@@ -224,6 +227,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             sandboxService,
             workspaceService,
             messagingService,
+            autonomyTierService,
           );
 
           // Create a system user + conversation for scheduled tasks
