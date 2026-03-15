@@ -42,6 +42,8 @@ export const queryKeys = {
   },
   usage: {
     summary: (period?: string) => ["usage", period ?? "all"] as const,
+    daily: (days?: number) => ["usage", "daily", days ?? 30] as const,
+    budget: ["usage", "budget"] as const,
   },
   monitoring: {
     status: ["monitoring", "status"] as const,

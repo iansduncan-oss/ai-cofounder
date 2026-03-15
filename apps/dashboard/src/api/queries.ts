@@ -73,6 +73,21 @@ export function useUsage(period?: "today" | "week" | "month" | "all") {
   });
 }
 
+export function useDailyCost(days = 30) {
+  return useQuery({
+    queryKey: queryKeys.usage.daily(days),
+    queryFn: () => apiClient.getDailyCost(days),
+  });
+}
+
+export function useBudgetStatus() {
+  return useQuery({
+    queryKey: queryKeys.usage.budget,
+    queryFn: () => apiClient.getBudgetStatus(),
+    refetchInterval: 60_000, // sync with budget check interval
+  });
+}
+
 export function useMemories(userId: string) {
   return useQuery({
     queryKey: queryKeys.memories.list(userId),

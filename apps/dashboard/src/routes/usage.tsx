@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { useUsage, useProviderHealth } from "@/api/queries";
+import { useUsage, useProviderHealth, useDailyCost, useBudgetStatus } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { AlertTriangle, Activity, DollarSign, Cpu, Zap } from "lucide-react";
+import { AlertTriangle, Activity, DollarSign, Cpu, Zap, TrendingDown } from "lucide-react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
+  CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
@@ -28,6 +31,8 @@ export function UsagePage() {
   const [period, setPeriod] = useState<Period>("today");
   const { data: usage, isLoading, error } = useUsage(period);
   const { data: providerHealthData } = useProviderHealth();
+  const { data: dailyData } = useDailyCost(30);
+  const { data: budgetData } = useBudgetStatus();
 
   const formatTokens = (n: number) =>
     n >= 1_000_000
@@ -161,6 +166,151 @@ export function UsagePage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Daily Cost Trend */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="text-sm">Daily Cost Trend (30 Days)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={dailyData?.days ?? []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v: string) => {
+                      const parts = v.split("-");
+                      return `${parts[1]}/${parts[2]}`;
+                    }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    tickFormatter={(v) => "$" + Number(v).toFixed(3)}
+                  />
+                  <Tooltip
+                    formatter={(value) => ["$" + Number(value).toFixed(4), "Cost"]}
+                    contentStyle={{
+                      backgroundColor: "var(--color-card)",
+                      border: "1px solid var(--color-border)",
+                      borderRadius: "0.375rem",
+                      fontSize: 12,
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="costUsd"
+                    stroke="#3b82f6"
+                    dot={false}
+                    strokeWidth={2}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          {/* Budget Gauges */}
+          <div className="grid gap-4 sm:grid-cols-2 mb-6">
+            {/* Daily Budget */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Daily Budget</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {budgetData?.daily.limitUsd === 0 ? (
+                  <p className="text-sm text-muted-foreground">No limit configured</p>
+                ) : (
+                  <>
+                    <p className="text-sm mb-2">
+                      ${budgetData?.daily.spentUsd.toFixed(4) ?? "0.0000"} / ${budgetData?.daily.limitUsd.toFixed(2) ?? "0.00"}
+                    </p>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          (budgetData?.daily.percentUsed ?? 0) > 100
+                            ? "bg-red-500"
+                            : (budgetData?.daily.percentUsed ?? 0) > 90
+                              ? "bg-yellow-500"
+                              : "bg-blue-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(budgetData?.daily.percentUsed ?? 0, 100)}%`,
+                        }}
+                      />
+                    </div>
+                    {budgetData?.daily.percentUsed != null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {budgetData.daily.percentUsed.toFixed(1)}% used
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Weekly Budget */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Weekly Budget</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {budgetData?.weekly.limitUsd === 0 ? (
+                  <p className="text-sm text-muted-foreground">No limit configured</p>
+                ) : (
+                  <>
+                    <p className="text-sm mb-2">
+                      ${budgetData?.weekly.spentUsd.toFixed(4) ?? "0.0000"} / ${budgetData?.weekly.limitUsd.toFixed(2) ?? "0.00"}
+                    </p>
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          (budgetData?.weekly.percentUsed ?? 0) > 100
+                            ? "bg-red-500"
+                            : (budgetData?.weekly.percentUsed ?? 0) > 90
+                              ? "bg-yellow-500"
+                              : "bg-blue-500"
+                        }`}
+                        style={{
+                          width: `${Math.min(budgetData?.weekly.percentUsed ?? 0, 100)}%`,
+                        }}
+                      />
+                    </div>
+                    {budgetData?.weekly.percentUsed != null && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {budgetData.weekly.percentUsed.toFixed(1)}% used
+                      </p>
+                    )}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Optimization Suggestions */}
+          {budgetData?.optimizationSuggestions &&
+            budgetData.optimizationSuggestions.length > 0 &&
+            !budgetData.optimizationSuggestions.every((s) =>
+              s.startsWith("No optimization opportunities detected"),
+            ) && (
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-1.5">
+                    <TrendingDown className="h-3.5 w-3.5" />
+                    Cost Optimization Suggestions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {budgetData.optimizationSuggestions.map((suggestion, i) => (
+                      <li key={i} className="text-sm text-muted-foreground flex gap-2">
+                        <span className="text-blue-500 mt-0.5">•</span>
+                        <span>{suggestion}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Charts */}
           <div className="grid gap-6 lg:grid-cols-2">
