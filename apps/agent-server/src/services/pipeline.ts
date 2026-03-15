@@ -12,6 +12,8 @@ import { ReviewerAgent } from "../agents/specialists/reviewer.js";
 import { PlannerAgent } from "../agents/specialists/planner.js";
 import { DebuggerAgent } from "../agents/specialists/debugger.js";
 import type { NotificationService } from "./notifications.js";
+import type { JournalService } from "./journal.js";
+import type { N8nService } from "./n8n.js";
 
 const logger = createLogger("pipeline");
 
@@ -39,6 +41,8 @@ export class PipelineExecutor {
     private notificationService?: NotificationService,
     embeddingService?: EmbeddingService,
     sandboxService?: SandboxService,
+    private journalService?: JournalService,
+    private n8nService?: N8nService,
   ) {
     this.specialists = new Map<string, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -145,6 +149,41 @@ export class PipelineExecutor {
           `**Pipeline ${pipelineId}** ${pipelineStatus}: ${completedStages}/${stages.length} stages completed`,
         )
         .catch(() => {});
+    }
+
+    // Write journal entry for content_pipeline
+    if (this.journalService) {
+      const completedStages = stageResults.filter((r) => r.status === "completed").length;
+      this.journalService.writeEntry({
+        entryType: "content_pipeline",
+        title: `Pipeline ${pipelineId} ${pipelineStatus}`,
+        summary: `${completedStages}/${stages.length} stages completed`,
+        goalId,
+        details: {
+          pipelineId,
+          stageResults: stageResults.map((r) => ({ agent: r.agent, status: r.status })),
+          templateName: (context as Record<string, unknown>).templateName,
+        },
+      }).catch(() => {});
+    }
+
+    // Auto-trigger n8n workflow for templates that specify one
+    if (this.n8nService && pipelineStatus === "completed" && context.templateName) {
+      const n8nWorkflowName = (context as Record<string, unknown>).n8nWorkflow as string | undefined;
+      if (n8nWorkflowName) {
+        const { getN8nWorkflowByName } = await import("@ai-cofounder/db");
+        const workflow = await getN8nWorkflowByName(this.db, n8nWorkflowName);
+        if (workflow?.webhookUrl) {
+          const lastOutput = stageResults.filter((r) => r.output).map((r) => r.output).pop();
+          this.n8nService.trigger(workflow.webhookUrl, n8nWorkflowName, {
+            pipelineId,
+            goalId,
+            output: lastOutput,
+          }).catch((err) => {
+            logger.warn({ err, n8nWorkflowName }, "n8n post-pipeline trigger failed");
+          });
+        }
+      }
     }
 
     logger.info(

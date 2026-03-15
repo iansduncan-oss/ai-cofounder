@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
@@ -97,7 +97,9 @@ const sampleTemplate = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Re-apply default returns after clearing
   mockEnqueuePipeline.mockResolvedValue("job-123");
+  mockGetPipelineTemplateByName.mockResolvedValue(null);
 });
 
 describe("pipeline templates CRUD", () => {
@@ -231,9 +233,18 @@ describe("pipeline templates CRUD", () => {
 });
 
 describe("pipeline template trigger", () => {
-  it("POST /api/pipeline-templates/:name/trigger — enqueues pipeline and returns 202", async () => {
+  beforeAll(() => {
+    // Trigger tests need REDIS_URL so route passes the 503 guard
     process.env.REDIS_URL = "redis://localhost:6379";
-    mockGetPipelineTemplateByName.mockResolvedValueOnce(sampleTemplate);
+  });
+
+  afterAll(() => {
+    delete process.env.REDIS_URL;
+  });
+
+  it("POST /api/pipeline-templates/:name/trigger — enqueues pipeline and returns 202", async () => {
+    // Use mockResolvedValue (not Once) so seed logic in queue plugin doesn't exhaust the mock
+    mockGetPipelineTemplateByName.mockResolvedValue(sampleTemplate);
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -250,14 +261,10 @@ describe("pipeline template trigger", () => {
     expect(body.template).toBe("youtube-shorts");
     expect(mockGetPipelineTemplateByName).toHaveBeenCalled();
     expect(mockEnqueuePipeline).toHaveBeenCalled();
-
-    delete process.env.REDIS_URL;
   });
 
   it("POST /api/pipeline-templates/:name/trigger — 404 for unknown template", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
-    mockGetPipelineTemplateByName.mockResolvedValueOnce(null);
-
+    // mockGetPipelineTemplateByName default returns null (see mockDbModule), so no override needed
     const { app } = buildServer();
     const res = await app.inject({
       method: "POST",
@@ -268,13 +275,10 @@ describe("pipeline template trigger", () => {
     await app.close();
 
     expect(res.statusCode).toBe(404);
-
-    delete process.env.REDIS_URL;
   });
 
   it("POST /api/pipeline-templates/:name/trigger — 404 for inactive template", async () => {
-    process.env.REDIS_URL = "redis://localhost:6379";
-    mockGetPipelineTemplateByName.mockResolvedValueOnce({ ...sampleTemplate, isActive: false });
+    mockGetPipelineTemplateByName.mockResolvedValue({ ...sampleTemplate, isActive: false });
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -286,7 +290,5 @@ describe("pipeline template trigger", () => {
     await app.close();
 
     expect(res.statusCode).toBe(404);
-
-    delete process.env.REDIS_URL;
   });
 });

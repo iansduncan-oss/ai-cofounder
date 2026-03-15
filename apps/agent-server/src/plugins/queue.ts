@@ -116,6 +116,8 @@ export const queuePlugin = fp(async (app) => {
         app.notificationService,
         app.embeddingService,
         app.sandboxService,
+        app.journalService,   // journal integration
+        app.n8nService,       // n8n post-pipeline trigger
       );
       await executor.execute(job.data);
     },
@@ -309,6 +311,44 @@ export const queuePlugin = fp(async (app) => {
     briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
     monitoringIntervalMinutes: 5,
     autonomousSessionIntervalMinutes: Number(optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30")),
+  });
+
+  // Seed YouTube Shorts pipeline template (idempotent)
+  setImmediate(async () => {
+    try {
+      const { getPipelineTemplateByName, createPipelineTemplate, getN8nWorkflowByName, createN8nWorkflow } = await import("@ai-cofounder/db");
+
+      // Seed pipeline template
+      const existing = await getPipelineTemplateByName(app.db, "youtube-shorts");
+      if (!existing) {
+        await createPipelineTemplate(app.db, {
+          name: "youtube-shorts",
+          description: "Generate a YouTube Shorts script and trigger n8n publishing workflow",
+          stages: [
+            { agent: "researcher", prompt: "Research trending topics and generate a YouTube Shorts script (60 seconds max). Output: title, hook, script, hashtags.", dependsOnPrevious: false },
+            { agent: "reviewer", prompt: "Review the YouTube Shorts script for quality, hook strength, and SEO. Suggest improvements.", dependsOnPrevious: true },
+          ],
+          defaultContext: { templateName: "youtube-shorts", n8nWorkflow: "youtube-shorts-publish" },
+        });
+        logger.info("Seeded youtube-shorts pipeline template");
+      }
+
+      // Register YouTube Shorts n8n workflow — placeholder webhook URL
+      const existingWorkflow = await getN8nWorkflowByName(app.db, "youtube-shorts-publish");
+      if (!existingWorkflow) {
+        const n8nBaseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
+        await createN8nWorkflow(app.db, {
+          name: "youtube-shorts-publish",
+          description: "YouTube Shorts publishing workflow — triggered after content pipeline generates script",
+          webhookUrl: `${n8nBaseUrl}/webhook/youtube-shorts-publish`,
+          direction: "outbound",
+          inputSchema: { pipelineId: "string", goalId: "string", output: "string" },
+        });
+        logger.info("Registered youtube-shorts-publish n8n workflow");
+      }
+    } catch (err) {
+      logger.warn({ err }, "Failed to seed content automation templates");
+    }
   });
 
   // Shutdown cleanup
