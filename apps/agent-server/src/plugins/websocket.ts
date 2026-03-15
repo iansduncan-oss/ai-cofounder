@@ -2,10 +2,17 @@ import type { WebSocket } from "ws";
 import fp from "fastify-plugin";
 import websocket from "@fastify/websocket";
 import { createLogger } from "@ai-cofounder/shared";
-import { WS_CHANNELS, type WsChannel, type WsClientMessage, type WsServerMessage } from "@ai-cofounder/shared";
+import type { WsChannel, WsClientMessage, WsServerMessage } from "@ai-cofounder/shared";
 import { goalChannel } from "@ai-cofounder/queue";
 
 const logger = createLogger("websocket-plugin");
+
+/** Valid channel names — kept inline to avoid vitest mock issues with imported constants */
+const VALID_CHANNELS = new Set<string>([
+  "tasks", "approvals", "monitoring", "queue", "health",
+  "tools", "pipelines", "briefing", "goals", "deploys",
+  "patterns", "context", "journal",
+]);
 
 /** Per-connection state */
 interface WsClient {
@@ -135,7 +142,7 @@ export const websocketPlugin = fp(async (app) => {
       switch (msg.type) {
         case "subscribe":
           for (const ch of msg.channels) {
-            if (WS_CHANNELS.includes(ch)) {
+            if (VALID_CHANNELS.has(ch)) {
               client.channels.add(ch);
             }
           }

@@ -104,6 +104,7 @@ export const taskStatusEnum = pgEnum("task_status", [
   "completed",
   "failed",
   "cancelled",
+  "blocked",
 ]);
 
 export const approvalStatusEnum = pgEnum("approval_status", ["pending", "approved", "rejected"]);
@@ -167,6 +168,7 @@ export const tasks = pgTable("tasks", {
   assignedAgent: agentRoleEnum("assigned_agent"),
   orderIndex: integer("order_index").notNull().default(0),
   parallelGroup: integer("parallel_group"),
+  dependsOn: jsonb("depends_on").$type<string[]>(),
   input: text("input"),
   output: text("output"),
   error: text("error"),

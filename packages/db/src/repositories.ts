@@ -313,6 +313,24 @@ export async function failTask(db: Db, id: string, error: string) {
   return updated ?? null;
 }
 
+export async function blockTask(db: Db, id: string, reason: string) {
+  const [updated] = await db
+    .update(tasks)
+    .set({ status: "blocked" as const, error: reason, updatedAt: new Date() })
+    .where(eq(tasks.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function updateTaskDependencies(db: Db, taskId: string, dependsOn: string[]) {
+  const [updated] = await db
+    .update(tasks)
+    .set({ dependsOn, updatedAt: new Date() })
+    .where(eq(tasks.id, taskId))
+    .returning();
+  return updated ?? null;
+}
+
 /* ────────────────────────── Approvals ────────────────────── */
 
 export async function createApproval(

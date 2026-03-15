@@ -246,5 +246,39 @@ describe("TaskDispatcher DAG execution", () => {
     expect(mockBlockTask).not.toHaveBeenCalled();
   });
 
-  it.todo("detects cycles in the dependency graph at plan creation time — validateDependencyGraph not yet added to Orchestrator");
+  it("detects cycles in the dependency graph at plan creation time", async () => {
+    const { validateDependencyGraph } = await import("../agents/orchestrator.js");
+
+    // Valid DAG — should not throw
+    expect(() =>
+      validateDependencyGraph([
+        { title: "A", description: "", assigned_agent: "coder" },
+        { title: "B", description: "", assigned_agent: "coder", depends_on: [0] },
+        { title: "C", description: "", assigned_agent: "coder", depends_on: [0, 1] },
+      ]),
+    ).not.toThrow();
+
+    // Cycle: A→B→C→A
+    expect(() =>
+      validateDependencyGraph([
+        { title: "A", description: "", assigned_agent: "coder", depends_on: [2] },
+        { title: "B", description: "", assigned_agent: "coder", depends_on: [0] },
+        { title: "C", description: "", assigned_agent: "coder", depends_on: [1] },
+      ]),
+    ).toThrow("Dependency cycle detected");
+
+    // Self-reference
+    expect(() =>
+      validateDependencyGraph([
+        { title: "A", description: "", assigned_agent: "coder", depends_on: [0] },
+      ]),
+    ).toThrow("invalid dependency index");
+
+    // Out-of-bounds index
+    expect(() =>
+      validateDependencyGraph([
+        { title: "A", description: "", assigned_agent: "coder", depends_on: [5] },
+      ]),
+    ).toThrow("invalid dependency index");
+  });
 });

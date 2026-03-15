@@ -49,6 +49,8 @@ export function mockDbModule() {
     startTask: vi.fn().mockResolvedValue({}),
     completeTask: vi.fn().mockResolvedValue({}),
     failTask: vi.fn().mockResolvedValue({}),
+    blockTask: vi.fn().mockResolvedValue({}),
+    updateTaskDependencies: vi.fn().mockResolvedValue({}),
     // Approvals
     createApproval: vi.fn().mockResolvedValue({ id: "approval-1" }),
     getApproval: vi.fn().mockResolvedValue(null),

@@ -29,6 +29,7 @@ import {
   createMilestone,
   touchMemory,
   recordToolExecution,
+  updateTaskDependencies,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
@@ -162,6 +163,13 @@ const CREATE_PLAN_TOOL: LlmTool = {
                 "Optional group number for parallel execution. Tasks with the same group run concurrently. " +
                 "Groups execute sequentially (0 before 1 before 2). Omit to run sequentially.",
             },
+            depends_on: {
+              type: "array",
+              items: { type: "integer" },
+              description:
+                "Optional array of zero-based task indices that must complete before this task runs. " +
+                "Enables DAG-based parallel execution. Prefer this over parallel_group for complex dependencies.",
+            },
           },
           required: ["title", "description", "assigned_agent"],
         },
@@ -241,7 +249,51 @@ interface CreatePlanInput {
     description: string;
     assigned_agent: "researcher" | "coder" | "reviewer" | "planner";
     parallel_group?: number;
+    depends_on?: number[];
   }>;
+}
+
+/**
+ * Validate that a dependency graph (expressed as zero-based task indices) has no cycles.
+ * Uses Kahn's algorithm for topological sort — if not all nodes are visited, a cycle exists.
+ */
+export function validateDependencyGraph(tasks: CreatePlanInput["tasks"]): void {
+  const n = tasks.length;
+  const inDegree = new Array<number>(n).fill(0);
+  const adj = new Array<number[]>(n);
+  for (let i = 0; i < n; i++) adj[i] = [];
+
+  for (let i = 0; i < n; i++) {
+    const deps = tasks[i].depends_on;
+    if (!deps) continue;
+    for (const dep of deps) {
+      if (dep < 0 || dep >= n || dep === i) {
+        throw new Error(`Task ${i} has invalid dependency index ${dep}`);
+      }
+      adj[dep].push(i);
+      inDegree[i]++;
+    }
+  }
+
+  // Kahn's algorithm
+  const queue: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (inDegree[i] === 0) queue.push(i);
+  }
+
+  let visited = 0;
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    visited++;
+    for (const neighbor of adj[node]) {
+      inDegree[neighbor]--;
+      if (inDegree[neighbor] === 0) queue.push(neighbor);
+    }
+  }
+
+  if (visited < n) {
+    throw new Error("Dependency cycle detected in task graph");
+  }
 }
 
 /* ── Orchestrator class ── */
@@ -930,6 +982,12 @@ export class Orchestrator {
   private async persistPlan(conversationId: string, input: CreatePlanInput, userId?: string): Promise<PlanResult> {
     const db = this.db!;
 
+    // Validate dependency graph before creating anything
+    const hasDeps = input.tasks.some((t) => t.depends_on && t.depends_on.length > 0);
+    if (hasDeps) {
+      validateDependencyGraph(input.tasks);
+    }
+
     const goal = await createGoal(db, {
       conversationId,
       title: input.goal_title,
@@ -943,6 +1001,7 @@ export class Orchestrator {
 
     const createdTasks: PlanResult["tasks"] = [];
 
+    // Pass 1: create all tasks (without dependencies)
     for (let i = 0; i < input.tasks.length; i++) {
       const t = input.tasks[i];
       const task = await createTask(db, {
@@ -962,6 +1021,17 @@ export class Orchestrator {
         orderIndex: task.orderIndex,
         parallelGroup: task.parallelGroup,
       });
+    }
+
+    // Pass 2: resolve index-based depends_on to UUIDs and update tasks
+    if (hasDeps) {
+      for (let i = 0; i < input.tasks.length; i++) {
+        const deps = input.tasks[i].depends_on;
+        if (deps && deps.length > 0) {
+          const depUuids = deps.map((idx) => createdTasks[idx].id);
+          await updateTaskDependencies(db, createdTasks[i].id, depUuids);
+        }
+      }
     }
 
     return {

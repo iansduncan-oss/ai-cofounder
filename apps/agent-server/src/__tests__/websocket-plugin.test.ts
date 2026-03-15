@@ -146,15 +146,17 @@ describe("WebSocket plugin", () => {
     ws.close();
   });
 
-  it.skip("subscribes to channels and receives invalidation", async () => {
+  it("subscribes to channels and receives invalidation", async () => {
     const ws = await connectWs();
 
     // Subscribe to tasks channel
     const sub: WsClientMessage = { type: "subscribe", channels: ["tasks"] };
     ws.send(JSON.stringify(sub));
 
-    // Wait a tick for subscription to register
-    await new Promise((r) => setTimeout(r, 50));
+    // Send a ping and wait for pong — confirms subscribe was processed (same message queue)
+    const ping: WsClientMessage = { type: "ping" };
+    ws.send(JSON.stringify(ping));
+    await waitForMessage(ws); // pong
 
     // Trigger a broadcast from the server
     const msgPromise = waitForMessage(ws);
@@ -168,13 +170,16 @@ describe("WebSocket plugin", () => {
     ws.close();
   });
 
-  it.skip("does not receive events for unsubscribed channels", async () => {
+  it("does not receive events for unsubscribed channels", async () => {
     const ws = await connectWs();
 
     // Subscribe only to tasks
     const sub: WsClientMessage = { type: "subscribe", channels: ["tasks"] };
     ws.send(JSON.stringify(sub));
-    await new Promise((r) => setTimeout(r, 50));
+
+    // Confirm subscribe processed
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    await waitForMessage(ws); // pong
 
     // Broadcast to monitoring (not subscribed)
     app.wsBroadcast("monitoring");
