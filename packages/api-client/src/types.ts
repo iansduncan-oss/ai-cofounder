@@ -725,3 +725,15 @@ export interface CreateProjectDependencyInput {
   dependencyType: string;
   description?: string;
 }
+
+/* ── App Settings ── */
+
+export interface AppSettings {
+  dailyBudgetUsd: number;
+  weeklyBudgetUsd: number;
+}
+
+export interface UpdateBudgetInput {
+  dailyUsd: number;
+  weeklyUsd: number;
+}

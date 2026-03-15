@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { getUsageSummary, getCostByDay } from "@ai-cofounder/db";
+import { getUsageSummary, getCostByDay, getAppSetting } from "@ai-cofounder/db";
 import { optionalEnv } from "@ai-cofounder/shared";
 
 export const usageRoutes: FastifyPluginAsync = async (app) => {
@@ -66,8 +66,17 @@ export const usageRoutes: FastifyPluginAsync = async (app) => {
 
   /** GET /api/usage/budget — daily+weekly spend vs thresholds + optimization suggestions */
   app.get("/budget", { schema: { tags: ["usage"] } }, async () => {
-    const dailyLimitUsd = parseFloat(optionalEnv("DAILY_BUDGET_USD", "0"));
-    const weeklyLimitUsd = parseFloat(optionalEnv("WEEKLY_BUDGET_USD", "0"));
+    // DB-first: read persisted budget thresholds, fall back to env
+    const [dailyDbRaw, weeklyDbRaw] = await Promise.all([
+      getAppSetting(app.db, "daily_budget_usd"),
+      getAppSetting(app.db, "weekly_budget_usd"),
+    ]);
+    const dailyLimitUsd = dailyDbRaw !== null
+      ? parseFloat(dailyDbRaw)
+      : parseFloat(optionalEnv("DAILY_BUDGET_USD", "0"));
+    const weeklyLimitUsd = weeklyDbRaw !== null
+      ? parseFloat(weeklyDbRaw)
+      : parseFloat(optionalEnv("WEEKLY_BUDGET_USD", "0"));
 
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());

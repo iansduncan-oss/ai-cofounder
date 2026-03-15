@@ -60,6 +60,8 @@ import type {
   CreateProjectInput,
   UpdateProjectInput,
   CreateProjectDependencyInput,
+  AppSettings,
+  UpdateBudgetInput,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1052,6 +1054,16 @@ export class ApiClient {
 
   async createProjectDependency(projectId: string, data: CreateProjectDependencyInput): Promise<ProjectDependency> {
     return this.request<ProjectDependency>("POST", `/api/projects/${projectId}/dependencies`, data);
+  }
+
+  /* ── Settings ── */
+
+  async getSettings(): Promise<AppSettings> {
+    return this.request<AppSettings>("GET", "/api/settings");
+  }
+
+  async updateBudgetThresholds(data: UpdateBudgetInput): Promise<void> {
+    await this.request<void>("PUT", "/api/settings/budget", data);
   }
 }
 

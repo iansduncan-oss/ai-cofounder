@@ -1,5 +1,5 @@
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-import { getUsageSummary } from "@ai-cofounder/db";
+import { getUsageSummary, getAppSetting } from "@ai-cofounder/db";
 import type { Db } from "@ai-cofounder/db";
 import type { NotificationService } from "./notifications.js";
 
@@ -30,8 +30,17 @@ export class BudgetAlertService {
   async checkBudgets(): Promise<void> {
     const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-    const dailyBudget = parseFloat(optionalEnv("DAILY_BUDGET_USD", "0"));
-    const weeklyBudget = parseFloat(optionalEnv("WEEKLY_BUDGET_USD", "0"));
+    // DB-first: read persisted budget thresholds, fall back to env
+    const [dailyDbRaw, weeklyDbRaw] = await Promise.all([
+      getAppSetting(this.db, "daily_budget_usd"),
+      getAppSetting(this.db, "weekly_budget_usd"),
+    ]);
+    const dailyBudget = dailyDbRaw !== null
+      ? parseFloat(dailyDbRaw)
+      : parseFloat(optionalEnv("DAILY_BUDGET_USD", "0"));
+    const weeklyBudget = weeklyDbRaw !== null
+      ? parseFloat(weeklyDbRaw)
+      : parseFloat(optionalEnv("WEEKLY_BUDGET_USD", "0"));
 
     // ── Daily check ──
     if (dailyBudget > 0) {
