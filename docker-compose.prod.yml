@@ -43,6 +43,9 @@ services:
       - WORKSPACE_DIR=/data/workspace
       - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET:-}
       - N8N_SHARED_SECRET=${N8N_SHARED_SECRET:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI:-}
     volumes:
       - workspace_data:/data/workspace
       - /var/run/docker.sock:/var/run/docker.sock

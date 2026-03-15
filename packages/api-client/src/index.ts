@@ -70,4 +70,9 @@ export type {
   UpdateProjectInput,
   CreateProjectDependencyInput,
   ProjectLanguage,
+  DeadLetterEntry,
+  JournalEntry,
+  JournalEntryType,
+  DailyCostResponse,
+  BudgetStatusResponse,
 } from "./types.js";

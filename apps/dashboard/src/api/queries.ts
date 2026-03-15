@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { SubagentRunStatus } from "@ai-cofounder/api-client";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
 
@@ -228,5 +229,29 @@ export function useToolTierConfig() {
   return useQuery({
     queryKey: queryKeys.autonomy.tiers,
     queryFn: () => apiClient.listToolTierConfig(),
+  });
+}
+
+export function useDlqJobs() {
+  return useQuery({
+    queryKey: queryKeys.dlq.all,
+    queryFn: () => apiClient.listDlqJobs(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSubagentRuns(status?: SubagentRunStatus) {
+  return useQuery({
+    queryKey: queryKeys.subagents.list(status),
+    queryFn: () => apiClient.listSubagentRuns(status ? { status } : undefined),
+    refetchInterval: 10_000,
+  });
+}
+
+export function useDashboardSummary() {
+  return useQuery({
+    queryKey: queryKeys.dashboard.summary,
+    queryFn: () => apiClient.getDashboardSummary(),
+    refetchInterval: 60_000,
   });
 }

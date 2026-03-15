@@ -87,4 +87,15 @@ export const queryKeys = {
     all: ["pipeline-templates"] as const,
     list: ["pipeline-templates", "list"] as const,
   },
+  dlq: {
+    all: ["dlq"] as const,
+    list: (params?: string) => ["dlq", "list", params ?? ""] as const,
+  },
+  subagents: {
+    all: ["subagents"] as const,
+    list: (status?: string) => ["subagents", "list", status ?? "all"] as const,
+  },
+  dashboard: {
+    summary: ["dashboard", "summary"] as const,
+  },
 };

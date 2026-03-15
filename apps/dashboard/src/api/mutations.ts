@@ -344,3 +344,45 @@ export function useUpdateToolTier() {
     },
   });
 }
+
+export function useRetryDlqJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dlqJobId: string) => apiClient.retryDlqJob(dlqJobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dlq.all });
+      toast.success("DLQ job retried");
+    },
+    onError: (err) => {
+      toast.error(`Failed to retry DLQ job: ${err.message}`);
+    },
+  });
+}
+
+export function useDeleteDlqJob() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dlqJobId: string) => apiClient.deleteDlqJob(dlqJobId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dlq.all });
+      toast.success("DLQ job deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete DLQ job: ${err.message}`);
+    },
+  });
+}
+
+export function useCancelSubagentRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.cancelSubagentRun(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subagents.all });
+      toast.success("Subagent run cancelled");
+    },
+    onError: (err) => {
+      toast.error(`Failed to cancel subagent run: ${err.message}`);
+    },
+  });
+}

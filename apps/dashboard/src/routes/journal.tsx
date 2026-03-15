@@ -67,7 +67,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
               View Goal
             </Link>
           )}
-          {details?.prUrl && (
+          {details?.prUrl ? (
             <a
               href={String(details.prUrl)}
               target="_blank"
@@ -76,12 +76,12 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
             >
               View PR
             </a>
-          )}
-          {details?.commitSha && (
+          ) : null}
+          {details?.commitSha ? (
             <span className="text-xs font-mono text-muted-foreground">
               {String(details.commitSha).slice(0, 7)}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

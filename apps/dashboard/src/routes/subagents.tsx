@@ -44,7 +44,7 @@ export function SubagentsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const { data, isLoading, error } = useSubagentRuns(statusFilter);
+  const { data, isLoading, error } = useSubagentRuns(statusFilter === "all" ? undefined : statusFilter as SubagentRunStatus);
   const cancelMutation = useCancelSubagentRun();
 
   const runs = data?.data ?? [];

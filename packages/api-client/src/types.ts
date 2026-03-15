@@ -562,10 +562,10 @@ export interface AutonomousRunResponse {
 }
 
 export interface DeadLetterEntry {
-  id: string;
-  queue: string;
-  jobName: string;
-  jobData: Record<string, unknown>;
+  dlqJobId: string;
+  originalQueue: string;
+  originalJobId: string;
+  originalJobName: string;
   failedReason: string;
   failedAt: string;
   attemptsMade: number;
