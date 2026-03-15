@@ -89,6 +89,7 @@ export function mockDbModule() {
     getTodayTokenUsage: vi.fn().mockResolvedValue(0),
     getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
     getCostByGoal: vi.fn().mockResolvedValue({ totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0, requestCount: 0 }),
+    getCostByDay: vi.fn().mockResolvedValue([]),
     // Schedules
     createSchedule: vi.fn().mockResolvedValue({ id: "sch-1" }),
     getSchedule: vi.fn().mockResolvedValue(null),

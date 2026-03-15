@@ -967,6 +967,44 @@ export async function getCostByGoal(
   };
 }
 
+/**
+ * Returns daily cost aggregates for LLM usage within the given date range.
+ * Divides microdollar values by 1_000_000 to return USD.
+ * Results are ordered ascending by date for chart rendering.
+ */
+export async function getCostByDay(
+  db: Db,
+  since: Date,
+  until?: Date,
+): Promise<Array<{ date: string; costUsd: number; inputTokens: number; outputTokens: number; requests: number }>> {
+  const conditions = [sql`${llmUsage.createdAt} >= ${since.toISOString()}`];
+  if (until) {
+    conditions.push(sql`${llmUsage.createdAt} <= ${until.toISOString()}`);
+  }
+
+  const rows = await db
+    .select({
+      date: sql<string>`date_trunc('day', ${llmUsage.createdAt})::date::text`.as("date"),
+      costUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("cost_usd"),
+      inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("input_tokens"),
+      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("output_tokens"),
+      requests: sql<number>`count(*)::int`.as("requests"),
+    })
+    .from(llmUsage)
+    .where(and(...conditions))
+    .groupBy(sql`date_trunc('day', ${llmUsage.createdAt})::date`)
+    .orderBy(sql`date_trunc('day', ${llmUsage.createdAt})::date asc`);
+
+  return rows.map((row) => ({
+    date: row.date,
+    // Convert microdollars to dollars
+    costUsd: Number(row.costUsd) / 1_000_000,
+    inputTokens: row.inputTokens ?? 0,
+    outputTokens: row.outputTokens ?? 0,
+    requests: row.requests ?? 0,
+  }));
+}
+
 export interface UsageSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
