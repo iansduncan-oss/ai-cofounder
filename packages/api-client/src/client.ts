@@ -17,6 +17,8 @@ import type {
   AgentRunResult,
   ExecutionProgress,
   UsageSummary,
+  DailyCostResponse,
+  BudgetStatusResponse,
   StreamEvent,
   StreamEventType,
   PaginationParams,
@@ -426,6 +428,14 @@ export class ApiClient {
 
   getUsage(period: "today" | "week" | "month" | "all" = "today") {
     return this.request<UsageSummary>("GET", `/api/usage?period=${period}`);
+  }
+
+  getDailyCost(days = 30) {
+    return this.request<DailyCostResponse>("GET", `/api/usage/daily?days=${days}`);
+  }
+
+  getBudgetStatus() {
+    return this.request<BudgetStatusResponse>("GET", `/api/usage/budget`);
   }
 
   /* ── Dashboard ── */

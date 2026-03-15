@@ -624,6 +624,26 @@ export interface StandupResponse {
   data: StandupData;
 }
 
+/* ── Financial Tracking ── */
+
+export interface DailyCostDay {
+  date: string; // "2026-03-14"
+  costUsd: number;
+  inputTokens: number;
+  outputTokens: number;
+  requests: number;
+}
+
+export interface DailyCostResponse {
+  days: DailyCostDay[];
+}
+
+export interface BudgetStatusResponse {
+  daily: { spentUsd: number; limitUsd: number; percentUsed: number | null };
+  weekly: { spentUsd: number; limitUsd: number; percentUsed: number | null };
+  optimizationSuggestions: string[];
+}
+
 export interface AgentMessageItem {
   id: string;
   senderRole: string;
