@@ -40,6 +40,7 @@
 - [x] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state (completed 2026-03-15)
 - [x] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks (completed 2026-03-15)
 - [x] **Phase 16: Dashboard Command Center** — Journal, approvals, costs, projects, notifications, settings (completed 2026-03-15)
+- [ ] **Phase 17: Close Integration & Flow Gaps** — Dashboard autonomous sessions page, journal typeConfig fix, project switcher wiring, scheduler tier enforcement
 
 ## Phase Details
 
@@ -163,7 +164,7 @@ Plans:
 Plans:
 - [x] 15-01-PLAN.md — Data layer: DB migration + schema (pipelineTemplates table, content_pipeline enum), repository CRUD, N8nService.listExecutions()
 - [x] 15-02-PLAN.md — Backend routes + wiring: pipeline template CRUD/trigger routes, n8n execution route, PipelineExecutor journal integration, YouTube template seed
-- [ ] 15-03-PLAN.md — Dashboard: ApiClient methods, N8n Workflows page, pipeline template trigger on pipelines page
+- [x] 15-03-PLAN.md — Dashboard: ApiClient methods, N8n Workflows page, pipeline template trigger on pipelines page
 
 ### Phase 16: Dashboard Command Center
 **Goal**: Dashboard becomes the single pane of glass — work journal, approvals, costs, projects, notifications, and settings all in one place
@@ -181,6 +182,18 @@ Plans:
 - [x] 16-01-PLAN.md — Backend settings persistence (appSettings DB table, settings API) + journal date-range filter + approvals tier badge
 - [x] 16-02-PLAN.md — Project switcher component + notification center page
 - [x] 16-03-PLAN.md — Settings page extensions: budget threshold config + project registration UI
+
+### Phase 17: Close Integration & Flow Gaps
+**Goal**: Close all integration gaps and broken E2E flows identified by milestone audit — dashboard surfaces autonomous work, journal renders all types correctly, project switcher scopes data, scheduler respects tier enforcement
+**Depends on**: Phase 16
+**Requirements**: TERM-01, TERM-05, CONT-04, DASH-01, PROJ-01, DASH-04, AUTO-01, AUTO-02, AUTO-03, SCHED-01
+**Gap Closure:** Closes gaps from v2.0 milestone audit (INTEG-01/02/03/04, FLOW-01/02/03)
+**Success Criteria** (what must be TRUE):
+  1. Dashboard has an autonomous work sessions page showing execution history from GET /api/autonomous/sessions
+  2. content_pipeline journal entries render with correct icon and "Content Pipeline" label
+  3. Project switcher in dashboard header causes API queries to scope data by active project
+  4. Scheduled autonomous sessions pass through tier enforcement (autonomyTierService wired in scheduler.ts)
+**Plans:** TBD
 
 ## Progress
 
@@ -203,7 +216,8 @@ Plans:
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
 | 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 16. Dashboard Command Center | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
+| 16. Dashboard Command Center | v2.0 | 3/3 | Complete | 2026-03-15 |
+| 17. Close Integration & Flow Gaps | v2.0 | 0/0 | Planned | — |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
