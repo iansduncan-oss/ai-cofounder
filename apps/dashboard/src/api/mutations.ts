@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -383,6 +383,50 @@ export function useCancelSubagentRun() {
     },
     onError: (err) => {
       toast.error(`Failed to cancel subagent run: ${err.message}`);
+    },
+  });
+}
+
+export function useUpdateBudgetThresholds() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { dailyUsd: number; weeklyUsd: number }) =>
+      apiClient.updateBudgetThresholds(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.settings.all });
+      qc.invalidateQueries({ queryKey: queryKeys.usage.budget });
+      toast.success("Budget thresholds updated");
+    },
+    onError: (err) => {
+      toast.error(`Failed to update budget: ${err.message}`);
+    },
+  });
+}
+
+export function useCreateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateProjectInput) => apiClient.createProject(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.projects.all });
+      toast.success("Project registered");
+    },
+    onError: (err) => {
+      toast.error(`Failed to register project: ${err.message}`);
+    },
+  });
+}
+
+export function useDeleteProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteProject(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.projects.all });
+      toast.success("Project removed");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete project: ${err.message}`);
     },
   });
 }

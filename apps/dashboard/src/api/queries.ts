@@ -263,3 +263,10 @@ export function useProjects() {
     staleTime: 60_000,
   });
 }
+
+export function useSettings() {
+  return useQuery({
+    queryKey: queryKeys.settings.current,
+    queryFn: () => apiClient.getSettings(),
+  });
+}
