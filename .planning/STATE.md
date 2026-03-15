@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: "Checkpoint: 16-03 Task 1 complete, awaiting human-verify checkpoint for DASH-06 full verification"
-last_updated: "2026-03-15T22:45:42.657Z"
-last_activity: "2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher with localStorage persistence, notification center, journal date-range filter, approval tier badges, 135 tests passing"
+stopped_at: "Phase 16 Plan 03 complete — all 6 DASH requirements verified and approved. Phase 16 (Dashboard Command Center) is complete."
+last_updated: "2026-03-15T23:55:00Z"
+last_activity: "2026-03-15 — Phase 16 Plan 03 complete: Budget threshold settings + project registration UI in SettingsPage. Human-verify checkpoint approved. DASH-06 fully satisfied. Phase 16 complete."
 progress:
   total_phases: 9
-  completed_phases: 6
+  completed_phases: 9
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 17
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 16 (Dashboard Command Center) — Plan 2 of 3 complete
-Plan: 2 of 3
-Status: active
-Last activity: 2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher with localStorage persistence, notification center, journal date-range filter, approval tier badges, 135 tests passing
+Phase: 16 (Dashboard Command Center) — All 3 plans complete
+Plan: 3 of 3
+Status: complete
+Last activity: 2026-03-15 — Phase 16 Plan 03 complete: Budget threshold settings + project registration UI. All 6 DASH requirements verified and approved. Phase 16 complete. v2.0 milestone complete.
 
 ## Milestones Shipped
 
@@ -115,6 +115,12 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - extractToolName uses single-quote regex first then word-after-Tool fallback for resilient parsing
 - [Phase 16]: useEffect syncs budget form state from settings query on load — avoids stale default values
 
+**Phase 16 Plan 03 Decisions:**
+- useEffect syncs budget form state from settings query on load — avoids stale default values when API responds
+- Budget gauge only renders when dailyUsd > 0 — avoids showing 0% gauge for unconfigured budgets
+- createProject.mutate called with onSuccess callback in options arg — resets form after successful registration
+- Test assertion uses expect.objectContaining on both data and options args to match mutate(data, options) call signature
+
 ### Pending Todos
 
 None.
@@ -144,7 +150,7 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | Phase 15 P03 | 3.5 min | 2 tasks | 6 files |
 | Phase 16 P01 | 15 min | 2 tasks | 13 files |
 | 16 | 02 | 15 min | 3/3 | 13 |
-| Phase 16 P03 | 12 | 1 tasks | 5 files |
+| 16 | 03 | 12 min | 2/2 | 5 |
 
 ## Session Continuity
 

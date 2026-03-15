@@ -180,7 +180,7 @@ Plans:
 Plans:
 - [x] 16-01-PLAN.md — Backend settings persistence (appSettings DB table, settings API) + journal date-range filter + approvals tier badge
 - [x] 16-02-PLAN.md — Project switcher component + notification center page
-- [ ] 16-03-PLAN.md — Settings page extensions: budget threshold config + project registration UI
+- [x] 16-03-PLAN.md — Settings page extensions: budget threshold config + project registration UI
 
 ## Progress
 
@@ -203,7 +203,7 @@ Plans:
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
 | 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 16. Dashboard Command Center | 3/3 | Complete   | 2026-03-15 | — |
+| 16. Dashboard Command Center | v2.0 | 3/3 | Complete | 2026-03-15 |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
