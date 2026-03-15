@@ -38,7 +38,7 @@
 - [x] **Phase 12: Work Journal & Standup** — Browsable activity log, daily standup summaries (completed 2026-03-15)
 - [x] **Phase 13: Financial Tracking** — Per-request cost tracking, aggregation, budget alerts (completed 2026-03-15)
 - [x] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state (completed 2026-03-15)
-- [ ] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks
+- [x] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks (completed 2026-03-15)
 - [ ] **Phase 16: Dashboard Command Center** — Journal, approvals, costs, projects, notifications, settings
 
 ## Phase Details
@@ -158,7 +158,7 @@ Plans:
   2. n8n execution history visible in dashboard with status and timing
   3. Content outputs appear in work journal with links to published content
   4. Content pipelines can be scheduled via autonomous scheduling
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [x] 15-01-PLAN.md — Data layer: DB migration + schema (pipelineTemplates table, content_pipeline enum), repository CRUD, N8nService.listExecutions()
@@ -197,7 +197,7 @@ Plans:
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 14. Multi-Project Awareness | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
-| 15. Content Automations | v2.0 | 0/3 | Planned | — |
+| 15. Content Automations | 3/3 | Complete   | 2026-03-15 | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 
 ---
