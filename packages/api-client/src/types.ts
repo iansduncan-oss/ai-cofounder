@@ -595,7 +595,8 @@ export type JournalEntryType =
   | "goal_started" | "goal_completed" | "goal_failed"
   | "task_completed" | "task_failed"
   | "git_commit" | "pr_created"
-  | "reflection" | "work_session" | "subagent_run" | "deployment";
+  | "reflection" | "work_session" | "subagent_run" | "deployment"
+  | "content_pipeline";
 
 export interface JournalEntry {
   id: string;

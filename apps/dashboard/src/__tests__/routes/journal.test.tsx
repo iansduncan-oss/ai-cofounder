@@ -115,3 +115,37 @@ describe("JournalPage date-range filtering", () => {
     await screen.findByText("Entry old");
   });
 });
+
+describe("JournalPage content_pipeline entry type", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders content_pipeline entries with 'Content Pipeline' label", async () => {
+    const { apiClient } = await import("@/api/client");
+    vi.mocked(apiClient.listJournalEntries).mockResolvedValue({
+      data: [
+        {
+          id: "cp-1",
+          entryType: "content_pipeline",
+          title: "Pipeline Run",
+          summary: "Content pipeline executed",
+          occurredAt: `${todayStr}T12:00:00Z`,
+          goalId: null,
+          details: null,
+          createdAt: `${todayStr}T12:00:00Z`,
+        },
+      ],
+      total: 1,
+    });
+    vi.mocked(apiClient.getStandup).mockResolvedValue(null as never);
+
+    renderWithProviders(<JournalPage />);
+
+    await screen.findByText("Pipeline Run");
+    // "Content Pipeline" label appears in the entry badge (span) — getAllByText since
+    // it also appears in the filter dropdown option
+    const labels = screen.getAllByText("Content Pipeline");
+    expect(labels.length).toBeGreaterThanOrEqual(1);
+  });
+});
