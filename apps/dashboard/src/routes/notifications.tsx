@@ -81,14 +81,15 @@ export function NotificationsPage() {
     });
   });
 
-  // Add budget warning if over 90%
-  if (budgetStatus && budgetStatus.percentUsed > 90) {
+  // Add budget warning if daily percentUsed > 90
+  const dailyPercent = budgetStatus?.daily?.percentUsed ?? 0;
+  if (budgetStatus && dailyPercent !== null && dailyPercent > 90) {
     const severity: NotificationItem["severity"] =
-      budgetStatus.percentUsed > 100 ? "critical" : "warning";
+      dailyPercent > 100 ? "critical" : "warning";
     notifications.push({
       id: "budget-warning",
-      title: `Budget: ${budgetStatus.percentUsed}% of daily limit used`,
-      description: `$${budgetStatus.dailySpend.toFixed(2)} of $${budgetStatus.dailyLimit.toFixed(2)} daily limit`,
+      title: `Budget: ${dailyPercent}% of daily limit used`,
+      description: `$${budgetStatus.daily.spentUsd.toFixed(2)} of $${budgetStatus.daily.limitUsd.toFixed(2)} daily limit`,
       type: "budget",
       severity,
       timestamp: new Date().toISOString(),

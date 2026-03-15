@@ -28,7 +28,10 @@ describe("NotificationsPage", () => {
       data: { alerts: [], github: null, vps: null },
     } as ReturnType<typeof useMonitoringStatus>);
     mockUseBudgetStatus.mockReturnValue({
-      data: { dailySpend: 0, dailyLimit: 10, weeklySpend: 0, weeklyLimit: 70, percentUsed: 50 },
+      data: {
+        daily: { spentUsd: 0, limitUsd: 10, percentUsed: 50 },
+        weekly: { spentUsd: 0, limitUsd: 70, percentUsed: 10 },
+      },
     } as ReturnType<typeof useBudgetStatus>);
   });
 
@@ -82,11 +85,8 @@ describe("NotificationsPage", () => {
   it("renders budget warning when percentUsed > 90", () => {
     mockUseBudgetStatus.mockReturnValue({
       data: {
-        dailySpend: 9.5,
-        dailyLimit: 10,
-        weeklySpend: 60,
-        weeklyLimit: 70,
-        percentUsed: 95,
+        daily: { spentUsd: 9.5, limitUsd: 10, percentUsed: 95 },
+        weekly: { spentUsd: 60, limitUsd: 70, percentUsed: 85 },
       },
     } as ReturnType<typeof useBudgetStatus>);
 
