@@ -162,7 +162,7 @@ Plans:
 
 Plans:
 - [x] 15-01-PLAN.md — Data layer: DB migration + schema (pipelineTemplates table, content_pipeline enum), repository CRUD, N8nService.listExecutions()
-- [ ] 15-02-PLAN.md — Backend routes + wiring: pipeline template CRUD/trigger routes, n8n execution route, PipelineExecutor journal integration, YouTube template seed
+- [x] 15-02-PLAN.md — Backend routes + wiring: pipeline template CRUD/trigger routes, n8n execution route, PipelineExecutor journal integration, YouTube template seed
 - [ ] 15-03-PLAN.md — Dashboard: ApiClient methods, N8n Workflows page, pipeline template trigger on pipelines page
 
 ### Phase 16: Dashboard Command Center

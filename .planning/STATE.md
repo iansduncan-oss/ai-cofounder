@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 15-01-PLAN.md
-last_updated: "2026-03-15T18:11:46Z"
-last_activity: "2026-03-15 — Phase 15 Plan 01 complete: DB migration, pipelineTemplates schema + CRUD repository, N8nService listExecutions"
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-03-15T18:22:00Z"
+last_activity: "2026-03-15 — Phase 15 Plan 02 complete: pipeline template routes, n8n executions route, PipelineExecutor journal + n8n wiring, YouTube Shorts template seed"
 progress:
   total_phases: 9
   completed_phases: 4
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 15 (Content Automations) — Plan 1 of 3 complete
-Plan: 1 of 3
+Phase: 15 (Content Automations) — Plan 2 of 3 complete
+Plan: 2 of 3
 Status: active
-Last activity: 2026-03-15 — Phase 15 Plan 01 complete: DB migration, pipelineTemplates schema + CRUD repository, N8nService listExecutions
+Last activity: 2026-03-15 — Phase 15 Plan 02 complete: pipeline template routes, n8n executions route, PipelineExecutor journal + n8n wiring, YouTube Shorts template seed
 
 ## Milestones Shipped
 
@@ -97,6 +97,11 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - listExecutions returns [] when N8N_API_KEY not configured — graceful no-op for optional integrations
 - listPipelineTemplates defaults activeOnly=true — consistent with listN8nWorkflows pattern
 
+**Phase 15 Plan 02 Decisions:**
+- clearAllMocks + explicit re-setup in beforeEach handles mock isolation where queue seed setImmediate would exhaust mockResolvedValueOnce
+- mockResolvedValue (not Once) for trigger-success test allows both seed call and route call to return sampleTemplate
+- afterAll cleanup of REDIS_URL scoped to trigger describe block avoids affecting CRUD tests
+
 ### Pending Todos
 
 None.
@@ -122,9 +127,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 14 | 01 | 4 min | 2/2 | 7 |
 | 14 | 02 | 14 min | 2/2 | 12 |
 | 15 | 01 | 2.5 min | 2/2 | 5 |
+| 15 | 02 | 7 min | 2/2 | 8 |
 
 ## Session Continuity
 
-Last session: 2026-03-15T18:11:46Z
-Stopped at: Completed 15-01-PLAN.md
+Last session: 2026-03-15T18:22:00Z
+Stopped at: Completed 15-02-PLAN.md
 Resume file: None
