@@ -21,6 +21,7 @@ import {
   GitBranch,
   Sparkles,
   BookOpen,
+  Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -42,6 +43,7 @@ const navItems = [
   { to: "/dashboard/usage", icon: BarChart3, label: "Usage" },
   { to: "/dashboard/workspace", icon: FolderOpen, label: "Workspace" },
   { to: "/dashboard/pipelines", icon: GitBranch, label: "Pipelines" },
+  { to: "/dashboard/n8n", icon: Workflow, label: "N8n Workflows" },
   { to: "/dashboard/persona", icon: Bot, label: "Persona" },
   { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
   { to: "/dashboard/journal", icon: BookOpen, label: "Journal" },

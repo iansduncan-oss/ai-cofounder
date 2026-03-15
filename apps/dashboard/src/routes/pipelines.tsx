@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useListPipelines } from "@/api/queries";
 import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -14,7 +15,7 @@ import { EmptyState } from "@/components/common/empty-state";
 import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { SubmitPipelineDialog } from "@/components/pipelines/submit-pipeline-dialog";
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, Plus, Play, Loader2 } from "lucide-react";
 import type { PipelineRun, PipelineRunState } from "@ai-cofounder/api-client";
 
 /* ── PipelineStateBadge ── */
@@ -60,8 +61,27 @@ export function PipelinesPage() {
   usePageTitle("Pipelines");
   const [searchParams, setSearchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   const stateFilter = searchParams.get("state") ?? "all";
+
+  const { data: templatesData, isLoading: templatesLoading } = useQuery({
+    queryKey: queryKeys.pipelineTemplates.list,
+    queryFn: () => apiClient.listPipelineTemplates(),
+  });
+
+  const triggerMutation = useMutation({
+    mutationFn: (name: string) => apiClient.triggerPipelineTemplate(name),
+    onSuccess: (_data, name) => {
+      toast.success(`Pipeline "${name}" queued`);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+    },
+    onError: (err: Error, name) => {
+      toast.error(`Failed to trigger "${name}": ${err.message}`);
+    },
+  });
+
+  const templates = templatesData ?? [];
 
   const setFilter = (value: string) => {
     setSearchParams((prev) => {
@@ -95,6 +115,47 @@ export function PipelinesPage() {
           </Button>
         }
       />
+
+      {/* Quick Launch section */}
+      {(templatesLoading || templates.length > 0) && (
+        <section className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold text-foreground">Quick Launch</h2>
+          {templatesLoading ? (
+            <ListSkeleton rows={1} />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {templates.map((template) => (
+                <Card key={template.id}>
+                  <CardContent className="flex items-start justify-between gap-3 p-4">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{template.name}</p>
+                      {template.description && (
+                        <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                          {template.description}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={triggerMutation.isPending}
+                      onClick={() => triggerMutation.mutate(template.name)}
+                      className="shrink-0"
+                    >
+                      {triggerMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Play className="h-3.5 w-3.5" />
+                      )}
+                      <span className="ml-1">Run</span>
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <div className="mb-4 flex items-center gap-3">
         <Select

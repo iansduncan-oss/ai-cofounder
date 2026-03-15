@@ -1,4 +1,11 @@
-export { ApiClient, ApiError, type ClientOptions } from "./client.js";
+export {
+  ApiClient,
+  ApiError,
+  type ClientOptions,
+  type PipelineTemplate,
+  type N8nExecution,
+  type TriggerTemplateResponse,
+} from "./client.js";
 export type {
   AgentRole,
   GoalStatus,
