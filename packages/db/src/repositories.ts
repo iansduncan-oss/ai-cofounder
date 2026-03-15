@@ -37,6 +37,7 @@ import {
   journalEntries,
   registeredProjects,
   projectDependencies,
+  pipelineTemplates,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -3226,4 +3227,70 @@ export async function deleteProjectDependency(db: Db, id: string) {
     .where(eq(projectDependencies.id, id))
     .returning();
   return deleted;
+}
+
+/* ────────────────── Pipeline Templates ─────────────────────── */
+
+export async function createPipelineTemplate(
+  db: Db,
+  data: {
+    name: string;
+    description?: string;
+    stages: unknown;
+    defaultContext?: unknown;
+    isActive?: boolean;
+  },
+) {
+  const [template] = await db.insert(pipelineTemplates).values(data).returning();
+  return template;
+}
+
+export async function getPipelineTemplate(db: Db, id: string) {
+  const rows = await db.select().from(pipelineTemplates).where(eq(pipelineTemplates.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getPipelineTemplateByName(db: Db, name: string) {
+  const rows = await db
+    .select()
+    .from(pipelineTemplates)
+    .where(eq(pipelineTemplates.name, name))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listPipelineTemplates(db: Db, activeOnly = true) {
+  const conditions = activeOnly ? [eq(pipelineTemplates.isActive, true)] : [];
+  return db
+    .select()
+    .from(pipelineTemplates)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(asc(pipelineTemplates.name));
+}
+
+export async function updatePipelineTemplate(
+  db: Db,
+  id: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    stages: unknown;
+    defaultContext: unknown;
+    isActive: boolean;
+  }>,
+) {
+  const [updated] = await db
+    .update(pipelineTemplates)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(pipelineTemplates.id, id))
+    .returning();
+  return updated ?? null;
+}
+
+export async function deletePipelineTemplate(db: Db, id: string) {
+  const result = await db
+    .delete(pipelineTemplates)
+    .where(eq(pipelineTemplates.id, id))
+    .returning();
+  return result.length > 0;
 }

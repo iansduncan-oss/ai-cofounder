@@ -55,7 +55,6 @@ export const projectRoutes = fp(async (app: FastifyInstance) => {
     schema: {
       tags: ["projects"],
       summary: "List registered projects",
-      response: { 200: Type.Array(Type.Record(Type.String(), Type.Unknown())) },
     },
   }, async (_req, reply) => {
     try {

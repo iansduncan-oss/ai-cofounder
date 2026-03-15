@@ -10,8 +10,21 @@ export interface N8nTriggerResult {
   error?: string;
 }
 
+export interface N8nExecution {
+  id: string;
+  workflowId: string;
+  status: "success" | "error" | "waiting" | "canceled";
+  finished: boolean;
+  mode: "manual" | "trigger" | "webhook" | "retry";
+  startedAt: string;
+  stoppedAt: string | null;
+  retryOf: string | null;
+  retrySuccessId: string | null;
+}
+
 export interface N8nService {
   trigger(webhookUrl: string, workflowName: string, payload: Record<string, unknown>): Promise<N8nTriggerResult>;
+  listExecutions(opts?: { workflowId?: string; status?: string; limit?: number }): Promise<N8nExecution[]>;
 }
 
 export function createN8nService(): N8nService {
@@ -59,6 +72,46 @@ export function createN8nService(): N8nService {
         const message = err instanceof Error ? err.message : "Unknown error";
         logger.error({ workflowName, err }, "n8n workflow trigger error");
         return { success: false, workflowName, error: message };
+      }
+    },
+
+    async listExecutions(opts = {}) {
+      const baseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
+      const apiKey = optionalEnv("N8N_API_KEY", "");
+
+      if (!apiKey) {
+        logger.warn("N8N_API_KEY not configured — skipping listExecutions");
+        return [];
+      }
+
+      try {
+        const params = new URLSearchParams();
+        if (opts.workflowId) params.set("workflowId", opts.workflowId);
+        if (opts.status) params.set("status", opts.status);
+        if (opts.limit != null) params.set("limit", String(opts.limit));
+
+        const url = `${baseUrl}/api/v1/executions${params.toString() ? `?${params.toString()}` : ""}`;
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch(url, {
+          headers: { "X-N8N-API-KEY": apiKey },
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeout);
+
+        if (!response.ok) {
+          logger.error({ status: response.status }, "n8n listExecutions request failed");
+          return [];
+        }
+
+        const json = (await response.json()) as { data?: N8nExecution[] };
+        return json.data ?? [];
+      } catch (err) {
+        logger.error({ err }, "n8n listExecutions error");
+        return [];
       }
     },
   };
