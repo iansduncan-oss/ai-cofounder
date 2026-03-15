@@ -193,11 +193,15 @@ Plans:
   2. content_pipeline journal entries render with correct icon and "Content Pipeline" label
   3. Project switcher in dashboard header causes API queries to scope data by active project
   4. Scheduled autonomous sessions pass through tier enforcement (autonomyTierService wired in scheduler.ts)
-**Plans:** TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 17-01-PLAN.md — content_pipeline journal type fix + scheduler tier enforcement wiring
+- [ ] 17-02-PLAN.md — Autonomous sessions dashboard page + project switcher workspace scoping
 
 ## Progress
 
-**Execution Order:** 8 & 9 (parallel) → 10 → 11, 12, 13 (parallel) → 14, 15 → 16
+**Execution Order:** 8 & 9 (parallel) → 10 → 11, 12, 13 (parallel) → 14, 15 → 16 → 17
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -217,7 +221,7 @@ Plans:
 | 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
 | 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 16. Dashboard Command Center | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 17. Close Integration & Flow Gaps | v2.0 | 0/0 | Planned | — |
+| 17. Close Integration & Flow Gaps | v2.0 | 0/2 | In Progress | — |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
