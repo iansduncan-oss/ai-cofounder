@@ -689,6 +689,7 @@ export const journalEntryTypeEnum = pgEnum("journal_entry_type", [
   "work_session",
   "subagent_run",
   "deployment",
+  "content_pipeline",
 ]);
 
 export const journalEntries = pgTable("journal_entries", {
@@ -702,4 +703,17 @@ export const journalEntries = pgTable("journal_entries", {
   details: jsonb("details"),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Pipeline Templates (content automation workflows) ── */
+
+export const pipelineTemplates = pgTable("pipeline_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  stages: jsonb("stages").notNull(),
+  defaultContext: jsonb("default_context"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
