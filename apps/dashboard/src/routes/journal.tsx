@@ -1,9 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import {
   GitCommit, GitPullRequest, CheckCircle2, XCircle, FileText,
-  Zap, Clock, Target, Bot, Rocket, Search,
+  Zap, Clock, Target, Bot, Rocket, Search, Workflow,
 } from "lucide-react";
 import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -21,6 +21,7 @@ const typeConfig: Record<string, { icon: typeof GitCommit; color: string; label:
   work_session: { icon: Clock, color: "text-cyan-500", label: "Work Session" },
   subagent_run: { icon: Bot, color: "text-pink-500", label: "Subagent Run" },
   deployment: { icon: Rocket, color: "text-teal-500", label: "Deployment" },
+  content_pipeline: { icon: Workflow, color: "text-orange-400", label: "Content Pipeline" },
 };
 
 function RelativeTime({ date }: { date: string }) {
@@ -92,7 +93,7 @@ const entryTypes: JournalEntryType[] = [
   "goal_started", "goal_completed", "goal_failed",
   "task_completed", "task_failed",
   "git_commit", "pr_created", "reflection", "work_session",
-  "subagent_run", "deployment",
+  "subagent_run", "deployment", "content_pipeline",
 ];
 
 function toDateString(date: Date): string {
@@ -109,7 +110,7 @@ export function JournalPage() {
   const [toDate, setToDate] = useState(() => toDateString(new Date()));
 
   // Debounce search
-  useMemo(() => {
+  useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 300);
     return () => clearTimeout(t);
   }, [search]);
