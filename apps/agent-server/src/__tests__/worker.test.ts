@@ -162,7 +162,7 @@ describe("Worker — QUEUE-03: processor delegates to dispatcher.runGoal", () =>
     await main();
 
     expect(mockStartWorkers).toHaveBeenCalledOnce();
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {
@@ -185,7 +185,7 @@ describe("Worker — QUEUE-03: processor re-throws on dispatcher failure", () =>
 
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {
@@ -275,7 +275,7 @@ describe("Worker — QUEUE-10: publishes job_started event before dispatcher.run
     vi.clearAllMocks();
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {
@@ -304,7 +304,7 @@ describe("Worker — QUEUE-10: passes onProgress callback to dispatcher.runGoal(
     vi.clearAllMocks();
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {
@@ -323,12 +323,12 @@ describe("Worker — QUEUE-10: onProgress callback publishes task events via red
     vi.clearAllMocks();
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     // Capture the onProgress callback passed to runGoal
-    let capturedOnProgress: Function | undefined;
-    mockRunGoal.mockImplementationOnce(async (_goalId: string, _userId: string, onProgress: Function) => {
+    let capturedOnProgress: ((...args: unknown[]) => unknown) | undefined;
+    mockRunGoal.mockImplementationOnce(async (_goalId: string, _userId: string, onProgress: (...args: unknown[]) => unknown) => {
       capturedOnProgress = onProgress;
       return { status: "completed" };
     });
@@ -370,7 +370,7 @@ describe("Worker — QUEUE-10: publishes job_completed event after successful ex
     vi.clearAllMocks();
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {
@@ -407,7 +407,7 @@ describe("Worker — QUEUE-10: publishes job_failed event when execution fails",
 
     await main();
 
-    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, Function>];
+    const [processors] = mockStartWorkers.mock.calls[0] as [Record<string, (...args: unknown[]) => unknown>];
     const agentTaskProcessor = processors.agentTask;
 
     const fakeJob = {

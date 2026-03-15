@@ -111,7 +111,6 @@ export function ChatPage() {
       }
     }
     prevStreaming.current = stream.isStreaming;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   // Handle stream error — show as message
@@ -123,7 +122,6 @@ export function ChatPage() {
       ]);
       stream.reset();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.error]);
 
   // Track scroll position
@@ -177,7 +175,6 @@ export function ChatPage() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   const handleNewChat = () => {
@@ -267,7 +264,6 @@ export function ChatPage() {
 
         return elements;
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, lastAssistantIndex, stream.isStreaming],
   );
 

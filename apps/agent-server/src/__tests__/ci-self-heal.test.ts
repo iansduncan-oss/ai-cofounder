@@ -39,8 +39,8 @@ const mockNotificationService = {
 
 function makeService(): CiSelfHealService {
   return new CiSelfHealService(
-    mockRedis as unknown as import("ioredis").Redis,
-    mockNotificationService as unknown as import("../services/notifications.js").NotificationService,
+    mockRedis as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   );
 }
 

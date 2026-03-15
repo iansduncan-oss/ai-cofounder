@@ -67,8 +67,10 @@ vi.mock("@ai-cofounder/queue", () => ({
 }));
 
 describe("session context", () => {
-  let SessionContextService: typeof import("../services/session-context.js").SessionContextService;
-  const mockDb = {} as Parameters<typeof SessionContextService.prototype.getRecentContext>[0];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let SessionContextService: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockDb = {} as any;
 
   beforeEach(async () => {
     vi.clearAllMocks();

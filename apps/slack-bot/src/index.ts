@@ -21,7 +21,7 @@ logger.info({ port }, "Slack bot is online (Socket Mode)");
 
 // Health check HTTP server
 const healthPort = Number(optionalEnv("SLACK_HEALTH_PORT", "3102"));
-let slackConnected = true; // Socket Mode connection is established by app.start()
+const slackConnected = true; // Socket Mode connection is established by app.start()
 
 const healthServer = http.createServer((_req, res) => {
   if (_req.url === "/health" && _req.method === "GET") {

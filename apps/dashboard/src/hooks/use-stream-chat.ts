@@ -187,7 +187,6 @@ export function useStreamChat() {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

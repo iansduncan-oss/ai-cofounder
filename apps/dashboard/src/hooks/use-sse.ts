@@ -111,7 +111,6 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [maxRetries, timeoutMs],
   );
 
@@ -123,7 +122,6 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
     return () => {
       disconnect();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goalId]);
 
   const reset = useCallback(() => {

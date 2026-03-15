@@ -25,7 +25,7 @@ vi.mock("@ai-cofounder/db", () => ({
 // ── Mock node:fs/promises (WorkspaceService.init calls mkdir) ─────────────────
 
 vi.mock("node:fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const actual = ((await importOriginal()) as Record<string, unknown>);
   return {
     ...actual,
     mkdir: vi.fn().mockResolvedValue(undefined),

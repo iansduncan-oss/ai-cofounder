@@ -56,7 +56,8 @@ const { AutonomyTierService } = await import("../services/autonomy-tier.js");
 const { buildSharedToolList, executeWithTierCheck } = await import("../agents/tool-executor.js");
 const { notifyApprovalCreated } = await import("../services/notifications.js");
 
-const mockDb = {} as import("@ai-cofounder/db").Db;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const mockDb = {} as any;
 
 describe("AutonomyTierService", () => {
   beforeEach(() => {

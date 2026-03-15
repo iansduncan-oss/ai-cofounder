@@ -166,9 +166,11 @@ describe("approval timeout sweep", () => {
       { id: "a-2", status: "pending", createdAt: new Date(Date.now() - 900_000) },
     ]);
     const { listExpiredPendingApprovals, resolveApproval } = await import("@ai-cofounder/db");
-    const expired = await listExpiredPendingApprovals({} as import("@ai-cofounder/db").Db);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const expired = await listExpiredPendingApprovals({} as any);
     for (const approval of expired) {
-      await resolveApproval({} as import("@ai-cofounder/db").Db, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await resolveApproval({} as any, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
     }
     expect(mockListExpiredPendingApprovals).toHaveBeenCalled();
     expect(mockResolveApproval).toHaveBeenCalledTimes(2);

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-import { createEvent } from "@ai-cofounder/db";
+import { createEvent, type Db } from "@ai-cofounder/db";
 
 const logger = createLogger("security");
 
@@ -103,7 +103,7 @@ const ipHits = new Map<string, IpRecord>();
 const bannedIps = new Map<string, number>(); // ip -> ban expiry timestamp
 
 // Set by the plugin so recordHit can log bans to DB
-let banEventDb: import("@ai-cofounder/db").Db | undefined;
+let banEventDb: Db | undefined;
 
 function getClientIp(request: FastifyRequest): string {
   // Use Fastify's built-in request.ip which respects trustProxy settings

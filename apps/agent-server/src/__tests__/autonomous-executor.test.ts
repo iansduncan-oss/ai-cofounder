@@ -177,7 +177,7 @@ describe("AutonomousExecutorService.executeGoal", () => {
 
   function createMockDispatcher(progress = sampleProgress) {
     return {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, onProgress?: Function) => {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, onProgress?: (...args: unknown[]) => unknown) => {
         // Simulate progress events
         if (onProgress) {
           await onProgress({
@@ -449,7 +449,7 @@ describe("Work log structure (TERM-05)", () => {
       void event;
     });
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
         if (cb) {
           await cb({
             goalId: "goal-abc12345",
@@ -486,7 +486,7 @@ describe("Work log structure (TERM-05)", () => {
   it("output in task_progress actions is truncated to 500 chars", async () => {
     const longOutput = "x".repeat(600);
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
         if (cb) {
           await cb({
             goalId: "goal-abc12345",

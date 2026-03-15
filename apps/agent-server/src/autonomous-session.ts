@@ -14,7 +14,8 @@ import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./services/workspace.js";
 import type { AgentMessagingService } from "./services/agent-messaging.js";
 import { Orchestrator } from "./agents/orchestrator.js";
-import { DistributedLockService, AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
+import type { DistributedLockService} from "./services/distributed-lock.js";
+import { AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
 import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
 
 const logger = createLogger("autonomous-session");

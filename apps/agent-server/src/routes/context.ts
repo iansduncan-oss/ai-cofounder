@@ -64,8 +64,7 @@ export async function contextRoutes(app: FastifyInstance): Promise<void> {
       return { data: null };
     }
 
-    let timezone: string | undefined;
-    timezone = (await getUserTimezone(app.db, query.userId)) ?? undefined;
+    const timezone = (await getUserTimezone(app.db, query.userId)) ?? undefined;
 
     const service = new ContextualAwarenessService(app.db, { timezone });
     const block = await service.getContextBlock(query.userId);

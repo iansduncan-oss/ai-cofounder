@@ -6,7 +6,7 @@ import helmet from "@fastify/helmet";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUi from "@fastify/swagger-ui";
 import fastifyStatic from "@fastify/static";
-import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv, type WsChannel, type AgentRole } from "@ai-cofounder/shared";
 import {
   LlmRegistry,
   AnthropicProvider,
@@ -109,7 +109,7 @@ export function buildServer(registry?: LlmRegistry) {
       provider: event.provider,
       model: event.model,
       taskCategory: event.task,
-      agentRole: event.metadata?.agentRole as import("@ai-cofounder/shared").AgentRole | undefined,
+      agentRole: event.metadata?.agentRole as AgentRole | undefined,
       inputTokens: event.inputTokens,
       outputTokens: event.outputTokens,
       goalId: event.metadata?.goalId as string | undefined,
@@ -494,6 +494,6 @@ declare module "fastify" {
     ciSelfHealService?: CiSelfHealService;
     journalService: JournalService;
     budgetAlertService: BudgetAlertService;
-    wsBroadcast: (channel: import("@ai-cofounder/shared").WsChannel) => void;
+    wsBroadcast: (channel: WsChannel) => void;
   }
 }

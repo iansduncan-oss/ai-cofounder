@@ -19,7 +19,7 @@ vi.mock("@/hooks/use-auth", () => ({
 }));
 
 vi.mock("react-router", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("react-router")>();
+  const mod = (await importOriginal()) as Record<string, unknown>;
   return {
     ...mod,
     useNavigate: () => mockNavigate,

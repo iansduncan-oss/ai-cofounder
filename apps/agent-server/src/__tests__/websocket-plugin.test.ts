@@ -16,7 +16,7 @@ vi.mock("@ai-cofounder/db", () => ({
 }));
 
 vi.mock("@ai-cofounder/shared", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@ai-cofounder/shared")>();
+  const actual = ((await importOriginal()) as Record<string, unknown>);
   return {
     ...actual,
     createLogger: () => ({
@@ -77,7 +77,8 @@ vi.mock("@ai-cofounder/sandbox", () => ({
 
 import WebSocket from "ws";
 
-let app: Awaited<ReturnType<typeof import("../server.js")["buildServer"]>>["app"];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let app: any;
 
 beforeEach(async () => {
   const { buildServer } = await import("../server.js");

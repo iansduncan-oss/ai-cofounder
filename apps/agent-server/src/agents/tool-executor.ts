@@ -2,6 +2,7 @@
 // Extracted from the orchestrator's executeToolInner() to avoid duplication.
 
 import type { LlmTool, LlmToolUseContent, EmbeddingService } from "@ai-cofounder/llm";
+import type { BrowserActionInput } from "../services/browser.js";
 import type { Db } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 import { retrieve, formatContext } from "@ai-cofounder/rag";
@@ -875,7 +876,7 @@ export async function executeSharedTool(
 
     case "browser_action": {
       if (!browserService?.available) return { error: "Browser automation not available" };
-      const input = block.input as unknown as import("../services/browser.js").BrowserActionInput;
+      const input = block.input as unknown as BrowserActionInput;
       return browserService.execute(input);
     }
 

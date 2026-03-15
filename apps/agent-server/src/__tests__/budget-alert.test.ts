@@ -46,7 +46,7 @@ const mockDb = {} as Db;
 function makeService(): BudgetAlertService {
   return new BudgetAlertService(
     mockDb,
-    mockNotificationService as unknown as import("../services/notifications.js").NotificationService,
+    mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
   );
 }
 

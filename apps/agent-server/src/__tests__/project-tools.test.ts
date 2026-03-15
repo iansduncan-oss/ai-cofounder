@@ -47,7 +47,8 @@ import {
 import { executeSharedTool, type ToolExecutorServices, type ToolExecutorContext } from "../agents/tool-executor.js";
 
 describe("project tools", () => {
-  const mockDb = {} as ReturnType<typeof import("@ai-cofounder/db").createDb>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockDb = {} as any;
 
   const mockProjectRegistryService = {
     validateProjectPath: vi.fn().mockReturnValue(true),
@@ -109,7 +110,8 @@ describe("project tools", () => {
       updatedAt: new Date(),
     });
     vi.mocked(getRegisteredProjectByName).mockResolvedValue(null);
-    vi.mocked(updateConversationMetadata).mockResolvedValue({ id: "conv-123" } as ReturnType<typeof import("@ai-cofounder/db").createConversation> extends Promise<infer T> ? T : never);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(updateConversationMetadata).mockResolvedValue({ id: "conv-123" } as any);
     vi.mocked(listProjectDependencies).mockResolvedValue([]);
     vi.mocked(getRegisteredProjectById).mockResolvedValue(null);
   });

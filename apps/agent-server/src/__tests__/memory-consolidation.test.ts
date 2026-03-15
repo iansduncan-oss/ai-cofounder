@@ -116,7 +116,8 @@ function createMockDb({
 }
 
 describe("consolidation", () => {
-  let MemoryConsolidationService: typeof import("../services/memory-consolidation.js").MemoryConsolidationService;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let MemoryConsolidationService: any;
 
   beforeEach(async () => {
     vi.clearAllMocks();

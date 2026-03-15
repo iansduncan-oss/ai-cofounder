@@ -41,7 +41,7 @@ describe("JournalService", () => {
   let service: ReturnType<typeof createJournalService>;
   let registry: InstanceType<typeof LlmRegistry>;
   const mockEmit = vi.fn();
-  const mockEvents = { emit: mockEmit } as unknown as import("node:events").EventEmitter;
+  const mockEvents = { emit: mockEmit } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   beforeEach(() => {
     vi.clearAllMocks();
