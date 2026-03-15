@@ -193,4 +193,19 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
     if (!deleted) return reply.status(404).send({ error: "Workflow not found" });
     return { deleted: true };
   });
+
+  /* ── Execution history ── */
+  app.get<{ Querystring: { workflowId?: string; status?: string; limit?: string } }>(
+    "/executions",
+    { schema: { tags: ["n8n"] } },
+    async (request) => {
+      const { workflowId, status, limit } = request.query;
+      const executions = await app.n8nService.listExecutions({
+        workflowId,
+        status,
+        limit: limit ? Number(limit) : undefined,
+      });
+      return { data: executions };
+    },
+  );
 };

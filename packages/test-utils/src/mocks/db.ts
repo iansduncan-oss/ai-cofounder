@@ -273,6 +273,14 @@ export function mockDbModule() {
     deleteProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1" }),
     registeredProjects: {},
     projectDependencies: {},
+    // Pipeline templates
+    createPipelineTemplate: vi.fn().mockResolvedValue({ id: "pt-1", name: "test-template", isActive: true }),
+    getPipelineTemplate: vi.fn().mockResolvedValue(null),
+    getPipelineTemplateByName: vi.fn().mockResolvedValue(null),
+    listPipelineTemplates: vi.fn().mockResolvedValue([]),
+    updatePipelineTemplate: vi.fn().mockResolvedValue(null),
+    deletePipelineTemplate: vi.fn().mockResolvedValue(false),
+    pipelineTemplates: {},
   };
 }
 
