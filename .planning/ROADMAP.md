@@ -37,7 +37,7 @@
 - [x] **Phase 11: Autonomous Scheduling** — Recurring execution loop, distributed lock, token budget, self-healing (completed 2026-03-14)
 - [x] **Phase 12: Work Journal & Standup** — Browsable activity log, daily standup summaries (completed 2026-03-15)
 - [x] **Phase 13: Financial Tracking** — Per-request cost tracking, aggregation, budget alerts (completed 2026-03-15)
-- [ ] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state
+- [ ] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state (next)
 - [ ] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks
 - [ ] **Phase 16: Dashboard Command Center** — Journal, approvals, costs, projects, notifications, settings
 
@@ -73,8 +73,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 09-01-PLAN.md — DB schema, AutonomyTierService, and tier enforcement in tool executor
-- [ ] 09-02-PLAN.md — REST API, approval timeout sweep, and dashboard tier config UI
+- [x] 09-01-PLAN.md — DB schema, AutonomyTierService, and tier enforcement in tool executor
+- [x] 09-02-PLAN.md — REST API, approval timeout sweep, and dashboard tier config UI
 
 ### Phase 10: Autonomous Execution Engine
 **Goal**: Agent picks up tasks from the goal backlog and completes them end-to-end — code, test, commit, PR — without human intervention
@@ -89,8 +89,8 @@ Plans:
 **Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 10-01-PLAN.md — Core engine: listGoalBacklog, AutonomousExecutorService, buildConventionalCommit, CoderAgent workspace tools
-- [ ] 10-02-PLAN.md — REST API routes, autonomous session backlog wiring, ApiClient methods
+- [x] 10-01-PLAN.md — Core engine: listGoalBacklog, AutonomousExecutorService, buildConventionalCommit, CoderAgent workspace tools
+- [x] 10-02-PLAN.md — REST API routes, autonomous session backlog wiring, ApiClient methods
 
 ### Phase 11: Autonomous Scheduling
 **Goal**: Agent works while you sleep — recurring execution loop with distributed lock, token budget, and CI self-healing
@@ -101,11 +101,11 @@ Plans:
   2. Second session attempt while one is running is rejected (no dual execution)
   3. Session aborts cleanly when token budget is exhausted (no partial commits)
   4. CI self-heal creates a PR fixing a real test failure after 2-cycle confirmation
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
-- [ ] 11-01-PLAN.md — Recurring BullMQ schedule, DistributedLockService, token budget hard abort
-- [ ] 11-02-PLAN.md — CiSelfHealService with 2-cycle confirmation and monitoring integration
+- [x] 11-01-PLAN.md — Recurring BullMQ schedule, DistributedLockService, token budget hard abort
+- [x] 11-02-PLAN.md — CiSelfHealService with 2-cycle confirmation and monitoring integration
 
 ### Phase 12: Work Journal & Standup
 **Goal**: Browsable activity log of everything the agent does, with daily standup summaries delivered proactively
@@ -132,7 +132,7 @@ Plans:
 Plans:
 - [x] 13-01-PLAN.md — Data layer + alerting: getCostByDay DB function, BudgetAlertService, BullMQ budget-check wiring
 - [x] 13-02-PLAN.md — API routes + dashboard UI: daily trend endpoint, budget status endpoint, LineChart + budget gauge + suggestions
-- [ ] 13-03-PLAN.md — Gap closure: onCompletion hook on LlmRegistry for automatic usage recording on all call sites (FIN-01)
+- [x] 13-03-PLAN.md — Gap closure: onCompletion hook on LlmRegistry for automatic usage recording on all call sites (FIN-01)
 
 ### Phase 14: Multi-Project Awareness
 **Goal**: Agent understands all your projects, infrastructure, and how they relate — can switch context and reason across projects
@@ -143,7 +143,11 @@ Plans:
   2. VPS container status is queryable and accurate
   3. Agent flags potential cross-project impact when making changes
   4. Per-project RAG namespace scopes memories correctly
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 14-01-PLAN.md — DB schema + migration + repository CRUD + ProjectRegistryService + Fastify plugin
+- [ ] 14-02-PLAN.md — Orchestrator tools + RAG scoping + VPS monitoring extension + REST API routes
 
 ### Phase 15: Content Automations
 **Goal**: YouTube pipeline and n8n workflows are managed tasks the agent can trigger, monitor, and report on
@@ -182,12 +186,12 @@ Plans:
 | 6. Pipeline Detail | v1.1 | 2/2 | Complete | 2026-03-09 |
 | 7. Pipeline Trigger | v1.1 | 1/1 | Complete | 2026-03-09 |
 | 8. Memory & Session Foundation | v2.0 | 3/3 | Complete | 2026-03-10 |
-| 9. Autonomy & Approval System | 2/2 | Complete   | 2026-03-10 | — |
-| 10. Autonomous Execution Engine | 2/2 | Complete    | 2026-03-10 | — |
-| 11. Autonomous Scheduling | v2.0 | 0/2 | Planned | — |
-| 12. Work Journal & Standup | v2.0 | 0/0 | Pending | — |
-| 13. Financial Tracking | 3/3 | Complete    | 2026-03-15 | — |
-| 14. Multi-Project Awareness | v2.0 | 0/0 | Pending | — |
+| 9. Autonomy & Approval System | v2.0 | 2/2 | Complete | 2026-03-10 |
+| 10. Autonomous Execution Engine | v2.0 | 2/2 | Complete | 2026-03-10 |
+| 11. Autonomous Scheduling | v2.0 | 2/2 | Complete | 2026-03-14 |
+| 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
+| 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
+| 14. Multi-Project Awareness | v2.0 | 0/2 | Planned | — |
 | 15. Content Automations | v2.0 | 0/0 | Pending | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 
