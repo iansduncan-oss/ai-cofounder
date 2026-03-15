@@ -30,6 +30,7 @@ import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
 import { NotificationBell } from "@/components/common/notification-bell";
+import { ProjectSwitcher } from "@/components/layout/project-switcher";
 
 const navItems = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Overview", end: true },
@@ -101,6 +102,8 @@ export function Sidebar() {
           <X className="h-4 w-4" />
         </button>
       </div>
+
+      <ProjectSwitcher />
 
       <nav className="flex-1 space-y-1 px-2 py-3">
         {navItems.map(({ to, icon: Icon, label, end }) => (

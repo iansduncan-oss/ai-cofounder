@@ -255,3 +255,11 @@ export function useDashboardSummary() {
     refetchInterval: 60_000,
   });
 }
+
+export function useProjects() {
+  return useQuery({
+    queryKey: queryKeys.projects.list,
+    queryFn: () => apiClient.listProjects(),
+    staleTime: 60_000,
+  });
+}
