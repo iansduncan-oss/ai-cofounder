@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: completed
-stopped_at: "Checkpoint: 16-03 Task 1 complete, awaiting human-verify checkpoint for DASH-06 full verification"
-last_updated: "2026-03-15T22:57:33.363Z"
+stopped_at: Completed 17-01-PLAN.md
+last_updated: "2026-03-15T23:54:34.332Z"
 last_activity: "2026-03-15 — Phase 16 Plan 03 complete: Budget threshold settings + project registration UI. All 6 DASH requirements verified and approved. Phase 16 complete. v2.0 milestone complete."
 progress:
-  total_phases: 9
+  total_phases: 10
   completed_phases: 6
-  total_plans: 17
-  completed_plans: 15
+  total_plans: 19
+  completed_plans: 16
 ---
 
 # Project State
@@ -120,6 +120,9 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - Budget gauge only renders when dailyUsd > 0 — avoids showing 0% gauge for unconfigured budgets
 - createProject.mutate called with onSuccess callback in options arg — resets form after successful registration
 - Test assertion uses expect.objectContaining on both data and options args to match mutate(data, options) call signature
+- [Phase 17]: Orchestrator param 9 is autonomyTierService (not 12 as plan's interface section stated)
+- [Phase 17]: vi.advanceTimersByTimeAsync(1000) used in scheduler tests to avoid infinite setInterval loop from runAllTimersAsync
+- [Phase 17]: getAllByText used in journal test: Content Pipeline appears in both badge and filter dropdown option
 
 ### Pending Todos
 
@@ -151,9 +154,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | Phase 16 P01 | 15 min | 2 tasks | 13 files |
 | 16 | 02 | 15 min | 3/3 | 13 |
 | 16 | 03 | 12 min | 2/2 | 5 |
+| Phase 17 P01 | 8 | 2 tasks | 6 files |
 
 ## Session Continuity
 
-Last session: 2026-03-15T22:45:42.655Z
-Stopped at: Checkpoint: 16-03 Task 1 complete, awaiting human-verify checkpoint for DASH-06 full verification
+Last session: 2026-03-15T23:54:34.330Z
+Stopped at: Completed 17-01-PLAN.md
 Resume file: None

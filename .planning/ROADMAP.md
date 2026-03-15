@@ -193,7 +193,7 @@ Plans:
   2. content_pipeline journal entries render with correct icon and "Content Pipeline" label
   3. Project switcher in dashboard header changes workspace browsing root to active project's workspacePath
   4. Scheduled autonomous sessions pass through tier enforcement (autonomyTierService wired in scheduler.ts)
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 17-01-PLAN.md — content_pipeline journal type fix + scheduler tier enforcement wiring
@@ -221,7 +221,7 @@ Plans:
 | 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
 | 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 16. Dashboard Command Center | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 17. Close Integration & Flow Gaps | v2.0 | 0/2 | In Progress | — |
+| 17. Close Integration & Flow Gaps | 1/2 | In Progress|  | — |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
