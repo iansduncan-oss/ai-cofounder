@@ -43,9 +43,9 @@ describe("DistributedLockService", () => {
       expect(redis.set).toHaveBeenCalledWith(
         "my-lock",
         expect.any(String),
-        "NX",
         "PX",
         30_000,
+        "NX",
       );
     });
 

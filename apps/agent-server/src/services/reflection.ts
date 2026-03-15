@@ -1,5 +1,6 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
+import { gte, asc } from "drizzle-orm";
 import type { Db } from "@ai-cofounder/db";
 import {
   insertReflection,
@@ -7,6 +8,7 @@ import {
   getUserActionsSince,
   upsertUserPattern,
   deleteOldUserActions,
+  userActions,
 } from "@ai-cofounder/db";
 
 const logger = createLogger("reflection-service");
@@ -284,13 +286,11 @@ LESSONS:
 
     try {
       // Get all recent actions via a direct query approach
-      const { userActions } = await import("@ai-cofounder/db");
-      const { sql: sqlTag } = await import("drizzle-orm");
       actions = await this.db
         .select()
         .from(userActions)
-        .where(sqlTag`${userActions.createdAt} >= ${thirtyDaysAgo}`)
-        .orderBy(sqlTag`${userActions.createdAt} ASC`);
+        .where(gte(userActions.createdAt, thirtyDaysAgo))
+        .orderBy(asc(userActions.createdAt));
     } catch (err) {
       logger.warn({ err }, "failed to fetch user actions for pattern analysis");
       return [];

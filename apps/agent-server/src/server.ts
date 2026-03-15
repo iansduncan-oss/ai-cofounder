@@ -483,5 +483,6 @@ declare module "fastify" {
     ciSelfHealService?: CiSelfHealService;
     journalService: JournalService;
     budgetAlertService: BudgetAlertService;
+    wsBroadcast: (channel: import("@ai-cofounder/shared").WsChannel) => void;
   }
 }

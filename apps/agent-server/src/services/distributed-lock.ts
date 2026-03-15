@@ -17,7 +17,7 @@ export class DistributedLockService {
    */
   async acquire(lockKey: string, ttlMs: number): Promise<string | null> {
     const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const result = await this.redis.set(lockKey, token, "NX", "PX", ttlMs);
+    const result = await this.redis.set(lockKey, token, "PX", ttlMs, "NX");
     return result === "OK" ? token : null;
   }
 

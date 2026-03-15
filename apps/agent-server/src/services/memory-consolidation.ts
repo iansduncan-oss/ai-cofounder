@@ -222,7 +222,6 @@ Rules:
           category: category as Parameters<typeof saveMemory>[1]["category"],
           key: cluster.title,
           content: cluster.summary,
-          importance: 9,
           metadata: {
             consolidated_from: validMembers,
             consolidated_at: new Date().toISOString(),

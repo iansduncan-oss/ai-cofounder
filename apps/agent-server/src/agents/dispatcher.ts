@@ -348,7 +348,7 @@ export class TaskDispatcher {
     // Check approvals up front
     const allTaskIds = tasks.map((t) => t.id);
     const pendingApprovals = await listPendingApprovalsForTasks(this.db, allTaskIds);
-    const approvalBlockedIds = new Set(pendingApprovals.map((a) => a.taskId).filter(Boolean));
+    const approvalBlockedIds = new Set(pendingApprovals.map((a) => a.taskId).filter((id): id is string => Boolean(id)));
 
     // Find tasks that are ready to execute
     const getReadyTasks = (): typeof tasks => {

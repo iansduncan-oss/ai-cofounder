@@ -191,7 +191,6 @@ describe("consolidation", () => {
       expect.objectContaining({
         userId: "user-1",
         category: "decisions",
-        importance: 9,
         metadata: expect.objectContaining({ consolidated_from: ["m3", "m4"] }),
       }),
     );
