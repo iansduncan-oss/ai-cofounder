@@ -79,4 +79,12 @@ export const queryKeys = {
     list: (params?: string) => ["journal", "list", params ?? ""] as const,
     standup: (date?: string) => ["journal", "standup", date ?? "today"] as const,
   },
+  n8n: {
+    workflows: ["n8n", "workflows"] as const,
+    executions: (opts?: string) => ["n8n", "executions", opts ?? "all"] as const,
+  },
+  pipelineTemplates: {
+    all: ["pipeline-templates"] as const,
+    list: ["pipeline-templates", "list"] as const,
+  },
 };

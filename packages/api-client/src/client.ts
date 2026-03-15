@@ -62,6 +62,32 @@ import type {
   CreateProjectDependencyInput,
 } from "./types.js";
 
+export interface PipelineTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  stages: unknown[];
+  defaultContext: Record<string, unknown> | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface N8nExecution {
+  id: string;
+  workflowId: string;
+  status: "success" | "error" | "waiting" | "canceled";
+  finished: boolean;
+  mode: string;
+  startedAt: string;
+  stoppedAt: string | null;
+}
+
+export interface TriggerTemplateResponse {
+  jobId: string;
+  template: string;
+}
+
 export interface ClientOptions {
   baseUrl: string;
   /** Static API secret for bot clients (Discord/Slack). Mutually exclusive with getToken. */
@@ -591,6 +617,37 @@ export class ApiClient {
 
   retryPipeline(jobId: string) {
     return this.request<RetryPipelineResponse>("POST", `/api/pipelines/${jobId}/retry`);
+  }
+
+  /* ── Pipeline Templates ── */
+
+  listPipelineTemplates() {
+    return this.request<PipelineTemplate[]>("GET", "/api/pipeline-templates");
+  }
+
+  getPipelineTemplate(id: string) {
+    return this.request<PipelineTemplate>("GET", `/api/pipeline-templates/${id}`);
+  }
+
+  triggerPipelineTemplate(name: string, opts?: { goalId?: string; context?: Record<string, unknown> }) {
+    return this.request<TriggerTemplateResponse>("POST", `/api/pipeline-templates/${encodeURIComponent(name)}/trigger`, opts);
+  }
+
+  /* ── N8n Executions ── */
+
+  listN8nExecutions(opts?: { workflowId?: string; status?: string; limit?: number }) {
+    const params = new URLSearchParams();
+    if (opts?.workflowId) params.set("workflowId", opts.workflowId);
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    const qs = params.toString();
+    return this.request<{ data: N8nExecution[] }>("GET", `/api/n8n/executions${qs ? `?${qs}` : ""}`);
+  }
+
+  listN8nWorkflows() {
+    return this.request<Array<{ id: string; name: string; description?: string; webhookUrl: string; isActive: boolean; direction: string }>>(
+      "GET", "/api/n8n/workflows",
+    );
   }
 
   /* ── Subagents ── */
