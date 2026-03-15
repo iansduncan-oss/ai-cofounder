@@ -34,8 +34,8 @@
 - [x] **Phase 8: Memory & Session Foundation** — RAG auto-ingestion, decision tagging, session continuity (completed 2026-03-10)
 - [x] **Phase 9: Autonomy & Approval System** — Three-tier approval (green/yellow/red) with configurable per-tool controls (completed 2026-03-10)
 - [x] **Phase 10: Autonomous Execution Engine** — Task pickup, chained tool execution, auto-commit, auto-PR (completed 2026-03-10)
-- [ ] **Phase 11: Autonomous Scheduling** — Recurring execution loop, distributed lock, token budget, self-healing
-- [ ] **Phase 12: Work Journal & Standup** — Browsable activity log, daily standup summaries
+- [x] **Phase 11: Autonomous Scheduling** — Recurring execution loop, distributed lock, token budget, self-healing (completed 2026-03-14)
+- [x] **Phase 12: Work Journal & Standup** — Browsable activity log, daily standup summaries (completed 2026-03-15)
 - [ ] **Phase 13: Financial Tracking** — Per-request cost tracking, aggregation, budget alerts
 - [ ] **Phase 14: Multi-Project Awareness** — Multi-workspace registry, per-project context, VPS state
 - [ ] **Phase 15: Content Automations** — YouTube pipeline + n8n as managed tasks
@@ -130,7 +130,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 13-01-PLAN.md — Data layer + alerting: getCostByDay DB function, BudgetAlertService, BullMQ budget-check wiring
+- [x] 13-01-PLAN.md — Data layer + alerting: getCostByDay DB function, BudgetAlertService, BullMQ budget-check wiring
 - [ ] 13-02-PLAN.md — API routes + dashboard UI: daily trend endpoint, budget status endpoint, LineChart + budget gauge + suggestions
 
 ### Phase 14: Multi-Project Awareness
