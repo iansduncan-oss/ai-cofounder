@@ -197,7 +197,7 @@ Plans:
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 14. Multi-Project Awareness | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
-| 15. Content Automations | 3/3 | Complete   | 2026-03-15 | — |
+| 15. Content Automations | 3/3 | Complete    | 2026-03-15 | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 
 ---
