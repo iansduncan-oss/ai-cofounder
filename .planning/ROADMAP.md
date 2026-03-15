@@ -143,7 +143,7 @@ Plans:
   2. VPS container status is queryable and accurate
   3. Agent flags potential cross-project impact when making changes
   4. Per-project RAG namespace scopes memories correctly
-**Plans:** 2 plans
+**Plans:** 2/2 plans complete
 
 Plans:
 - [x] 14-01-PLAN.md — DB schema + migration + repository CRUD + ProjectRegistryService + Fastify plugin
@@ -191,7 +191,7 @@ Plans:
 | 11. Autonomous Scheduling | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 14. Multi-Project Awareness | v2.0 | 2/2 | Complete | 2026-03-15 |
+| 14. Multi-Project Awareness | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
 | 15. Content Automations | v2.0 | 0/0 | Pending | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 
