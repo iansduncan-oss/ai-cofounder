@@ -175,11 +175,11 @@ Plans:
   3. Settings changes take effect immediately without server restart
   4. Multi-project switcher correctly changes workspace context
   5. Notification center shows real-time updates
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
-- [ ] 16-01-PLAN.md — Backend settings persistence (appSettings DB table, settings API) + journal date-range filter + approvals tier badge
-- [ ] 16-02-PLAN.md — Project switcher component + notification center page
+- [x] 16-01-PLAN.md — Backend settings persistence (appSettings DB table, settings API) + journal date-range filter + approvals tier badge
+- [x] 16-02-PLAN.md — Project switcher component + notification center page
 - [ ] 16-03-PLAN.md — Settings page extensions: budget threshold config + project registration UI
 
 ## Progress

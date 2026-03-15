@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 16-01-PLAN.md
-last_updated: "2026-03-15T22:35:59.488Z"
-last_activity: "2026-03-15 — Phase 15 Plan 02 complete: pipeline template routes, n8n executions route, PipelineExecutor journal + n8n wiring, YouTube Shorts template seed"
+stopped_at: Completed 16-02-PLAN.md
+last_updated: "2026-03-15T22:45:00.000Z"
+last_activity: "2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher, notification center, journal date-range filter, approval tier badges"
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 15 (Content Automations) — Plan 2 of 3 complete
+Phase: 16 (Dashboard Command Center) — Plan 2 of 3 complete
 Plan: 2 of 3
 Status: active
-Last activity: 2026-03-15 — Phase 15 Plan 02 complete: pipeline template routes, n8n executions route, PipelineExecutor journal + n8n wiring, YouTube Shorts template seed
+Last activity: 2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher with localStorage persistence, notification center, journal date-range filter, approval tier badges, 135 tests passing
 
 ## Milestones Shipped
 
@@ -106,6 +106,14 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - [Phase 16]: Migration numbered 0029 (not 0022 as planned) — 0022 was already taken by 0022_add_memory_agent_role.sql
 - [Phase 16]: DB-first config reads: getAppSetting(db, key) ?? parseFloat(optionalEnv(name, '0')) — use this pattern for all future configurable thresholds
 
+**Phase 16 Plan 02 Decisions:**
+- useSyncExternalStore is the correct React 18 pattern for localStorage-backed external store — avoids stale reads vs useState+useEffect
+- ProjectSwitcher returns null when no projects registered — avoids empty dropdown noise
+- BudgetStatusResponse uses nested shape data.daily.percentUsed — not flat percentUsed at root
+- Date-range filtering is client-side — entries already fetched, avoids extra API round trips
+- TierBadge defaults to yellow when tool name cannot be extracted — pending approvals are minimum yellow-tier
+- extractToolName uses single-quote regex first then word-after-Tool fallback for resilient parsing
+
 ### Pending Todos
 
 None.
@@ -134,9 +142,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 15 | 02 | 7 min | 2/2 | 8 |
 | Phase 15 P03 | 3.5 min | 2 tasks | 6 files |
 | Phase 16 P01 | 15 min | 2 tasks | 13 files |
+| 16 | 02 | 15 min | 3/3 | 13 |
 
 ## Session Continuity
 
-Last session: 2026-03-15T22:35:59.486Z
-Stopped at: Completed 16-01-PLAN.md
+Last session: 2026-03-15T22:45:00.000Z
+Stopped at: Completed 16-02-PLAN.md
 Resume file: None
