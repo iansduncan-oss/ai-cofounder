@@ -42,11 +42,11 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
         run: |
-          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 << 'DEPLOY'
+          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 bash -s -- "${GITHUB_SHA}" << 'DEPLOY'
           set -e
           cd /opt/ai-cofounder
 
-          SHA="$GITHUB_SHA"
+          SHA="$1"
           SHORT_SHA="${SHA:0:7}"
 
           echo "==> Saving previous image SHA for rollback..."
