@@ -317,7 +317,7 @@ describe("Users", () => {
 
     it("creates and returns new user when not found", async () => {
       // First call (select) returns empty, second (insert...returning) returns created user
-      let callCount = 0;
+      const callCount = 0;
       const selectProxy = new Proxy({} as Record<string, unknown>, {
         get(_, prop) {
           if (prop === "then") {
