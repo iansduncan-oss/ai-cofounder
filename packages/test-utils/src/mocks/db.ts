@@ -260,6 +260,18 @@ export function mockDbModule() {
     listJournalEntries: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     listWorkSessionsFiltered: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     journalEntries: {},
+    // Registered projects
+    createRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "test-project", slug: "test-project", workspacePath: "/tmp/test" }),
+    listRegisteredProjects: vi.fn().mockResolvedValue([]),
+    getRegisteredProjectByName: vi.fn().mockResolvedValue(null),
+    getRegisteredProjectById: vi.fn().mockResolvedValue(null),
+    updateRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
+    deleteRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", isActive: false }),
+    createProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1", sourceProjectId: "proj-1", targetProjectId: "proj-2", dependencyType: "uses" }),
+    listProjectDependencies: vi.fn().mockResolvedValue([]),
+    deleteProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1" }),
+    registeredProjects: {},
+    projectDependencies: {},
   };
 }
 

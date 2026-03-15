@@ -634,6 +634,46 @@ export const subagentRuns = pgTable("subagent_runs", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Registered Projects (multi-project awareness) ── */
+
+export const projectLanguageEnum = pgEnum("project_language", [
+  "typescript",
+  "python",
+  "javascript",
+  "go",
+  "other",
+]);
+
+export const registeredProjects = pgTable("registered_projects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  slug: text("slug").notNull().unique(),
+  repoUrl: text("repo_url"),
+  workspacePath: text("workspace_path").notNull(),
+  description: text("description"),
+  language: projectLanguageEnum("language").notNull().default("typescript"),
+  defaultBranch: text("default_branch").notNull().default("main"),
+  testCommand: text("test_command"),
+  isActive: boolean("is_active").notNull().default(true),
+  config: jsonb("config"),
+  lastIngestedAt: timestamp("last_ingested_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const projectDependencies = pgTable("project_dependencies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceProjectId: uuid("source_project_id")
+    .notNull()
+    .references(() => registeredProjects.id, { onDelete: "cascade" }),
+  targetProjectId: uuid("target_project_id")
+    .notNull()
+    .references(() => registeredProjects.id, { onDelete: "cascade" }),
+  dependencyType: text("dependency_type").notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Journal Entries (unified activity timeline) ── */
 
 export const journalEntryTypeEnum = pgEnum("journal_entry_type", [
