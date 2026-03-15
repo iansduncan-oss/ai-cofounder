@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 16-02-PLAN.md
-last_updated: "2026-03-15T22:45:00.000Z"
-last_activity: "2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher, notification center, journal date-range filter, approval tier badges"
+stopped_at: "Checkpoint: 16-03 Task 1 complete, awaiting human-verify checkpoint for DASH-06 full verification"
+last_updated: "2026-03-15T22:45:42.657Z"
+last_activity: "2026-03-15 — Phase 16 Plan 02 complete: ProjectSwitcher with localStorage persistence, notification center, journal date-range filter, approval tier badges, 135 tests passing"
 progress:
   total_phases: 9
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -113,6 +113,7 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - Date-range filtering is client-side — entries already fetched, avoids extra API round trips
 - TierBadge defaults to yellow when tool name cannot be extracted — pending approvals are minimum yellow-tier
 - extractToolName uses single-quote regex first then word-after-Tool fallback for resilient parsing
+- [Phase 16]: useEffect syncs budget form state from settings query on load — avoids stale default values
 
 ### Pending Todos
 
@@ -143,9 +144,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | Phase 15 P03 | 3.5 min | 2 tasks | 6 files |
 | Phase 16 P01 | 15 min | 2 tasks | 13 files |
 | 16 | 02 | 15 min | 3/3 | 13 |
+| Phase 16 P03 | 12 | 1 tasks | 5 files |
 
 ## Session Continuity
 
-Last session: 2026-03-15T22:45:00.000Z
-Stopped at: Completed 16-02-PLAN.md
+Last session: 2026-03-15T22:45:42.655Z
+Stopped at: Checkpoint: 16-03 Task 1 complete, awaiting human-verify checkpoint for DASH-06 full verification
 Resume file: None
