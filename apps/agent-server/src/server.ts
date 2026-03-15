@@ -34,6 +34,7 @@ import { createN8nService, type N8nService } from "./services/n8n.js";
 import { createMonitoringService, type MonitoringService } from "./services/monitoring.js";
 import { createTTSService, type TTSService } from "./services/tts.js";
 import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
+import { createBrowserService, type BrowserService } from "./services/browser.js";
 import {
   createNotificationService,
   type NotificationService,
@@ -68,6 +69,7 @@ const DEFAULT_TOOLS = [
   "run_tests", "create_pr",
   "send_message", "check_messages", "broadcast_update",
   "create_plan", "create_milestone", "request_approval",
+  "browser_action",
 ] as const;
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { createJournalService, type JournalService } from "./services/journal.js";
@@ -227,6 +229,10 @@ export function buildServer(registry?: LlmRegistry) {
   // Create workspace service for file system and git access
   const workspaceService = createWorkspaceService();
   app.decorate("workspaceService", workspaceService);
+
+  // Create browser service for Playwright-based browser automation
+  const browserService = createBrowserService();
+  app.decorate("browserService", browserService);
 
   // Create notification service for proactive alerts
   const notificationService = createNotificationService();
@@ -477,6 +483,7 @@ declare module "fastify" {
     n8nService: N8nService;
     sandboxService: SandboxService;
     workspaceService: WorkspaceService;
+    browserService: BrowserService;
     notificationService: NotificationService;
     monitoringService: MonitoringService;
     ttsService: TTSService;

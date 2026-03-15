@@ -5,7 +5,7 @@ import { createLogger } from "@ai-cofounder/shared";
 
 const logger = createLogger("browse-web");
 
-function isPrivateIp(ip: string): boolean {
+export function isPrivateIp(ip: string): boolean {
   // Block loopback, link-local, private ranges, and metadata endpoints
   return (
     ip.startsWith("127.") ||

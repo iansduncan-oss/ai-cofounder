@@ -34,6 +34,9 @@ async function main() {
   // Initialize workspace service (creates workspace directory)
   await app.workspaceService.init();
 
+  // Initialize browser service (launches Chromium if available)
+  await app.browserService.init();
+
   const port = parseInt(optionalEnv("PORT", "3100"), 10);
   const host = optionalEnv("HOST", "0.0.0.0");
 
@@ -43,6 +46,7 @@ async function main() {
   // Graceful shutdown (scheduler is started inside buildServer)
   const shutdown = async () => {
     logger.info("shutting down...");
+    await app.browserService.close();
     await shutdownTracing();
     await app.close();
     process.exit(0);

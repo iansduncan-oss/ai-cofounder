@@ -18,6 +18,7 @@ services:
     image: ai-cofounder-agent-server:latest
     container_name: ai-cofounder-agent-server
     restart: unless-stopped
+    shm_size: "256m"
     ports:
       - "127.0.0.1:3100:3100"
     environment:

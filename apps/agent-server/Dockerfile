@@ -38,10 +38,12 @@ RUN rm -rf packages/*/node_modules/drizzle-orm \
 FROM node:24-alpine
 WORKDIR /app
 
-# Install Docker CLI for sandbox code execution
-RUN apk add --no-cache docker-cli \
+# Install Docker CLI for sandbox code execution and Chromium for browser automation
+RUN apk add --no-cache docker-cli chromium \
     && addgroup -g 1001 appgroup \
     && adduser -u 1001 -G appgroup -s /bin/sh -D appuser
+
+ENV BROWSER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 COPY --from=base /app/package.json /app/package-lock.json /app/turbo.json ./
 COPY --from=base /app/packages/shared/package.json packages/shared/

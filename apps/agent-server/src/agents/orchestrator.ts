@@ -79,6 +79,7 @@ import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";
 import type { MonitoringService } from "../services/monitoring.js";
+import type { BrowserService } from "../services/browser.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -314,6 +315,7 @@ export class Orchestrator {
   private autonomyTierService?: AutonomyTierService;
   private projectRegistryService?: ProjectRegistryService;
   private monitoringService?: MonitoringService;
+  private browserService?: BrowserService;
   private requestId?: string;
 
   constructor(
@@ -328,6 +330,7 @@ export class Orchestrator {
     autonomyTierService?: AutonomyTierService,
     projectRegistryService?: ProjectRegistryService,
     monitoringService?: MonitoringService,
+    browserService?: BrowserService,
   ) {
     this.registry = registry;
     this.db = db;
@@ -340,6 +343,7 @@ export class Orchestrator {
     this.autonomyTierService = autonomyTierService;
     this.projectRegistryService = projectRegistryService;
     this.monitoringService = monitoringService;
+    this.browserService = browserService;
   }
 
   async run(
@@ -487,6 +491,7 @@ export class Orchestrator {
       messagingService: this.messagingService,
       projectRegistryService: this.projectRegistryService,
       monitoringService: this.monitoringService,
+      browserService: this.browserService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -693,6 +698,7 @@ export class Orchestrator {
       messagingService: this.messagingService,
       projectRegistryService: this.projectRegistryService,
       monitoringService: this.monitoringService,
+      browserService: this.browserService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -986,6 +992,7 @@ export class Orchestrator {
           autonomyTierService: this.autonomyTierService,
           projectRegistryService: this.projectRegistryService,
           monitoringService: this.monitoringService,
+          browserService: this.browserService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

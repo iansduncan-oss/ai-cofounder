@@ -71,6 +71,7 @@ import {
   ANALYZE_CROSS_PROJECT_IMPACT_TOOL,
 } from "./tools/project-tools.js";
 import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
+import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import {
   createRegisteredProject,
   getRegisteredProjectByName,
@@ -82,6 +83,7 @@ import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
+import type { BrowserService } from "../services/browser.js";
 import { notifyApprovalCreated } from "../services/notifications.js";
 
 const logger = createLogger("tool-executor");
@@ -96,6 +98,7 @@ export interface ToolExecutorServices {
   autonomyTierService?: AutonomyTierService;
   projectRegistryService?: ProjectRegistryService;
   monitoringService?: MonitoringService;
+  browserService?: BrowserService;
 }
 
 export interface ToolExecutorContext {
@@ -185,6 +188,10 @@ export function buildSharedToolList(
 
   if (services.monitoringService) {
     add(QUERY_VPS_TOOL);
+  }
+
+  if (services.browserService?.available) {
+    add(BROWSER_ACTION_TOOL);
   }
 
   return tools;
@@ -294,7 +301,7 @@ export async function executeSharedTool(
   services: ToolExecutorServices,
   context: ToolExecutorContext,
 ): Promise<unknown> {
-  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService, projectRegistryService, monitoringService } = services;
+  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService, projectRegistryService, monitoringService, browserService } = services;
 
   switch (block.name) {
     case "save_memory": {
@@ -864,6 +871,12 @@ export async function executeSharedTool(
       const health = await monitoringService.checkVPSHealth();
       if (!health) return { error: "VPS is not configured or health check failed" };
       return health;
+    }
+
+    case "browser_action": {
+      if (!browserService?.available) return { error: "Browser automation not available" };
+      const input = block.input as unknown as import("../services/browser.js").BrowserActionInput;
+      return browserService.execute(input);
     }
 
     default:
