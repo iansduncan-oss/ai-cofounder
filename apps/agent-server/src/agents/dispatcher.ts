@@ -13,7 +13,6 @@ import {
   blockTask,
   updateGoalStatus,
   listPendingApprovalsForTasks,
-  recordLlmUsage,
   saveMemory,
   createJournalEntry,
 } from "@ai-cofounder/db";
@@ -543,20 +542,7 @@ export class TaskDispatcher {
 
       await completeTask(this.db, task.id, result.output);
 
-      try {
-        await recordLlmUsage(this.db, {
-          provider: result.provider,
-          model: result.model,
-          taskCategory: specialist.taskCategory,
-          agentRole: agentRole as AgentRole,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          goalId,
-          taskId: task.id,
-        });
-      } catch {
-        /* usage tracking failures are non-fatal */
-      }
+      // Usage recording handled automatically by LlmRegistry.onCompletion hook
 
       this.logger.info(
         { taskId: task.id, model: result.model, provider: result.provider },
@@ -625,18 +611,7 @@ export class TaskDispatcher {
           const retryResult = await specialist.execute(retryContext);
           await completeTask(this.db, task.id, retryResult.output);
 
-          try {
-            await recordLlmUsage(this.db, {
-              provider: retryResult.provider,
-              model: retryResult.model,
-              taskCategory: specialist.taskCategory,
-              agentRole: agentRole as AgentRole,
-              inputTokens: retryResult.usage.inputTokens,
-              outputTokens: retryResult.usage.outputTokens,
-              goalId,
-              taskId: task.id,
-            });
-          } catch { /* usage tracking failures are non-fatal */ }
+          // Usage recording handled automatically by LlmRegistry.onCompletion hook
 
           this.logger.info({ taskId: task.id, agent: agentRole }, "task succeeded on retry");
 

@@ -7,7 +7,6 @@ import {
   findOrCreateUser,
   createConversation,
   createMessage,
-  recordLlmUsage,
   getTodayTokenTotal,
   incrementPatternAcceptCount,
 } from "@ai-cofounder/db";
@@ -137,7 +136,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    // Record LLM usage for cost tracking + Prometheus metrics
+    // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
     if (result.usage && result.model) {
       recordLlmMetrics({
         provider: result.provider ?? "unknown",
@@ -148,19 +147,6 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         durationMs: llmDurationMs,
         success: true,
       });
-      try {
-        await recordLlmUsage(app.db, {
-          provider: result.provider ?? "unknown",
-          model: result.model,
-          taskCategory: "conversation",
-          agentRole: "orchestrator",
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          conversationId: result.conversationId,
-        });
-      } catch {
-        /* usage tracking failures are non-fatal */
-      }
     }
 
     // Record user action (fire-and-forget)
@@ -279,19 +265,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
-      if (result.usage && result.model) {
-        try {
-          await recordLlmUsage(app.db, {
-            provider: result.provider ?? "unknown",
-            model: result.model,
-            taskCategory: "conversation",
-            agentRole: "orchestrator",
-            inputTokens: result.usage.inputTokens,
-            outputTokens: result.usage.outputTokens,
-            conversationId: result.conversationId,
-          });
-        } catch { /* non-fatal */ }
-      }
+      // Usage recording handled automatically by LlmRegistry.onCompletion hook
 
       // Record user action (fire-and-forget)
       if (dbUserId) {

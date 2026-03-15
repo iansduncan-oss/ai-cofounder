@@ -7,7 +7,6 @@ import {
   createConversation,
   getConversationMessages,
   createMessage,
-  recordLlmUsage,
   getActivePersona,
 } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
@@ -92,7 +91,7 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
       });
     }
 
-    // Record usage metrics
+    // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
     if (result.usage && result.model) {
       recordLlmMetrics({
         provider: result.provider ?? "unknown",
@@ -103,19 +102,6 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
         durationMs: llmDurationMs,
         success: true,
       });
-      try {
-        await recordLlmUsage(app.db, {
-          provider: result.provider ?? "unknown",
-          model: result.model,
-          taskCategory: "conversation",
-          agentRole: "orchestrator",
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          conversationId: result.conversationId,
-        });
-      } catch {
-        /* non-fatal */
-      }
     }
 
     return result;

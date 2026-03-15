@@ -475,6 +475,7 @@ export class Orchestrator {
         messages,
         tools,
         max_tokens: 4096,
+        metadata: { agentRole: "orchestrator", conversationId: id },
       });
 
       totalInputTokens += response.usage.inputTokens;
@@ -515,6 +516,7 @@ export class Orchestrator {
           messages,
           tools,
           max_tokens: 4096,
+          metadata: { agentRole: "orchestrator", conversationId: id },
         });
 
         totalInputTokens += response.usage.inputTokens;
@@ -661,7 +663,7 @@ export class Orchestrator {
 
       await onEvent({ type: "thinking", data: { round: 1, message: "Generating response..." } });
 
-      let response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096 });
+      let response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
       totalInputTokens += response.usage.inputTokens;
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
@@ -692,7 +694,7 @@ export class Orchestrator {
         messages.push({ role: "user", content: toolResults });
 
         await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
-        response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096 });
+        response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
         totalInputTokens += response.usage.inputTokens;
         totalOutputTokens += response.usage.outputTokens;
       }
