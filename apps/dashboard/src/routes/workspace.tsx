@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useDirectoryListing, useFileContent } from "@/api/queries";
+import { useState, useMemo, useEffect } from "react";
+import { useDirectoryListing, useFileContent, useProjects } from "@/api/queries";
+import { useActiveProject } from "@/hooks/use-active-project";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
@@ -18,6 +19,25 @@ export function WorkspacePage() {
   usePageTitle("Workspace");
   const [currentPath, setCurrentPath] = useState(".");
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  const activeProjectId = useActiveProject();
+  const { data: projects } = useProjects();
+
+  const workspaceRoot = useMemo(() => {
+    if (!activeProjectId || !projects) return ".";
+    const project = projects.find((p) => p.id === activeProjectId);
+    return project?.workspacePath ?? ".";
+  }, [activeProjectId, projects]);
+
+  const activeProjectName = useMemo(() => {
+    if (!activeProjectId || !projects) return null;
+    return projects.find((p) => p.id === activeProjectId)?.name ?? null;
+  }, [activeProjectId, projects]);
+
+  useEffect(() => {
+    setCurrentPath(workspaceRoot);
+    setSelectedFile(null);
+  }, [workspaceRoot]);
 
   const { data: listing, isLoading, error } = useDirectoryListing(currentPath);
   const { data: fileData, isLoading: fileLoading } = useFileContent(selectedFile);
@@ -60,7 +80,7 @@ export function WorkspacePage() {
     <div>
       <PageHeader
         title="Workspace"
-        description="Browse workspace files and repositories"
+        description={activeProjectName ? `Project: ${activeProjectName}` : "Browse workspace files and repositories"}
       />
 
       {/* Breadcrumbs */}
