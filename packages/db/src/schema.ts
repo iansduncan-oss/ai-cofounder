@@ -705,6 +705,14 @@ export const journalEntries = pgTable("journal_entries", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── App Settings (key-value system configuration) ── */
+
+export const appSettings = pgTable("app_settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 /* ── Pipeline Templates (content automation workflows) ── */
 
 export const pipelineTemplates = pgTable("pipeline_templates", {

@@ -281,6 +281,11 @@ export function mockDbModule() {
     updatePipelineTemplate: vi.fn().mockResolvedValue(null),
     deletePipelineTemplate: vi.fn().mockResolvedValue(false),
     pipelineTemplates: {},
+    // App settings
+    getAppSetting: vi.fn().mockResolvedValue(null),
+    upsertAppSetting: vi.fn().mockResolvedValue(undefined),
+    getAllAppSettings: vi.fn().mockResolvedValue({}),
+    appSettings: {},
   };
 }
 
