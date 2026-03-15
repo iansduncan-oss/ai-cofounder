@@ -62,6 +62,9 @@ const AuthCallbackPage = lazy(() =>
 const N8nWorkflowsPage = lazy(() =>
   import("./n8n-workflows").then((m) => ({ default: m.N8nWorkflowsPage })),
 );
+const NotificationsPage = lazy(() =>
+  import("./notifications").then((m) => ({ default: m.NotificationsPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -93,6 +96,7 @@ export const router = createBrowserRouter([
       { path: "persona", element: <PersonaPage /> },
       { path: "patterns", element: <PatternsPage /> },
       { path: "journal", element: <JournalPage /> },
+      { path: "notifications", element: <NotificationsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },
