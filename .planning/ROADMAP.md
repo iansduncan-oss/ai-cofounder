@@ -158,7 +158,12 @@ Plans:
   2. n8n execution history visible in dashboard with status and timing
   3. Content outputs appear in work journal with links to published content
   4. Content pipelines can be scheduled via autonomous scheduling
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 15-01-PLAN.md — Data layer: DB migration + schema (pipelineTemplates table, content_pipeline enum), repository CRUD, N8nService.listExecutions()
+- [ ] 15-02-PLAN.md — Backend routes + wiring: pipeline template CRUD/trigger routes, n8n execution route, PipelineExecutor journal integration, YouTube template seed
+- [ ] 15-03-PLAN.md — Dashboard: ApiClient methods, N8n Workflows page, pipeline template trigger on pipelines page
 
 ### Phase 16: Dashboard Command Center
 **Goal**: Dashboard becomes the single pane of glass — work journal, approvals, costs, projects, notifications, and settings all in one place
@@ -192,7 +197,7 @@ Plans:
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 14. Multi-Project Awareness | v2.0 | Complete    | 2026-03-15 | 2026-03-15 |
-| 15. Content Automations | v2.0 | 0/0 | Pending | — |
+| 15. Content Automations | v2.0 | 0/3 | Planned | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 
 ---
