@@ -146,7 +146,7 @@ Plans:
 **Plans:** 2 plans
 
 Plans:
-- [ ] 14-01-PLAN.md — DB schema + migration + repository CRUD + ProjectRegistryService + Fastify plugin
+- [x] 14-01-PLAN.md — DB schema + migration + repository CRUD + ProjectRegistryService + Fastify plugin
 - [ ] 14-02-PLAN.md — Orchestrator tools + RAG scoping + VPS monitoring extension + REST API routes
 
 ### Phase 15: Content Automations
@@ -191,7 +191,7 @@ Plans:
 | 11. Autonomous Scheduling | v2.0 | 2/2 | Complete | 2026-03-14 |
 | 12. Work Journal & Standup | v2.0 | — | Complete | 2026-03-15 |
 | 13. Financial Tracking | v2.0 | 3/3 | Complete | 2026-03-15 |
-| 14. Multi-Project Awareness | v2.0 | 0/2 | Planned | — |
+| 14. Multi-Project Awareness | v2.0 | 1/2 | In Progress | — |
 | 15. Content Automations | v2.0 | 0/0 | Pending | — |
 | 16. Dashboard Command Center | v2.0 | 0/0 | Pending | — |
 

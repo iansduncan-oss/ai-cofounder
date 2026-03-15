@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: active
-stopped_at: Completed 13-03-PLAN.md
-last_updated: "2026-03-15T16:22:02.493Z"
-last_activity: "2026-03-15 — Phase 13 Plan 03 complete: FIN-01 gap closure via LlmRegistry.onCompletion hook"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-03-15T16:57:30Z"
+last_activity: "2026-03-15 — Phase 14 Plan 01 complete: multi-project DB schema + ProjectRegistryService + Fastify plugin"
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 7
+  total_plans: 10
+  completed_plans: 8
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 13 (Financial Tracking) — Plan 3 of 3 complete (phase complete)
-Plan: 3 of 3
+Phase: 14 (Multi-Project Awareness) — Plan 1 of 2 complete
+Plan: 1 of 2
 Status: active
-Last activity: 2026-03-15 — Phase 13 Plan 03 complete: FIN-01 gap closure via LlmRegistry.onCompletion hook
+Last activity: 2026-03-15 — Phase 14 Plan 01 complete: multi-project DB schema + ProjectRegistryService + Fastify plugin
 
 ## Milestones Shipped
 
@@ -81,6 +81,11 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - [Phase 13]: onCompletion hook fires fire-and-forget with swallowed errors — hook failures never block LLM responses
 - [Phase 13]: metadata field on LlmCompletionRequest passes through registry to onCompletion for attribution without affecting providers
 
+**Phase 14 Plan 01 Decisions:**
+- Static top-level module import after vi.mock declarations — avoids dynamic import in beforeEach which caused mock reference instability with vitest module caching
+- importOriginal pattern for node:fs/promises mock — vitest 4.x requires default export to be present in mocked node built-ins
+- PROJECTS_BASE_DIR defaults to WORKSPACE_DIR env for backward compatibility with existing single-project deployments
+
 ### Pending Todos
 
 None.
@@ -103,9 +108,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 13 | 01 | 4 min | 2/2 | 8 |
 | 13 | 02 | 4 min | 2/2 | 6 |
 | Phase 13 P03 | 6 | 2 tasks | 9 files |
+| 14 | 01 | 4 min | 2/2 | 7 |
 
 ## Session Continuity
 
-Last session: 2026-03-15T16:16:32.338Z
-Stopped at: Completed 13-03-PLAN.md
+Last session: 2026-03-15T16:57:30Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None
