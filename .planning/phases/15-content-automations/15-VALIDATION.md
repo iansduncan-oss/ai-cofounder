@@ -38,13 +38,12 @@ created: 2026-03-15
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 15-01-01 | 01 | 1 | CONT-01 | unit | `npx vitest run n8n-bridge` | ❌ W0 | ⬜ pending |
-| 15-01-02 | 01 | 1 | CONT-02 | unit | `npx vitest run n8n-executions` | ❌ W0 | ⬜ pending |
-| 15-02-01 | 02 | 1 | CONT-01 | integration | `npx vitest run pipeline-template` | ❌ W0 | ⬜ pending |
-| 15-02-02 | 02 | 1 | CONT-04 | unit | `npx vitest run journal-pipeline` | ❌ W0 | ⬜ pending |
-| 15-03-01 | 03 | 2 | CONT-01 | integration | `npx vitest run dashboard-pipeline` | ❌ W0 | ⬜ pending |
-| 15-03-02 | 03 | 2 | CONT-02 | integration | `npx vitest run dashboard-n8n` | ❌ W0 | ⬜ pending |
-| 15-04-01 | 04 | 2 | CONT-03 | unit | `npx vitest run content-scheduling` | ❌ W0 | ⬜ pending |
+| 15-01-01 | 01 | 1 | CONT-01 | unit | `npm run build -w @ai-cofounder/db` | N/A (build) | ⬜ pending |
+| 15-01-02 | 01 | 1 | CONT-02 | unit | `npm run build -w @ai-cofounder/db && npm run build -w @ai-cofounder/agent-server` | N/A (build) | ⬜ pending |
+| 15-02-01 | 02 | 2 | CONT-01, CONT-02 | integration | `npx vitest run pipeline-templates` | ❌ W0 | ⬜ pending |
+| 15-02-02 | 02 | 2 | CONT-03, CONT-04 | unit | `npx vitest run --testPathPattern="pipeline\|n8n\|journal"` | ❌ W0 | ⬜ pending |
+| 15-03-01 | 03 | 3 | CONT-01 | build | `npm run build -w @ai-cofounder/api-client && npm run build -w @ai-cofounder/dashboard` | N/A (build) | ⬜ pending |
+| 15-03-02 | 03 | 3 | CONT-02 | build | `npm run build -w @ai-cofounder/dashboard` | N/A (build) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -52,13 +51,10 @@ created: 2026-03-15
 
 ## Wave 0 Requirements
 
-- [ ] Test stubs for n8n bridge service (CONT-01, CONT-02)
-- [ ] Test stubs for pipeline template management (CONT-01)
-- [ ] Test stubs for journal integration (CONT-04)
-- [ ] Test stubs for dashboard content components (CONT-01, CONT-02)
-- [ ] Test stubs for content scheduling (CONT-03)
+- [ ] Test stubs for pipeline template routes (`apps/agent-server/src/__tests__/pipeline-templates.test.ts`)
+- [ ] Extended tests for N8nService.listExecutions (`apps/agent-server/src/__tests__/n8n-service.test.ts`)
 
-*Existing vitest infrastructure covers framework needs — only test files needed.*
+*Existing vitest infrastructure covers framework needs — only test files needed. Plan 01 tasks are build-verified (no dedicated test files). Plan 03 tasks are build-verified (dashboard components).*
 
 ---
 
