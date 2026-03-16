@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Autonomous Cofounder
 status: completed
-stopped_at: Completed 17-01-PLAN.md
-last_updated: "2026-03-15T23:54:34.332Z"
-last_activity: "2026-03-15 — Phase 16 Plan 03 complete: Budget threshold settings + project registration UI. All 6 DASH requirements verified and approved. Phase 16 complete. v2.0 milestone complete."
+stopped_at: Completed 17-02-PLAN.md
+last_updated: "2026-03-15T23:59:30Z"
+last_activity: "2026-03-15 — Phase 17 Plan 02 complete: Autonomous Sessions dashboard page + WorkSession type + project switcher workspace scoping. All 5 requirements (TERM-01, TERM-05, DASH-01, PROJ-01, DASH-04) satisfied. Phase 17 complete."
 progress:
   total_phases: 10
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 18
 ---
 
 # Project State
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-03-09)
 
 ## Current Position
 
-Phase: 16 (Dashboard Command Center) — All 3 plans complete
-Plan: 3 of 3
+Phase: 17 (Close Integration & Flow Gaps) — All 2 plans complete
+Plan: 2 of 2
 Status: complete
-Last activity: 2026-03-15 — Phase 16 Plan 03 complete: Budget threshold settings + project registration UI. All 6 DASH requirements verified and approved. Phase 16 complete. v2.0 milestone complete.
+Last activity: 2026-03-15 — Phase 17 Plan 02 complete: Autonomous Sessions dashboard page + WorkSession type + project switcher workspace scoping. All 5 requirements satisfied. Phase 17 complete.
 
 ## Milestones Shipped
 
@@ -124,6 +124,11 @@ See PROJECT.md Key Decisions table (7 decisions, all marked Good).
 - [Phase 17]: vi.advanceTimersByTimeAsync(1000) used in scheduler tests to avoid infinite setInterval loop from runAllTimersAsync
 - [Phase 17]: getAllByText used in journal test: Content Pipeline appears in both badge and filter dropdown option
 
+**Phase 17 Plan 02 Decisions:**
+- useProjects() returns RegisteredProject[] directly (not paginated) — no .data access needed in workspace.tsx
+- statusConfig uses data-testid on badge span for clean test assertions without relying on icon rendering
+- workspaceRoot derivation uses useMemo + useEffect to reset currentPath — clean separation of derived state
+
 ### Pending Todos
 
 None.
@@ -155,9 +160,10 @@ Pre-existing build error in `reflection.ts` (TS2345: drizzle-orm SQL type declar
 | 16 | 02 | 15 min | 3/3 | 13 |
 | 16 | 03 | 12 min | 2/2 | 5 |
 | Phase 17 P01 | 8 | 2 tasks | 6 files |
+| Phase 17 P02 | 3 | 2 tasks | 10 files |
 
 ## Session Continuity
 
-Last session: 2026-03-15T23:54:34.330Z
-Stopped at: Completed 17-01-PLAN.md
+Last session: 2026-03-15T23:59:30Z
+Stopped at: Completed 17-02-PLAN.md
 Resume file: None
