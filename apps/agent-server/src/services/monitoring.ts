@@ -105,6 +105,7 @@ export class MonitoringService {
               Accept: "application/vnd.github+json",
               "X-GitHub-Api-Version": "2022-11-28",
             },
+            signal: AbortSignal.timeout(10_000),
           },
         );
 
@@ -157,6 +158,7 @@ export class MonitoringService {
               Accept: "application/vnd.github+json",
               "X-GitHub-Api-Version": "2022-11-28",
             },
+            signal: AbortSignal.timeout(10_000),
           },
         );
 

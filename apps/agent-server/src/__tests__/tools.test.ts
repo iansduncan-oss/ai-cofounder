@@ -103,7 +103,7 @@ describe("executeWebSearch", () => {
 
     await executeWebSearch("test query", 3);
 
-    expect(mockFetch).toHaveBeenCalledWith("https://api.tavily.com/search", {
+    expect(mockFetch).toHaveBeenCalledWith("https://api.tavily.com/search", expect.objectContaining({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -113,7 +113,7 @@ describe("executeWebSearch", () => {
         include_answer: true,
         search_depth: "advanced",
       }),
-    });
+    }));
   });
 
   it("returns results and answer on success", async () => {

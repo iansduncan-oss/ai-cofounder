@@ -605,6 +605,7 @@ export class Orchestrator {
     history?: AgentMessage[],
     userId?: string,
     requestId?: string,
+    signal?: AbortSignal,
   ): Promise<OrchestratorResult> {
     this.requestId = requestId;
     const id = conversationId ?? crypto.randomUUID();
@@ -712,6 +713,7 @@ export class Orchestrator {
 
       await onEvent({ type: "thinking", data: { round: 1, message: "Generating response..." } });
 
+      if (signal?.aborted) throw new Error("Request aborted");
       let response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
       totalInputTokens += response.usage.inputTokens;
       totalOutputTokens += response.usage.outputTokens;
@@ -743,6 +745,7 @@ export class Orchestrator {
         messages.push({ role: "user", content: toolResults });
 
         await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
+        if (signal?.aborted) throw new Error("Request aborted");
         response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
         totalInputTokens += response.usage.inputTokens;
         totalOutputTokens += response.usage.outputTokens;

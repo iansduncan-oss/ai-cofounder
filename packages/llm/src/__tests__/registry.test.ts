@@ -349,4 +349,65 @@ describe("LlmRegistry", () => {
       expect(registry.getModelCost("unknown-model")).toBeUndefined();
     });
   });
+
+  describe("transient retry", () => {
+    it("retries once on 429 then succeeds", async () => {
+      let attempt = 0;
+      const provider = mockProvider("anthropic", true, async () => {
+        attempt++;
+        if (attempt === 1) throw new Error("429 rate limit exceeded");
+        return {
+          content: [{ type: "text" as const, text: "ok" }],
+          model: "anthropic-model",
+          stop_reason: "end_turn" as const,
+          usage: { inputTokens: 10, outputTokens: 20 },
+        };
+      });
+
+      registry.register(provider);
+
+      const result = await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hello" }],
+      });
+
+      expect(attempt).toBe(2);
+      expect(result.provider).toBe("anthropic");
+    });
+
+    it("falls back to next provider after retry exhaustion on transient error", async () => {
+      const failing = mockProvider("anthropic", true, async () => {
+        throw new Error("503 overloaded");
+      });
+      const groq = mockProvider("groq", true);
+
+      registry.register(failing);
+      registry.register(groq);
+
+      const result = await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hello" }],
+      });
+
+      expect(result.provider).toBe("groq");
+    });
+
+    it("does not retry on non-transient errors", async () => {
+      let attempt = 0;
+      const failing = mockProvider("anthropic", true, async () => {
+        attempt++;
+        throw new Error("invalid_api_key");
+      });
+      const groq = mockProvider("groq", true);
+
+      registry.register(failing);
+      registry.register(groq);
+
+      const result = await registry.complete("conversation", {
+        messages: [{ role: "user", content: "hello" }],
+      });
+
+      // Should only try anthropic once (no retry), then fall back to groq
+      expect(attempt).toBe(1);
+      expect(result.provider).toBe("groq");
+    });
+  });
 });

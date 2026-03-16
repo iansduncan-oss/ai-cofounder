@@ -170,13 +170,16 @@ describe("AnthropicProvider", () => {
       const provider = new AnthropicProvider("sk-test");
       const response = await provider.complete(simpleRequest);
 
-      expect(mockAnthropicCreate).toHaveBeenCalledWith({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: undefined,
-        messages: [{ role: "user", content: "Hello" }],
-        tools: undefined,
-      });
+      expect(mockAnthropicCreate).toHaveBeenCalledWith(
+        {
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          system: undefined,
+          messages: [{ role: "user", content: "Hello" }],
+          tools: undefined,
+        },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
 
       expect(response).toEqual({
         content: [{ type: "text", text: "Hi there!" }],
@@ -203,14 +206,17 @@ describe("AnthropicProvider", () => {
         temperature: 0.5,
       });
 
-      expect(mockAnthropicCreate).toHaveBeenCalledWith({
-        model: "claude-opus-4-20250514",
-        max_tokens: 1024,
-        system: [{ type: "text", text: "You are a pirate.", cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: "Ahoy" }],
-        tools: undefined,
-        temperature: 0.5,
-      });
+      expect(mockAnthropicCreate).toHaveBeenCalledWith(
+        {
+          model: "claude-opus-4-20250514",
+          max_tokens: 1024,
+          system: [{ type: "text", text: "You are a pirate.", cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: "Ahoy" }],
+          tools: undefined,
+          temperature: 0.5,
+        },
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      );
     });
 
     it("maps tool_use response blocks correctly", async () => {

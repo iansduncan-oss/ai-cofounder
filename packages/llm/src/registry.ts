@@ -218,6 +218,14 @@ export class LlmRegistry {
     }
   }
 
+  /** Check if an error is transient and worth retrying */
+  private isTransientError(err: unknown): boolean {
+    return (
+      err instanceof Error &&
+      /rate.?limit|429|timeout|econnreset|socket hang up|503|overloaded/i.test(err.message)
+    );
+  }
+
   /** Estimate cost in microdollars for a completion */
   private estimateCost(model: string, inputTokens: number, outputTokens: number): number {
     const costs = MODEL_COSTS[model];
@@ -318,72 +326,89 @@ export class LlmRegistry {
         breaker.halfOpenRequests++;
       }
 
-      try {
-        this.logger.info(
-          { task, provider: route.provider, model: route.model },
-          "attempting completion",
-        );
+      const MAX_RETRIES_PER_PROVIDER = 1;
 
-        const start = Date.now();
-        const response = await provider.complete({
-          ...request,
-          model: route.model,
-        });
-        const latencyMs = Date.now() - start;
+      for (let attempt = 0; attempt <= MAX_RETRIES_PER_PROVIDER; attempt++) {
+        try {
+          this.logger.info(
+            { task, provider: route.provider, model: route.model, attempt },
+            "attempting completion",
+          );
 
-        this.recordSuccess(route.provider, latencyMs);
+          const start = Date.now();
+          const response = await provider.complete({
+            ...request,
+            model: route.model,
+          });
+          const latencyMs = Date.now() - start;
 
-        // Track cost
-        const costMicrodollars = this.estimateCost(
-          route.model,
-          response.usage.inputTokens,
-          response.usage.outputTokens,
-        );
-        this.totalCostMicrodollars += costMicrodollars;
+          this.recordSuccess(route.provider, latencyMs);
 
-        this.logger.info(
-          {
-            task,
-            provider: route.provider,
-            model: response.model,
-            inputTokens: response.usage.inputTokens,
-            outputTokens: response.usage.outputTokens,
-            latencyMs,
-            costMicrodollars,
-          },
-          "completion succeeded",
-        );
+          // Track cost
+          const costMicrodollars = this.estimateCost(
+            route.model,
+            response.usage.inputTokens,
+            response.usage.outputTokens,
+          );
+          this.totalCostMicrodollars += costMicrodollars;
 
-        // Fire onCompletion hook (fire-and-forget, errors caught to protect caller)
-        if (this.onCompletion) {
-          try {
-            const hookResult = this.onCompletion({
+          this.logger.info(
+            {
               task,
               provider: route.provider,
               model: response.model,
               inputTokens: response.usage.inputTokens,
               outputTokens: response.usage.outputTokens,
+              latencyMs,
               costMicrodollars,
-              metadata: (request as LlmCompletionRequest).metadata,
-            });
-            if (hookResult instanceof Promise) {
-              hookResult.catch((err: unknown) => {
-                this.logger.warn({ err }, "onCompletion hook error (async)");
-              });
-            }
-          } catch (err) {
-            this.logger.warn({ err }, "onCompletion hook error (sync)");
-          }
-        }
+            },
+            "completion succeeded",
+          );
 
-        return { ...response, provider: route.provider, costMicrodollars };
-      } catch (err) {
-        this.recordError(route.provider, err instanceof Error ? err.message : String(err));
-        this.logger.warn(
-          { task, provider: route.provider, model: route.model, err },
-          "provider failed, trying next",
-        );
-        errors.push({ provider: route.provider, model: route.model, error: err });
+          // Fire onCompletion hook (fire-and-forget, errors caught to protect caller)
+          if (this.onCompletion) {
+            try {
+              const hookResult = this.onCompletion({
+                task,
+                provider: route.provider,
+                model: response.model,
+                inputTokens: response.usage.inputTokens,
+                outputTokens: response.usage.outputTokens,
+                costMicrodollars,
+                metadata: (request as LlmCompletionRequest).metadata,
+              });
+              if (hookResult instanceof Promise) {
+                hookResult.catch((err: unknown) => {
+                  this.logger.warn({ err }, "onCompletion hook error (async)");
+                });
+              }
+            } catch (err) {
+              this.logger.warn({ err }, "onCompletion hook error (sync)");
+            }
+          }
+
+          return { ...response, provider: route.provider, costMicrodollars };
+        } catch (err) {
+          this.recordError(route.provider, err instanceof Error ? err.message : String(err));
+
+          // Retry once on transient errors before falling back to next provider
+          if (this.isTransientError(err) && attempt < MAX_RETRIES_PER_PROVIDER) {
+            const delayMs = 2000 + Math.random() * 1000;
+            this.logger.warn(
+              { task, provider: route.provider, model: route.model, attempt, delayMs: Math.round(delayMs) },
+              "transient error, retrying same provider",
+            );
+            await new Promise((r) => setTimeout(r, delayMs));
+            continue;
+          }
+
+          this.logger.warn(
+            { task, provider: route.provider, model: route.model, err },
+            "provider failed, trying next",
+          );
+          errors.push({ provider: route.provider, model: route.model, error: err });
+          break; // Move to next provider
+        }
       }
     }
 

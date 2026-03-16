@@ -193,7 +193,7 @@ export abstract class SpecialistAgent {
   private async _completeWithRetryInner(
     ...args: Parameters<LlmRegistry["complete"]>
   ): ReturnType<LlmRegistry["complete"]> {
-    const MAX_RETRIES = 3;
+    const MAX_RETRIES = 1;
     const BASE_DELAY_MS = 1000;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {

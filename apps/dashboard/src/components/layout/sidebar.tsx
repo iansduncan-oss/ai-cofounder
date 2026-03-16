@@ -24,6 +24,7 @@ import {
   Workflow,
   Bell,
   PlayCircle,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -51,6 +52,7 @@ const navItems = [
   { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
   { to: "/dashboard/journal", icon: BookOpen, label: "Journal" },
   { to: "/dashboard/autonomous", icon: PlayCircle, label: "Autonomous" },
+  { to: "/dashboard/dlq", icon: Inbox, label: "Dead Letter Queue" },
   { to: "/dashboard/notifications", icon: Bell, label: "Notifications" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },
 ];

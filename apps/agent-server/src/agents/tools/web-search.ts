@@ -57,6 +57,7 @@ export async function executeWebSearch(
         include_answer: true,
         search_depth: "advanced",
       }),
+      signal: AbortSignal.timeout(15_000),
     });
 
     if (!response.ok) {

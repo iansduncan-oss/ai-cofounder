@@ -332,12 +332,10 @@ describe("Specialist Agents", () => {
 
     it("throws if all retries fail", async () => {
       vi.useFakeTimers();
-      // MAX_RETRIES = 3: initial attempt + 3 retries = 4 total calls
+      // MAX_RETRIES = 1: initial attempt + 1 retry = 2 total calls
       mockComplete
         .mockRejectedValueOnce(new Error("429 rate limit"))
-        .mockRejectedValueOnce(new Error("429 rate limit"))
-        .mockRejectedValueOnce(new Error("429 rate limit"))
-        .mockRejectedValueOnce(new Error("429 rate limit final"));
+        .mockRejectedValueOnce(new Error("429 rate limit again"));
 
       const registry = new LlmRegistry();
       const agent = new ResearcherAgent(registry);
@@ -348,14 +346,14 @@ describe("Specialist Agents", () => {
         thrownError = err as Error;
       });
 
-      // Advance timers through all retry delays (exponential: ~1s, ~2s, ~4s + random)
-      await vi.advanceTimersByTimeAsync(30_000);
+      // Advance timers through retry delay (exponential: ~1s + random)
+      await vi.advanceTimersByTimeAsync(5_000);
 
       await executePromise;
 
       expect(thrownError).toBeDefined();
-      expect(thrownError!.message).toContain("429 rate limit final");
-      expect(mockComplete).toHaveBeenCalledTimes(4);
+      expect(thrownError!.message).toContain("429 rate limit again");
+      expect(mockComplete).toHaveBeenCalledTimes(2);
       vi.useRealTimers();
     });
 

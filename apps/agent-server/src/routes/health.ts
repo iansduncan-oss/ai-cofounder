@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { sql } from "drizzle-orm";
 import { getProviderHealthHistory, getToolStats } from "@ai-cofounder/db";
-import { pingRedis } from "@ai-cofounder/queue";
+import { pingRedis, getAllQueueStatus } from "@ai-cofounder/queue";
 import { optionalEnv } from "@ai-cofounder/shared";
 import { gatherBriefingData, formatBriefing, generateLlmBriefing, sendDailyBriefing } from "../services/briefing.js";
 import { getActivePersona } from "@ai-cofounder/db";
@@ -59,21 +59,40 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
     const llmTotal = providers.length;
     const llmAvailable = providers.filter((p) => p.available).length;
     const llmStatus = llmTotal === 0 ? "none" : llmAvailable === llmTotal ? "ok" : "degraded";
+    const circuitBreakers = app.llmRegistry.getCircuitBreakerStates();
+
+    // Queue status (if Redis available)
+    let queueStatus: { status: string; dlqSize: number; queues: Awaited<ReturnType<typeof getAllQueueStatus>> } | undefined;
+    if (redisUrl) {
+      try {
+        const queues = await getAllQueueStatus();
+        const dlq = queues.find((q) => q.name === "dead-letter");
+        const dlqSize = dlq ? dlq.waiting + dlq.failed : 0;
+        queueStatus = {
+          status: dlqSize > 10 ? "degraded" : "ok",
+          dlqSize,
+          queues,
+        };
+      } catch {
+        queueStatus = { status: "unreachable", dlqSize: 0, queues: [] };
+      }
+    }
 
     // External services — config detection only (no active probing)
     const github = !!(optionalEnv("GITHUB_TOKEN", "") && optionalEnv("GITHUB_MONITORED_REPOS", ""));
     const vps = !!(optionalEnv("VPS_HOST", "") && optionalEnv("VPS_USER", ""));
     const tts = !!app.ttsService?.isConfigured();
 
-    // Overall: ok if DB+Redis healthy, degraded otherwise
+    // Overall: ok if DB+Redis healthy and DLQ not overflowing, degraded otherwise
     const coreHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
+    const overallHealthy = coreHealthy && queueStatus?.status !== "degraded";
 
     if (!coreHealthy) {
       reply.code(503);
     }
 
     return {
-      status: coreHealthy ? "ok" : "degraded",
+      status: overallHealthy ? "ok" : "degraded",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       core: {
@@ -84,7 +103,9 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
         status: llmStatus,
         available: llmAvailable,
         total: llmTotal,
+        circuitBreakers,
       },
+      ...(queueStatus ? { queue: queueStatus } : {}),
       external: {
         github: github ? "configured" : "not_configured",
         vps: vps ? "configured" : "not_configured",

@@ -41,14 +41,17 @@ export class AnthropicProvider implements LlmProvider {
       ? [{ type: "text" as const, text: request.system, cache_control: { type: "ephemeral" as const } }]
       : undefined;
 
-    const response = await this.client.messages.create({
-      model,
-      max_tokens: request.max_tokens ?? 4096,
-      system,
-      messages,
-      tools,
-      ...(request.temperature != null ? { temperature: request.temperature } : {}),
-    });
+    const response = await this.client.messages.create(
+      {
+        model,
+        max_tokens: request.max_tokens ?? 4096,
+        system,
+        messages,
+        tools,
+        ...(request.temperature != null ? { temperature: request.temperature } : {}),
+      },
+      { signal: AbortSignal.timeout(120_000) },
+    );
 
     const usage = response.usage as Anthropic.Usage & {
       cache_creation_input_tokens?: number;

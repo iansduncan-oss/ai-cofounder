@@ -12,6 +12,7 @@ import {
   getSubagentTaskQueue,
   getDeadLetterQueue,
   getAutonomousSessionQueue,
+  getDeployVerificationQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
@@ -302,6 +303,8 @@ export async function retryDeadLetterJob(dlqJobId: string): Promise<{ requeued: 
     "pipelines": getPipelineQueue,
     "rag-ingestion": getRagIngestionQueue,
     "reflections": getReflectionQueue,
+    "deploy-verification": getDeployVerificationQueue,
+    "autonomous-sessions": getAutonomousSessionQueue,
   };
 
   const getQueue = queueMap[originalQueue];

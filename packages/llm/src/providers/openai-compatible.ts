@@ -35,13 +35,16 @@ export class OpenAICompatibleProvider implements LlmProvider {
       ? request.tools.map((t) => this.toOpenAITool(t))
       : undefined;
 
-    const response = await this.client.chat.completions.create({
-      model,
-      messages,
-      tools,
-      max_tokens: request.max_tokens ?? 4096,
-      ...(request.temperature != null ? { temperature: request.temperature } : {}),
-    });
+    const response = await this.client.chat.completions.create(
+      {
+        model,
+        messages,
+        tools,
+        max_tokens: request.max_tokens ?? 4096,
+        ...(request.temperature != null ? { temperature: request.temperature } : {}),
+      },
+      { signal: AbortSignal.timeout(120_000) },
+    );
 
     const choice = response.choices[0];
     if (!choice) throw new Error(`${this.name}: empty response`);

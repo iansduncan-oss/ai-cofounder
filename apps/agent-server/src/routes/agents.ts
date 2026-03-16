@@ -234,8 +234,13 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       Connection: "keep-alive",
     });
 
+    const abortController = new AbortController();
+    request.raw.on("close", () => abortController.abort());
+
     const send = (event: string, data: unknown) => {
-      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      if (!abortController.signal.aborted) {
+        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      }
     };
 
     const onEvent: StreamCallback = async (event) => {
@@ -250,6 +255,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         resolvedHistory as AgentMessage[] | undefined,
         dbUserId,
         (request as unknown as Record<string, unknown>).requestId as string | undefined,
+        abortController.signal,
       );
 
       // Persist messages to DB
@@ -305,8 +311,10 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         send("suggestions", { suggestions });
       }
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : String(err);
-      send("error", { error: errorMsg });
+      // Orchestrator already emits error event via onEvent; only log here
+      if (!abortController.signal.aborted) {
+        logger.error({ err }, "stream handler error");
+      }
     } finally {
       reply.raw.end();
     }

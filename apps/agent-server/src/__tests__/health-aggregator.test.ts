@@ -137,6 +137,10 @@ vi.mock("@ai-cofounder/db", () => ({
 }));
 
 const mockPingRedis = vi.fn().mockResolvedValue("ok");
+const mockGetAllQueueStatus = vi.fn().mockResolvedValue([
+  { name: "agent-tasks", waiting: 2, active: 1, failed: 0 },
+  { name: "dead-letter", waiting: 0, active: 0, failed: 0 },
+]);
 
 vi.mock("@ai-cofounder/queue", () => ({
   getRedisConnection: vi.fn().mockReturnValue({ host: "localhost", port: 6379 }),
@@ -167,6 +171,7 @@ vi.mock("@ai-cofounder/queue", () => ({
     quit: vi.fn().mockResolvedValue(undefined),
   }),
   pingRedis: (...args: unknown[]) => mockPingRedis(...args),
+  getAllQueueStatus: (...args: unknown[]) => mockGetAllQueueStatus(...args),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -185,6 +190,7 @@ vi.mock("@ai-cofounder/llm", () => {
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
     getProviderHealth = vi.fn().mockReturnValue([]);
+    getCircuitBreakerStates = vi.fn().mockReturnValue([]);
     seedStats = vi.fn();
     getStatsSnapshots = vi.fn().mockReturnValue([]);
   }
@@ -290,5 +296,56 @@ describe("GET /health/full", () => {
     expect(body.external.github).toBe("configured");
     expect(body.external.vps).toBe("configured");
     expect(body.external.tts).toBe("not_configured"); // ttsService mock not configured
+  });
+
+  it("includes circuit breaker states in response", async () => {
+    const { app } = buildServer();
+
+    // Override getCircuitBreakerStates on the registry instance
+    app.llmRegistry.getCircuitBreakerStates = vi.fn().mockReturnValue([
+      { provider: "anthropic", state: "closed", failures: 0, openUntil: null },
+      { provider: "groq", state: "open", failures: 5, openUntil: Date.now() + 60000 },
+    ]);
+
+    const res = await app.inject({ method: "GET", url: "/health/full" });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.llm.circuitBreakers).toHaveLength(2);
+    expect(body.llm.circuitBreakers[0]).toMatchObject({ provider: "anthropic", state: "closed" });
+    expect(body.llm.circuitBreakers[1]).toMatchObject({ provider: "groq", state: "open", failures: 5 });
+  });
+
+  it("returns status degraded when DLQ size exceeds 10", async () => {
+    mockGetAllQueueStatus.mockResolvedValueOnce([
+      { name: "agent-tasks", waiting: 0, active: 0, failed: 0 },
+      { name: "dead-letter", waiting: 8, active: 0, failed: 5 },
+    ]);
+
+    const { app } = buildServer();
+    const res = await app.inject({ method: "GET", url: "/health/full" });
+    await app.close();
+
+    // Core healthy (DB + Redis ok) so no 503, but status is degraded due to DLQ
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.status).toBe("degraded");
+    expect(body.queue.status).toBe("degraded");
+    expect(body.queue.dlqSize).toBe(13); // 8 waiting + 5 failed
+  });
+
+  it("reports queue as unreachable when getAllQueueStatus throws", async () => {
+    mockGetAllQueueStatus.mockRejectedValueOnce(new Error("Redis connection refused"));
+
+    const { app } = buildServer();
+    const res = await app.inject({ method: "GET", url: "/health/full" });
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.queue.status).toBe("unreachable");
+    expect(body.queue.dlqSize).toBe(0);
+    expect(body.queue.queues).toEqual([]);
   });
 });

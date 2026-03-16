@@ -68,6 +68,9 @@ const NotificationsPage = lazy(() =>
 const AutonomousSessionsPage = lazy(() =>
   import("./autonomous-sessions").then((m) => ({ default: m.AutonomousSessionsPage })),
 );
+const DlqPage = lazy(() =>
+  import("./dlq").then((m) => ({ default: m.DlqPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -101,6 +104,7 @@ export const router = createBrowserRouter([
       { path: "journal", element: <JournalPage /> },
       { path: "notifications", element: <NotificationsPage /> },
       { path: "autonomous", element: <AutonomousSessionsPage /> },
+      { path: "dlq", element: <DlqPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

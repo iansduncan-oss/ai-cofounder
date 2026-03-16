@@ -45,14 +45,20 @@ export class GeminiProvider implements LlmProvider {
       ? [{ functionDeclarations: request.tools.map((t) => this.toGeminiTool(t)) }]
       : undefined;
 
-    const result = await genModel.generateContent({
-      contents,
-      ...(tools ? { tools } : {}),
-      generationConfig: {
-        maxOutputTokens: request.max_tokens ?? 4096,
-        ...(request.temperature != null ? { temperature: request.temperature } : {}),
-      },
-    });
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Gemini request timeout")), 120_000),
+    );
+    const result = await Promise.race([
+      genModel.generateContent({
+        contents,
+        ...(tools ? { tools } : {}),
+        generationConfig: {
+          maxOutputTokens: request.max_tokens ?? 4096,
+          ...(request.temperature != null ? { temperature: request.temperature } : {}),
+        },
+      }),
+      timeout,
+    ]);
 
     const response = result.response;
     const candidate = response.candidates?.[0];

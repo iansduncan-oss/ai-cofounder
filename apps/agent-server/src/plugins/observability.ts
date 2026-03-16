@@ -74,6 +74,25 @@ const toolExecutionDuration = new client.Histogram({
   buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60],
 });
 
+// --- Queue Metrics ---
+
+const queueDepth = new client.Gauge({
+  name: "queue_depth",
+  help: "Number of waiting jobs per queue",
+  labelNames: ["queue"] as const,
+});
+
+const queueActiveJobs = new client.Gauge({
+  name: "queue_active_jobs",
+  help: "Number of active jobs per queue",
+  labelNames: ["queue"] as const,
+});
+
+const dlqSizeTotal = new client.Gauge({
+  name: "dlq_size_total",
+  help: "Total jobs in dead letter queue",
+});
+
 // --- Subagent Metrics ---
 
 const subagentRunsTotal = new client.Counter({
@@ -161,6 +180,24 @@ function startProcessMetrics() {
   return interval;
 }
 
+async function updateQueueMetrics() {
+  try {
+    const { getAllQueueStatus } = await import("@ai-cofounder/queue");
+    const statuses = await getAllQueueStatus();
+    let dlqTotal = 0;
+    for (const s of statuses) {
+      queueDepth.set({ queue: s.name }, s.waiting);
+      queueActiveJobs.set({ queue: s.name }, s.active);
+      if (s.name === "dead-letter") {
+        dlqTotal = s.waiting + s.failed;
+      }
+    }
+    dlqSizeTotal.set(dlqTotal);
+  } catch {
+    // Redis not available — skip silently
+  }
+}
+
 export const observabilityPlugin = fp(async (app: FastifyInstance) => {
   // Collect registered route patterns after server is ready
   const registeredRoutes = new Set<string>();
@@ -182,6 +219,13 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
 
     // Fallback: also parse via the routerPath on actual requests below
     startProcessMetrics();
+
+    // Start queue metrics collection if Redis is configured
+    if (process.env.REDIS_URL) {
+      updateQueueMetrics(); // initial collection
+      const queueInterval = setInterval(updateQueueMetrics, 30_000);
+      queueInterval.unref();
+    }
   });
 
   // Track request start time and record metrics on response
