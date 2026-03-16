@@ -164,12 +164,12 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
  * Protected deploy list routes — registered inside JWT guard.
  */
 export async function deployRoutes(app: FastifyInstance): Promise<void> {
-  // GET /api/deploys — list recent deployments
+  // GET /api/deploys — list recent deployments (paginated)
   app.get("/", { schema: { tags: ["deploys"] } }, async (request) => {
-    const query = request.query as { limit?: string };
+    const query = request.query as { limit?: string; offset?: string };
     const limit = query.limit ? parseInt(query.limit, 10) : 20;
-    const deploys = await listDeployments(app.db, limit);
-    return { data: deploys, total: deploys.length };
+    const offset = query.offset ? parseInt(query.offset, 10) : 0;
+    return listDeployments(app.db, { limit, offset });
   });
 
   // GET /api/deploys/latest — get latest deployment

@@ -2528,8 +2528,9 @@ export async function incrementPatternAcceptCount(db: Db, patternId: string) {
 
 export async function listPatterns(
   db: Db,
-  opts?: { userId?: string; includeInactive?: boolean },
+  opts?: { userId?: string; includeInactive?: boolean; limit?: number; offset?: number },
 ) {
+  const { limit = 50, offset = 0 } = opts ?? {};
   const conditions = [];
   if (opts?.userId) {
     conditions.push(eq(userPatterns.userId, opts.userId));
@@ -2538,11 +2539,20 @@ export async function listPatterns(
     conditions.push(eq(userPatterns.isActive, true));
   }
 
-  return db
-    .select()
-    .from(userPatterns)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(userPatterns.confidence));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const [data, countResult] = await Promise.all([
+    db
+      .select()
+      .from(userPatterns)
+      .where(where)
+      .orderBy(desc(userPatterns.confidence))
+      .limit(limit)
+      .offset(offset),
+    db.select({ count: sql<number>`count(*)::int` }).from(userPatterns).where(where),
+  ]);
+
+  return { data, total: countResult[0]?.count ?? 0 };
 }
 
 export async function togglePatternActive(db: Db, id: string, isActive: boolean) {
@@ -2755,12 +2765,18 @@ export async function getLatestDeployment(db: Db) {
   return rows[0] ?? null;
 }
 
-export async function listDeployments(db: Db, limit = 20) {
-  return db
-    .select()
-    .from(deployments)
-    .orderBy(desc(deployments.startedAt))
-    .limit(limit);
+export async function listDeployments(db: Db, opts: { limit?: number; offset?: number } = {}) {
+  const { limit = 20, offset = 0 } = opts;
+  const [data, countResult] = await Promise.all([
+    db
+      .select()
+      .from(deployments)
+      .orderBy(desc(deployments.startedAt))
+      .limit(limit)
+      .offset(offset),
+    db.select({ count: sql<number>`count(*)::int` }).from(deployments),
+  ]);
+  return { data, total: countResult[0]?.count ?? 0 };
 }
 
 export async function getDeploymentBySha(db: Db, commitSha: string) {

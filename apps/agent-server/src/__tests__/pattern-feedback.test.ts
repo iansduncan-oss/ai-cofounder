@@ -6,7 +6,7 @@ beforeAll(() => {
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
 });
 
-const mockListPatterns = vi.fn().mockResolvedValue([]);
+const mockListPatterns = vi.fn().mockResolvedValue({ data: [], total: 0 });
 const mockAdjustPatternConfidence = vi.fn().mockResolvedValue({ id: "up-1", confidence: 55 });
 const mockDeactivateLowConfidencePatterns = vi.fn().mockResolvedValue(0);
 
@@ -37,9 +37,9 @@ describe("PatternFeedbackProcessor", () => {
   const db = {} as any;
 
   it("skips patterns with fewer than 5 hits", async () => {
-    mockListPatterns.mockResolvedValueOnce([
+    mockListPatterns.mockResolvedValueOnce({ data: [
       { id: "p1", hitCount: 3, acceptCount: 0, confidence: 50 },
-    ]);
+    ], total: 1 });
 
     const processor = new PatternFeedbackProcessor(db);
     const result = await processor.processConfidenceAdjustments();
@@ -49,9 +49,9 @@ describe("PatternFeedbackProcessor", () => {
   });
 
   it("boosts confidence for high-acceptance patterns (>=70%, >=10 hits)", async () => {
-    mockListPatterns.mockResolvedValueOnce([
+    mockListPatterns.mockResolvedValueOnce({ data: [
       { id: "p1", hitCount: 10, acceptCount: 8, confidence: 60 },
-    ]);
+    ], total: 1 });
 
     const processor = new PatternFeedbackProcessor(db);
     await processor.processConfidenceAdjustments();
@@ -60,9 +60,9 @@ describe("PatternFeedbackProcessor", () => {
   });
 
   it("boosts confidence for moderate-acceptance patterns (>=50%, >=5 hits)", async () => {
-    mockListPatterns.mockResolvedValueOnce([
+    mockListPatterns.mockResolvedValueOnce({ data: [
       { id: "p1", hitCount: 6, acceptCount: 4, confidence: 50 },
-    ]);
+    ], total: 1 });
 
     const processor = new PatternFeedbackProcessor(db);
     await processor.processConfidenceAdjustments();
@@ -71,9 +71,9 @@ describe("PatternFeedbackProcessor", () => {
   });
 
   it("decays confidence for low-acceptance patterns (<10%)", async () => {
-    mockListPatterns.mockResolvedValueOnce([
+    mockListPatterns.mockResolvedValueOnce({ data: [
       { id: "p1", hitCount: 10, acceptCount: 0, confidence: 40 },
-    ]);
+    ], total: 1 });
 
     const processor = new PatternFeedbackProcessor(db);
     await processor.processConfidenceAdjustments();
@@ -82,9 +82,9 @@ describe("PatternFeedbackProcessor", () => {
   });
 
   it("decays confidence for below-25% acceptance patterns", async () => {
-    mockListPatterns.mockResolvedValueOnce([
+    mockListPatterns.mockResolvedValueOnce({ data: [
       { id: "p1", hitCount: 8, acceptCount: 1, confidence: 30 },
-    ]);
+    ], total: 1 });
 
     const processor = new PatternFeedbackProcessor(db);
     await processor.processConfidenceAdjustments();
@@ -93,7 +93,7 @@ describe("PatternFeedbackProcessor", () => {
   });
 
   it("calls deactivateLowConfidencePatterns after adjustments", async () => {
-    mockListPatterns.mockResolvedValueOnce([]);
+    mockListPatterns.mockResolvedValueOnce({ data: [], total: 0 });
     mockDeactivateLowConfidencePatterns.mockResolvedValueOnce(2);
 
     const processor = new PatternFeedbackProcessor(db);

@@ -1,8 +1,9 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
-import { gte, asc } from "drizzle-orm";
 import type { Db } from "@ai-cofounder/db";
 import {
+  gte,
+  asc,
   insertReflection,
   listReflections,
   getUserActionsSince,

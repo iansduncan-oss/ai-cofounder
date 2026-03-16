@@ -21,11 +21,12 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
     "/",
     { schema: { tags: ["patterns"], querystring: PatternListQuery } },
     async (request) => {
-      const patterns = await listPatterns(app.db, {
+      return listPatterns(app.db, {
         userId: request.query.userId,
         includeInactive: request.query.includeInactive,
+        limit: request.query.limit,
+        offset: request.query.offset,
       });
-      return { data: patterns };
     },
   );
 

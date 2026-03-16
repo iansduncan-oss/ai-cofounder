@@ -776,7 +776,7 @@ export class ApiClient {
     if (userId) params.set("userId", userId);
     if (includeInactive) params.set("includeInactive", "true");
     const qs = params.toString();
-    return this.request<{ data: UserPattern[] }>(
+    return this.request<{ data: UserPattern[]; total: number }>(
       "GET",
       `/api/patterns${qs ? `?${qs}` : ""}`,
     );
@@ -1065,6 +1065,17 @@ export class ApiClient {
 
   async updateBudgetThresholds(data: UpdateBudgetInput): Promise<void> {
     await this.request<void>("PUT", "/api/settings/budget", data);
+  }
+
+  /* ── Database ── */
+
+  async queryDatabase(sqlQuery: string) {
+    const params = new URLSearchParams({ sql: sqlQuery });
+    return this.request<{
+      rows: Record<string, unknown>[];
+      rowCount: number;
+      truncated: boolean;
+    }>("GET", `/api/database/query?${params}`);
   }
 }
 

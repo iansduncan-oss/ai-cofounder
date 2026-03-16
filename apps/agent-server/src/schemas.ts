@@ -302,6 +302,8 @@ export type RagDeleteSourceParams = Static<typeof RagDeleteSourceParams>;
 export const PatternListQuery = Type.Object({
   userId: Type.Optional(Type.String({ format: "uuid" })),
   includeInactive: Type.Optional(Type.Boolean()),
+  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200, default: 50 })),
+  offset: Type.Optional(Type.Integer({ minimum: 0, default: 0 })),
 });
 export type PatternListQuery = Static<typeof PatternListQuery>;
 

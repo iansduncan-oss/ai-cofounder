@@ -17,7 +17,7 @@ export class PatternFeedbackProcessor {
   constructor(private db: Db) {}
 
   async processConfidenceAdjustments() {
-    const patterns = await listPatterns(this.db, { includeInactive: false });
+    const { data: patterns } = await listPatterns(this.db, { includeInactive: false, limit: 500 });
 
     let adjusted = 0;
 

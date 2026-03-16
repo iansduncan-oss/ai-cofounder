@@ -101,7 +101,7 @@ describe("Deploy routes", () => {
 
   describe("GET /api/deploys", () => {
     it("lists deployments", async () => {
-      mockListDeployments.mockResolvedValueOnce([{ id: "dep-1", shortSha: "abc1234", status: "healthy" }]);
+      mockListDeployments.mockResolvedValueOnce({ data: [{ id: "dep-1", shortSha: "abc1234", status: "healthy" }], total: 1 });
       const { app } = buildServer();
       const res = await app.inject({ method: "GET", url: "/api/deploys" });
       await app.close();
