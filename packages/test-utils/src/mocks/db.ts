@@ -286,6 +286,19 @@ export function mockDbModule() {
     upsertAppSetting: vi.fn().mockResolvedValue(undefined),
     getAllAppSettings: vi.fn().mockResolvedValue({}),
     appSettings: {},
+    // Drizzle ORM operators (re-exported by @ai-cofounder/db)
+    eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
+    and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
+    or: vi.fn((...args: unknown[]) => ({ op: "or", args })),
+    desc: vi.fn((col: unknown) => ({ op: "desc", col })),
+    asc: vi.fn((col: unknown) => ({ op: "asc", col })),
+    ilike: vi.fn((...args: unknown[]) => ({ op: "ilike", args })),
+    sql: vi.fn(),
+    lte: vi.fn((...args: unknown[]) => ({ op: "lte", args })),
+    gte: vi.fn((...args: unknown[]) => ({ op: "gte", args })),
+    isNull: vi.fn((col: unknown) => ({ op: "isNull", col })),
+    inArray: vi.fn((...args: unknown[]) => ({ op: "inArray", args })),
+    gt: vi.fn((...args: unknown[]) => ({ op: "gt", args })),
   };
 }
 
