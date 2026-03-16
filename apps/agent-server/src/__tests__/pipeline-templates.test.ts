@@ -67,6 +67,9 @@ vi.mock("@ai-cofounder/llm", () => {
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
     getProviderHealth = vi.fn().mockReturnValue([]);
+    seedStats = vi.fn();
+    getStatsSnapshots = vi.fn().mockReturnValue([]);
+    onCompletion: unknown = undefined;
   }
 
   return {

@@ -41,6 +41,7 @@ vi.mock("@ai-cofounder/llm", () => {
     getProviderHealth = vi.fn().mockReturnValue([]);
     getStatsSnapshots = vi.fn().mockReturnValue([]);
     seedStats = vi.fn();
+    onCompletion: unknown = undefined;
   }
   return {
     LlmRegistry: MockLlmRegistry,

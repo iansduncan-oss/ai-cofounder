@@ -64,4 +64,7 @@ Element.prototype.scrollIntoView = vi.fn();
 afterEach(() => {
   localStorageMock.clear();
   vi.clearAllMocks();
+  // Reset DOM state that hooks may have modified
+  document.title = "";
+  document.documentElement.className = "";
 });
