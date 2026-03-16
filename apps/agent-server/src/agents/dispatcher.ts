@@ -106,6 +106,13 @@ export class TaskDispatcher {
     }
 
     await updateGoalStatus(this.db, goalId, "active");
+    void createJournalEntry(this.db, {
+      entryType: "goal_started",
+      title: `Goal started: ${goal.title}`,
+      summary: `${tasks.length} tasks queued for execution`,
+      goalId,
+      details: { totalTasks: tasks.length },
+    }).catch((err) => this.logger.warn({ err }, "journal write failed"));
 
     // Route to DAG executor when any task has explicit dependencies
     const hasDAGDeps = tasks.some((t) => (t as { dependsOn?: string[] | null }).dependsOn?.length);
@@ -541,6 +548,14 @@ export class TaskDispatcher {
       const result = await specialist.execute(context);
 
       await completeTask(this.db, task.id, result.output);
+      void createJournalEntry(this.db, {
+        entryType: "task_completed",
+        title: `Task completed: ${task.title}`,
+        summary: result.output.slice(0, 300),
+        goalId,
+        taskId: task.id,
+        details: { agent: agentRole, model: result.model, provider: result.provider },
+      }).catch((err) => this.logger.warn({ err }, "journal write failed"));
 
       // Usage recording handled automatically by LlmRegistry.onCompletion hook
 
@@ -610,6 +625,14 @@ export class TaskDispatcher {
         try {
           const retryResult = await specialist.execute(retryContext);
           await completeTask(this.db, task.id, retryResult.output);
+          void createJournalEntry(this.db, {
+            entryType: "task_completed",
+            title: `Task completed (retry): ${task.title}`,
+            summary: retryResult.output.slice(0, 300),
+            goalId,
+            taskId: task.id,
+            details: { agent: agentRole, retried: true },
+          }).catch((err2) => this.logger.warn({ err: err2 }, "journal write failed"));
 
           // Usage recording handled automatically by LlmRegistry.onCompletion hook
 
@@ -657,6 +680,14 @@ export class TaskDispatcher {
           const retryErrorMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
           this.logger.error({ taskId: task.id, err: retryErr }, "task retry also failed");
           await failTask(this.db, task.id, retryErrorMsg);
+          void createJournalEntry(this.db, {
+            entryType: "task_failed",
+            title: `Task failed (after retry): ${task.title}`,
+            summary: retryErrorMsg.slice(0, 300),
+            goalId,
+            taskId: task.id,
+            details: { agent: agentRole, error: retryErrorMsg.slice(0, 1000), retried: true },
+          }).catch((err2) => this.logger.warn({ err: err2 }, "journal write failed"));
 
           if (this.notificationService) {
             this.notificationService.notifyTaskFailed({
@@ -686,6 +717,14 @@ export class TaskDispatcher {
       }
 
       await failTask(this.db, task.id, errorMsg);
+      void createJournalEntry(this.db, {
+        entryType: "task_failed",
+        title: `Task failed: ${task.title}`,
+        summary: errorMsg.slice(0, 300),
+        goalId,
+        taskId: task.id,
+        details: { agent: agentRole, error: errorMsg.slice(0, 1000) },
+      }).catch((err2) => this.logger.warn({ err: err2 }, "journal write failed"));
 
       this.logger.error({ taskId: task.id, err }, "task failed");
 

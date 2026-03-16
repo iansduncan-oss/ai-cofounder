@@ -59,13 +59,21 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
         {entry.summary && (
           <p className="text-xs text-muted-foreground mt-1">{entry.summary}</p>
         )}
-        <div className="flex gap-2 mt-2 flex-wrap">
+        <div className="flex gap-2 mt-2 flex-wrap items-center">
           {entry.goalId && (
             <Link
               to={`/dashboard/goals/${entry.goalId}`}
               className="text-xs text-blue-500 hover:underline"
             >
               View Goal
+            </Link>
+          )}
+          {entry.taskId && (
+            <Link
+              to={`/dashboard/goals/${entry.goalId}?task=${entry.taskId}`}
+              className="text-xs text-cyan-500 hover:underline"
+            >
+              View Task
             </Link>
           )}
           {details?.prUrl ? (
@@ -78,9 +86,14 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
               View PR
             </a>
           ) : null}
-          {details?.commitSha ? (
+          {details?.sha ? (
             <span className="text-xs font-mono text-muted-foreground">
-              {String(details.commitSha).slice(0, 7)}
+              {String(details.sha).slice(0, 7)}
+            </span>
+          ) : null}
+          {details?.agent ? (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              {String(details.agent)}
             </span>
           ) : null}
         </div>
@@ -104,6 +117,7 @@ export function JournalPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [groupBy, setGroupBy] = useState<"timeline" | "goal">("timeline");
   const [fromDate, setFromDate] = useState(() =>
     toDateString(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)),
   );
@@ -137,6 +151,28 @@ export function JournalPage() {
       return true;
     });
   }, [journal?.data, fromDate, toDate]);
+
+  // Group entries by goal for "By Goal" view
+  const groupedByGoal = useMemo(() => {
+    if (groupBy !== "goal") return null;
+    const groups = new Map<string, { goalTitle: string; entries: JournalEntry[] }>();
+    const ungrouped: JournalEntry[] = [];
+    for (const entry of filteredEntries) {
+      if (entry.goalId) {
+        const existing = groups.get(entry.goalId);
+        if (existing) {
+          existing.entries.push(entry);
+        } else {
+          // Extract goal title from the first goal-level entry, or use a fallback
+          const goalTitle = entry.title.replace(/^(Goal started|Goal completed|Goal failed): /, "") || "Goal";
+          groups.set(entry.goalId, { goalTitle, entries: [entry] });
+        }
+      } else {
+        ungrouped.push(entry);
+      }
+    }
+    return { groups: Array.from(groups.entries()), ungrouped };
+  }, [filteredEntries, groupBy]);
 
   const { data: standup } = useQuery({
     queryKey: queryKeys.journal.standup(),
@@ -205,6 +241,20 @@ export function JournalPage() {
             className="rounded border bg-card border-border px-3 py-2 text-sm"
           />
         </label>
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          <button
+            onClick={() => setGroupBy("timeline")}
+            className={`px-3 py-2 text-xs ${groupBy === "timeline" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"}`}
+          >
+            Timeline
+          </button>
+          <button
+            onClick={() => setGroupBy("goal")}
+            className={`px-3 py-2 text-xs ${groupBy === "goal" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted"}`}
+          >
+            By Goal
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -214,11 +264,47 @@ export function JournalPage() {
           ))}
         </div>
       ) : filteredEntries.length > 0 ? (
-        <div className="relative">
-          {filteredEntries.map((entry) => (
-            <EntryCard key={entry.id} entry={entry} />
-          ))}
-        </div>
+        groupBy === "goal" && groupedByGoal ? (
+          <div className="space-y-6">
+            {groupedByGoal.groups.map(([goalId, group]) => (
+              <div key={goalId} className="bg-card/50 rounded-lg border border-border p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-4 h-4 text-blue-500" />
+                  <Link
+                    to={`/dashboard/goals/${goalId}`}
+                    className="text-sm font-semibold hover:underline"
+                  >
+                    {group.goalTitle}
+                  </Link>
+                  <span className="text-xs text-muted-foreground">
+                    {group.entries.length} {group.entries.length === 1 ? "entry" : "entries"}
+                  </span>
+                </div>
+                <div className="relative">
+                  {group.entries.map((entry) => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </div>
+            ))}
+            {groupedByGoal.ungrouped.length > 0 && (
+              <div className="bg-card/50 rounded-lg border border-border p-4">
+                <p className="text-sm font-semibold mb-3 text-muted-foreground">Other entries</p>
+                <div className="relative">
+                  {groupedByGoal.ungrouped.map((entry) => (
+                    <EntryCard key={entry.id} entry={entry} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="relative">
+            {filteredEntries.map((entry) => (
+              <EntryCard key={entry.id} entry={entry} />
+            ))}
+          </div>
+        )
       ) : (
         <div className="text-center py-12 text-muted-foreground">
           No journal entries found.
