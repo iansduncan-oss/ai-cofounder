@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type {
   LlmCompletionRequest,
-  LlmCompletionResponse,
   LlmTool,
 } from "../types.js";
 
@@ -1376,7 +1375,7 @@ describe("GeminiProvider", () => {
             input_schema: {
               type: "object",
               properties: {
-                field: { type: "custom_type" as any, description: "Unknown type" },
+                field: { type: "custom_type" as unknown as string, description: "Unknown type" },
               },
               required: [],
             },

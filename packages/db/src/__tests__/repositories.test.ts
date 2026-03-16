@@ -49,13 +49,8 @@ function createMockChain(): Record<string, ReturnType<typeof vi.fn>> {
 }
 
 function createMockDb() {
-  const selectChain = createMockChain();
-  const insertChain = createMockChain();
-  const updateChain = createMockChain();
-  const deleteChain = createMockChain();
-
   const db = {
-    select: vi.fn().mockImplementation((fields?: unknown) => {
+    select: vi.fn().mockImplementation((_fields?: unknown) => {
       // select() or select({ ... }) both return the chain
       const chain = createMockChain();
       const proxy = new Proxy(chain, {
@@ -317,7 +312,6 @@ describe("Users", () => {
 
     it("creates and returns new user when not found", async () => {
       // First call (select) returns empty, second (insert...returning) returns created user
-      const callCount = 0;
       const selectProxy = new Proxy({} as Record<string, unknown>, {
         get(_, prop) {
           if (prop === "then") {
