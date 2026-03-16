@@ -40,7 +40,7 @@ describe("ChatPage", () => {
 
   it("renders chat page with empty state", () => {
     renderWithProviders(<ChatPage />);
-    expect(screen.getByText("Send a message to start chatting with the AI Cofounder")).toBeInTheDocument();
+    expect(screen.getByText("What can I help with?")).toBeInTheDocument();
   });
 
   it("renders input textarea", () => {
