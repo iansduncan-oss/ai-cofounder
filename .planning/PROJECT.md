@@ -52,24 +52,24 @@ The platform is fully operational with:
 
 ### Active
 
-#### Current Milestone: v2.0 Autonomous Cofounder
+#### Current Milestone: v3.0 Production-Grade
 
-**Goal:** Transform the AI Cofounder from a reactive tool into an autonomous engineering partner that works independently, remembers everything, and manages all systems.
+**Goal:** Harden the AI Cofounder for daily reliable use — improve test infrastructure, deploy confidence, data scaling, and operational visibility.
 
-**Requirements:** [v2.0-REQUIREMENTS.md](milestones/v2.0-REQUIREMENTS.md) — 43 requirements, 10 categories
-**Roadmap:** [v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md) — 9 phases (8–16)
+**Requirements:** [v3.0-REQUIREMENTS.md](milestones/v3.0-REQUIREMENTS.md) — 24 requirements, 6 categories
+**Roadmap:** [v3.0-ROADMAP.md](milestones/v3.0-ROADMAP.md) — 5 phases (18–22)
 
 **Categories:**
-- TERM (5) — Autonomous task execution (pick up tasks, code, commit, PR)
-- MEM (5) — Persistent memory (auto-ingest conversations, decisions, project context)
-- AUTO (5) — Autonomy tiers (green/yellow/red approval system)
-- JRNL (4) — Work journal & daily standup
-- CONT (4) — Content automations (YouTube, n8n as managed tasks)
-- PROJ (4) — Multi-project awareness (all projects, VPS, infrastructure)
-- FIN (4) — Financial tracking (per-request costs, budgets, optimization)
-- DASH (6) — Dashboard command center (journal, approvals, costs, settings)
-- SCHED (4) — Autonomous scheduling (works while you sleep, distributed lock, token budget)
-- SESS (2) — Session continuity (RAG-retrieved context, proactive decision referencing)
+- STAB (5) — Stabilization & tech debt (orchestrator refactor, type fixes, pagination, docs)
+- INTEG (4) — Integration testing (E2E harness, goal lifecycle, approval flow, API contracts)
+- DEPLOY (4) — Deploy pipeline (local CI, health checks, rollback, dry-run)
+- OPS (4) — Operational hardening (pagination, queue health, budget validation, error reporting)
+- DASH-Q (4) — Dashboard quality (test environments, hook coverage, accessibility)
+- DOC (2) — Documentation (summaries, ADRs)
+
+#### Shipped: v2.0 Autonomous Cofounder (2026-03-15)
+
+43 requirements, 10 phases, 24 plans — all delivered. See [v2.0-REQUIREMENTS.md](milestones/v2.0-REQUIREMENTS.md).
 
 ### Out of Scope
 

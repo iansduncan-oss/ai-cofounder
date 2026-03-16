@@ -4,7 +4,8 @@
 
 - [v1.0 Infrastructure & Reliability](milestones/v1.0-ROADMAP.md) — Phases 1-4 (shipped 2026-03-09)
 - [v1.1 Pipeline Dashboard UI](milestones/v1.1-ROADMAP.md) — Phases 5-7 (shipped 2026-03-09)
-- [v2.0 Autonomous Cofounder](milestones/v2.0-ROADMAP.md) — Phases 8-16 (active)
+- [v2.0 Autonomous Cofounder](milestones/v2.0-ROADMAP.md) — Phases 8-17 (shipped 2026-03-15)
+- [v3.0 Production-Grade](milestones/v3.0-ROADMAP.md) — Phases 18-22 (active)
 
 ## Phases
 
@@ -27,7 +28,7 @@
 
 </details>
 
-### v2.0 Autonomous Cofounder (In Progress)
+### v2.0 Autonomous Cofounder (COMPLETE — shipped 2026-03-15)
 
 **Milestone Goal:** Transform the AI Cofounder from a reactive tool into an autonomous engineering partner that works independently, remembers everything, and manages all systems.
 
@@ -222,9 +223,15 @@ Plans:
 | 15. Content Automations | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 16. Dashboard Command Center | v2.0 | 3/3 | Complete | 2026-03-15 |
 | 17. Close Integration & Flow Gaps | v2.0 | Complete    | 2026-03-16 | 2026-03-15 |
+| 18. Stabilization & Tech Debt | v3.0 | — | Complete | 2026-03-16 |
+| 19. Integration Test Suite | v3.0 | TBD | In Progress | — |
+| 20. Deploy Pipeline | v3.0 | TBD | Pending | — |
+| 21. Operational Hardening | v3.0 | TBD | Pending | — |
+| 22. Dashboard Quality & Docs | v3.0 | TBD | Pending | — |
 
 ---
 *v1.0 roadmap created: 2026-03-07*
 *v1.1 roadmap created: 2026-03-09*
 *v1.1 archived: 2026-03-09*
 *v2.0 roadmap created: 2026-03-09*
+*v3.0 roadmap created: 2026-03-16*
