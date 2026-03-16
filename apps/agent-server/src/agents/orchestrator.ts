@@ -300,6 +300,23 @@ export function validateDependencyGraph(tasks: CreatePlanInput["tasks"]): void {
   }
 }
 
+/* ── Orchestrator options ── */
+
+export interface OrchestratorOptions {
+  registry: LlmRegistry;
+  db?: Db;
+  taskCategory?: TaskCategory;
+  embeddingService?: EmbeddingService;
+  n8nService?: N8nService;
+  sandboxService?: SandboxService;
+  workspaceService?: WorkspaceService;
+  messagingService?: AgentMessagingService;
+  autonomyTierService?: AutonomyTierService;
+  projectRegistryService?: ProjectRegistryService;
+  monitoringService?: MonitoringService;
+  browserService?: BrowserService;
+}
+
 /* ── Orchestrator class ── */
 
 export class Orchestrator {
@@ -318,32 +335,19 @@ export class Orchestrator {
   private browserService?: BrowserService;
   private requestId?: string;
 
-  constructor(
-    registry: LlmRegistry,
-    db?: Db,
-    taskCategory: TaskCategory = "conversation",
-    embeddingService?: EmbeddingService,
-    n8nService?: N8nService,
-    sandboxService?: SandboxService,
-    workspaceService?: WorkspaceService,
-    messagingService?: AgentMessagingService,
-    autonomyTierService?: AutonomyTierService,
-    projectRegistryService?: ProjectRegistryService,
-    monitoringService?: MonitoringService,
-    browserService?: BrowserService,
-  ) {
-    this.registry = registry;
-    this.db = db;
-    this.taskCategory = taskCategory;
-    this.embeddingService = embeddingService;
-    this.n8nService = n8nService;
-    this.sandboxService = sandboxService;
-    this.workspaceService = workspaceService;
-    this.messagingService = messagingService;
-    this.autonomyTierService = autonomyTierService;
-    this.projectRegistryService = projectRegistryService;
-    this.monitoringService = monitoringService;
-    this.browserService = browserService;
+  constructor(options: OrchestratorOptions) {
+    this.registry = options.registry;
+    this.db = options.db;
+    this.taskCategory = options.taskCategory ?? "conversation";
+    this.embeddingService = options.embeddingService;
+    this.n8nService = options.n8nService;
+    this.sandboxService = options.sandboxService;
+    this.workspaceService = options.workspaceService;
+    this.messagingService = options.messagingService;
+    this.autonomyTierService = options.autonomyTierService;
+    this.projectRegistryService = options.projectRegistryService;
+    this.monitoringService = options.monitoringService;
+    this.browserService = options.browserService;
   }
 
   async run(

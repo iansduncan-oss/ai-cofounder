@@ -142,9 +142,8 @@ describe("Scheduler autonomyTierService wiring", () => {
 
     expect(MockOrchestrator).toHaveBeenCalled();
 
-    // autonomyTierService is the 9th positional arg (index 8)
-    const constructorArgs = MockOrchestrator.mock.calls[0];
-    expect(constructorArgs[8]).toBe(mockAutonomyTierService);
+    const options = MockOrchestrator.mock.calls[0][0];
+    expect(options.autonomyTierService).toBe(mockAutonomyTierService);
   });
 
   it("passes undefined for autonomyTierService when not provided (backward compatibility)", async () => {
@@ -171,8 +170,7 @@ describe("Scheduler autonomyTierService wiring", () => {
 
     expect(MockOrchestrator).toHaveBeenCalled();
 
-    // autonomyTierService arg (index 8) should be undefined
-    const constructorArgs = MockOrchestrator.mock.calls[0];
-    expect(constructorArgs[8]).toBeUndefined();
+    const options = MockOrchestrator.mock.calls[0][0];
+    expect(options.autonomyTierService).toBeUndefined();
   });
 });

@@ -122,12 +122,11 @@ describe("orchestrator auto semantic retrieval", () => {
     const { LlmRegistry } = await import("@ai-cofounder/llm");
     const registry = new LlmRegistry();
 
-    const orchestrator = new Orchestrator(
+    const orchestrator = new Orchestrator({
       registry,
-      {} as any, // db
-      "conversation",
-      { embed: mockEmbed } as any, // embeddingService
-    );
+      db: {} as any,
+      embeddingService: { embed: mockEmbed } as any,
+    });
 
     await orchestrator.run("Tell me about my projects", undefined, [], "user-1");
 
@@ -155,12 +154,11 @@ describe("orchestrator auto semantic retrieval", () => {
     const { LlmRegistry } = await import("@ai-cofounder/llm");
     const registry = new LlmRegistry();
 
-    const orchestrator = new Orchestrator(
+    const orchestrator = new Orchestrator({
       registry,
-      {} as any,
-      "conversation",
-      { embed: mockEmbed } as any,
-    );
+      db: {} as any,
+      embeddingService: { embed: mockEmbed } as any,
+    });
 
     const result = await orchestrator.run("Hello", undefined, [], "user-1");
     expect(result.response).toBe("Response text");
@@ -182,12 +180,10 @@ describe("orchestrator auto semantic retrieval", () => {
     const { LlmRegistry } = await import("@ai-cofounder/llm");
     const registry = new LlmRegistry();
 
-    const orchestrator = new Orchestrator(
+    const orchestrator = new Orchestrator({
       registry,
-      {} as any,
-      "conversation",
-      undefined, // no embedding service
-    );
+      db: {} as any,
+    });
 
     const result = await orchestrator.run("Hello", undefined, [], "user-1");
     expect(result.response).toBe("Response text");

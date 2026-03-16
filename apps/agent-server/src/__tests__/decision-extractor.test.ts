@@ -227,12 +227,11 @@ describe("proactive reference", () => {
     mockComplete.mockResolvedValue(textResponse("Sure, here is how we set up Postgres..."));
 
     const registry = new LlmRegistry();
-    const orchestrator = new Orchestrator(
+    const orchestrator = new Orchestrator({
       registry,
-      {} as any, // db
-      "conversation",
-      { embed: vi.fn().mockResolvedValue(new Array(768).fill(0.1)) } as any, // embeddingService
-    );
+      db: {} as any,
+      embeddingService: { embed: vi.fn().mockResolvedValue(new Array(768).fill(0.1)) } as any,
+    });
 
     const result = await orchestrator.run("How do we set up the database?", "conv-1", undefined, "user-1");
 

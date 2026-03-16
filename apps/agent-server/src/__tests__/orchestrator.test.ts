@@ -129,7 +129,7 @@ describe("Orchestrator", () => {
       mockComplete.mockResolvedValueOnce(textResponse("Hello there!"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       const result = await orchestrator.run("Hi");
 
       expect(result.response).toBe("Hello there!");
@@ -141,7 +141,7 @@ describe("Orchestrator", () => {
       mockComplete.mockResolvedValueOnce(textResponse("ok"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
       const result = await orchestrator.run("test", "conv-123");
 
       expect(result.conversationId).toBe("conv-123");
@@ -151,7 +151,7 @@ describe("Orchestrator", () => {
       mockComplete.mockResolvedValueOnce(textResponse("ok"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
       const result = await orchestrator.run("test");
 
       expect(result.conversationId).toBeDefined();
@@ -176,7 +176,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Plan created!"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       const result = await orchestrator.run("Build a new feature", undefined, undefined, "user-1");
 
       expect(mockCreateGoal).toHaveBeenCalledWith(
@@ -212,7 +212,7 @@ describe("Orchestrator", () => {
         });
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       const result = await orchestrator.run("plan something");
 
       expect(result.response).toContain("Plan created");
@@ -233,7 +233,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Saved!"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       await orchestrator.run("Remember I like TypeScript", undefined, undefined, "user-1");
 
       expect(mockSaveMemory).toHaveBeenCalledWith(
@@ -259,7 +259,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Could not save."));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       await orchestrator.run("remember this");
 
       // save_memory should not have been called (no userId)
@@ -280,7 +280,7 @@ describe("Orchestrator", () => {
 
       const registry = new LlmRegistry();
       const embeddingService = { embed: mockEmbed };
-      const orchestrator = new Orchestrator(registry, {} as any, "conversation", embeddingService);
+      const orchestrator = new Orchestrator({ registry, db: {} as any, embeddingService });
       await orchestrator.run("Save this fact", undefined, undefined, "user-1");
 
       expect(mockEmbed).toHaveBeenCalledWith("company: We sell widgets");
@@ -306,7 +306,7 @@ describe("Orchestrator", () => {
 
       const registry = new LlmRegistry();
       const embeddingService = { embed: mockEmbed };
-      const orchestrator = new Orchestrator(registry, {} as any, "conversation", embeddingService);
+      const orchestrator = new Orchestrator({ registry, db: {} as any, embeddingService });
       await orchestrator.run("What do I like?", undefined, undefined, "user-1");
 
       expect(mockEmbed).toHaveBeenCalledWith("what do I like");
@@ -325,7 +325,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Found memories"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       await orchestrator.run("recall my preferences", undefined, undefined, "user-1");
 
       expect(mockRecallMemories).toHaveBeenCalled();
@@ -344,7 +344,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Approval requested."));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       await orchestrator.run("deploy to prod");
 
       expect(mockCreateApproval).toHaveBeenCalledWith(
@@ -367,7 +367,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Here's what I found"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry); // no DB needed for search
+      const orchestrator = new Orchestrator({ registry }); // no DB needed for search
       await orchestrator.run("search for fastify docs");
 
       expect(mockExecuteWebSearch).toHaveBeenCalledWith("fastify docs", 3);
@@ -383,7 +383,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Sorry, that tool doesn't exist"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       const result = await orchestrator.run("do something weird");
 
       // Should not crash, should return a response
@@ -402,7 +402,7 @@ describe("Orchestrator", () => {
       // 12th call won't happen since loop stops at 10
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
       const result = await orchestrator.run("search a lot");
 
       // 1 initial + 10 rounds = 11 calls total
@@ -415,7 +415,7 @@ describe("Orchestrator", () => {
         .mockResolvedValueOnce(textResponse("Done"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
       const result = await orchestrator.run("search");
 
       // First call: 10 input + 10 output, second: 10 input + 20 output
@@ -429,7 +429,7 @@ describe("Orchestrator", () => {
       mockComplete.mockResolvedValueOnce(textResponse("I remember"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
       const history = [
         { role: "user" as const, content: "My name is Ian" },
         { role: "assistant" as const, content: "Nice to meet you, Ian" },
@@ -449,7 +449,7 @@ describe("Orchestrator", () => {
       mockComplete.mockResolvedValueOnce(textResponse("ok"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry, {} as any);
+      const orchestrator = new Orchestrator({ registry, db: {} as any });
       await orchestrator.run("hi", undefined, undefined, "user-1");
 
       const callArgs = mockComplete.mock.calls[0][1];
@@ -462,7 +462,7 @@ describe("Orchestrator", () => {
       mockComplete.mockRejectedValueOnce(new Error("API down"));
 
       const registry = new LlmRegistry();
-      const orchestrator = new Orchestrator(registry);
+      const orchestrator = new Orchestrator({ registry });
 
       await expect(orchestrator.run("test")).rejects.toThrow("API down");
     });

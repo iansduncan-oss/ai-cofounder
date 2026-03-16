@@ -22,20 +22,19 @@ const VoiceChatBody = Type.Object({
 type VoiceChatBody = Static<typeof VoiceChatBody>;
 
 export const voiceRoutes: FastifyPluginAsync = async (app) => {
-  const orchestrator = new Orchestrator(
-    app.llmRegistry,
-    app.db,
-    "conversation",
-    app.embeddingService,
-    app.n8nService,
-    app.sandboxService,
-    app.workspaceService,
-    app.messagingService,
-    app.autonomyTierService,
-    app.projectRegistry,
-    app.monitoringService,
-    app.browserService,
-  );
+  const orchestrator = new Orchestrator({
+    registry: app.llmRegistry,
+    db: app.db,
+    embeddingService: app.embeddingService,
+    n8nService: app.n8nService,
+    sandboxService: app.sandboxService,
+    workspaceService: app.workspaceService,
+    messagingService: app.messagingService,
+    autonomyTierService: app.autonomyTierService,
+    projectRegistryService: app.projectRegistry,
+    monitoringService: app.monitoringService,
+    browserService: app.browserService,
+  });
 
   // ── Original non-streaming chat endpoint ──
   app.post<{ Body: VoiceChatBody }>("/chat", { schema: { body: VoiceChatBody } }, async (request) => {

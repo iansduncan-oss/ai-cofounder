@@ -354,16 +354,15 @@ async function _runSessionBody(
       status = "timeout";
       summary = "Session timed out before orchestrator could run.";
     } else {
-      const orchestrator = new Orchestrator(
+      const orchestrator = new Orchestrator({
         registry,
         db,
-        "planning",
+        taskCategory: "planning",
         embeddingService,
-        undefined, // n8nService — not needed in autonomous context
         sandboxService,
         workspaceService,
         messagingService,
-      );
+      });
 
       const result = await Promise.race([
         orchestrator.run(contextPrompt, session.id),

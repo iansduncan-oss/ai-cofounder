@@ -218,17 +218,16 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
           });
 
           // Create an orchestrator instance for this execution
-          const orchestrator = new Orchestrator(
-            llmRegistry,
+          const orchestrator = new Orchestrator({
+            registry: llmRegistry,
             db,
-            "conversation",
             embeddingService,
             n8nService,
             sandboxService,
             workspaceService,
             messagingService,
             autonomyTierService,
-          );
+          });
 
           // Create a system user + conversation for scheduled tasks
           const user = await findOrCreateUser(db, "system-scheduler", "system");

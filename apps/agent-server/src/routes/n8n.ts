@@ -61,20 +61,19 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       convId = conv.id;
     }
 
-    const orchestrator = new Orchestrator(
-      app.llmRegistry,
-      app.db,
-      "conversation",
-      app.embeddingService,
-      app.n8nService,
-      app.sandboxService,
-      app.workspaceService,
-      app.messagingService,
-      app.autonomyTierService,
-      app.projectRegistry,
-      app.monitoringService,
-      app.browserService,
-    );
+    const orchestrator = new Orchestrator({
+      registry: app.llmRegistry,
+      db: app.db,
+      embeddingService: app.embeddingService,
+      n8nService: app.n8nService,
+      sandboxService: app.sandboxService,
+      workspaceService: app.workspaceService,
+      messagingService: app.messagingService,
+      autonomyTierService: app.autonomyTierService,
+      projectRegistryService: app.projectRegistry,
+      monitoringService: app.monitoringService,
+      browserService: app.browserService,
+    });
 
     const contextMessage = event_type
       ? `[n8n event: ${event_type}] ${message}`
