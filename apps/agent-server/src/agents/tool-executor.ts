@@ -72,6 +72,7 @@ import {
   ANALYZE_CROSS_PROJECT_IMPACT_TOOL,
 } from "./tools/project-tools.js";
 import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
+import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import {
   createRegisteredProject,
@@ -143,6 +144,7 @@ export function buildSharedToolList(
     add(CREATE_SCHEDULE_TOOL);
     add(LIST_SCHEDULES_TOOL);
     add(DELETE_SCHEDULE_TOOL);
+    add(QUERY_DATABASE_TOOL);
   }
 
   if (services.n8nService && services.db) {
@@ -865,6 +867,12 @@ export async function executeSharedTool(
         dependencies: dependencyDetails,
         analysis_note: "Review all 'depended_on_by' projects to assess impact of your change.",
       };
+    }
+
+    case "query_database": {
+      if (!db) return { error: "Database not available" };
+      const input = block.input as { sql: string; limit?: number };
+      return executeQueryDatabase(db, input.sql, input.limit);
     }
 
     case "query_vps": {

@@ -34,6 +34,7 @@ import { journalRoutes } from "../routes/journal.js";
 import { projectRoutes } from "../routes/projects.js";
 import { pipelineTemplateRoutes } from "../routes/pipeline-templates.js";
 import { settingsApiRoutes } from "../routes/settings-api.js";
+import { databaseRoutes } from "../routes/database.js";
 
 /**
  * JWT Guard Plugin — scoped Fastify plugin (NOT wrapped with fp()) so its
@@ -99,4 +100,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(projectRoutes);
   app.register(pipelineTemplateRoutes, { prefix: "/api/pipeline-templates" });
   app.register(settingsApiRoutes, { prefix: "/api/settings" });
+  app.register(databaseRoutes, { prefix: "/api/database" });
 }
