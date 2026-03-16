@@ -45,6 +45,10 @@ export default defineConfig({
         target: "http://localhost:3100",
         changeOrigin: true,
       },
+      "/voice": {
+        target: "http://localhost:3100",
+        changeOrigin: true,
+      },
     },
   },
 });

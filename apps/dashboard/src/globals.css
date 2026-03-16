@@ -111,3 +111,63 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-muted-foreground);
 }
+
+/* Voice ring animations */
+@keyframes pulse-listen {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes spin-think {
+  0% { border-color: #eab308 transparent #eab308 transparent; }
+  50% { border-color: transparent #eab308 transparent #eab308; }
+  100% { border-color: #eab308 transparent #eab308 transparent; }
+}
+
+@keyframes pulse-stream {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.9; }
+}
+
+@keyframes pulse-speak {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+@keyframes message-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Prose styling for chat markdown */
+.prose pre {
+  background: #0d0d14;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+}
+
+.prose code:not(pre code) {
+  background: rgba(124, 58, 237, 0.15);
+  color: #c4b5fd;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+
+.prose a {
+  color: #818cf8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose a:hover {
+  color: #a78bfa;
+}
+
+/* Chat message entrance */
+.chat-message-enter {
+  animation: message-in 0.3s ease-out;
+}
