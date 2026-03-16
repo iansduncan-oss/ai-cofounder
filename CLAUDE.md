@@ -93,7 +93,7 @@ Services available at:
 ## Architecture
 
 - **TypeScript**: Strict mode, ES2022 target, Node16 module resolution. Shared `tsconfig.base.json` extended by each workspace.
-- **Testing**: Vitest with root config (`vitest.config.ts`). Tests live in `src/__tests__/` (excluded from tsc build). Run from source (not compiled JS). Mock `@ai-cofounder/db` with individual mock fns AND `@ai-cofounder/llm` with MockLlmRegistry.
+- **Testing**: Vitest with per-workspace isolation. Root `vitest.config.ts` lists 13 workspace directories as `projects`; each workspace has its own `vitest.config.ts` using `defineProject`. Tests live in `src/__tests__/` (excluded from tsc build). Run from source (not compiled JS). Mock `@ai-cofounder/db` with individual mock fns AND `@ai-cofounder/llm` with MockLlmRegistry. Use `setupTestEnv()` from `@ai-cofounder/test-utils` to set env vars with automatic snapshot/restore. Tests that call `buildServer()` **must** call `await app.close()` in `afterAll`.
 - **Agent Server**: Fastify + pino logging. Routes in `src/routes/`, agents in `src/agents/`, plugins in `src/plugins/`. `buildServer(registry?)` accepts optional LlmRegistry; creates one via `createLlmRegistry()` if not provided. `app.llmRegistry` Fastify decorator. Use `app.inject()` for testing. Dev mode uses `tsx watch`.
 - **Multi-LLM**: `LlmRegistry` routes by task category (planning→Opus, conversation→Sonnet, simple→Groq, research→Gemini, code→Sonnet) with automatic fallback chains. Providers share an OpenAI-compatible base class.
 - **Database**: Drizzle ORM with PostgreSQL + pgvector. Auto-migrations run at startup via `runMigrations()`. Use `db:push` for dev, `db:generate`/`db:migrate` for production.

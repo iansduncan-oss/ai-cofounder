@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 vi.mock("@ai-cofounder/shared", () => ({
@@ -43,6 +43,10 @@ describe("Context Routes", () => {
     const server = buildServer();
     app = server.app;
     await app.ready();
+  });
+
+  afterAll(async () => {
+    if (app) await app.close();
   });
 
   it("GET /api/context/current returns context block", async () => {

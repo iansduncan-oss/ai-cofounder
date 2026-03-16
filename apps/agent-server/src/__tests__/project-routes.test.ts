@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
@@ -141,6 +141,10 @@ describe("project routes", () => {
     const server = buildServer();
     app = server.app;
     await app.ready();
+  });
+
+  afterAll(async () => {
+    if (app) await app.close();
   });
 
   beforeEach(() => {
