@@ -61,10 +61,12 @@ vi.mock("@ai-cofounder/db", () => ({
 }));
 
 const mockGetAllQueueStatus = vi.fn().mockResolvedValue([
-  { name: "agent-tasks", waiting: 5, active: 2, failed: 0 },
-  { name: "monitoring", waiting: 1, active: 0, failed: 0 },
-  { name: "dead-letter", waiting: 3, active: 0, failed: 1 },
+  { name: "agent-tasks", waiting: 5, active: 2, failed: 0, completed: 0 },
+  { name: "monitoring", waiting: 1, active: 0, failed: 0, completed: 0 },
+  { name: "dead-letter", waiting: 3, active: 0, failed: 1, completed: 0 },
 ]);
+
+const mockGetStaleJobCounts = vi.fn().mockResolvedValue([]);
 
 vi.mock("@ai-cofounder/queue", () => ({
   getRedisConnection: vi.fn().mockReturnValue({ host: "localhost", port: 6379 }),
@@ -91,6 +93,7 @@ vi.mock("@ai-cofounder/queue", () => ({
   }),
   pingRedis: vi.fn().mockResolvedValue("ok"),
   getAllQueueStatus: (...args: unknown[]) => mockGetAllQueueStatus(...args),
+  getStaleJobCounts: (...args: unknown[]) => mockGetStaleJobCounts(...args),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {
@@ -120,10 +123,11 @@ const internalHeaders = { "x-forwarded-for": "10.0.0.1" };
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetAllQueueStatus.mockResolvedValue([
-    { name: "agent-tasks", waiting: 5, active: 2, failed: 0 },
-    { name: "monitoring", waiting: 1, active: 0, failed: 0 },
-    { name: "dead-letter", waiting: 3, active: 0, failed: 1 },
+    { name: "agent-tasks", waiting: 5, active: 2, failed: 0, completed: 0 },
+    { name: "monitoring", waiting: 1, active: 0, failed: 0, completed: 0 },
+    { name: "dead-letter", waiting: 3, active: 0, failed: 1, completed: 0 },
   ]);
+  mockGetStaleJobCounts.mockResolvedValue([]);
 });
 
 describe("Queue Prometheus metrics", () => {
