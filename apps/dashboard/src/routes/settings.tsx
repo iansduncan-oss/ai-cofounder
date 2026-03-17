@@ -172,6 +172,7 @@ export function SettingsPage() {
                         </td>
                         <td className="py-2 pr-4">
                           <select
+                            aria-label={`Autonomy tier for ${t.toolName}`}
                             className="rounded border bg-background px-2 py-1 text-xs"
                             value={t.tier}
                             onChange={(e) =>
