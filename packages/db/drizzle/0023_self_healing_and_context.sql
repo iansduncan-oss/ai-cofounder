@@ -2,6 +2,33 @@
 -- Adds soak monitoring fields to deployments, circuit breaker table,
 -- session engagement table, and timezone to users.
 
+-- Create deployments table (referenced by schema but no prior migration creates it)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deploy_status') THEN
+    CREATE TYPE deploy_status AS ENUM ('started','building','deploying','verifying','healthy','failed','rolled_back');
+  END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS deployments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  commit_sha text NOT NULL,
+  short_sha text NOT NULL,
+  branch text NOT NULL DEFAULT 'main',
+  status deploy_status NOT NULL DEFAULT 'started',
+  services jsonb,
+  previous_sha text,
+  triggered_by text NOT NULL DEFAULT 'ci',
+  health_checks jsonb,
+  error_log text,
+  root_cause_analysis text,
+  rolled_back boolean NOT NULL DEFAULT false,
+  rollback_sha text,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz
+);
+
 -- Add soak monitoring + remediation fields to deployments
 ALTER TABLE deployments
   ADD COLUMN IF NOT EXISTS soak_status text,
@@ -47,15 +74,3 @@ CREATE INDEX IF NOT EXISTS idx_session_engagement_session_start ON session_engag
 -- Add timezone to users
 ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone text;
 
--- Add new user action types (goal_viewed, goal_executed)
--- Note: tool_executed already exists in the enum; we add the new ones
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'goal_viewed' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_action_type')) THEN
-    ALTER TYPE user_action_type ADD VALUE 'goal_viewed';
-  END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'goal_executed' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'user_action_type')) THEN
-    ALTER TYPE user_action_type ADD VALUE 'goal_executed';
-  END IF;
-END
-$$;
