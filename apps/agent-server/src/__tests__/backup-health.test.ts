@@ -88,10 +88,16 @@ describe("checkBackupHealth", () => {
 
 describe("runFullCheck includes backup", () => {
   it("generates warning alert for stale backup", async () => {
-    const oldEpoch = Math.floor(Date.now() / 1000) - 40 * 3600; // 40 hours
-    mockExecFile.mockResolvedValue({ stdout: `${oldEpoch} /backups/ai-cofounder/latest/db.dump\n` });
-
     const svc = makeService();
+    vi.spyOn(svc, "checkGitHubCI").mockResolvedValue([]);
+    vi.spyOn(svc, "checkGitHubPRs").mockResolvedValue([]);
+    vi.spyOn(svc, "checkVPSHealth").mockResolvedValue(null);
+    vi.spyOn(svc, "checkBackupHealth").mockResolvedValue({
+      lastBackupAge: 40,
+      lastBackupFile: "/backups/ai-cofounder/latest/db.dump",
+      isFresh: false,
+    });
+
     const report = await svc.runFullCheck();
 
     const backupAlerts = report.alerts.filter((a) => a.source === "backup");
@@ -102,10 +108,16 @@ describe("runFullCheck includes backup", () => {
   });
 
   it("generates critical alert when backup is very old", async () => {
-    const veryOldEpoch = Math.floor(Date.now() / 1000) - 72 * 3600; // 72 hours
-    mockExecFile.mockResolvedValue({ stdout: `${veryOldEpoch} /backups/ai-cofounder/latest/db.dump\n` });
-
     const svc = makeService();
+    vi.spyOn(svc, "checkGitHubCI").mockResolvedValue([]);
+    vi.spyOn(svc, "checkGitHubPRs").mockResolvedValue([]);
+    vi.spyOn(svc, "checkVPSHealth").mockResolvedValue(null);
+    vi.spyOn(svc, "checkBackupHealth").mockResolvedValue({
+      lastBackupAge: 72,
+      lastBackupFile: "/backups/ai-cofounder/latest/db.dump",
+      isFresh: false,
+    });
+
     const report = await svc.runFullCheck();
 
     const backupAlerts = report.alerts.filter((a) => a.source === "backup");
@@ -114,10 +126,16 @@ describe("runFullCheck includes backup", () => {
   });
 
   it("no backup alert when backup is fresh", async () => {
-    const recentEpoch = Math.floor(Date.now() / 1000) - 3600;
-    mockExecFile.mockResolvedValue({ stdout: `${recentEpoch} /backups/ai-cofounder/latest/db.dump\n` });
-
     const svc = makeService();
+    vi.spyOn(svc, "checkGitHubCI").mockResolvedValue([]);
+    vi.spyOn(svc, "checkGitHubPRs").mockResolvedValue([]);
+    vi.spyOn(svc, "checkVPSHealth").mockResolvedValue(null);
+    vi.spyOn(svc, "checkBackupHealth").mockResolvedValue({
+      lastBackupAge: 1,
+      lastBackupFile: "/backups/ai-cofounder/latest/db.dump",
+      isFresh: true,
+    });
+
     const report = await svc.runFullCheck();
 
     const backupAlerts = report.alerts.filter((a) => a.source === "backup");
