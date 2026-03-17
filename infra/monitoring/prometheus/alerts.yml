@@ -39,3 +39,33 @@ groups:
         annotations:
           summary: "Prometheus target {{ $labels.job }} is down"
           description: "Target {{ $labels.instance }} has been down for more than 2 minutes."
+
+      - alert: DeadLetterQueueHigh
+        expr: dlq_size_total{job="agent-server"} > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Dead letter queue size is high"
+          description: "DLQ has {{ $value }} jobs for more than 5 minutes. Investigate failed jobs."
+
+      - alert: StaleJobsDetected
+        expr: queue_stale_jobs{job="agent-server"} > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Stale jobs detected in queue {{ $labels.queue }}"
+          description: "{{ $value }} job(s) in {{ $labels.queue }} have been active for more than 30 minutes."
+
+      - alert: HighJobFailureRate
+        expr: |
+          sum by (queue) (rate(queue_jobs_failed_total{job="agent-server"}[10m]))
+          / (sum by (queue) (rate(queue_jobs_completed_total{job="agent-server"}[10m])) + sum by (queue) (rate(queue_jobs_failed_total{job="agent-server"}[10m])))
+          > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High job failure rate in queue {{ $labels.queue }}"
+          description: "Job failure rate is above 10% for the last 10 minutes (current: {{ $value | humanizePercentage }})."

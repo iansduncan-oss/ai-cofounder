@@ -93,6 +93,24 @@ const dlqSizeTotal = new client.Gauge({
   help: "Total jobs in dead letter queue",
 });
 
+const queueJobsCompletedTotal = new client.Counter({
+  name: "queue_jobs_completed_total",
+  help: "Total completed jobs per queue",
+  labelNames: ["queue"] as const,
+});
+
+const queueJobsFailedTotal = new client.Counter({
+  name: "queue_jobs_failed_total",
+  help: "Total failed jobs per queue",
+  labelNames: ["queue"] as const,
+});
+
+const queueStaleJobs = new client.Gauge({
+  name: "queue_stale_jobs",
+  help: "Number of active jobs running longer than 30 minutes per queue",
+  labelNames: ["queue"] as const,
+});
+
 // --- Subagent Metrics ---
 
 const subagentRunsTotal = new client.Counter({
@@ -180,9 +198,13 @@ function startProcessMetrics() {
   return interval;
 }
 
+// Track previous completed/failed counts for counter increments
+const prevCompleted = new Map<string, number>();
+const prevFailed = new Map<string, number>();
+
 async function updateQueueMetrics() {
   try {
-    const { getAllQueueStatus } = await import("@ai-cofounder/queue");
+    const { getAllQueueStatus, getStaleJobCounts } = await import("@ai-cofounder/queue");
     const statuses = await getAllQueueStatus();
     let dlqTotal = 0;
     for (const s of statuses) {
@@ -191,8 +213,33 @@ async function updateQueueMetrics() {
       if (s.name === "dead-letter") {
         dlqTotal = s.waiting + s.failed;
       }
+
+      // Increment counters by delta since last collection
+      const prevC = prevCompleted.get(s.name) ?? 0;
+      if (s.completed > prevC) {
+        queueJobsCompletedTotal.inc({ queue: s.name }, s.completed - prevC);
+      }
+      prevCompleted.set(s.name, s.completed);
+
+      const prevF = prevFailed.get(s.name) ?? 0;
+      if (s.failed > prevF) {
+        queueJobsFailedTotal.inc({ queue: s.name }, s.failed - prevF);
+      }
+      prevFailed.set(s.name, s.failed);
     }
     dlqSizeTotal.set(dlqTotal);
+
+    // Stale job detection
+    const stale = await getStaleJobCounts();
+    // Reset all to 0 first, then set stale ones
+    for (const s of statuses) {
+      if (s.name !== "dead-letter") {
+        queueStaleJobs.set({ queue: s.name }, 0);
+      }
+    }
+    for (const s of stale) {
+      queueStaleJobs.set({ queue: s.name }, s.staleCount);
+    }
   } catch {
     // Redis not available — skip silently
   }

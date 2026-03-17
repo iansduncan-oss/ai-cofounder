@@ -94,7 +94,9 @@ export {
   listDeadLetterJobs,
   retryDeadLetterJob,
   deleteDeadLetterJob,
+  getStaleJobCounts,
   type QueueStatus,
   type JobStatusResult,
   type DeadLetterEntry,
+  type StaleJobCount,
 } from "./helpers.js";

@@ -325,3 +325,46 @@ export async function deleteDeadLetterJob(dlqJobId: string): Promise<void> {
   await job.remove();
   logger.info({ dlqJobId }, "DLQ job deleted");
 }
+
+// ── Stale job detection ──
+
+export interface StaleJobCount {
+  name: string;
+  staleCount: number;
+}
+
+/**
+ * Returns a count of active jobs per queue that have been running longer than `thresholdMs`.
+ */
+export async function getStaleJobCounts(thresholdMs = 30 * 60 * 1000): Promise<StaleJobCount[]> {
+  const queues = [
+    { name: "agent-tasks", queue: getAgentTaskQueue() },
+    { name: "subagent-tasks", queue: getSubagentTaskQueue() },
+    { name: "monitoring", queue: getMonitoringQueue() },
+    { name: "briefings", queue: getBriefingQueue() },
+    { name: "notifications", queue: getNotificationQueue() },
+    { name: "pipelines", queue: getPipelineQueue() },
+    { name: "rag-ingestion", queue: getRagIngestionQueue() },
+    { name: "reflections", queue: getReflectionQueue() },
+    { name: "autonomous-sessions", queue: getAutonomousSessionQueue() },
+  ];
+
+  const now = Date.now();
+  const results: StaleJobCount[] = [];
+
+  for (const { name, queue } of queues) {
+    try {
+      const activeJobs = await queue.getActive();
+      const staleCount = activeJobs.filter(
+        (job) => job.processedOn && now - job.processedOn > thresholdMs,
+      ).length;
+      if (staleCount > 0) {
+        results.push({ name, staleCount });
+      }
+    } catch {
+      // Queue not available — skip
+    }
+  }
+
+  return results;
+}
