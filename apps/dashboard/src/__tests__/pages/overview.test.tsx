@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { OverviewPage } from "@/routes/overview";
 import { renderWithProviders } from "../test-utils";
 
