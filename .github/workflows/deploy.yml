@@ -18,11 +18,9 @@ jobs:
 
     steps:
       - name: Connect to Tailscale
-        uses: tailscale/github-action@v4
+        uses: tailscale/github-action@v3
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Notify deploy started
         env:
@@ -75,18 +73,47 @@ jobs:
           echo "==> Restarting monitoring stack..."
           sudo docker compose -f docker-compose.monitoring.yml up -d
 
-          echo "==> Waiting for health check..."
-          sleep 10
-          if ! curl -sf http://localhost:3100/health; then
-            echo "Health check failed! Attempting rollback..."
+          echo "==> Waiting for health check (up to 30s)..."
+          HEALTHY=false
+          for i in 1 2 3 4 5 6; do
+            sleep 5
+            RESPONSE=$(curl -sf http://localhost:3100/health/deep 2>/dev/null || echo "")
+            if [ -n "$RESPONSE" ] && echo "$RESPONSE" | grep -q '"status".*:.*"ok"'; then
+              echo "Health check passed on attempt $i:"
+              echo "$RESPONSE" | python3 -m json.tool
+              HEALTHY=true
+              break
+            fi
+            echo "Attempt $i/6 failed..."
+            if [ -n "$RESPONSE" ]; then
+              echo "$RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$RESPONSE"
+            fi
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "Health check failed after 6 attempts! Attempting rollback..."
             if [ -n "$PREVIOUS_SHA" ] && sudo docker image inspect ai-cofounder-agent-server:${PREVIOUS_SHA} >/dev/null 2>&1; then
               echo "==> Rolling back to ${PREVIOUS_SHA:0:7}..."
               sudo docker tag ai-cofounder-agent-server:${PREVIOUS_SHA} ai-cofounder-agent-server:latest
               sudo docker tag ai-cofounder-discord-bot:${PREVIOUS_SHA} ai-cofounder-discord-bot:latest
               sudo docker tag ai-cofounder-slack-bot:${PREVIOUS_SHA} ai-cofounder-slack-bot:latest
               sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
-              sleep 10
-              curl -sf http://localhost:3100/health && echo "Rollback successful!" || echo "Rollback also failed!"
+
+              ROLLBACK_OK=false
+              for i in 1 2 3 4 5 6; do
+                sleep 5
+                RESPONSE=$(curl -sf http://localhost:3100/health/deep 2>/dev/null || echo "")
+                if [ -n "$RESPONSE" ] && echo "$RESPONSE" | grep -q '"status".*:.*"ok"'; then
+                  echo "Rollback successful on attempt $i:"
+                  echo "$RESPONSE" | python3 -m json.tool
+                  ROLLBACK_OK=true
+                  break
+                fi
+                echo "Rollback attempt $i/6..."
+              done
+              if [ "$ROLLBACK_OK" != "true" ]; then
+                echo "Rollback also failed after 6 attempts!"
+              fi
             fi
             exit 1
           fi
