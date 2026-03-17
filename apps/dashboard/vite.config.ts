@@ -20,7 +20,7 @@ export default defineConfig({
   },
   build: {
     commonjsOptions: {
-      include: [/api-client/, /node_modules/],
+      include: [/api-client/, /shared/, /node_modules/],
     },
     rollupOptions: {
       output: {
@@ -33,7 +33,7 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    include: ["@ai-cofounder/api-client"],
+    include: ["@ai-cofounder/api-client", "@ai-cofounder/shared"],
   },
   server: {
     proxy: {
