@@ -139,6 +139,70 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
+  /** GET /health/deep — timed per-subsystem health check for deploy verification */
+  app.get("/health/deep", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    const checks: Array<{ name: string; status: string; latencyMs: number; error?: string }> = [];
+    const start = performance.now();
+
+    // Database check
+    const dbStart = performance.now();
+    let dbStatus = "ok";
+    let dbError: string | undefined;
+    try {
+      await app.db.execute(sql`SELECT 1`);
+    } catch (err) {
+      dbStatus = "unreachable";
+      dbError = err instanceof Error ? err.message : String(err);
+    }
+    checks.push({ name: "database", status: dbStatus, latencyMs: Math.round(performance.now() - dbStart), ...(dbError ? { error: dbError } : {}) });
+
+    // Redis check
+    const redisUrl = optionalEnv("REDIS_URL", "");
+    const redisStart = performance.now();
+    let redisStatus: string;
+    let redisError: string | undefined;
+    if (!redisUrl) {
+      redisStatus = "disabled";
+    } else {
+      try {
+        const result = await pingRedis();
+        redisStatus = result === "ok" ? "ok" : "unreachable";
+        if (result !== "ok") redisError = "ping returned: " + result;
+      } catch (err) {
+        redisStatus = "unreachable";
+        redisError = err instanceof Error ? err.message : String(err);
+      }
+    }
+    checks.push({ name: "redis", status: redisStatus, latencyMs: Math.round(performance.now() - redisStart), ...(redisError ? { error: redisError } : {}) });
+
+    // LLM check
+    const llmStart = performance.now();
+    const providers = app.llmRegistry.getProviderHealth();
+    let llmStatus: string;
+    if (providers.length === 0) {
+      llmStatus = "disabled";
+    } else {
+      const available = providers.filter((p) => p.available).length;
+      llmStatus = available === providers.length ? "ok" : "degraded";
+    }
+    checks.push({ name: "llm", status: llmStatus, latencyMs: Math.round(performance.now() - llmStart) });
+
+    const totalLatencyMs = Math.round(performance.now() - start);
+    const overallOk = checks.every((c) => c.status === "ok" || c.status === "disabled");
+
+    if (!overallOk) {
+      reply.code(503);
+    }
+
+    return {
+      status: overallOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      totalLatencyMs,
+      checks,
+    };
+  });
+
   /** GET /api/tools/stats — per-tool execution timing stats */
   app.get("/api/tools/stats", { schema: { tags: ["health"] } }, async () => {
     const stats = await getToolStats(app.db);
