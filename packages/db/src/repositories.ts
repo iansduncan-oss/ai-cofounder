@@ -1003,6 +1003,55 @@ export async function getCostByGoal(
 }
 
 /**
+ * Returns the top most expensive goals by total LLM cost.
+ * JOINs llmUsage with goals to include titles.
+ */
+export async function getTopExpensiveGoals(
+  db: Db,
+  options?: { limit?: number; since?: Date },
+): Promise<
+  Array<{
+    goalId: string;
+    goalTitle: string;
+    totalCostUsd: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    requestCount: number;
+  }>
+> {
+  const limit = options?.limit ?? 10;
+  const conditions = [sql`${llmUsage.goalId} IS NOT NULL`];
+  if (options?.since) {
+    conditions.push(sql`${llmUsage.createdAt} >= ${options.since.toISOString()}`);
+  }
+
+  const rows = await db
+    .select({
+      goalId: llmUsage.goalId,
+      goalTitle: goals.title,
+      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("total_cost_usd"),
+      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("total_input_tokens"),
+      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("total_output_tokens"),
+      requestCount: sql<number>`count(*)::int`.as("request_count"),
+    })
+    .from(llmUsage)
+    .innerJoin(goals, eq(llmUsage.goalId, goals.id))
+    .where(and(...conditions))
+    .groupBy(llmUsage.goalId, goals.title)
+    .orderBy(sql`total_cost_usd desc`)
+    .limit(limit);
+
+  return rows.map((row) => ({
+    goalId: row.goalId!,
+    goalTitle: row.goalTitle,
+    totalCostUsd: Number(row.totalCostUsd) / 1_000_000,
+    totalInputTokens: row.totalInputTokens ?? 0,
+    totalOutputTokens: row.totalOutputTokens ?? 0,
+    requestCount: row.requestCount ?? 0,
+  }));
+}
+
+/**
  * Returns daily cost aggregates for LLM usage within the given date range.
  * Divides microdollar values by 1_000_000 to return USD.
  * Results are ordered ascending by date for chart rendering.

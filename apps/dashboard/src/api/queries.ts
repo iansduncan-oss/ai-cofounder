@@ -89,6 +89,21 @@ export function useBudgetStatus() {
   });
 }
 
+export function useCostByGoal(goalId: string) {
+  return useQuery({
+    queryKey: queryKeys.usage.byGoal(goalId),
+    queryFn: () => apiClient.getCostByGoal(goalId),
+    enabled: !!goalId,
+  });
+}
+
+export function useTopExpensiveGoals(limit?: number) {
+  return useQuery({
+    queryKey: queryKeys.usage.topGoals(limit),
+    queryFn: () => apiClient.getTopExpensiveGoals({ limit }),
+  });
+}
+
 export function useMemories(userId: string) {
   return useQuery({
     queryKey: queryKeys.memories.list(userId),

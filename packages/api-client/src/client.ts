@@ -19,6 +19,8 @@ import type {
   UsageSummary,
   DailyCostResponse,
   BudgetStatusResponse,
+  GoalCostSummary,
+  TopExpensiveGoal,
   StreamEvent,
   StreamEventType,
   PaginationParams,
@@ -470,6 +472,18 @@ export class ApiClient {
 
   getBudgetStatus() {
     return this.request<BudgetStatusResponse>("GET", `/api/usage/budget`);
+  }
+
+  getCostByGoal(goalId: string) {
+    return this.request<GoalCostSummary>("GET", `/api/usage/by-goal/${goalId}`);
+  }
+
+  getTopExpensiveGoals(params?: { limit?: number; since?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.since) qs.set("since", params.since);
+    const query = qs.toString();
+    return this.request<TopExpensiveGoal[]>("GET", `/api/usage/top-goals${query ? `?${query}` : ""}`);
   }
 
   /* ── Dashboard ── */

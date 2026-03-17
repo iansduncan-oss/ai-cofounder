@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useUsage, useProviderHealth, useDailyCost, useBudgetStatus } from "@/api/queries";
+import { useUsage, useProviderHealth, useDailyCost, useBudgetStatus, useTopExpensiveGoals } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { AlertTriangle, Activity, DollarSign, Cpu, Zap, TrendingDown } from "lucide-react";
+import { AlertTriangle, Activity, DollarSign, Cpu, Zap, TrendingDown, Target } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -33,6 +33,7 @@ export function UsagePage() {
   const { data: providerHealthData } = useProviderHealth();
   const { data: dailyData } = useDailyCost(30);
   const { data: budgetData } = useBudgetStatus();
+  const { data: topGoals } = useTopExpensiveGoals(10);
 
   const formatTokens = (n: number) =>
     n >= 1_000_000
@@ -441,6 +442,46 @@ export function UsagePage() {
               </Card>
             )}
           </div>
+
+          {/* Top Expensive Goals */}
+          {topGoals && topGoals.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-1.5">
+                  <Target className="h-3.5 w-3.5" />
+                  Top Expensive Goals
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b text-left text-muted-foreground">
+                        <th className="pb-2 font-medium">Goal</th>
+                        <th className="pb-2 font-medium text-right">Cost</th>
+                        <th className="pb-2 font-medium text-right">Input Tokens</th>
+                        <th className="pb-2 font-medium text-right">Output Tokens</th>
+                        <th className="pb-2 font-medium text-right">Requests</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {topGoals.map((g) => (
+                        <tr key={g.goalId}>
+                          <td className="py-2 font-medium max-w-[300px] truncate" title={g.goalTitle}>
+                            {g.goalTitle}
+                          </td>
+                          <td className="py-2 text-right tabular-nums">${g.totalCostUsd.toFixed(4)}</td>
+                          <td className="py-2 text-right tabular-nums">{formatTokens(g.totalInputTokens)}</td>
+                          <td className="py-2 text-right tabular-nums">{formatTokens(g.totalOutputTokens)}</td>
+                          <td className="py-2 text-right tabular-nums">{g.requestCount}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Provider health table */}
           {providerHealthData && providerHealthData.providers.length > 0 && (

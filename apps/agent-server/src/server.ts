@@ -116,6 +116,8 @@ export function buildServer(registry?: LlmRegistry) {
       taskId: event.metadata?.taskId as string | undefined,
       conversationId: event.metadata?.conversationId as string | undefined,
       metadata: event.metadata,
+    }).then(() => {
+      app.agentEvents?.emit("ws:usage_change");
     }).catch(() => {
       // Usage tracking failures are non-fatal
     });

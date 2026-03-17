@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { getUsageSummary, getCostByDay, getAppSetting } from "@ai-cofounder/db";
+import { getUsageSummary, getCostByDay, getCostByGoal, getTopExpensiveGoals, getAppSetting } from "@ai-cofounder/db";
 import { optionalEnv } from "@ai-cofounder/shared";
 
 export const usageRoutes: FastifyPluginAsync = async (app) => {
@@ -108,4 +108,21 @@ export const usageRoutes: FastifyPluginAsync = async (app) => {
       optimizationSuggestions,
     };
   });
+
+  /** GET /api/usage/by-goal/:id — cost breakdown for a specific goal */
+  app.get<{ Params: { id: string } }>("/by-goal/:id", { schema: { tags: ["usage"] } }, async (request) => {
+    const { id } = request.params;
+    return getCostByGoal(app.db, id);
+  });
+
+  /** GET /api/usage/top-goals?limit=10&since=... — most expensive goals */
+  app.get<{ Querystring: { limit?: string; since?: string } }>(
+    "/top-goals",
+    { schema: { tags: ["usage"] } },
+    async (request) => {
+      const limit = Math.min(parseInt(request.query.limit ?? "10", 10) || 10, 50);
+      const since = request.query.since ? new Date(request.query.since) : undefined;
+      return getTopExpensiveGoals(app.db, { limit, since: since && !isNaN(since.getTime()) ? since : undefined });
+    },
+  );
 };

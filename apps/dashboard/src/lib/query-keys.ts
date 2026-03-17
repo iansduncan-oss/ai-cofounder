@@ -44,6 +44,8 @@ export const queryKeys = {
     summary: (period?: string) => ["usage", period ?? "all"] as const,
     daily: (days?: number) => ["usage", "daily", days ?? 30] as const,
     budget: ["usage", "budget"] as const,
+    byGoal: (goalId: string) => ["usage", "by-goal", goalId] as const,
+    topGoals: (limit?: number) => ["usage", "top-goals", limit ?? 10] as const,
   },
   monitoring: {
     status: ["monitoring", "status"] as const,

@@ -664,6 +664,22 @@ export interface BudgetStatusResponse {
   optimizationSuggestions: string[];
 }
 
+export interface GoalCostSummary {
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  requestCount: number;
+}
+
+export interface TopExpensiveGoal {
+  goalId: string;
+  goalTitle: string;
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  requestCount: number;
+}
+
 export interface AgentMessageItem {
   id: string;
   senderRole: string;

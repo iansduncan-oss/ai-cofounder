@@ -11,7 +11,7 @@ const logger = createLogger("websocket-plugin");
 const VALID_CHANNELS = new Set<string>([
   "tasks", "approvals", "monitoring", "queue", "health",
   "tools", "pipelines", "briefing", "goals", "deploys",
-  "patterns", "context", "journal",
+  "patterns", "context", "journal", "usage",
 ]);
 
 /** Per-connection state */
