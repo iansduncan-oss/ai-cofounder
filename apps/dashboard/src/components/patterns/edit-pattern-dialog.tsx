@@ -73,8 +73,9 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
 
         <div className="space-y-3 py-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Description</label>
+            <label htmlFor="edit-pattern-description" className="mb-1 block text-sm font-medium">Description</label>
             <input
+              id="edit-pattern-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -84,8 +85,9 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Suggested Action</label>
+            <label htmlFor="edit-pattern-action" className="mb-1 block text-sm font-medium">Suggested Action</label>
             <input
+              id="edit-pattern-action"
               type="text"
               value={suggestedAction}
               onChange={(e) => setSuggestedAction(e.target.value)}
@@ -96,8 +98,9 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">Day of Week</label>
+              <label htmlFor="edit-pattern-day" className="mb-1 block text-sm font-medium">Day of Week</label>
               <select
+                id="edit-pattern-day"
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(e.target.value)}
                 className="w-full rounded-md border bg-card px-3 py-1.5 text-sm"
@@ -113,8 +116,9 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Hour Start</label>
+              <label htmlFor="edit-pattern-hour-start" className="mb-1 block text-sm font-medium">Hour Start</label>
               <input
+                id="edit-pattern-hour-start"
                 type="number"
                 min={0}
                 max={23}
@@ -124,8 +128,9 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Hour End</label>
+              <label htmlFor="edit-pattern-hour-end" className="mb-1 block text-sm font-medium">Hour End</label>
               <input
+                id="edit-pattern-hour-end"
                 type="number"
                 min={0}
                 max={23}
@@ -137,15 +142,17 @@ export function EditPatternDialog({ open, onClose, pattern }: EditPatternDialogP
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">
+            <label htmlFor="edit-pattern-confidence" className="mb-1 block text-sm font-medium">
               Confidence: {confidence}%
             </label>
             <input
+              id="edit-pattern-confidence"
               type="range"
               min={0}
               max={100}
               value={confidence}
               onChange={(e) => setConfidence(Number(e.target.value))}
+              aria-label={`Confidence: ${confidence}%`}
               className="w-full"
             />
           </div>

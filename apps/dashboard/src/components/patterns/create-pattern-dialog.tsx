@@ -68,8 +68,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
 
         <div className="space-y-3 py-4">
           <div>
-            <label className="mb-1 block text-sm font-medium">Type</label>
+            <label htmlFor="pattern-type" className="mb-1 block text-sm font-medium">Type</label>
             <select
+              id="pattern-type"
               value={patternType}
               onChange={(e) => setPatternType(e.target.value)}
               className="w-full rounded-md border bg-card px-3 py-1.5 text-sm"
@@ -81,8 +82,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Description</label>
+            <label htmlFor="pattern-description" className="mb-1 block text-sm font-medium">Description</label>
             <input
+              id="pattern-description"
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -93,8 +95,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">Suggested Action</label>
+            <label htmlFor="pattern-action" className="mb-1 block text-sm font-medium">Suggested Action</label>
             <input
+              id="pattern-action"
               type="text"
               value={suggestedAction}
               onChange={(e) => setSuggestedAction(e.target.value)}
@@ -106,8 +109,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
 
           <div className="grid grid-cols-3 gap-2">
             <div>
-              <label className="mb-1 block text-sm font-medium">Day of Week</label>
+              <label htmlFor="pattern-day" className="mb-1 block text-sm font-medium">Day of Week</label>
               <select
+                id="pattern-day"
                 value={dayOfWeek}
                 onChange={(e) => setDayOfWeek(e.target.value)}
                 className="w-full rounded-md border bg-card px-3 py-1.5 text-sm"
@@ -123,8 +127,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Hour Start</label>
+              <label htmlFor="pattern-hour-start" className="mb-1 block text-sm font-medium">Hour Start</label>
               <input
+                id="pattern-hour-start"
                 type="number"
                 min={0}
                 max={23}
@@ -135,8 +140,9 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Hour End</label>
+              <label htmlFor="pattern-hour-end" className="mb-1 block text-sm font-medium">Hour End</label>
               <input
+                id="pattern-hour-end"
                 type="number"
                 min={0}
                 max={23}
@@ -149,15 +155,17 @@ export function CreatePatternDialog({ open, onClose }: CreatePatternDialogProps)
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium">
+            <label htmlFor="pattern-confidence" className="mb-1 block text-sm font-medium">
               Confidence: {confidence}%
             </label>
             <input
+              id="pattern-confidence"
               type="range"
               min={0}
               max={100}
               value={confidence}
               onChange={(e) => setConfidence(Number(e.target.value))}
+              aria-label={`Confidence: ${confidence}%`}
               className="w-full"
             />
           </div>

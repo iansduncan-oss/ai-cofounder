@@ -111,7 +111,7 @@ export function Sidebar() {
 
       <ProjectSwitcher />
 
-      <nav className="flex-1 space-y-1 px-2 py-3">
+      <nav className="flex-1 space-y-1 px-2 py-3" aria-label="Main navigation">
         {navItems.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
@@ -184,13 +184,14 @@ export function Sidebar() {
         className="fixed top-3 left-3 z-50 rounded-md border bg-card p-2 md:hidden"
         onClick={() => setMobileOpen(true)}
         aria-label="Open sidebar"
+        aria-expanded={mobileOpen}
       >
         <Menu className="h-5 w-5" />
       </button>
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden animate-fade-in" />
+        <div className="fixed inset-0 z-40 bg-black/50 md:hidden animate-fade-in" aria-hidden="true" />
       )}
 
       {/* Sidebar — desktop: always visible, mobile: slide-in */}

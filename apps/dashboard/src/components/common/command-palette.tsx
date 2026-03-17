@@ -91,13 +91,16 @@ export function CommandPalette() {
   return (
     <div
       className="fixed inset-0 z-[60] flex items-start justify-center pt-[20vh] bg-black/50 animate-fade-in"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
       onClick={(e) => {
         if (e.target === e.currentTarget) setOpen(false);
       }}
     >
       <div className="w-full max-w-md rounded-lg border bg-card shadow-2xl animate-scale-in">
         <div className="flex items-center gap-2 border-b px-3">
-          <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input
             ref={inputRef}
             type="text"
@@ -105,9 +108,10 @@ export function CommandPalette() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Search pages..."
+            aria-label="Search pages"
             className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
           />
-          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+          <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" aria-hidden="true">
             ESC
           </kbd>
         </div>
@@ -119,6 +123,7 @@ export function CommandPalette() {
                 <button
                   key={cmd.to}
                   onClick={() => handleSelect(cmd.to)}
+                  aria-label={`Go to ${cmd.label}`}
                   className={cn(
                     "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                     i === selectedIndex
@@ -126,7 +131,7 @@ export function CommandPalette() {
                       : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   {cmd.label}
                 </button>
               );

@@ -68,22 +68,25 @@ export function CreateGoalDialog({
 
         <div className="space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
+            <label htmlFor="goal-title" className="mb-1.5 block text-sm font-medium">
               Title <span className="text-destructive">*</span>
             </label>
             <Input
+              id="goal-title"
               placeholder="e.g. Build user authentication system"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
+              aria-required="true"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium">
+            <label htmlFor="goal-description" className="mb-1.5 block text-sm font-medium">
               Description
             </label>
             <Textarea
+              id="goal-description"
               placeholder="Describe the goal in detail..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -93,8 +96,9 @@ export function CreateGoalDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Priority</label>
+              <label htmlFor="goal-priority" className="mb-1.5 block text-sm font-medium">Priority</label>
               <Select
+                id="goal-priority"
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as GoalPriority)}
               >
@@ -106,10 +110,11 @@ export function CreateGoalDialog({
             </div>
 
             <div>
-              <label className="mb-1.5 block text-sm font-medium">
+              <label htmlFor="goal-conversation-id" className="mb-1.5 block text-sm font-medium">
                 Conversation ID
               </label>
               <Input
+                id="goal-conversation-id"
                 value={conversationId}
                 onChange={(e) => setConversationId(e.target.value)}
               />
