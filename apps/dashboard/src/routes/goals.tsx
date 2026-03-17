@@ -69,25 +69,25 @@ export function GoalsPage() {
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search goals..."
             value={search}
             onChange={(e) => setFilter("search", e.target.value)}
-            className="w-60 pl-8"
+            className="w-full sm:w-60 pl-8"
           />
         </div>
         <Input
           placeholder="Conversation ID"
           value={conversationId}
           onChange={(e) => setFilter("conversationId", e.target.value || "default")}
-          className="w-48"
+          className="w-full sm:w-48"
         />
         <Select
           value={statusFilter}
           onChange={(e) => setFilter("status", e.target.value)}
-          className="w-36"
+          className="w-full sm:w-36"
         >
           <option value="all">All statuses</option>
           <option value="draft">Draft</option>
@@ -98,7 +98,7 @@ export function GoalsPage() {
         <Select
           value={priorityFilter}
           onChange={(e) => setFilter("priority", e.target.value)}
-          className="w-36"
+          className="w-full sm:w-36"
         >
           <option value="all">All priorities</option>
           <option value="critical">Critical</option>

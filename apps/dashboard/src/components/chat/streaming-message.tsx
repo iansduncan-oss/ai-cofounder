@@ -37,7 +37,7 @@ export function StreamingMessage({
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20">
         <Bot className="h-4 w-4 text-white" />
       </div>
-      <div className="max-w-[75%] rounded-2xl rounded-tl-sm bg-muted px-4 py-2.5 text-sm shadow-sm">
+      <div className="max-w-[90%] sm:max-w-[75%] rounded-2xl rounded-tl-sm bg-muted px-4 py-2.5 text-sm shadow-sm">
         {toolCalls.length > 0 && (
           <div className="mb-2">
             {toolCalls.map((tc) => (

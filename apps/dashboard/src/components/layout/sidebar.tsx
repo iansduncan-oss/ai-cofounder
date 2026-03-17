@@ -91,6 +91,18 @@ export function Sidebar() {
     return () => document.removeEventListener("keydown", handleKey);
   }, [mobileOpen]);
 
+  // Lock body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
+
   const navContent = (
     <>
       <div className="flex items-center justify-between border-b px-4 py-4">

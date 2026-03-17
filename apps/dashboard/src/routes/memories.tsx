@@ -68,25 +68,25 @@ export function MemoriesPage() {
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search memories..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-60 pl-8"
+            className="w-full sm:w-60 pl-8"
           />
         </div>
         <Input
           placeholder="User ID"
           value={userId}
           onChange={(e) => setUserId(e.target.value || "default")}
-          className="w-48"
+          className="w-full sm:w-48"
         />
         <Select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="w-40"
+          className="w-full sm:w-40"
         >
           <option value="all">All categories</option>
           {categories.map((c) => (

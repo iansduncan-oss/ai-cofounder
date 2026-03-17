@@ -90,7 +90,7 @@ export function CommandPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-start justify-center pt-[20vh] bg-black/50 animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-start justify-center pt-[10vh] sm:pt-[20vh] bg-black/50 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-label="Command palette"
@@ -98,7 +98,7 @@ export function CommandPalette() {
         if (e.target === e.currentTarget) setOpen(false);
       }}
     >
-      <div className="w-full max-w-md rounded-lg border bg-card shadow-2xl animate-scale-in">
+      <div className="mx-3 sm:mx-0 w-full max-w-md rounded-lg border bg-card shadow-2xl animate-scale-in">
         <div className="flex items-center gap-2 border-b px-3">
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <input

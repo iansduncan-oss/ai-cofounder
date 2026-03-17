@@ -63,6 +63,7 @@ export function ChatPage() {
   );
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [mobileConvOpen, setMobileConvOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -277,7 +278,7 @@ export function ChatPage() {
               </div>
             )}
             <div
-              className={`max-w-[75%] px-4 py-2.5 text-sm shadow-sm ${
+              className={`max-w-[90%] sm:max-w-[75%] px-4 py-2.5 text-sm shadow-sm ${
                 msg.role === "user"
                   ? "rounded-2xl rounded-tr-sm bg-primary text-primary-foreground"
                   : "rounded-2xl rounded-tl-sm bg-muted"
@@ -328,12 +329,14 @@ export function ChatPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-3rem)]">
+    <div className="flex h-[calc(100dvh-3rem)]">
       <ConversationSidebar
         userId={dashboardUser?.id}
         activeConversationId={conversationId}
         onSelect={handleSelectConversation}
         onNewChat={handleNewChat}
+        mobileOpen={mobileConvOpen}
+        onMobileClose={() => setMobileConvOpen(false)}
       />
 
       <div className="flex flex-1 flex-col">
@@ -346,6 +349,15 @@ export function ChatPage() {
           }
           actions={
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="md:hidden"
+                onClick={() => setMobileConvOpen(true)}
+                aria-label="Open conversations"
+              >
+                <MessageSquare className="h-4 w-4" />
+              </Button>
               {tts.isAvailable && (
                 <Button
                   variant="ghost"

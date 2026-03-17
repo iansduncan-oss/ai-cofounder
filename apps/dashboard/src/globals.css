@@ -63,6 +63,7 @@ body {
   color: var(--color-foreground);
   font-family:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Light theme overrides */

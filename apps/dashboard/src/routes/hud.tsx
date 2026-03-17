@@ -306,7 +306,7 @@ export function HudPage() {
           </div>
 
           {/* Three-column detail area */}
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {/* Alerts column */}
             <Card>
               <CardHeader className="pb-3">
@@ -465,7 +465,7 @@ export function HudPage() {
           </div>
 
           {/* Bottom row: Queue details + Provider health + Tool stats */}
-          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {/* Queue details */}
             <Card>
               <CardHeader className="pb-3">
