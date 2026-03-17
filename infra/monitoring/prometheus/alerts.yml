@@ -69,3 +69,12 @@ groups:
         annotations:
           summary: "High job failure rate in queue {{ $labels.queue }}"
           description: "Job failure rate is above 10% for the last 10 minutes (current: {{ $value | humanizePercentage }})."
+
+      - alert: BackupStale
+        expr: (time() - backup_last_success_timestamp{job="agent-server"}) > 129600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backup is stale"
+          description: "No successful backup recorded in the last 36 hours."

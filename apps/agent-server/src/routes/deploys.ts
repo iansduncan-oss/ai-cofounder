@@ -22,7 +22,7 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
       body: {
         type: "object",
         properties: {
-          event: { type: "string", enum: ["deploy_started", "deploy_completed", "deploy_failed"] },
+          event: { type: "string", enum: ["deploy_started", "deploy_completed", "deploy_failed", "deploy_rolled_back"] },
           commitSha: { type: "string" },
           shortSha: { type: "string" },
           branch: { type: "string" },
@@ -152,6 +152,20 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
         }
 
         return { id: existing.id, status: "failed" };
+      }
+
+      case "deploy_rolled_back": {
+        const existing = await getDeploymentBySha(db, body.commitSha);
+        if (!existing) {
+          return reply.code(404).send({ error: "Deployment not found" });
+        }
+        await updateDeploymentStatus(db, existing.id, {
+          status: "rolled_back" as Parameters<typeof updateDeploymentStatus>[2]["status"],
+          errorLog: body.error ?? "Auto-rollback after health check failure",
+          completedAt: new Date(),
+        });
+        logger.warn({ deploymentId: existing.id, previousSha: body.previousSha }, "deploy rolled back");
+        return { id: existing.id, status: "rolled_back" };
       }
 
       default:

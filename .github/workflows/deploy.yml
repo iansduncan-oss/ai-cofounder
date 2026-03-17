@@ -150,6 +150,24 @@ jobs:
             -d "{\"event\":\"deploy_failed\",\"commitSha\":\"${COMMIT_SHA}\",\"error\":\"Deploy step failed — check GitHub Actions logs\"}" \
             || true
 
+      - name: Notify deploy rolled back
+        if: failure()
+        env:
+          DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
+          DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          # Read rollback state from deploy step (if it exists)
+          if ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ian@avion-stack-01 "cat /tmp/deploy_state 2>/dev/null" | grep -q "ROLLBACK_STATUS=success"; then
+            ROLLBACK_SHA=$(ssh ian@avion-stack-01 "grep ROLLBACK_SHA /tmp/deploy_state 2>/dev/null | cut -d= -f2" || echo "unknown")
+            curl -sf -X POST "${DEPLOY_WEBHOOK_URL}/api/deploys/webhook" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
+              -d "{\"event\":\"deploy_rolled_back\",\"commitSha\":\"${COMMIT_SHA}\",\"previousSha\":\"${ROLLBACK_SHA}\",\"error\":\"Health check failed, rolled back\"}" \
+              || true
+          fi
+          ssh ian@avion-stack-01 "rm -f /tmp/deploy_state" 2>/dev/null || true
+
       - name: Notify Discord — Success
         if: success()
         env:
@@ -172,6 +190,18 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           SHORT_SHA="${COMMIT_SHA:0:7}"
+          # Check if rollback succeeded
+          ROLLBACK_INFO=$(ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=5 ian@avion-stack-01 "cat /tmp/deploy_state 2>/dev/null" 2>/dev/null || echo "")
+          if echo "$ROLLBACK_INFO" | grep -q "ROLLBACK_STATUS=success"; then
+            ROLLBACK_SHA=$(echo "$ROLLBACK_INFO" | grep ROLLBACK_SHA | cut -d= -f2)
+            TITLE="Deploy Failed — Rolled Back to ${ROLLBACK_SHA}"
+            DESC="Deploy of \`${SHORT_SHA}\` failed health check. Auto-rolled back to \`${ROLLBACK_SHA}\`."
+            COLOR=16744192
+          else
+            TITLE="Deploy FAILED"
+            DESC="AI Cofounder deploy to production failed! Manual intervention may be required."
+            COLOR=15548997
+          fi
           curl -s -H "Content-Type: application/json" \
-            -d "{\"embeds\":[{\"title\":\"Deploy FAILED\",\"description\":\"AI Cofounder deploy to production failed!\",\"color\":15548997,\"fields\":[{\"name\":\"Commit\",\"value\":\"\`${SHORT_SHA}\`\",\"inline\":true},{\"name\":\"Branch\",\"value\":\"main\",\"inline\":true},{\"name\":\"Action\",\"value\":\"[View logs](https://github.com/${REPO}/actions/runs/${RUN_ID})\",\"inline\":false}],\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" \
+            -d "{\"embeds\":[{\"title\":\"${TITLE}\",\"description\":\"${DESC}\",\"color\":${COLOR},\"fields\":[{\"name\":\"Commit\",\"value\":\"\`${SHORT_SHA}\`\",\"inline\":true},{\"name\":\"Branch\",\"value\":\"main\",\"inline\":true},{\"name\":\"Action\",\"value\":\"[View logs](https://github.com/${REPO}/actions/runs/${RUN_ID})\",\"inline\":false}],\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}]}" \
             "$DISCORD_WEBHOOK"

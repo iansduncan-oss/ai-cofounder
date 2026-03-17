@@ -131,6 +131,17 @@ const subagentToolRounds = new client.Histogram({
   buckets: [1, 3, 5, 10, 15, 20, 25],
 });
 
+// --- Backup Metrics ---
+
+export const backupLastSuccessTimestamp = new client.Gauge({
+  name: "backup_last_success_timestamp",
+  help: "Unix timestamp of last successful backup",
+});
+
+export function recordBackupSuccess() {
+  backupLastSuccessTimestamp.set(Date.now() / 1000);
+}
+
 export function recordSubagentMetrics(data: {
   status: string;
   durationMs: number;
