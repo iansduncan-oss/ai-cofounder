@@ -211,6 +211,13 @@
       "when": 1772795000000,
       "tag": "0029_add_app_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1772796000000,
+      "tag": "0030_fix_provider_health_bigint",
+      "breakpoints": true
     }
   ]
 }

@@ -1728,15 +1728,16 @@ export async function listConversationsByUser(
 
 export async function getLatestUserMessageTime(db: Db): Promise<Date | null> {
   const rows = await db
-    .select({ latest: sql<Date>`max(${messages.createdAt})` })
+    .select({ latest: sql<string>`max(${messages.createdAt})` })
     .from(messages)
     .where(eq(messages.role, "user"));
-  return rows[0]?.latest ?? null;
+  const val = rows[0]?.latest;
+  return val ? new Date(val) : null;
 }
 
 export async function getLastUserMessageTimestamp(db: Db, userId: string): Promise<Date | null> {
   const rows = await db
-    .select({ latest: sql<Date>`max(${messages.createdAt})` })
+    .select({ latest: sql<string>`max(${messages.createdAt})` })
     .from(messages)
     .innerJoin(conversations, eq(messages.conversationId, conversations.id))
     .where(
@@ -1745,7 +1746,8 @@ export async function getLastUserMessageTimestamp(db: Db, userId: string): Promi
         eq(messages.role, "user"),
       ),
     );
-  return rows[0]?.latest ?? null;
+  const val = rows[0]?.latest;
+  return val ? new Date(val) : null;
 }
 
 export async function getRecentDecisionMemories(db: Db, userId: string, since: Date) {
