@@ -49,6 +49,12 @@ export interface ContainerStatus {
   memPercent?: number;
 }
 
+export interface BackupHealthStatus {
+  lastBackupAge: number; // hours since last backup
+  lastBackupFile: string;
+  isFresh: boolean; // true if < 36h old
+}
+
 export interface MonitoringReport {
   timestamp: string;
   github?: {
@@ -56,6 +62,7 @@ export interface MonitoringReport {
     openPRs: GitHubPR[];
   };
   vps?: VPSHealthStatus;
+  backup?: BackupHealthStatus;
   alerts: MonitoringAlert[];
 }
 
@@ -279,13 +286,56 @@ export class MonitoringService {
     }
   }
 
+  // ── Backup Health ──
+
+  async checkBackupHealth(): Promise<BackupHealthStatus | null> {
+    if (!this.isVPSConfigured()) return null;
+
+    try {
+      const { execFile } = await import("node:child_process");
+      const { promisify } = await import("node:util");
+      const execFileAsync = promisify(execFile);
+
+      // Find the newest file in the backup directory and get its age in hours
+      const { stdout } = await execFileAsync(
+        "ssh",
+        [
+          "-o", "ConnectTimeout=10",
+          "-o", "StrictHostKeyChecking=accept-new",
+          `${this.vpsUser}@${this.vpsHost}`,
+          "stat -c '%Y %n' /backups/ai-cofounder/latest/db.dump 2>/dev/null || echo 'no-backup'",
+        ],
+        { timeout: 15_000 },
+      );
+
+      const trimmed = stdout.trim();
+      if (trimmed === "no-backup") {
+        return { lastBackupAge: Infinity, lastBackupFile: "none", isFresh: false };
+      }
+
+      const [epochStr, ...fileParts] = trimmed.split(" ");
+      const epochSec = parseInt(epochStr ?? "0", 10);
+      const ageHours = (Date.now() / 1000 - epochSec) / 3600;
+
+      return {
+        lastBackupAge: Math.round(ageHours * 10) / 10,
+        lastBackupFile: fileParts.join(" "),
+        isFresh: ageHours < 36,
+      };
+    } catch (err) {
+      logger.error({ err }, "Failed to check backup health");
+      return null;
+    }
+  }
+
   // ── Full monitoring run ──
 
   async runFullCheck(): Promise<MonitoringReport> {
-    const [ciStatus, openPRs, vpsHealth] = await Promise.all([
+    const [ciStatus, openPRs, vpsHealth, backupHealth] = await Promise.all([
       this.checkGitHubCI(),
       this.checkGitHubPRs(),
       this.checkVPSHealth(),
+      this.checkBackupHealth(),
     ]);
 
     const alerts: MonitoringAlert[] = [];
@@ -372,6 +422,17 @@ export class MonitoringService {
       }
     }
 
+    // Check backup freshness
+    if (backupHealth) {
+      if (!backupHealth.isFresh) {
+        alerts.push({
+          severity: backupHealth.lastBackupAge > 48 ? "critical" : "warning",
+          source: "backup",
+          message: `Backup is ${backupHealth.lastBackupAge === Infinity ? "missing" : `${backupHealth.lastBackupAge}h old`}`,
+        });
+      }
+    }
+
     const report: MonitoringReport = {
       timestamp: new Date().toISOString(),
       alerts,
@@ -382,6 +443,9 @@ export class MonitoringService {
     }
     if (vpsHealth) {
       report.vps = vpsHealth;
+    }
+    if (backupHealth) {
+      report.backup = backupHealth;
     }
 
     // Send critical/warning alerts

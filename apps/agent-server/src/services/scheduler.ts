@@ -24,6 +24,8 @@ import { sendDailyBriefing } from "./briefing.js";
 import type { NotificationService } from "./notifications.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
 import type { AutonomyTierService } from "./autonomy-tier.js";
+import type { MonitoringService } from "./monitoring.js";
+import { recordBackupSuccess } from "../plugins/observability.js";
 
 const logger = createLogger("scheduler");
 
@@ -37,6 +39,7 @@ export interface SchedulerConfig {
   notificationService?: NotificationService;
   messagingService?: AgentMessagingService;
   autonomyTierService?: AutonomyTierService;
+  monitoringService?: MonitoringService;
   pollIntervalMs?: number;
   briefingHour?: number;
   briefingTimezone?: string;
@@ -53,6 +56,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     notificationService,
     messagingService,
     autonomyTierService,
+    monitoringService,
     pollIntervalMs = 60_000,
     briefingHour = 8,
     briefingTimezone = "America/New_York",
@@ -63,6 +67,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
   let lastDecayDate = ""; // "YYYY-MM-DD" to decay once per day
   let lastCheckInHour = -1; // track last hour we ran proactive check-in
   let lastQuietCheckDate = ""; // "YYYY-MM-DD" to send quiet check-in at most once per day
+  let lastBackupCheckDate = ""; // "YYYY-MM-DD" to check backup freshness once per day
 
   /** Run built-in daily system tasks (briefing + memory decay) */
   async function runSystemTasks() {
@@ -112,6 +117,22 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
         await runProactiveCheckIn();
       } catch (err) {
         logger.error({ err }, "proactive check-in failed");
+      }
+    }
+
+    // Backup health check: once per day, update Prometheus gauge if fresh
+    if (lastBackupCheckDate !== dateStr && monitoringService) {
+      lastBackupCheckDate = dateStr;
+      try {
+        const backupHealth = await monitoringService.checkBackupHealth();
+        if (backupHealth?.isFresh) {
+          recordBackupSuccess();
+          logger.info({ ageHours: backupHealth.lastBackupAge }, "backup health verified");
+        } else if (backupHealth) {
+          logger.warn({ ageHours: backupHealth.lastBackupAge }, "backup is stale");
+        }
+      } catch (err) {
+        logger.error({ err }, "backup health check failed");
       }
     }
   }
