@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 vi.mock("@ai-cofounder/shared", () => ({
@@ -38,8 +38,7 @@ const { buildServer } = await import("../server.js");
 describe("Context Routes", () => {
   let app: ReturnType<typeof buildServer>["app"];
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
+  beforeAll(async () => {
     const server = buildServer();
     app = server.app;
     await app.ready();
@@ -47,6 +46,10 @@ describe("Context Routes", () => {
 
   afterAll(async () => {
     if (app) await app.close();
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
   it("GET /api/context/current returns context block", async () => {

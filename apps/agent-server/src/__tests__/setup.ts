@@ -1,7 +1,7 @@
 import { afterAll, afterEach, vi } from "vitest";
+import { snapshotEnv } from "@ai-cofounder/test-utils";
 
-// Snapshot process.env before any test file mutates it
-const envSnapshot = { ...process.env };
+const restoreEnv = snapshotEnv();
 
 // Snapshot globalThis.fetch
 const originalFetch = globalThis.fetch;
@@ -11,15 +11,8 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  // Restore process.env to pre-test state
-  for (const key of Object.keys(process.env)) {
-    if (!(key in envSnapshot)) {
-      delete process.env[key];
-    }
-  }
-  Object.assign(process.env, envSnapshot);
+  restoreEnv();
 
-  // Restore fetch if it was replaced
   if (globalThis.fetch !== originalFetch) {
     globalThis.fetch = originalFetch;
   }

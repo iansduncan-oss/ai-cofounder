@@ -1,3 +1,5 @@
+import { afterAll } from "vitest";
+
 /**
  * Returns a function that restores process.env to the state
  * captured at the time of the call.
@@ -30,15 +32,9 @@ export function setupTestEnv(overrides: Record<string, string> = {}) {
 
   Object.assign(process.env, defaults, overrides);
 
-  // If vitest globals are available, register cleanup
-  if (typeof afterAll === "function") {
-    afterAll(() => {
-      restore();
-    });
-  }
+  afterAll(() => {
+    restore();
+  });
 
   return restore;
 }
-
-// Support vitest globals when available
-declare const afterAll: ((fn: () => void) => void) | undefined;
