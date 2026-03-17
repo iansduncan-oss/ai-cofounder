@@ -57,6 +57,9 @@ export const queryKeys = {
   tools: {
     stats: ["tools", "stats"] as const,
   },
+  errors: {
+    summary: (hours?: number) => ["errors", "summary", hours ?? 24] as const,
+  },
   persona: {
     all: ["persona"] as const,
     active: ["persona", "active"] as const,

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { sql } from "drizzle-orm";
-import { getProviderHealthHistory, getToolStats } from "@ai-cofounder/db";
+import { getProviderHealthHistory, getToolStats, getErrorSummary } from "@ai-cofounder/db";
 import { pingRedis, getAllQueueStatus } from "@ai-cofounder/queue";
 import { optionalEnv } from "@ai-cofounder/shared";
 import { gatherBriefingData, formatBriefing, generateLlmBriefing, sendDailyBriefing } from "../services/briefing.js";
@@ -211,6 +211,25 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
       tools: stats,
     };
   });
+
+  /** GET /api/errors/summary — aggregated error analytics */
+  app.get<{ Querystring: { hours?: string; limit?: string } }>(
+    "/api/errors/summary",
+    { schema: { tags: ["health"] } },
+    async (request) => {
+      const hours = request.query.hours ? parseInt(request.query.hours, 10) : 24;
+      const limit = request.query.limit ? parseInt(request.query.limit, 10) : 20;
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+      const errors = await getErrorSummary(app.db, { since, limit });
+      const totalErrors = errors.reduce((sum, e) => sum + e.count, 0);
+      return {
+        timestamp: new Date().toISOString(),
+        hours,
+        totalErrors,
+        errors,
+      };
+    },
+  );
 
   /** GET /api/briefing — generate and optionally send the daily briefing */
   app.get<{ Querystring: { send?: string } }>(

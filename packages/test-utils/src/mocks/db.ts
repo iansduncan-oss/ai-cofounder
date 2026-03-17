@@ -133,6 +133,7 @@ export function mockDbModule() {
     getProviderHealthHistory: vi.fn().mockResolvedValue([]),
     recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
     getToolStats: vi.fn().mockResolvedValue([]),
+    getErrorSummary: vi.fn().mockResolvedValue([]),
     // Decisions
     listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     // User time

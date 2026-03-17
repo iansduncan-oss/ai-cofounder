@@ -1540,6 +1540,32 @@ export async function getToolStats(db: Db) {
   return rows;
 }
 
+/* ────────────────── Error Summary ──────────────── */
+
+export async function getErrorSummary(
+  db: Db,
+  options?: { since?: Date; limit?: number },
+) {
+  const limit = options?.limit ?? 20;
+  const conditions = [eq(toolExecutions.success, false)];
+  if (options?.since) {
+    conditions.push(gt(toolExecutions.createdAt, options.since));
+  }
+  const rows = await db
+    .select({
+      toolName: toolExecutions.toolName,
+      errorMessage: toolExecutions.errorMessage,
+      count: sql<number>`count(*)::int`,
+      lastSeen: sql<string>`max(${toolExecutions.createdAt})::text`,
+    })
+    .from(toolExecutions)
+    .where(and(...conditions))
+    .groupBy(toolExecutions.toolName, toolExecutions.errorMessage)
+    .orderBy(sql`count(*) desc`)
+    .limit(limit);
+  return rows;
+}
+
 /* ────────────────── Decision Log ──────────────── */
 
 export async function listDecisions(

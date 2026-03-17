@@ -568,6 +568,17 @@ export class ApiClient {
     return this.request<{ timestamp: string; tools: ToolStat[] }>("GET", "/api/tools/stats");
   }
 
+  /* ── Error Analytics ── */
+
+  getErrorSummary(hours = 24) {
+    return this.request<{
+      timestamp: string;
+      hours: number;
+      totalErrors: number;
+      errors: Array<{ toolName: string; errorMessage: string | null; count: number; lastSeen: string }>;
+    }>("GET", `/api/errors/summary?hours=${hours}`);
+  }
+
   /* ── Provider Health History ── */
 
   getProviderHealthHistory(provider?: string) {

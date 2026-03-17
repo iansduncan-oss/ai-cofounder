@@ -8,6 +8,7 @@ import {
   useToolStats,
   usePendingTasks,
   usePendingApprovals,
+  useErrorSummary,
 } from "@/api/queries";
 import { apiClient } from "@/api/client";
 import { PageHeader } from "@/components/layout/page-header";
@@ -180,6 +181,7 @@ export function HudPage() {
   const { data: toolStats } = useToolStats();
   const { data: pendingTasks } = usePendingTasks();
   const { data: approvals } = usePendingApprovals();
+  const { data: errorSummary } = useErrorSummary();
 
   const isLoading = monitoringLoading || queuesLoading;
 
@@ -236,7 +238,7 @@ export function HudPage() {
           </div>
 
           {/* Second row: Pending work */}
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <MetricCard
               label="Pending Tasks"
               value={pendingTasks?.length ?? 0}
@@ -282,6 +284,23 @@ export function HudPage() {
                       ? "warning"
                       : "ok"
                   : "unknown"
+              }
+            />
+            <MetricCard
+              label="Errors (24h)"
+              value={errorSummary?.totalErrors ?? 0}
+              subtext={
+                errorSummary?.errors?.[0]
+                  ? `Top: ${errorSummary.errors[0].toolName}`
+                  : "No errors"
+              }
+              icon={XCircle}
+              status={
+                (errorSummary?.totalErrors ?? 0) > 10
+                  ? "critical"
+                  : (errorSummary?.totalErrors ?? 0) > 0
+                    ? "warning"
+                    : "ok"
               }
             />
           </div>

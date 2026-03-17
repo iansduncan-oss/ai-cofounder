@@ -183,6 +183,14 @@ export function useToolStats() {
   });
 }
 
+export function useErrorSummary(hours = 24) {
+  return useQuery({
+    queryKey: queryKeys.errors.summary(hours),
+    queryFn: () => apiClient.getErrorSummary(hours),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useActivePersona() {
   return useQuery({
     queryKey: queryKeys.persona.active,
