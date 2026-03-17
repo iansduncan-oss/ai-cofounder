@@ -14,6 +14,7 @@
     "format:check": "prettier --check .",
     "test": "turbo run test",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config apps/agent-server/vitest.integration.config.ts",
     "clean": "turbo run clean",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",

@@ -19,3 +19,7 @@ dist/
 .claude/primer.md
 .claude/git-state.md
 .claude/commit-log.md
+.claude/next-session-prompt.md
+
+# Test coverage output
+coverage/
