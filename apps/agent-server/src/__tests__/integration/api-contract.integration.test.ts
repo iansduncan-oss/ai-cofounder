@@ -145,6 +145,33 @@ describe.skipIf(shouldSkip())("API Contract (integration)", () => {
       expect(task.goalId).toBe(goalId);
       expect(task.assignedAgent).toBe("researcher");
     });
+
+    it("includes dependsOn field when created with dependencies", async () => {
+      const goalRes = await app.inject({
+        method: "POST",
+        url: "/api/goals",
+        payload: { conversationId, title: "DependsOn Shape" },
+      });
+      const gId = goalRes.json().id;
+
+      const rootRes = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        payload: { goalId: gId, title: "Dep Root", orderIndex: 0 },
+      });
+      const rootId = rootRes.json().id;
+
+      const depRes = await app.inject({
+        method: "POST",
+        url: "/api/tasks",
+        payload: { goalId: gId, title: "Dep Child", orderIndex: 1, dependsOn: [rootId] },
+      });
+      const task = depRes.json();
+
+      expect(task).toHaveProperty("dependsOn");
+      expect(Array.isArray(task.dependsOn)).toBe(true);
+      expect(task.dependsOn).toEqual([rootId]);
+    });
   });
 
   describe("Approval entity shape", () => {
