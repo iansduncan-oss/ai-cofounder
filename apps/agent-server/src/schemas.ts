@@ -73,6 +73,7 @@ export const CreateTaskBody = Type.Object({
     ]),
   ),
   orderIndex: Type.Optional(Type.Integer({ minimum: 0 })),
+  dependsOn: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
   input: Type.Optional(Type.String()),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });

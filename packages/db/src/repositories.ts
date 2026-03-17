@@ -241,6 +241,7 @@ export async function createTask(
     assignedAgent?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier";
     orderIndex?: number;
     parallelGroup?: number;
+    dependsOn?: string[];
     input?: string;
     metadata?: Record<string, unknown>;
   },

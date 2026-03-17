@@ -30,6 +30,7 @@ export interface Task {
   input?: string;
   output?: string;
   error?: string;
+  dependsOn?: string[];
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
