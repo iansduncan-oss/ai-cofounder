@@ -14,8 +14,11 @@ vi.mock("@ai-cofounder/shared", () => ({
   },
 }));
 
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 let encryptToken: typeof import("../services/crypto.js").encryptToken;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 let decryptToken: typeof import("../services/crypto.js").decryptToken;
+// eslint-disable-next-line @typescript-eslint/consistent-type-imports
 let isEncryptionConfigured: typeof import("../services/crypto.js").isEncryptionConfigured;
 
 beforeEach(async () => {
