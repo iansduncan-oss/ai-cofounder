@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import {
   GoalStatusBadge,
   TaskStatusBadge,
   ApprovalStatusBadge,
 } from "@/components/common/status-badge";
+import { renderWithProviders } from "../test-utils";
 
 describe("GoalStatusBadge", () => {
   it.each([
@@ -12,7 +13,7 @@ describe("GoalStatusBadge", () => {
     ["completed", "Completed"],
     ["cancelled", "Cancelled"],
   ] as const)("renders %s as %s", (status, label) => {
-    render(<GoalStatusBadge status={status} />);
+    renderWithProviders(<GoalStatusBadge status={status} />);
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 });
@@ -26,7 +27,7 @@ describe("TaskStatusBadge", () => {
     ["failed", "Failed"],
     ["cancelled", "Cancelled"],
   ] as const)("renders %s as %s", (status, label) => {
-    render(<TaskStatusBadge status={status} />);
+    renderWithProviders(<TaskStatusBadge status={status} />);
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 });
@@ -37,7 +38,7 @@ describe("ApprovalStatusBadge", () => {
     ["approved", "Approved"],
     ["rejected", "Rejected"],
   ] as const)("renders %s as %s", (status, label) => {
-    render(<ApprovalStatusBadge status={status} />);
+    renderWithProviders(<ApprovalStatusBadge status={status} />);
     expect(screen.getByText(label)).toBeInTheDocument();
   });
 });

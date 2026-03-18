@@ -1,23 +1,23 @@
-import { render, screen } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { screen } from "@testing-library/react";
+import { Routes, Route } from "react-router";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { setAccessToken } from "@/hooks/use-auth";
+import { renderWithProviders } from "../test-utils";
 
-function renderWithRouter() {
-  return render(
-    <MemoryRouter initialEntries={["/dashboard"]}>
-      <Routes>
-        <Route
-          path="/dashboard"
-          element={
-            <AuthGuard>
-              <div>Protected Content</div>
-            </AuthGuard>
-          }
-        />
-        <Route path="/dashboard/login" element={<div>Login Page</div>} />
-      </Routes>
-    </MemoryRouter>,
+function renderGuarded() {
+  return renderWithProviders(
+    <Routes>
+      <Route
+        path="/dashboard"
+        element={
+          <AuthGuard>
+            <div>Protected Content</div>
+          </AuthGuard>
+        }
+      />
+      <Route path="/dashboard/login" element={<div>Login Page</div>} />
+    </Routes>,
+    { initialEntries: ["/dashboard"] },
   );
 }
 
@@ -29,14 +29,14 @@ describe("AuthGuard", () => {
 
   it("renders children when authenticated", () => {
     setAccessToken("valid-jwt-token");
-    renderWithRouter();
+    renderGuarded();
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
     expect(screen.queryByText("Login Page")).not.toBeInTheDocument();
   });
 
   it("redirects to login when no token", () => {
     setAccessToken(null);
-    renderWithRouter();
+    renderGuarded();
     expect(screen.getByText("Login Page")).toBeInTheDocument();
     expect(screen.queryByText("Protected Content")).not.toBeInTheDocument();
   });
