@@ -46,16 +46,16 @@ function createRateLimitBucket() {
   return {
     map,
     check(
-      ip: string,
+      key: string,
       maxRequests: number,
       windowMs: number,
     ): { limited: boolean; remaining: number; resetMs: number } {
       const now = Date.now();
-      let record = map.get(ip);
+      let record = map.get(key);
 
       if (!record || now - record.windowStart > windowMs) {
         record = { count: 0, windowStart: now };
-        map.set(ip, record);
+        map.set(key, record);
       }
 
       record.count += 1;
@@ -69,6 +69,25 @@ function createRateLimitBucket() {
 
 const generalBucket = createRateLimitBucket();
 const expensiveBucket = createRateLimitBucket();
+
+/**
+ * Extract user ID from JWT payload without verifying signature.
+ * JWT verification is handled by the jwtGuardPlugin — this only reads the `sub` claim
+ * for rate-limit bucketing so unauthenticated requests fall back to IP-based limiting.
+ */
+function extractUserIdFromJwt(request: FastifyRequest): string | undefined {
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return undefined;
+  const token = authHeader.slice(7);
+  const parts = token.split(".");
+  if (parts.length !== 3) return undefined;
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
+    return typeof payload.sub === "string" ? payload.sub : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const HONEYPOT_PATHS = [
   "/.env",
@@ -189,11 +208,11 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   const apiSecret = optionalEnv("API_SECRET", "");
   // When JWT_SECRET is set, JWT auth handles protected routes — API_SECRET only applies to bot routes
   const jwtSecret = optionalEnv("JWT_SECRET", "");
-  const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "60"), 10);
+  const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "120"), 10);
   const rateLimitWindowSec = parseInt(optionalEnv("RATE_LIMIT_WINDOW", "60"), 10);
   const rateLimitWindowMs = rateLimitWindowSec * 1000;
-  // Expensive endpoints get a tighter limit (default: 10 per window)
-  const expensiveLimitMax = parseInt(optionalEnv("RATE_LIMIT_EXPENSIVE_MAX", "10"), 10);
+  // Expensive endpoints get a tighter limit (default: 20 per window)
+  const expensiveLimitMax = parseInt(optionalEnv("RATE_LIMIT_EXPENSIVE_MAX", "20"), 10);
 
   if (apiSecret && jwtSecret) {
     logger.info("JWT auth active — API_SECRET limited to bot routes (/api/channels/, /api/webhooks/)");
@@ -243,17 +262,21 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     }
 
     // 5. Rate limiting on /api/* and /voice/chat routes (tighter for expensive endpoints)
+    //    Uses user ID from JWT when available, falls back to IP-based limiting.
     if (url.startsWith("/api/") || url === "/voice/chat") {
       const isExpensive = EXPENSIVE_PATHS.some((p) => url.startsWith(p)) || url === "/voice/chat";
       const bucket = isExpensive ? expensiveBucket : generalBucket;
       const limit = isExpensive ? expensiveLimitMax : rateLimitMax;
-      const { limited, remaining, resetMs } = bucket.check(ip, limit, rateLimitWindowMs);
+      // Prefer user-ID bucketing for authenticated requests (fairer across shared IPs)
+      const userId = extractUserIdFromJwt(request);
+      const bucketKey = userId ? `user:${userId}` : `ip:${ip}`;
+      const { limited, remaining, resetMs } = bucket.check(bucketKey, limit, rateLimitWindowMs);
       reply.header("X-RateLimit-Limit", limit);
       reply.header("X-RateLimit-Remaining", remaining);
       reply.header("X-RateLimit-Reset", Math.ceil(resetMs / 1000));
       if (limited) {
-        logger.debug({ ip, expensive: isExpensive }, "rate limited");
-        reply.code(429).send({ error: "Too many requests" });
+        logger.debug({ ip, userId, expensive: isExpensive }, "rate limited");
+        reply.code(429).send({ error: "Too many requests", retryAfter: Math.ceil(resetMs / 1000) });
         return;
       }
     }

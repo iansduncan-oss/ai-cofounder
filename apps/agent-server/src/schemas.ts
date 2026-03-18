@@ -4,8 +4,8 @@ import { Type, type Static } from "@sinclair/typebox";
 
 export const CreateGoalBody = Type.Object({
   conversationId: Type.String({ format: "uuid" }),
-  title: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
+  title: Type.String({ minLength: 1, maxLength: 500 }),
+  description: Type.Optional(Type.String({ maxLength: 10_000 })),
   priority: Type.Optional(
     Type.Union([
       Type.Literal("low"),
@@ -61,8 +61,8 @@ export type BulkGoalStatusBody = Static<typeof BulkGoalStatusBody>;
 
 export const CreateTaskBody = Type.Object({
   goalId: Type.String({ format: "uuid" }),
-  title: Type.String({ minLength: 1 }),
-  description: Type.Optional(Type.String()),
+  title: Type.String({ minLength: 1, maxLength: 500 }),
+  description: Type.Optional(Type.String({ maxLength: 10_000 })),
   assignedAgent: Type.Optional(
     Type.Union([
       Type.Literal("orchestrator"),
@@ -72,9 +72,9 @@ export const CreateTaskBody = Type.Object({
       Type.Literal("planner"),
     ]),
   ),
-  orderIndex: Type.Optional(Type.Integer({ minimum: 0 })),
-  dependsOn: Type.Optional(Type.Array(Type.String({ format: "uuid" }))),
-  input: Type.Optional(Type.String()),
+  orderIndex: Type.Optional(Type.Integer({ minimum: 0, maximum: 100 })),
+  dependsOn: Type.Optional(Type.Array(Type.String({ format: "uuid" }), { maxItems: 50 })),
+  input: Type.Optional(Type.String({ maxLength: 10_000 })),
   metadata: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 export type CreateTaskBody = Static<typeof CreateTaskBody>;
@@ -135,7 +135,7 @@ export const CreateApprovalBody = Type.Object({
     Type.Literal("reviewer"),
     Type.Literal("planner"),
   ]),
-  reason: Type.String({ minLength: 1 }),
+  reason: Type.String({ minLength: 1, maxLength: 2_000 }),
 });
 export type CreateApprovalBody = Static<typeof CreateApprovalBody>;
 
@@ -154,10 +154,10 @@ export type TaskIdQuery = Static<typeof TaskIdQuery>;
 /* ────────────────────────── Queue ────────────────────────── */
 
 export const EnqueueAgentTaskBody = Type.Object({
-  goalId: Type.String(),
-  prompt: Type.String({ minLength: 1 }),
-  conversationId: Type.Optional(Type.String()),
-  userId: Type.Optional(Type.String()),
+  goalId: Type.String({ format: "uuid" }),
+  prompt: Type.String({ minLength: 1, maxLength: 50_000 }),
+  conversationId: Type.Optional(Type.String({ format: "uuid" })),
+  userId: Type.Optional(Type.String({ format: "uuid" })),
   priority: Type.Optional(
     Type.Union([
       Type.Literal("critical"),
@@ -202,8 +202,8 @@ export const EnqueueNotificationBody = Type.Object({
     Type.Literal("warning"),
     Type.Literal("success"),
   ]),
-  title: Type.String({ minLength: 1 }),
-  message: Type.String({ minLength: 1 }),
+  title: Type.String({ minLength: 1, maxLength: 200 }),
+  message: Type.String({ minLength: 1, maxLength: 5_000 }),
 });
 export type EnqueueNotificationBody = Static<typeof EnqueueNotificationBody>;
 
@@ -211,11 +211,11 @@ export type EnqueueNotificationBody = Static<typeof EnqueueNotificationBody>;
 
 export const UpsertPersonaBody = Type.Object({
   id: Type.Optional(Type.String({ format: "uuid" })),
-  name: Type.String({ minLength: 1 }),
-  voiceId: Type.Optional(Type.String()),
-  corePersonality: Type.String({ minLength: 1 }),
-  capabilities: Type.Optional(Type.String()),
-  behavioralGuidelines: Type.Optional(Type.String()),
+  name: Type.String({ minLength: 1, maxLength: 100 }),
+  voiceId: Type.Optional(Type.String({ maxLength: 200 })),
+  corePersonality: Type.String({ minLength: 1, maxLength: 5_000 }),
+  capabilities: Type.Optional(Type.String({ maxLength: 5_000 })),
+  behavioralGuidelines: Type.Optional(Type.String({ maxLength: 5_000 })),
   isActive: Type.Optional(Type.Boolean()),
 });
 export type UpsertPersonaBody = Static<typeof UpsertPersonaBody>;
@@ -230,13 +230,13 @@ const PipelineStageSchema = Type.Object({
     Type.Literal("debugger"),
     Type.Literal("researcher"),
   ]),
-  prompt: Type.String({ minLength: 1 }),
+  prompt: Type.String({ minLength: 1, maxLength: 10_000 }),
   dependsOnPrevious: Type.Boolean({ default: false }),
 });
 
 export const CreatePipelineBody = Type.Object({
   goalId: Type.String({ format: "uuid" }),
-  stages: Type.Array(PipelineStageSchema, { minItems: 1 }),
+  stages: Type.Array(PipelineStageSchema, { minItems: 1, maxItems: 20 }),
   context: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 export type CreatePipelineBody = Static<typeof CreatePipelineBody>;
@@ -280,7 +280,7 @@ export const RagIngestBody = Type.Object({
 export type RagIngestBody = Static<typeof RagIngestBody>;
 
 export const RagSearchBody = Type.Object({
-  query: Type.String({ minLength: 1 }),
+  query: Type.String({ minLength: 1, maxLength: 2_000 }),
   limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 100 })),
   sourceType: Type.Optional(RagSourceType),
   minScore: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),

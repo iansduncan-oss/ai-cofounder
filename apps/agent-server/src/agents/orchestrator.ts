@@ -350,6 +350,43 @@ export class Orchestrator {
     this.browserService = options.browserService;
   }
 
+  /**
+   * Call registry.complete with retry on transient failures (429/503).
+   * Exponential backoff: 2s, 4s. Max 2 retries.
+   */
+  private async completeWithRetry(
+    ...args: Parameters<LlmRegistry["complete"]>
+  ): ReturnType<LlmRegistry["complete"]> {
+    const MAX_RETRIES = 2;
+    const BASE_DELAY_MS = 2000;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        return await this.registry.complete(...args);
+      } catch (err: unknown) {
+        const isRetryable =
+          err instanceof Error &&
+          (/429|rate.limit/i.test(err.message) ||
+            /503|service.unavailable/i.test(err.message) ||
+            /ECONNRESET|ECONNREFUSED|timeout/i.test(err.message));
+
+        if (!isRetryable || attempt === MAX_RETRIES) {
+          throw err;
+        }
+
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        this.logger.warn(
+          { attempt: attempt + 1, delay, error: (err as Error).message },
+          "LLM call failed, retrying",
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    // Unreachable, but TypeScript needs it
+    throw new Error("completeWithRetry: exhausted retries");
+  }
+
   async run(
     message: string,
     conversationId?: string,
@@ -503,12 +540,12 @@ export class Orchestrator {
       let totalOutputTokens = 0;
       let plan: PlanResult | undefined;
       // Agentic tool-use loop
-      let response = await this.registry.complete(this.taskCategory, {
+      let response = await this.completeWithRetry(this.taskCategory, {
         system: systemPrompt,
         messages,
         tools,
         max_tokens: 4096,
-        metadata: { agentRole: "orchestrator", conversationId: id },
+        metadata: { agentRole: "orchestrator", conversationId: id, userId },
       });
 
       totalInputTokens += response.usage.inputTokens;
@@ -544,12 +581,12 @@ export class Orchestrator {
         messages.push({ role: "assistant", content: response.content });
         messages.push({ role: "user", content: toolResults });
 
-        response = await this.registry.complete(this.taskCategory, {
+        response = await this.completeWithRetry(this.taskCategory, {
           system: systemPrompt,
           messages,
           tools,
           max_tokens: 4096,
-          metadata: { agentRole: "orchestrator", conversationId: id },
+          metadata: { agentRole: "orchestrator", conversationId: id, userId },
         });
 
         totalInputTokens += response.usage.inputTokens;
@@ -714,7 +751,7 @@ export class Orchestrator {
       await onEvent({ type: "thinking", data: { round: 1, message: "Generating response..." } });
 
       if (signal?.aborted) throw new Error("Request aborted");
-      let response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
+      let response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
       totalInputTokens += response.usage.inputTokens;
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
@@ -746,7 +783,7 @@ export class Orchestrator {
 
         await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
         if (signal?.aborted) throw new Error("Request aborted");
-        response = await this.registry.complete(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
+        response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
         totalInputTokens += response.usage.inputTokens;
         totalOutputTokens += response.usage.outputTokens;
       }

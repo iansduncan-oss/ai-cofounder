@@ -263,6 +263,7 @@ export const llmUsage = pgTable("llm_usage", {
   inputTokens: integer("input_tokens").notNull(),
   outputTokens: integer("output_tokens").notNull(),
   estimatedCostUsd: integer("estimated_cost_usd_micros").notNull().default(0), // cost in microdollars ($0.000001)
+  userId: uuid("user_id"),
   goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
   conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),

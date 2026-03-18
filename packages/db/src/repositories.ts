@@ -951,6 +951,7 @@ export async function recordLlmUsage(
     agentRole?: AgentRole;
     inputTokens: number;
     outputTokens: number;
+    userId?: string;
     goalId?: string;
     taskId?: string;
     conversationId?: string;

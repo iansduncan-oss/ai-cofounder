@@ -112,6 +112,7 @@ export function buildServer(registry?: LlmRegistry) {
       agentRole: event.metadata?.agentRole as AgentRole | undefined,
       inputTokens: event.inputTokens,
       outputTokens: event.outputTokens,
+      userId: event.metadata?.userId as string | undefined,
       goalId: event.metadata?.goalId as string | undefined,
       taskId: event.metadata?.taskId as string | undefined,
       conversationId: event.metadata?.conversationId as string | undefined,
@@ -392,12 +393,29 @@ export function buildServer(registry?: LlmRegistry) {
     }
   });
 
-  // Global error handler — normalize all error responses
-  app.setErrorHandler((error: Error & { statusCode?: number }, _request, reply) => {
+  // Global error handler — normalize all error responses, differentiate retryable errors
+  app.setErrorHandler((error: Error & { statusCode?: number; code?: string }, _request, reply) => {
     const statusCode = error.statusCode ?? 500;
+    const isConnectionError =
+      error.code === "ECONNREFUSED" ||
+      error.code === "ECONNRESET" ||
+      error.code === "EPIPE" ||
+      error.message?.includes("connection") ||
+      error.message?.includes("Connection terminated");
+
     if (statusCode >= 500) {
-      logger.error({ err: error }, "unhandled server error");
+      logger.error({ err: error, code: error.code }, "unhandled server error");
     }
+
+    if (isConnectionError) {
+      reply.status(503).send({
+        error: "Service temporarily unavailable",
+        statusCode: 503,
+        retryable: true,
+      });
+      return;
+    }
+
     reply.status(statusCode).send({
       error: statusCode >= 500 ? "Internal Server Error" : error.message,
       statusCode,
