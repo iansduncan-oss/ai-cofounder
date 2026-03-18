@@ -218,6 +218,27 @@
       "when": 1772796000000,
       "tag": "0030_fix_provider_health_bigint",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1772797000000,
+      "tag": "0031_add_llm_usage_user_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1772798000000,
+      "tag": "0032_add_google_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1772799000000,
+      "tag": "0033_add_goal_scope_and_proposed",
+      "breakpoints": true
     }
   ]
 }

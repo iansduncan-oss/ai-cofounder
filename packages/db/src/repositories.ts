@@ -1545,9 +1545,9 @@ export async function upsertProviderHealth(
     .onConflictDoUpdate({
       target: providerHealth.providerName,
       set: {
-        requestCount: sql`${providerHealth.requestCount} + ${data.requestCount}`,
-        successCount: sql`${providerHealth.successCount} + ${data.successCount}`,
-        errorCount: sql`${providerHealth.errorCount} + ${data.errorCount}`,
+        requestCount: data.requestCount,
+        successCount: data.successCount,
+        errorCount: data.errorCount,
         avgLatencyMs: data.avgLatencyMs,
         lastErrorMessage: data.lastErrorMessage,
         lastErrorAt: data.lastErrorAt,
