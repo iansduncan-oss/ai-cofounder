@@ -80,6 +80,7 @@ import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";
 import type { MonitoringService } from "../services/monitoring.js";
 import type { BrowserService } from "../services/browser.js";
+import type { GmailService } from "../services/gmail.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -315,6 +316,7 @@ export interface OrchestratorOptions {
   projectRegistryService?: ProjectRegistryService;
   monitoringService?: MonitoringService;
   browserService?: BrowserService;
+  gmailService?: GmailService;
 }
 
 /* ── Orchestrator class ── */
@@ -333,6 +335,7 @@ export class Orchestrator {
   private projectRegistryService?: ProjectRegistryService;
   private monitoringService?: MonitoringService;
   private browserService?: BrowserService;
+  private gmailService?: GmailService;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -348,6 +351,7 @@ export class Orchestrator {
     this.projectRegistryService = options.projectRegistryService;
     this.monitoringService = options.monitoringService;
     this.browserService = options.browserService;
+    this.gmailService = options.gmailService;
   }
 
   /**
@@ -533,6 +537,7 @@ export class Orchestrator {
       projectRegistryService: this.projectRegistryService,
       monitoringService: this.monitoringService,
       browserService: this.browserService,
+      gmailService: this.gmailService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -741,6 +746,7 @@ export class Orchestrator {
       projectRegistryService: this.projectRegistryService,
       monitoringService: this.monitoringService,
       browserService: this.browserService,
+      gmailService: this.gmailService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -1037,6 +1043,7 @@ export class Orchestrator {
           projectRegistryService: this.projectRegistryService,
           monitoringService: this.monitoringService,
           browserService: this.browserService,
+          gmailService: this.gmailService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

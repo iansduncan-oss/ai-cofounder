@@ -75,6 +75,14 @@ import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
 import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import {
+  LIST_EMAILS_TOOL,
+  READ_EMAIL_TOOL,
+  SEARCH_EMAILS_TOOL,
+  DRAFT_REPLY_TOOL,
+  SEND_EMAIL_TOOL,
+} from "./tools/gmail-tools.js";
+import { GmailService } from "../services/gmail.js";
+import {
   createRegisteredProject,
   getRegisteredProjectByName,
   updateConversationMetadata,
@@ -101,6 +109,7 @@ export interface ToolExecutorServices {
   projectRegistryService?: ProjectRegistryService;
   monitoringService?: MonitoringService;
   browserService?: BrowserService;
+  gmailService?: GmailService;
 }
 
 export interface ToolExecutorContext {
@@ -195,6 +204,14 @@ export function buildSharedToolList(
 
   if (services.browserService?.available) {
     add(BROWSER_ACTION_TOOL);
+  }
+
+  if (services.gmailService) {
+    add(LIST_EMAILS_TOOL);
+    add(READ_EMAIL_TOOL);
+    add(SEARCH_EMAILS_TOOL);
+    add(DRAFT_REPLY_TOOL);
+    add(SEND_EMAIL_TOOL);
   }
 
   return tools;
@@ -886,6 +903,51 @@ export async function executeSharedTool(
       if (!browserService?.available) return { error: "Browser automation not available" };
       const input = block.input as unknown as BrowserActionInput;
       return browserService.execute(input);
+    }
+
+    /* ── Gmail tools ── */
+
+    case "list_emails": {
+      if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
+      const gmail = services.gmailService ?? new GmailService(db, context.userId);
+      const { maxResults } = block.input as { maxResults?: number };
+      const emails = await gmail.listInbox(Math.min(maxResults ?? 10, 20));
+      return { emails, count: emails.length };
+    }
+
+    case "read_email": {
+      if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
+      const gmail = services.gmailService ?? new GmailService(db, context.userId);
+      const { messageId } = block.input as { messageId: string };
+      if (!messageId) return { error: "messageId is required" };
+      return gmail.getMessage(messageId);
+    }
+
+    case "search_emails": {
+      if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
+      const gmail = services.gmailService ?? new GmailService(db, context.userId);
+      const { query, maxResults } = block.input as { query: string; maxResults?: number };
+      if (!query) return { error: "query is required" };
+      const emails = await gmail.searchEmails(query, Math.min(maxResults ?? 10, 20));
+      return { emails, count: emails.length };
+    }
+
+    case "draft_reply": {
+      if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
+      const gmail = services.gmailService ?? new GmailService(db, context.userId);
+      const input = block.input as { to: string; subject: string; body: string; cc?: string; threadId?: string; inReplyTo?: string };
+      if (!input.to || !input.subject || !input.body) return { error: "to, subject, and body are required" };
+      const draft = await gmail.createDraft(input);
+      return { success: true, draftId: draft.id };
+    }
+
+    case "send_email": {
+      if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
+      const gmail = services.gmailService ?? new GmailService(db, context.userId);
+      const input = block.input as { to: string; subject: string; body: string; cc?: string; threadId?: string };
+      if (!input.to || !input.subject || !input.body) return { error: "to, subject, and body are required" };
+      const sent = await gmail.sendEmail(input);
+      return { success: true, messageId: sent.id, threadId: sent.threadId };
     }
 
     default:
