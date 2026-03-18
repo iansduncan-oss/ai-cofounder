@@ -23,7 +23,8 @@ export interface Conversation {
 
 /* ── Goal / Task / Approval types ── */
 
-export type GoalStatus = "draft" | "active" | "completed" | "cancelled" | "needs_review";
+export type GoalStatus = "draft" | "proposed" | "active" | "completed" | "cancelled" | "needs_review";
+export type GoalScope = "read_only" | "local" | "external" | "destructive";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
 export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
@@ -35,6 +36,8 @@ export interface Goal {
   description?: string;
   status: GoalStatus;
   priority: GoalPriority;
+  scope?: GoalScope;
+  requiresApproval?: boolean;
   createdBy?: string;
   metadata?: Record<string, unknown>;
   createdAt: Date;

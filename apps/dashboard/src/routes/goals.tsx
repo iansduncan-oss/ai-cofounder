@@ -91,6 +91,7 @@ export function GoalsPage() {
         >
           <option value="all">All statuses</option>
           <option value="draft">Draft</option>
+          <option value="proposed">Proposed</option>
           <option value="active">Active</option>
           <option value="completed">Completed</option>
           <option value="cancelled">Cancelled</option>

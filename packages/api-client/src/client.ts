@@ -281,6 +281,14 @@ export class ApiClient {
     return this.request<Goal>("POST", `/api/goals/${id}/clone`);
   }
 
+  approveGoal(id: string) {
+    return this.request<Goal>("POST", `/api/goals/${id}/approve`);
+  }
+
+  rejectGoal(id: string, reason?: string) {
+    return this.request<Goal>("POST", `/api/goals/${id}/reject`, reason ? { reason } : undefined);
+  }
+
   /* ── Tasks ── */
 
   createTask(data: {

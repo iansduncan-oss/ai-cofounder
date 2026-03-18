@@ -95,7 +95,7 @@ export const toolTierConfig = pgTable("tool_tier_config", {
 
 /* ── Goal / Task / Approval enums ── */
 
-export const goalStatusEnum = pgEnum("goal_status", ["draft", "active", "completed", "cancelled", "needs_review"]);
+export const goalStatusEnum = pgEnum("goal_status", ["draft", "proposed", "active", "completed", "cancelled", "needs_review"]);
 
 export const goalPriorityEnum = pgEnum("goal_priority", ["low", "medium", "high", "critical"]);
 
@@ -151,6 +151,8 @@ export const goals = pgTable("goals", {
   description: text("description"),
   status: goalStatusEnum("status").notNull().default("draft"),
   priority: goalPriorityEnum("priority").notNull().default("medium"),
+  scope: text("scope"),
+  requiresApproval: boolean("requires_approval").notNull().default(false),
   createdBy: uuid("created_by").references(() => users.id),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

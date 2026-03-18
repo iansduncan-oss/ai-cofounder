@@ -80,6 +80,39 @@ export function useUpdateGoalStatus() {
   });
 }
 
+export function useApproveGoal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.approveGoal(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+      toast.success("Goal approved — execution can now proceed");
+    },
+    onError: (err) => {
+      toast.error(`Failed to approve goal: ${err.message}`);
+    },
+  });
+}
+
+export function useRejectGoal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      apiClient.rejectGoal(id, reason),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.detail(id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+      toast.success("Goal rejected");
+    },
+    onError: (err) => {
+      toast.error(`Failed to reject goal: ${err.message}`);
+    },
+  });
+}
+
 export function useRunAgent() {
   return useMutation({
     mutationFn: (data: {

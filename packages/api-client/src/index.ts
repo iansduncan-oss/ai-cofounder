@@ -9,6 +9,7 @@ export {
 export type {
   AgentRole,
   GoalStatus,
+  GoalScope,
   GoalPriority,
   TaskStatus,
   ApprovalStatus,

@@ -1,8 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
+import { createLogger } from "@ai-cofounder/shared";
 import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, createTask } from "@ai-cofounder/db";
 import { getJobStatus } from "@ai-cofounder/queue";
 import { CreateGoalBody, UpdateGoalStatusBody, BulkGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 import { recordActionSafe } from "../services/action-recorder.js";
+
+const logger = createLogger("goal-routes");
 
 export const goalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create a goal */
@@ -135,6 +138,50 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       }
 
       return reply.status(201).send(cloned);
+    },
+  );
+
+  /* POST /:id/approve — approve a proposed goal for execution */
+  app.post<{ Params: typeof IdParams.static }>(
+    "/:id/approve",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const goal = await getGoal(app.db, request.params.id);
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      if (goal.status !== "proposed") {
+        return reply.status(409).send({ error: `Cannot approve goal with status "${goal.status}" — must be "proposed"` });
+      }
+
+      const updated = await updateGoalStatus(app.db, goal.id, "active");
+      logger.info({ goalId: goal.id }, "Proposed goal approved");
+
+      if (app.wsBroadcast) {
+        app.wsBroadcast("goals");
+      }
+
+      return updated;
+    },
+  );
+
+  /* POST /:id/reject — reject a proposed goal */
+  app.post<{ Params: typeof IdParams.static; Body: { reason?: string } }>(
+    "/:id/reject",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const goal = await getGoal(app.db, request.params.id);
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      if (goal.status !== "proposed") {
+        return reply.status(409).send({ error: `Cannot reject goal with status "${goal.status}" — must be "proposed"` });
+      }
+
+      const updated = await updateGoalStatus(app.db, goal.id, "cancelled");
+      logger.info({ goalId: goal.id, reason: request.body?.reason }, "Proposed goal rejected");
+
+      if (app.wsBroadcast) {
+        app.wsBroadcast("goals");
+      }
+
+      return updated;
     },
   );
 

@@ -1,7 +1,7 @@
 /* ── API response types ── */
 
-import type { AgentRole, GoalStatus } from "@ai-cofounder/shared";
-export type { AgentRole, GoalStatus } from "@ai-cofounder/shared";
+import type { AgentRole, GoalStatus, GoalScope } from "@ai-cofounder/shared";
+export type { AgentRole, GoalStatus, GoalScope } from "@ai-cofounder/shared";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
 export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
@@ -13,6 +13,8 @@ export interface Goal {
   description?: string;
   status: GoalStatus;
   priority: GoalPriority;
+  scope?: GoalScope;
+  requiresApproval?: boolean;
   createdBy?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;

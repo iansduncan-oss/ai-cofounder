@@ -3,6 +3,7 @@ import type { GoalStatus, TaskStatus, ApprovalStatus } from "@ai-cofounder/api-c
 
 const goalStatusConfig: Record<GoalStatus, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }> = {
   draft: { label: "Draft", variant: "secondary" },
+  proposed: { label: "Proposed", variant: "warning" },
   active: { label: "Active", variant: "default" },
   completed: { label: "Completed", variant: "success" },
   cancelled: { label: "Cancelled", variant: "destructive" },

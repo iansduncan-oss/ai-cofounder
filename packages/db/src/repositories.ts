@@ -164,6 +164,8 @@ export async function createGoal(
     createdBy?: string;
     metadata?: Record<string, unknown>;
     milestoneId?: string;
+    scope?: string;
+    requiresApproval?: boolean;
   },
 ) {
   const [goal] = await db.insert(goals).values(data).returning();
@@ -201,10 +203,24 @@ export async function countGoalsByConversation(db: Db, conversationId: string): 
   return rows[0]?.count ?? 0;
 }
 
+export async function updateGoalScope(
+  db: Db,
+  id: string,
+  scope: string,
+  requiresApproval: boolean,
+) {
+  const [updated] = await db
+    .update(goals)
+    .set({ scope, requiresApproval, updatedAt: new Date() })
+    .where(eq(goals.id, id))
+    .returning();
+  return updated ?? null;
+}
+
 export async function updateGoalStatus(
   db: Db,
   id: string,
-  status: "draft" | "active" | "completed" | "cancelled" | "needs_review",
+  status: "draft" | "proposed" | "active" | "completed" | "cancelled" | "needs_review",
 ) {
   const [updated] = await db
     .update(goals)

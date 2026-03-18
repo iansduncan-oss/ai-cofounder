@@ -9,7 +9,7 @@ import type {
   EmbeddingService,
 } from "@ai-cofounder/llm";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
+import type { AgentRole, AgentMessage, GoalScope } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { retrieve, formatContext } from "@ai-cofounder/rag";
 import {
@@ -73,7 +73,8 @@ import type { StreamCallback } from "./stream-events.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
-import { notifyApprovalCreated } from "../services/notifications.js";
+import { notifyApprovalCreated, notifyGoalProposed } from "../services/notifications.js";
+import { classifyGoalScope, scopeRequiresApproval } from "../services/scope-classifier.js";
 import { buildSharedToolList, executeSharedTool, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
@@ -98,6 +99,8 @@ import { enqueueSubagentTask } from "@ai-cofounder/queue";
 export interface PlanResult {
   goalId: string;
   goalTitle: string;
+  scope?: GoalScope;
+  requiresApproval?: boolean;
   tasks: Array<{
     id: string;
     title: string;
@@ -185,6 +188,15 @@ const CREATE_PLAN_TOOL: LlmTool = {
         type: "string",
         description: "Optional milestone ID to associate this goal with (from create_milestone)",
       },
+      scope: {
+        type: "string",
+        enum: ["read_only", "local", "external", "destructive"],
+        description:
+          "Estimated scope of the plan's side effects: " +
+          "read_only (only reads data), local (modifies local files/code), " +
+          "external (sends emails, deploys, pushes code), destructive (deletes data, drops tables). " +
+          "Plans with external or destructive scope require human approval before execution.",
+      },
     },
     required: ["goal_title", "goal_description", "goal_priority", "tasks"],
   },
@@ -250,6 +262,7 @@ interface CreatePlanInput {
   goal_description: string;
   goal_priority: "low" | "medium" | "high" | "critical";
   milestone_id?: string;
+  scope?: GoalScope;
   tasks: Array<{
     title: string;
     description: string;
@@ -1097,6 +1110,10 @@ export class Orchestrator {
       validateDependencyGraph(input.tasks);
     }
 
+    // Classify scope — server-side keyword analysis merged with optional LLM hint
+    const scope = classifyGoalScope(input.tasks, input.scope);
+    const requiresApproval = scopeRequiresApproval(scope);
+
     const goal = await createGoal(db, {
       conversationId,
       title: input.goal_title,
@@ -1104,9 +1121,13 @@ export class Orchestrator {
       priority: input.goal_priority,
       createdBy: userId,
       milestoneId: input.milestone_id,
+      scope,
+      requiresApproval,
     });
 
-    await updateGoalStatus(db, goal.id, "active");
+    // If approval required → "proposed"; otherwise → "active"
+    const initialStatus = requiresApproval ? "proposed" : "active";
+    await updateGoalStatus(db, goal.id, initialStatus);
 
     const createdTasks: PlanResult["tasks"] = [];
 
@@ -1143,9 +1164,21 @@ export class Orchestrator {
       }
     }
 
+    // Fire-and-forget notification for proposed goals
+    if (requiresApproval) {
+      notifyGoalProposed({
+        goalId: goal.id,
+        goalTitle: goal.title,
+        scope,
+        taskCount: createdTasks.length,
+      }).catch((err) => this.logger.warn({ err }, "Failed to notify goal proposed"));
+    }
+
     return {
       goalId: goal.id,
       goalTitle: goal.title,
+      scope,
+      requiresApproval,
       tasks: createdTasks,
     };
   }
@@ -1155,6 +1188,12 @@ export class Orchestrator {
       .map((t, i) => `${i + 1}. ${t.title} (${t.assignedAgent})`)
       .join("\n");
 
-    return `Plan created: ${plan.goalTitle}\n\nTasks:\n${taskLines}`;
+    let summary = `Plan created: ${plan.goalTitle}\n\nTasks:\n${taskLines}`;
+
+    if (plan.requiresApproval) {
+      summary += `\n\n⚠️ This plan has **${plan.scope}** scope and requires human approval before execution. Status: proposed.`;
+    }
+
+    return summary;
   }
 }

@@ -1,4 +1,5 @@
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import type { GoalScope } from "@ai-cofounder/shared";
 
 const logger = createLogger("notifications");
 
@@ -36,6 +37,13 @@ interface GoalProgressNotification {
   completedTasks: number;
   totalTasks: number;
   status: "started" | "completed" | "failed";
+}
+
+interface GoalProposedNotification {
+  goalId: string;
+  goalTitle: string;
+  scope: GoalScope;
+  taskCount: number;
 }
 
 interface NotificationConfig {
@@ -285,6 +293,74 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
+  /** Notify that a goal was proposed and needs approval before execution */
+  async notifyGoalProposed(notification: GoalProposedNotification): Promise<void> {
+    const scopeEmoji = notification.scope === "destructive" ? "\u{1F6A8}" : "\u26A0\uFE0F";
+    const scopeLabel = notification.scope.charAt(0).toUpperCase() + notification.scope.slice(1);
+
+    const slackPromise = this.hasSlack()
+      ? this.sendSlack(
+          this.slackChannel,
+          `${scopeEmoji} Goal proposed: ${notification.goalTitle}`,
+          [
+            {
+              type: "header",
+              text: { type: "plain_text", text: `${scopeEmoji} Goal Needs Approval` },
+            },
+            {
+              type: "section",
+              text: {
+                type: "mrkdwn",
+                text: `*${notification.goalTitle}*\nScope: \`${scopeLabel}\` · ${notification.taskCount} task(s)`,
+              },
+            },
+            {
+              type: "actions",
+              elements: [
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Approve" },
+                  style: "primary",
+                  action_id: "goal_approve",
+                  value: notification.goalId,
+                },
+                {
+                  type: "button",
+                  text: { type: "plain_text", text: "Reject" },
+                  style: "danger",
+                  action_id: "goal_reject",
+                  value: notification.goalId,
+                },
+              ],
+            },
+            {
+              type: "context",
+              elements: [
+                {
+                  type: "mrkdwn",
+                  text: `Goal: \`${notification.goalId.slice(0, 8)}…\``,
+                },
+              ],
+            },
+          ],
+        )
+      : Promise.resolve();
+
+    const discordColor = notification.scope === "destructive" ? 0xed4245 : 0xfee75c;
+    const discordPromise = this.hasDiscord()
+      ? this.sendDiscord([
+          {
+            title: `${scopeEmoji} Goal Needs Approval: ${notification.goalTitle}`,
+            description: `Scope: **${scopeLabel}** · ${notification.taskCount} task(s)\n\nApprove or reject via the dashboard.`,
+            color: discordColor,
+            footer: { text: `Goal: ${notification.goalId.slice(0, 8)}…` },
+          },
+        ])
+      : Promise.resolve();
+
+    await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
   /** Notify about goals that have gone stale (no updates in 48h+) */
   async notifyStaleGoals(goals: Array<{ title: string; hoursStale: number }>): Promise<void> {
     const goalList = goals
@@ -512,4 +588,9 @@ export function createNotificationService(): NotificationService {
 export async function notifyApprovalCreated(approval: ApprovalNotification): Promise<void> {
   const service = createNotificationService();
   await service.notifyApprovalCreated(approval);
+}
+
+export async function notifyGoalProposed(notification: GoalProposedNotification): Promise<void> {
+  const service = createNotificationService();
+  await service.notifyGoalProposed(notification);
 }

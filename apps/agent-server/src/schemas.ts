@@ -22,6 +22,7 @@ export type CreateGoalBody = Static<typeof CreateGoalBody>;
 export const UpdateGoalStatusBody = Type.Object({
   status: Type.Union([
     Type.Literal("draft"),
+    Type.Literal("proposed"),
     Type.Literal("active"),
     Type.Literal("completed"),
     Type.Literal("cancelled"),
@@ -46,6 +47,7 @@ export const BulkGoalStatusBody = Type.Object({
       id: Type.String({ format: "uuid" }),
       status: Type.Union([
         Type.Literal("draft"),
+        Type.Literal("proposed"),
         Type.Literal("active"),
         Type.Literal("completed"),
         Type.Literal("cancelled"),

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link } from "react-router";
 import { useGoal, useTasks } from "@/api/queries";
-import { useUpdateGoalStatus } from "@/api/mutations";
+import { useUpdateGoalStatus, useApproveGoal, useRejectGoal } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { ExecutionPanel } from "@/components/goals/execution-panel";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDate } from "@/lib/utils";
-import { ChevronRight, AlertTriangle, XCircle } from "lucide-react";
+import { ChevronRight, AlertTriangle, XCircle, CheckCircle, ShieldAlert } from "lucide-react";
 import type { GoalStatus } from "@ai-cofounder/api-client";
 
 export function GoalDetailPage() {
@@ -27,6 +27,8 @@ export function GoalDetailPage() {
   const { data: tasksData, isLoading: tasksLoading } = useTasks(id!);
   const tasks = tasksData?.data;
   const updateStatus = useUpdateGoalStatus();
+  const approveGoal = useApproveGoal();
+  const rejectGoal = useRejectGoal();
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -80,6 +82,7 @@ export function GoalDetailPage() {
     : [];
 
   const canCancel = goal.status === "active" || goal.status === "draft";
+  const isProposed = goal.status === "proposed";
 
   return (
     <div>
@@ -101,6 +104,28 @@ export function GoalDetailPage() {
         description={goal.description}
         actions={
           <div className="flex items-center gap-2">
+            {isProposed && (
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => approveGoal.mutate(id!)}
+                  disabled={approveGoal.isPending}
+                >
+                  <CheckCircle className="mr-1 h-3 w-3" />
+                  {approveGoal.isPending ? "Approving..." : "Approve"}
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => rejectGoal.mutate({ id: id! })}
+                  disabled={rejectGoal.isPending}
+                >
+                  <XCircle className="mr-1 h-3 w-3" />
+                  {rejectGoal.isPending ? "Rejecting..." : "Reject"}
+                </Button>
+              </>
+            )}
             {canCancel && (
               <Button
                 variant="destructive"
@@ -184,6 +209,17 @@ export function GoalDetailPage() {
                 <span className="text-muted-foreground">Priority</span>
                 <p className="font-medium capitalize">{goal.priority}</p>
               </div>
+              {goal.scope && (
+                <div>
+                  <span className="text-muted-foreground">Scope</span>
+                  <p className="font-medium capitalize flex items-center gap-1">
+                    {(goal.scope === "external" || goal.scope === "destructive") && (
+                      <ShieldAlert className="h-3.5 w-3.5 text-warning" />
+                    )}
+                    {goal.scope}
+                  </p>
+                </div>
+              )}
               <div>
                 <span className="text-muted-foreground">Created</span>
                 <p className="font-medium">{formatDate(goal.createdAt)}</p>

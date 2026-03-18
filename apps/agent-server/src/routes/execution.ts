@@ -44,6 +44,13 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(404).send({ error: `Goal not found: ${id}` });
       }
 
+      // Block execution of proposed goals — they need approval first
+      if (goal.status === "proposed") {
+        return reply.status(409).send({
+          error: "Goal is proposed and requires approval before execution. Approve it first via POST /api/goals/:id/approve",
+        });
+      }
+
       // Enqueue job to BullMQ — returns immediately with jobId
       const jobId = await enqueueAgentTask({
         goalId: id,

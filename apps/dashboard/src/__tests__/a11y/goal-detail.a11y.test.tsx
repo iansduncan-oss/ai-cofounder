@@ -14,6 +14,8 @@ vi.mock("@/api/queries", () => ({
 
 vi.mock("@/api/mutations", () => ({
   useUpdateGoalStatus: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
+  useApproveGoal: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
+  useRejectGoal: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 import { useGoal, useTasks } from "@/api/queries";

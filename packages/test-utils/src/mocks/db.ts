@@ -38,6 +38,7 @@ export function mockDbModule() {
     listGoalBacklog: vi.fn().mockResolvedValue([]),
     listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
     updateGoalStatus: vi.fn().mockResolvedValue({}),
+    updateGoalScope: vi.fn().mockResolvedValue({}),
     updateGoalMetadata: vi.fn().mockResolvedValue({}),
     // Tasks
     createTask: vi.fn().mockResolvedValue({ id: "task-1", title: "Test Task" }),

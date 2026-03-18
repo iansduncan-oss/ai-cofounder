@@ -86,6 +86,8 @@ vi.mock("@/api/queries", () => ({
 vi.mock("@/api/mutations", () => ({
   useUpdateGoalStatus: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
   useAcceptSuggestion: vi.fn().mockReturnValue({ mutateAsync: vi.fn() }),
+  useApproveGoal: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
+  useRejectGoal: vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/use-stream-chat", () => ({
