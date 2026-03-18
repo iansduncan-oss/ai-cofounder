@@ -2,8 +2,22 @@ import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { findAdminByEmail, createAdminUser } from "@ai-cofounder/db";
-import { optionalEnv } from "@ai-cofounder/shared";
+import { findAdminByEmail, createAdminUser, upsertGoogleToken } from "@ai-cofounder/db";
+import { optionalEnv, createLogger } from "@ai-cofounder/shared";
+import { encryptToken, isEncryptionConfigured } from "../services/crypto.js";
+import { getGoogleConnectionStatus, disconnectGoogle } from "../services/google-auth.js";
+
+const logger = createLogger("auth");
+
+const GOOGLE_SCOPES = [
+  "openid",
+  "email",
+  "profile",
+  "https://www.googleapis.com/auth/gmail.readonly",
+  "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.compose",
+  "https://www.googleapis.com/auth/calendar",
+].join(" ");
 
 const LoginBody = Type.Object({
   email: Type.String({ format: "email", maxLength: 255 }),
@@ -138,10 +152,10 @@ export async function authRoutes(app: FastifyInstance) {
       client_id: config.clientId,
       redirect_uri: config.redirectUri,
       response_type: "code",
-      scope: "openid email profile",
+      scope: GOOGLE_SCOPES,
       state,
       access_type: "offline",
-      prompt: "select_account",
+      prompt: "consent", // Forces refresh token grant
     });
 
     return reply.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
@@ -179,7 +193,12 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       // Exchange authorization code for tokens
-      let tokenData: { access_token?: string };
+      let tokenData: {
+        access_token?: string;
+        refresh_token?: string;
+        expires_in?: number;
+        scope?: string;
+      };
       try {
         const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
           method: "POST",
@@ -197,7 +216,7 @@ export async function authRoutes(app: FastifyInstance) {
           return reply.redirect("/dashboard/login?error=oauth_token_exchange");
         }
 
-        tokenData = (await tokenRes.json()) as { access_token?: string };
+        tokenData = (await tokenRes.json()) as typeof tokenData;
       } catch {
         return reply.redirect("/dashboard/login?error=oauth_token_exchange");
       }
@@ -235,6 +254,23 @@ export async function authRoutes(app: FastifyInstance) {
         });
       }
 
+      // Persist encrypted Google tokens for Gmail/Calendar access
+      if (tokenData.refresh_token && isEncryptionConfigured()) {
+        try {
+          const expiresAt = new Date(Date.now() + (tokenData.expires_in ?? 3600) * 1000);
+          await upsertGoogleToken(app.db, {
+            adminUserId: admin.id,
+            accessTokenEncrypted: encryptToken(tokenData.access_token),
+            refreshTokenEncrypted: encryptToken(tokenData.refresh_token),
+            expiresAt,
+            scopes: tokenData.scope ?? GOOGLE_SCOPES,
+          });
+          logger.info({ adminUserId: admin.id }, "Google OAuth tokens stored");
+        } catch (err) {
+          logger.warn({ err }, "Failed to store Google tokens (non-fatal)");
+        }
+      }
+
       // Issue JWT + refresh cookie (same as password login)
       const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
 
@@ -255,4 +291,34 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.redirect(`/dashboard/auth/callback?token=${encodeURIComponent(accessToken)}`);
     },
   );
+
+  /**
+   * GET /api/auth/google/status
+   * Returns whether the user has connected Google (requires JWT).
+   */
+  app.get("/google/status", async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const { sub } = request.user as { sub: string };
+    const status = await getGoogleConnectionStatus(app.db, sub);
+    return reply.send(status);
+  });
+
+  /**
+   * DELETE /api/auth/google/disconnect
+   * Revokes Google tokens and removes from DB (requires JWT).
+   */
+  app.delete("/google/disconnect", async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const { sub } = request.user as { sub: string };
+    await disconnectGoogle(app.db, sub);
+    return reply.send({ success: true });
+  });
 }

@@ -38,6 +38,7 @@ import {
   registeredProjects,
   projectDependencies,
   pipelineTemplates,
+  googleTokens,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -2067,6 +2068,47 @@ export async function countAdminUsers(db: Db): Promise<number> {
     .select({ count: sql<number>`count(*)::int` })
     .from(adminUsers);
   return rows[0]?.count ?? 0;
+}
+
+/* ────────────────────── Google OAuth Tokens ─────────────────────── */
+
+export async function upsertGoogleToken(
+  db: Db,
+  data: {
+    adminUserId: string;
+    accessTokenEncrypted: string;
+    refreshTokenEncrypted: string;
+    expiresAt: Date;
+    scopes: string;
+  },
+) {
+  const [row] = await db
+    .insert(googleTokens)
+    .values(data)
+    .onConflictDoUpdate({
+      target: googleTokens.adminUserId,
+      set: {
+        accessTokenEncrypted: data.accessTokenEncrypted,
+        refreshTokenEncrypted: data.refreshTokenEncrypted,
+        expiresAt: data.expiresAt,
+        scopes: data.scopes,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function getGoogleToken(db: Db, adminUserId: string) {
+  const rows = await db
+    .select()
+    .from(googleTokens)
+    .where(eq(googleTokens.adminUserId, adminUserId));
+  return rows[0] ?? undefined;
+}
+
+export async function deleteGoogleToken(db: Db, adminUserId: string) {
+  await db.delete(googleTokens).where(eq(googleTokens.adminUserId, adminUserId));
 }
 
 /* ────────────────────── Subagent Runs ─────────────────────── */
