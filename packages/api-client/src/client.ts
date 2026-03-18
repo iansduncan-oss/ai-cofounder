@@ -65,6 +65,15 @@ import type {
   CreateProjectDependencyInput,
   AppSettings,
   UpdateBudgetInput,
+  GmailMessageSummary,
+  GmailMessage,
+  GmailThread,
+  SendEmailInput,
+  CalendarEventSummary,
+  CalendarEvent,
+  CreateCalendarEventInput,
+  UpdateCalendarEventInput,
+  FreeBusyResponse,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1090,6 +1099,112 @@ export class ApiClient {
 
   async updateBudgetThresholds(data: UpdateBudgetInput): Promise<void> {
     await this.request<void>("PUT", "/api/settings/budget", data);
+  }
+
+  /* ── Gmail ── */
+
+  listGmailMessages(params?: { maxResults?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.maxResults != null) qs.set("maxResults", String(params.maxResults));
+    const query = qs.toString();
+    return this.request<{ messages: GmailMessageSummary[] }>(
+      "GET",
+      `/api/gmail/messages${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getGmailMessage(messageId: string) {
+    return this.request<GmailMessage>("GET", `/api/gmail/messages/${messageId}`);
+  }
+
+  getGmailThread(threadId: string) {
+    return this.request<GmailThread>("GET", `/api/gmail/threads/${threadId}`);
+  }
+
+  searchGmail(query: string, maxResults?: number) {
+    const qs = new URLSearchParams({ q: query });
+    if (maxResults != null) qs.set("maxResults", String(maxResults));
+    return this.request<{ messages: GmailMessageSummary[] }>(
+      "GET",
+      `/api/gmail/search?${qs}`,
+    );
+  }
+
+  getGmailUnreadCount() {
+    return this.request<{ unreadCount: number }>("GET", "/api/gmail/unread-count");
+  }
+
+  createGmailDraft(input: SendEmailInput) {
+    return this.request<{ id: string; messageId: string }>("POST", "/api/gmail/drafts", input);
+  }
+
+  sendGmailMessage(input: SendEmailInput) {
+    return this.request<{ id: string; threadId: string }>("POST", "/api/gmail/send", input);
+  }
+
+  sendGmailDraft(draftId: string) {
+    return this.request<{ id: string; threadId: string }>(
+      "POST",
+      `/api/gmail/drafts/${draftId}/send`,
+    );
+  }
+
+  markGmailRead(messageId: string) {
+    return this.request<{ success: boolean }>(
+      "POST",
+      `/api/gmail/messages/${messageId}/read`,
+    );
+  }
+
+  /* ── Calendar ── */
+
+  listCalendarEvents(params?: { timeMin?: string; timeMax?: string; maxResults?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.timeMin) qs.set("timeMin", params.timeMin);
+    if (params?.timeMax) qs.set("timeMax", params.timeMax);
+    if (params?.maxResults != null) qs.set("maxResults", String(params.maxResults));
+    const query = qs.toString();
+    return this.request<{ events: CalendarEventSummary[] }>(
+      "GET",
+      `/api/calendar/events${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getCalendarEvent(eventId: string) {
+    return this.request<CalendarEvent>("GET", `/api/calendar/events/${eventId}`);
+  }
+
+  searchCalendarEvents(query: string, maxResults?: number) {
+    const qs = new URLSearchParams({ q: query });
+    if (maxResults != null) qs.set("maxResults", String(maxResults));
+    return this.request<{ events: CalendarEventSummary[] }>(
+      "GET",
+      `/api/calendar/events/search?${qs}`,
+    );
+  }
+
+  createCalendarEvent(input: CreateCalendarEventInput) {
+    return this.request<CalendarEvent>("POST", "/api/calendar/events", input);
+  }
+
+  updateCalendarEvent(eventId: string, input: UpdateCalendarEventInput) {
+    return this.request<CalendarEvent>("PATCH", `/api/calendar/events/${eventId}`, input);
+  }
+
+  deleteCalendarEvent(eventId: string) {
+    return this.request<{ success: boolean }>("DELETE", `/api/calendar/events/${eventId}`);
+  }
+
+  respondToCalendarEvent(eventId: string, responseStatus: "accepted" | "declined" | "tentative") {
+    return this.request<{ success: boolean; eventId: string }>(
+      "POST",
+      `/api/calendar/events/${eventId}/respond`,
+      { responseStatus },
+    );
+  }
+
+  getFreeBusy(timeMin: string, timeMax: string) {
+    return this.request<FreeBusyResponse>("POST", "/api/calendar/free-busy", { timeMin, timeMax });
   }
 
   /* ── Database ── */

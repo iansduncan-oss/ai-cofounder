@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -428,5 +428,81 @@ export function useDeleteProject() {
     onError: (err) => {
       toast.error(`Failed to delete project: ${err.message}`);
     },
+  });
+}
+
+export function useSendGmailMessage() {
+  return useMutation({
+    mutationFn: (input: SendEmailInput) => apiClient.sendGmailMessage(input),
+    onSuccess: () => { toast.success("Email sent"); },
+    onError: (err) => { toast.error(`Failed to send email: ${err.message}`); },
+  });
+}
+
+export function useCreateGmailDraft() {
+  return useMutation({
+    mutationFn: (input: SendEmailInput) => apiClient.createGmailDraft(input),
+    onSuccess: () => { toast.success("Draft saved"); },
+    onError: (err) => { toast.error(`Failed to create draft: ${err.message}`); },
+  });
+}
+
+export function useMarkGmailRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => apiClient.markGmailRead(messageId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.gmail.all });
+    },
+  });
+}
+
+export function useCreateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateCalendarEventInput) => apiClient.createCalendarEvent(input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+      toast.success("Event created");
+    },
+    onError: (err) => { toast.error(`Failed to create event: ${err.message}`); },
+  });
+}
+
+export function useUpdateCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, ...input }: UpdateCalendarEventInput & { eventId: string }) =>
+      apiClient.updateCalendarEvent(eventId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+      toast.success("Event updated");
+    },
+    onError: (err) => { toast.error(`Failed to update event: ${err.message}`); },
+  });
+}
+
+export function useDeleteCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: string) => apiClient.deleteCalendarEvent(eventId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+      toast.success("Event deleted");
+    },
+    onError: (err) => { toast.error(`Failed to delete event: ${err.message}`); },
+  });
+}
+
+export function useRespondToCalendarEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ eventId, responseStatus }: { eventId: string; responseStatus: "accepted" | "declined" | "tentative" }) =>
+      apiClient.respondToCalendarEvent(eventId, responseStatus),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
+      toast.success("RSVP sent");
+    },
+    onError: (err) => { toast.error(`Failed to RSVP: ${err.message}`); },
   });
 }

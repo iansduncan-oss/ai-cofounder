@@ -71,6 +71,12 @@ const AutonomousSessionsPage = lazy(() =>
 const DlqPage = lazy(() =>
   import("./dlq").then((m) => ({ default: m.DlqPage })),
 );
+const GmailPage = lazy(() =>
+  import("./gmail").then((m) => ({ default: m.GmailPage })),
+);
+const CalendarPage = lazy(() =>
+  import("./calendar").then((m) => ({ default: m.CalendarPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -105,6 +111,8 @@ export const router = createBrowserRouter([
       { path: "notifications", element: <NotificationsPage /> },
       { path: "autonomous", element: <AutonomousSessionsPage /> },
       { path: "dlq", element: <DlqPage /> },
+      { path: "gmail", element: <GmailPage /> },
+      { path: "calendar", element: <CalendarPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

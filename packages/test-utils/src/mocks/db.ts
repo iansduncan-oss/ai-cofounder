@@ -196,6 +196,11 @@ export function mockDbModule() {
     reflections: {},
     adminUsers: {},
     subagentRuns: {},
+    // Google tokens
+    getGoogleToken: vi.fn().mockResolvedValue(null),
+    upsertGoogleToken: vi.fn().mockResolvedValue({}),
+    deleteGoogleToken: vi.fn().mockResolvedValue(undefined),
+    googleTokens: {},
     // Agent messages
     sendAgentMessage: vi.fn().mockResolvedValue({ id: "am-1" }),
     getAgentInbox: vi.fn().mockResolvedValue([]),

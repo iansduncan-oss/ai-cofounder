@@ -199,6 +199,8 @@ export function buildServer(registry?: LlmRegistry) {
         { name: "rag", description: "RAG ingestion and search" },
         { name: "reflections", description: "Self-improvement reflections" },
         { name: "patterns", description: "User pattern management" },
+        { name: "gmail", description: "Gmail integration" },
+        { name: "calendar", description: "Google Calendar integration" },
       ],
     },
   });

@@ -447,6 +447,49 @@ export async function handleScheduleCreate(
   }
 }
 
+export async function handleGmailInbox(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const [inbox, unread] = await Promise.all([
+      client.listGmailMessages({ maxResults: 10 }),
+      client.getGmailUnreadCount(),
+    ]);
+
+    if (inbox.messages.length === 0) {
+      return { type: "info", message: "Your inbox is empty." };
+    }
+
+    return {
+      type: "gmail_inbox",
+      data: {
+        messages: inbox.messages.map((m) => ({
+          from: m.from,
+          subject: m.subject,
+          date: m.date,
+          isUnread: m.isUnread,
+        })),
+        unreadCount: unread.unreadCount,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch Gmail inbox. Is your Google account connected?" };
+  }
+}
+
+export async function handleGmailSend(
+  client: ApiClient,
+  input: { to: string; subject: string; body: string },
+): Promise<HandlerResult> {
+  try {
+    await client.sendGmailMessage(input);
+    return {
+      type: "gmail_send",
+      data: { to: input.to, subject: input.subject },
+    };
+  } catch {
+    return { type: "error", message: "Failed to send email. Is your Google account connected?" };
+  }
+}
+
 export async function handleListApprovals(client: ApiClient): Promise<HandlerResult> {
   try {
     const approvals = await client.listPendingApprovals();

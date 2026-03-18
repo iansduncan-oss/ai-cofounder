@@ -25,6 +25,8 @@ import {
   Bell,
   PlayCircle,
   Inbox,
+  Mail,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -41,6 +43,8 @@ const navItems = [
   { to: "/dashboard/goals", icon: Target, label: "Goals" },
   { to: "/dashboard/approvals", icon: ShieldCheck, label: "Approvals" },
   { to: "/dashboard/chat", icon: MessageSquare, label: "Chat" },
+  { to: "/dashboard/gmail", icon: Mail, label: "Gmail" },
+  { to: "/dashboard/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/dashboard/memories", icon: Brain, label: "Memories" },
   { to: "/dashboard/milestones", icon: Milestone, label: "Milestones" },
   { to: "/dashboard/activity", icon: Activity, label: "Activity" },

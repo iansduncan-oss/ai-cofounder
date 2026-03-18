@@ -108,6 +108,18 @@ export interface ScheduleCreateResult {
   description?: string;
 }
 
+/** Structured result from gmail inbox command */
+export interface GmailInboxResult {
+  messages: Array<{ from: string; subject: string; date: string; isUnread: boolean }>;
+  unreadCount: number;
+}
+
+/** Structured result from gmail send command */
+export interface GmailSendResult {
+  to: string;
+  subject: string;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
@@ -124,6 +136,8 @@ export type HandlerResult =
   | { type: "help"; data: HelpResult }
   | { type: "schedule_list"; data: ScheduleListResult }
   | { type: "schedule_create"; data: ScheduleCreateResult }
+  | { type: "gmail_inbox"; data: GmailInboxResult }
+  | { type: "gmail_send"; data: GmailSendResult }
   | { type: "info"; message: string }
   | { type: "error"; message: string };
 

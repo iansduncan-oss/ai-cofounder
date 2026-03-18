@@ -301,3 +301,65 @@ export function useAutonomousSessions(limit = 20) {
     refetchInterval: 30_000,
   });
 }
+
+export function useGmailInbox(maxResults?: number) {
+  return useQuery({
+    queryKey: [...queryKeys.gmail.inbox, maxResults ?? "default"] as const,
+    queryFn: () => apiClient.listGmailMessages(maxResults ? { maxResults } : undefined),
+  });
+}
+
+export function useGmailMessage(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.gmail.message(id ?? ""),
+    queryFn: () => apiClient.getGmailMessage(id!),
+    enabled: !!id,
+  });
+}
+
+export function useGmailThread(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.gmail.thread(id ?? ""),
+    queryFn: () => apiClient.getGmailThread(id!),
+    enabled: !!id,
+  });
+}
+
+export function useGmailSearch(q: string) {
+  return useQuery({
+    queryKey: queryKeys.gmail.search(q),
+    queryFn: () => apiClient.searchGmail(q),
+    enabled: q.length > 0,
+  });
+}
+
+export function useGmailUnreadCount() {
+  return useQuery({
+    queryKey: queryKeys.gmail.unreadCount,
+    queryFn: () => apiClient.getGmailUnreadCount(),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCalendarEvents(params?: { timeMin?: string; timeMax?: string; maxResults?: number }) {
+  return useQuery({
+    queryKey: [...queryKeys.calendar.events, params ?? "default"] as const,
+    queryFn: () => apiClient.listCalendarEvents(params),
+  });
+}
+
+export function useCalendarEvent(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.calendar.event(id ?? ""),
+    queryFn: () => apiClient.getCalendarEvent(id!),
+    enabled: !!id,
+  });
+}
+
+export function useCalendarSearch(q: string) {
+  return useQuery({
+    queryKey: queryKeys.calendar.search(q),
+    queryFn: () => apiClient.searchCalendarEvents(q),
+    enabled: q.length > 0,
+  });
+}

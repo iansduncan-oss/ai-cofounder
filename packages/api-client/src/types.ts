@@ -762,6 +762,112 @@ export interface CreateProjectDependencyInput {
   description?: string;
 }
 
+/* ── Gmail ── */
+
+export interface GmailMessageSummary {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string;
+  subject: string;
+  snippet: string;
+  date: string;
+  isUnread: boolean;
+  hasAttachments: boolean;
+  labels: string[];
+}
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string;
+  cc: string;
+  subject: string;
+  body: string;
+  bodyHtml: string;
+  date: string;
+  isUnread: boolean;
+  attachments: Array<{ filename: string; mimeType: string; size: number }>;
+  labels: string[];
+}
+
+export interface GmailThread {
+  id: string;
+  messages: GmailMessage[];
+  subject: string;
+  participants: string[];
+  messageCount: number;
+}
+
+export interface SendEmailInput {
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string;
+  inReplyTo?: string;
+  threadId?: string;
+}
+
+/* ── Calendar ── */
+
+export interface CalendarEventSummary {
+  id: string;
+  summary: string;
+  start: string;
+  end: string;
+  isAllDay: boolean;
+  location?: string;
+  status: string;
+  attendeeCount: number;
+}
+
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  start: { dateTime?: string; date?: string; timeZone?: string };
+  end: { dateTime?: string; date?: string; timeZone?: string };
+  status: string;
+  htmlLink: string;
+  attendees?: Array<{
+    email: string;
+    displayName?: string;
+    responseStatus: string;
+    self?: boolean;
+  }>;
+  organizer?: { email: string; displayName?: string; self?: boolean };
+  created: string;
+  updated: string;
+}
+
+export interface CreateCalendarEventInput {
+  summary: string;
+  start: string;
+  end: string;
+  description?: string;
+  location?: string;
+  attendees?: string[];
+  timeZone?: string;
+}
+
+export interface UpdateCalendarEventInput {
+  summary?: string;
+  start?: string;
+  end?: string;
+  description?: string;
+  location?: string;
+  attendees?: string[];
+  timeZone?: string;
+}
+
+export interface FreeBusyResponse {
+  timeMin: string;
+  timeMax: string;
+  busy: Array<{ start: string; end: string }>;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

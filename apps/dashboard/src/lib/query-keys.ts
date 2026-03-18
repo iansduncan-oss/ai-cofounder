@@ -116,4 +116,18 @@ export const queryKeys = {
     all: ["settings"] as const,
     current: ["settings", "current"] as const,
   },
+  gmail: {
+    all: ["gmail"] as const,
+    inbox: ["gmail", "inbox"] as const,
+    message: (id: string) => ["gmail", "message", id] as const,
+    thread: (id: string) => ["gmail", "thread", id] as const,
+    search: (q: string) => ["gmail", "search", q] as const,
+    unreadCount: ["gmail", "unread-count"] as const,
+  },
+  calendar: {
+    all: ["calendar"] as const,
+    events: ["calendar", "events"] as const,
+    event: (id: string) => ["calendar", "event", id] as const,
+    search: (q: string) => ["calendar", "search", q] as const,
+  },
 };

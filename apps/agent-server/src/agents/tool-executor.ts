@@ -81,7 +81,18 @@ import {
   DRAFT_REPLY_TOOL,
   SEND_EMAIL_TOOL,
 } from "./tools/gmail-tools.js";
+import {
+  LIST_CALENDAR_EVENTS_TOOL,
+  GET_CALENDAR_EVENT_TOOL,
+  SEARCH_CALENDAR_EVENTS_TOOL,
+  GET_FREE_BUSY_TOOL,
+  CREATE_CALENDAR_EVENT_TOOL,
+  UPDATE_CALENDAR_EVENT_TOOL,
+  DELETE_CALENDAR_EVENT_TOOL,
+  RESPOND_TO_CALENDAR_EVENT_TOOL,
+} from "./tools/calendar-tools.js";
 import { GmailService } from "../services/gmail.js";
+import { CalendarService } from "../services/calendar.js";
 import {
   createRegisteredProject,
   getRegisteredProjectByName,
@@ -110,6 +121,7 @@ export interface ToolExecutorServices {
   monitoringService?: MonitoringService;
   browserService?: BrowserService;
   gmailService?: GmailService;
+  calendarService?: CalendarService;
 }
 
 export interface ToolExecutorContext {
@@ -212,6 +224,17 @@ export function buildSharedToolList(
     add(SEARCH_EMAILS_TOOL);
     add(DRAFT_REPLY_TOOL);
     add(SEND_EMAIL_TOOL);
+  }
+
+  if (services.calendarService) {
+    add(LIST_CALENDAR_EVENTS_TOOL);
+    add(GET_CALENDAR_EVENT_TOOL);
+    add(SEARCH_CALENDAR_EVENTS_TOOL);
+    add(GET_FREE_BUSY_TOOL);
+    add(CREATE_CALENDAR_EVENT_TOOL);
+    add(UPDATE_CALENDAR_EVENT_TOOL);
+    add(DELETE_CALENDAR_EVENT_TOOL);
+    add(RESPOND_TO_CALENDAR_EVENT_TOOL);
   }
 
   return tools;
@@ -948,6 +971,77 @@ export async function executeSharedTool(
       if (!input.to || !input.subject || !input.body) return { error: "to, subject, and body are required" };
       const sent = await gmail.sendEmail(input);
       return { success: true, messageId: sent.id, threadId: sent.threadId };
+    }
+
+    /* ── Calendar tools ── */
+
+    case "list_calendar_events": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { timeMin, timeMax, maxResults } = block.input as { timeMin?: string; timeMax?: string; maxResults?: number };
+      const events = await cal.listEvents({ timeMin, timeMax, maxResults: maxResults ? Math.min(maxResults, 50) : undefined });
+      return { events, count: events.length };
+    }
+
+    case "get_calendar_event": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { eventId } = block.input as { eventId: string };
+      if (!eventId) return { error: "eventId is required" };
+      return cal.getEvent(eventId);
+    }
+
+    case "search_calendar_events": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { query, maxResults } = block.input as { query: string; maxResults?: number };
+      if (!query) return { error: "query is required" };
+      const events = await cal.searchEvents(query, Math.min(maxResults ?? 10, 50));
+      return { events, count: events.length };
+    }
+
+    case "get_free_busy": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { timeMin, timeMax } = block.input as { timeMin: string; timeMax: string };
+      if (!timeMin || !timeMax) return { error: "timeMin and timeMax are required" };
+      return cal.getFreeBusy(timeMin, timeMax);
+    }
+
+    case "create_calendar_event": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      if (!input.summary || !input.start || !input.end) return { error: "summary, start, and end are required" };
+      const event = await cal.createEvent(input);
+      return { success: true, eventId: event.id, summary: event.summary, htmlLink: event.htmlLink };
+    }
+
+    case "update_calendar_event": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      if (!eventId) return { error: "eventId is required" };
+      const event = await cal.updateEvent(eventId, updates);
+      return { success: true, eventId: event.id, summary: event.summary };
+    }
+
+    case "delete_calendar_event": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { eventId } = block.input as { eventId: string };
+      if (!eventId) return { error: "eventId is required" };
+      await cal.deleteEvent(eventId);
+      return { success: true, eventId };
+    }
+
+    case "respond_to_calendar_event": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { eventId, responseStatus } = block.input as { eventId: string; responseStatus: "accepted" | "declined" | "tentative" };
+      if (!eventId || !responseStatus) return { error: "eventId and responseStatus are required" };
+      const event = await cal.respondToEvent(eventId, responseStatus);
+      return { success: true, eventId: event.id, responseStatus };
     }
 
     default:

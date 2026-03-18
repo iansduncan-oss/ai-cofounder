@@ -14,6 +14,8 @@ import {
   handleHelp,
   handleScheduleList,
   handleScheduleCreate,
+  handleGmailInbox,
+  handleGmailSend,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -147,6 +149,20 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
           interaction,
           await handleScheduleCreate(client, cron, task, ctx.userId),
         );
+      }
+      return;
+    }
+    case "gmail": {
+      const sub = interaction.options.getSubcommand();
+      await interaction.deferReply();
+
+      if (sub === "inbox") {
+        await sendDiscordResponse(interaction, await handleGmailInbox(client));
+      } else if (sub === "send") {
+        const to = interaction.options.getString("to", true);
+        const subject = interaction.options.getString("subject", true);
+        const body = interaction.options.getString("body", true);
+        await sendDiscordResponse(interaction, await handleGmailSend(client, { to, subject, body }));
       }
       return;
     }
@@ -317,6 +333,27 @@ async function sendDiscordResponse(
         .setTitle("Schedule Created")
         .setDescription(`\`${result.data.cronExpression}\` \u2014 ${result.data.description ?? "No description"}`)
         .setFooter({ text: `ID: ${result.data.id}` });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "gmail_inbox": {
+      const lines = result.data.messages.map(
+        (m) => `${m.isUnread ? "**" : ""}${m.from}: ${m.subject}${m.isUnread ? "**" : ""} — ${m.date}`,
+      );
+      const embed = new EmbedBuilder()
+        .setColor(0xea4335)
+        .setTitle("Gmail Inbox")
+        .setDescription(truncate(lines.join("\n"), 4096))
+        .setFooter({ text: `${result.data.unreadCount} unread` });
+      await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "gmail_send": {
+      const embed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setDescription(`Email sent to **${result.data.to}**: ${result.data.subject}`);
       await interaction.editReply({ embeds: [embed] });
       return;
     }

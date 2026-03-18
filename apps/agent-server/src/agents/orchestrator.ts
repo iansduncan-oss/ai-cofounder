@@ -81,6 +81,7 @@ import type { ProjectRegistryService } from "../services/project-registry.js";
 import type { MonitoringService } from "../services/monitoring.js";
 import type { BrowserService } from "../services/browser.js";
 import type { GmailService } from "../services/gmail.js";
+import type { CalendarService } from "../services/calendar.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -317,6 +318,7 @@ export interface OrchestratorOptions {
   monitoringService?: MonitoringService;
   browserService?: BrowserService;
   gmailService?: GmailService;
+  calendarService?: CalendarService;
 }
 
 /* ── Orchestrator class ── */
@@ -336,6 +338,7 @@ export class Orchestrator {
   private monitoringService?: MonitoringService;
   private browserService?: BrowserService;
   private gmailService?: GmailService;
+  private calendarService?: CalendarService;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -352,6 +355,7 @@ export class Orchestrator {
     this.monitoringService = options.monitoringService;
     this.browserService = options.browserService;
     this.gmailService = options.gmailService;
+    this.calendarService = options.calendarService;
   }
 
   /**
@@ -538,6 +542,7 @@ export class Orchestrator {
       monitoringService: this.monitoringService,
       browserService: this.browserService,
       gmailService: this.gmailService,
+      calendarService: this.calendarService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -747,6 +752,7 @@ export class Orchestrator {
       monitoringService: this.monitoringService,
       browserService: this.browserService,
       gmailService: this.gmailService,
+      calendarService: this.calendarService,
     }, undefined, this.autonomyTierService));
 
     try {
@@ -1044,6 +1050,7 @@ export class Orchestrator {
           monitoringService: this.monitoringService,
           browserService: this.browserService,
           gmailService: this.gmailService,
+          calendarService: this.calendarService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

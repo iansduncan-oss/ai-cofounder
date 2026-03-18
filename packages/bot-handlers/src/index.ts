@@ -14,6 +14,8 @@ export {
   handleHelp,
   handleScheduleList,
   handleScheduleCreate,
+  handleGmailInbox,
+  handleGmailSend,
   truncate,
   STATUS_ICON,
 } from "./handlers.js";
@@ -35,5 +37,7 @@ export type {
   HelpResult,
   ScheduleListResult,
   ScheduleCreateResult,
+  GmailInboxResult,
+  GmailSendResult,
   HandlerResult,
 } from "./types.js";

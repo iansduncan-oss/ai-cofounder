@@ -16,6 +16,8 @@ import {
   handleHelp,
   handleScheduleList,
   handleScheduleCreate,
+  handleGmailInbox,
+  handleGmailSend,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -255,6 +257,30 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       });
       return;
 
+    case "gmail_inbox": {
+      const lines = result.data.messages.map(
+        (m) => `${m.isUnread ? "*" : ""}${m.from}: ${m.subject}${m.isUnread ? "*" : ""} \u2014 ${m.date}`,
+      );
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Gmail Inbox" } },
+          { type: "section", text: { type: "mrkdwn", text: truncate(lines.join("\n"), 3000) } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.unreadCount} unread` }] },
+        ],
+      });
+      return;
+    }
+
+    case "gmail_send":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: `\u2705 Email sent to *${result.data.to}*: ${result.data.subject}` } },
+        ],
+      });
+      return;
+
     case "info":
       await respond({ ...base, text: result.message });
       return;
@@ -478,6 +504,41 @@ export function registerCommands(app: App): void {
     } else {
       await respond("Usage: `/schedule list` or `/schedule create <cron> <task>`");
     }
+  });
+
+  app.command("/gmail-inbox", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "gmail-inbox");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    await sendSlackResponse(respond, await handleGmailInbox(client));
+  });
+
+  app.command("/gmail-send", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "gmail-send");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    // Parse: /gmail-send <to> <subject> | <body>
+    const text = command.text.trim();
+    const parts = text.split("|");
+    if (parts.length < 2) {
+      await respond("Usage: `/gmail-send <to> <subject> | <body>`\nExample: `/gmail-send bob@example.com Meeting tomorrow | Let's meet at 10am`");
+      return;
+    }
+    const headerParts = parts[0].trim().split(/\s+/);
+    if (headerParts.length < 2) {
+      await respond("Usage: `/gmail-send <to> <subject> | <body>`");
+      return;
+    }
+    const to = headerParts[0];
+    const subject = headerParts.slice(1).join(" ");
+    const body = parts.slice(1).join("|").trim();
+    await sendSlackResponse(respond, await handleGmailSend(client, { to, subject, body }));
   });
 
   // Interactive button handlers

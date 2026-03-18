@@ -10,6 +10,7 @@ import { executeCommand } from "./execute.js";
 import { approveCommand } from "./approve.js";
 import { helpCommand } from "./help.js";
 import { scheduleCommand } from "./schedule.js";
+import { gmailCommand } from "./gmail.js";
 
 const logger = createLogger("discord-commands");
 
@@ -24,6 +25,7 @@ const commands = [
   approveCommand.toJSON(),
   helpCommand.toJSON(),
   scheduleCommand.toJSON(),
+  gmailCommand.toJSON(),
 ];
 
 export async function registerCommands(token: string, clientId: string): Promise<void> {

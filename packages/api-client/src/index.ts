@@ -76,4 +76,13 @@ export type {
   JournalEntryType,
   DailyCostResponse,
   BudgetStatusResponse,
+  GmailMessageSummary,
+  GmailMessage,
+  GmailThread,
+  SendEmailInput,
+  CalendarEventSummary,
+  CalendarEvent,
+  CreateCalendarEventInput,
+  UpdateCalendarEventInput,
+  FreeBusyResponse,
 } from "./types.js";
