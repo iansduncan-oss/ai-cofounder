@@ -1,32 +1,49 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #09090b;
+  --color-background: #050508;
   --color-foreground: #fafafa;
-  --color-card: #0a0a0f;
+  --color-card: #0c0c12;
   --color-card-foreground: #fafafa;
-  --color-popover: #0a0a0f;
+  --color-popover: #0c0c12;
   --color-popover-foreground: #fafafa;
   --color-primary: #3b82f6;
   --color-primary-foreground: #fafafa;
   --color-secondary: #1e1e2e;
   --color-secondary-foreground: #fafafa;
-  --color-muted: #18181b;
+  --color-muted: #14141c;
   --color-muted-foreground: #a1a1aa;
   --color-accent: #1e1e2e;
   --color-accent-foreground: #fafafa;
   --color-destructive: #ef4444;
   --color-destructive-foreground: #fafafa;
-  --color-border: #27272a;
-  --color-input: #27272a;
+  --color-border: #1e1e28;
+  --color-input: #1e1e28;
   --color-ring: #3b82f6;
   --radius: 0.5rem;
+
+  /* Surface depth layers */
+  --color-surface-0: #050508;
+  --color-surface-1: #0c0c12;
+  --color-surface-2: #14141c;
+  --color-surface-3: #1c1c28;
+
+  /* Panel glow accents */
+  --color-glow-chat: rgba(168, 85, 247, 0.15);
+  --color-glow-goals: rgba(59, 130, 246, 0.15);
+  --color-glow-monitor: rgba(34, 197, 94, 0.15);
+
+  /* Monospace for metrics */
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Fira Code", monospace;
 
   --animate-fade-in: fade-in 0.2s ease-out;
   --animate-slide-up: slide-up 0.2s ease-out;
   --animate-scale-in: scale-in 0.15s ease-out;
   --animate-bounce-dot: bounce-dot 1.4s infinite ease-in-out both;
   --animate-slide-in-left: slide-in-left 0.2s ease-out;
+  --animate-glow-pulse: glow-pulse 2s ease-in-out infinite;
+  --animate-drawer-slide-in: drawer-slide-in 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-metric-flash: metric-flash 0.5s ease-out;
 }
 
 @keyframes fade-in {
@@ -52,6 +69,21 @@
 @keyframes slide-in-left {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes drawer-slide-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes metric-flash {
+  0% { background-color: rgba(59, 130, 246, 0.2); }
+  100% { background-color: transparent; }
 }
 
 * {
@@ -87,6 +119,13 @@ body {
   --color-border: #e4e4e7;
   --color-input: #e4e4e7;
   --color-ring: #2563eb;
+  --color-surface-0: #ffffff;
+  --color-surface-1: #fafafa;
+  --color-surface-2: #f4f4f5;
+  --color-surface-3: #e4e4e7;
+  --color-glow-chat: rgba(168, 85, 247, 0.08);
+  --color-glow-goals: rgba(59, 130, 246, 0.08);
+  --color-glow-monitor: rgba(34, 197, 94, 0.08);
 }
 
 ::selection {
@@ -172,3 +211,17 @@ body {
 .chat-message-enter {
   animation: message-in 0.3s ease-out;
 }
+
+/* Metric numbers — tabular for alignment */
+.font-metric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Panel glow borders */
+.panel-glow-chat { box-shadow: inset 0 1px 0 0 var(--color-glow-chat), 0 0 20px -5px var(--color-glow-chat); }
+.panel-glow-goals { box-shadow: inset 0 1px 0 0 var(--color-glow-goals), 0 0 20px -5px var(--color-glow-goals); }
+.panel-glow-monitor { box-shadow: inset 0 1px 0 0 var(--color-glow-monitor), 0 0 20px -5px var(--color-glow-monitor); }
+
+/* Data-updated flash for WS metric updates */
+[data-updated="true"] { animation: metric-flash 0.5s ease-out; }

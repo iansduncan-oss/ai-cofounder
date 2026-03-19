@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { useCalendarEvents, useCalendarEvent, useCalendarSearch } from "@/api/queries";
+import { useCalendarEvents, useCalendarEvent, useCalendarSearch, useMeetingPrep } from "@/api/queries";
 import { useCreateCalendarEvent, useDeleteCalendarEvent, useRespondToCalendarEvent } from "@/api/mutations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Search, Plus, ArrowLeft, Trash2 } from "lucide-react";
+import { Calendar, Search, Plus, ArrowLeft, Trash2, Brain, RefreshCw, Loader2, Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function formatEventTime(start: string, end: string, isAllDay: boolean) {
   if (isAllDay) return "All day";
@@ -73,6 +74,121 @@ function CreateEventDialog() {
   );
 }
 
+function MeetingPrepCard({ eventId }: { eventId: string }) {
+  const { data, isLoading, error, refetch } = useMeetingPrep(eventId);
+  const [hasRequested, setHasRequested] = useState(false);
+
+  const handleGenerate = () => {
+    setHasRequested(true);
+    refetch();
+  };
+
+  if (!hasRequested && !data) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Brain className="h-4 w-4" />
+            Meeting Prep
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Generate AI-powered prep notes for this meeting, including attendee context and related memories.
+          </p>
+          <Button size="sm" onClick={handleGenerate}>
+            <Brain className="mr-2 h-4 w-4" />
+            Generate Prep
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Brain className="h-4 w-4" />
+            Meeting Prep
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Generating meeting prep...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Brain className="h-4 w-4" />
+            Meeting Prep
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-destructive">
+            Failed to generate prep notes.{" "}
+            <button onClick={handleGenerate} className="underline hover:no-underline">
+              Try again
+            </button>
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-medium">
+          <span className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Meeting Prep
+          </span>
+          <button
+            onClick={handleGenerate}
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", isLoading && "animate-spin")} />
+            Refresh
+          </button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
+          {data.prepText}
+        </div>
+
+        {Array.isArray(data.relatedMemories) && data.relatedMemories.length > 0 && (
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Related Memories</p>
+            <ul className="ml-4 list-disc space-y-1 text-sm">
+              {(data.relatedMemories as Array<{ content: string }>).map((m, i) => (
+                <li key={i}>{m.content}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock className="h-3 w-3" />
+          Generated at {new Date(data.generatedAt).toLocaleTimeString()}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void }) {
   const { data: event, isLoading } = useCalendarEvent(eventId);
   const deleteMutation = useDeleteCalendarEvent();
@@ -86,76 +202,80 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
   const endStr = event.end.dateTime ?? event.end.date ?? "";
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
-          <div className="flex-1">
-            <CardTitle className="text-base">{event.summary}</CardTitle>
-            <p className="text-sm text-muted-foreground">{formatEventTime(startStr, endStr, isAllDay)}</p>
-            {event.location && <p className="text-xs text-muted-foreground">Location: {event.location}</p>}
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4" /></Button>
+            <div className="flex-1">
+              <CardTitle className="text-base">{event.summary}</CardTitle>
+              <p className="text-sm text-muted-foreground">{formatEventTime(startStr, endStr, isAllDay)}</p>
+              {event.location && <p className="text-xs text-muted-foreground">Location: {event.location}</p>}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-destructive"
+              onClick={() => { deleteMutation.mutate(eventId, { onSuccess: onBack }); }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-destructive"
-            onClick={() => { deleteMutation.mutate(eventId, { onSuccess: onBack }); }}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {event.description && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
-            <pre className="whitespace-pre-wrap text-sm font-sans">{event.description}</pre>
-          </div>
-        )}
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {event.description && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+              <pre className="whitespace-pre-wrap text-sm font-sans">{event.description}</pre>
+            </div>
+          )}
 
-        {event.attendees && event.attendees.length > 0 && (
-          <div>
-            <p className="text-xs font-medium text-muted-foreground mb-2">
-              Attendees ({event.attendees.length})
+          {event.attendees && event.attendees.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-muted-foreground mb-2">
+                Attendees ({event.attendees.length})
+              </p>
+              <div className="space-y-1">
+                {event.attendees.map((a, i) => (
+                  <div key={i} className="flex items-center justify-between text-sm">
+                    <span>{a.displayName ?? a.email}{a.self ? " (you)" : ""}</span>
+                    <Badge variant={
+                      a.responseStatus === "accepted" ? "default" :
+                      a.responseStatus === "declined" ? "destructive" :
+                      "secondary"
+                    }>
+                      {a.responseStatus}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-2 mt-3">
+                {(["accepted", "tentative", "declined"] as const).map((status) => (
+                  <Button
+                    key={status}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => respondMutation.mutate({ eventId, responseStatus: status })}
+                    disabled={respondMutation.isPending}
+                  >
+                    {status === "accepted" ? "Accept" : status === "tentative" ? "Maybe" : "Decline"}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {event.organizer && (
+            <p className="text-xs text-muted-foreground">
+              Organized by: {event.organizer.displayName ?? event.organizer.email}
             </p>
-            <div className="space-y-1">
-              {event.attendees.map((a, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <span>{a.displayName ?? a.email}{a.self ? " (you)" : ""}</span>
-                  <Badge variant={
-                    a.responseStatus === "accepted" ? "default" :
-                    a.responseStatus === "declined" ? "destructive" :
-                    "secondary"
-                  }>
-                    {a.responseStatus}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+          )}
+        </CardContent>
+      </Card>
 
-            <div className="flex gap-2 mt-3">
-              {(["accepted", "tentative", "declined"] as const).map((status) => (
-                <Button
-                  key={status}
-                  variant="outline"
-                  size="sm"
-                  onClick={() => respondMutation.mutate({ eventId, responseStatus: status })}
-                  disabled={respondMutation.isPending}
-                >
-                  {status === "accepted" ? "Accept" : status === "tentative" ? "Maybe" : "Decline"}
-                </Button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {event.organizer && (
-          <p className="text-xs text-muted-foreground">
-            Organized by: {event.organizer.displayName ?? event.organizer.email}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+      <MeetingPrepCard eventId={eventId} />
+    </div>
   );
 }
 

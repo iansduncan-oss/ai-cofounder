@@ -1,12 +1,32 @@
 import { type HTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
-  ({ className, ...props }, ref) => (
+type CardVariant = "default" | "panel" | "metric";
+
+interface CardProps extends HTMLAttributes<HTMLDivElement> {
+  variant?: CardVariant;
+  glowColor?: "chat" | "goals" | "monitor";
+}
+
+const variantStyles: Record<CardVariant, string> = {
+  default: "rounded-lg border bg-card text-card-foreground shadow-sm",
+  panel: "rounded-lg border bg-surface-1 text-card-foreground shadow-sm",
+  metric: "rounded-lg border bg-surface-1 text-card-foreground shadow-sm",
+};
+
+const glowStyles: Record<string, string> = {
+  chat: "panel-glow-chat",
+  goals: "panel-glow-goals",
+  monitor: "panel-glow-monitor",
+};
+
+const Card = forwardRef<HTMLDivElement, CardProps>(
+  ({ className, variant = "default", glowColor, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-lg border bg-card text-card-foreground shadow-sm",
+        variantStyles[variant],
+        glowColor && glowStyles[glowColor],
         className,
       )}
       {...props}

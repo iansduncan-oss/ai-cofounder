@@ -14,6 +14,7 @@ const badgeVariants = cva(
         outline: "text-foreground",
         success: "border-transparent bg-emerald-600 text-white",
         warning: "border-transparent bg-amber-600 text-white",
+        live: "border-transparent bg-emerald-600/20 text-emerald-400",
       },
     },
     defaultVariants: {
@@ -26,8 +27,13 @@ export interface BadgeProps
   extends HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
+export function Badge({ className, variant, children, ...props }: BadgeProps) {
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div className={cn(badgeVariants({ variant }), className)} {...props}>
+      {variant === "live" && (
+        <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-glow-pulse" />
+      )}
+      {children}
+    </div>
   );
 }

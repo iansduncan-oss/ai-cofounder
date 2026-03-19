@@ -4,12 +4,13 @@ import {
   useProviderHealth,
   useMonitoringStatus,
   useQueueStatus,
-  useBriefing,
+  useTodayBriefing,
   useToolStats,
   usePendingTasks,
   usePendingApprovals,
   useErrorSummary,
 } from "@/api/queries";
+import type { TodayBriefingResponse } from "@ai-cofounder/api-client";
 import { apiClient } from "@/api/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,12 @@ import {
   Wrench,
   XCircle,
   FileText,
+  Calendar,
+  Mail,
+  Target,
+  CheckSquare,
+  DollarSign,
+  RefreshCw,
 } from "lucide-react";
 
 function StatusDot({ status }: { status: "ok" | "warning" | "critical" | "unknown" }) {
@@ -84,7 +91,23 @@ function MetricCard({
   );
 }
 
-function BriefingCard({ text }: { text: string }) {
+const BRIEFING_SECTIONS = [
+  { key: "todaySchedule", icon: Calendar, label: "Today's Schedule" },
+  { key: "emailHighlights", icon: Mail, label: "Email Highlights" },
+  { key: "goals", icon: Target, label: "Goals" },
+  { key: "tasks", icon: CheckSquare, label: "Tasks" },
+  { key: "costs", icon: DollarSign, label: "Costs" },
+] as const;
+
+function BriefingCard({
+  briefing,
+  onRefresh,
+  isRefreshing,
+}: {
+  briefing: TodayBriefingResponse;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+}) {
   const [audioState, setAudioState] = useState<"idle" | "loading" | "playing">("idle");
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -127,44 +150,84 @@ function BriefingCard({ text }: { text: string }) {
     setAudioState("idle");
   }, [cleanup]);
 
+  const sections = briefing.sections;
+  const hasSections = sections && BRIEFING_SECTIONS.some((s) => sections[s.key]);
+
   return (
     <Card className="mt-6">
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center justify-between text-sm font-medium">
           <span className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Latest Briefing
+            Daily Briefing
           </span>
-          {audioState === "idle" && (
+          <div className="flex items-center gap-1">
             <button
-              onClick={handlePlay}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
             >
-              <Volume2 className="h-3.5 w-3.5" />
-              Play
+              <RefreshCw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+              Refresh
             </button>
-          )}
-          {audioState === "loading" && (
-            <span className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              Loading...
-            </span>
-          )}
-          {audioState === "playing" && (
-            <button
-              onClick={handleStop}
-              className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            >
-              <Square className="h-3.5 w-3.5" />
-              Stop
-            </button>
-          )}
+            {audioState === "idle" && (
+              <button
+                onClick={handlePlay}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Volume2 className="h-3.5 w-3.5" />
+                Play
+              </button>
+            )}
+            {audioState === "loading" && (
+              <span className="flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading...
+              </span>
+            )}
+            {audioState === "playing" && (
+              <button
+                onClick={handleStop}
+                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </button>
+            )}
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
-          {text}
+        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{briefing.date}</span>
+          {briefing.cached && (
+            <Badge variant="outline" className="text-[10px]">cached</Badge>
+          )}
         </div>
+
+        {hasSections ? (
+          <div className="space-y-4">
+            {BRIEFING_SECTIONS.map(({ key, icon: Icon, label }) => {
+              const content = sections[key];
+              if (!content) return null;
+              return (
+                <div key={key}>
+                  <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground">
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </div>
+                  <div className="ml-5.5 whitespace-pre-wrap text-sm">
+                    {content}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
+            {briefing.text}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -177,7 +240,7 @@ export function HudPage() {
   const { data: providers } = useProviderHealth();
   const { data: monitoring, isLoading: monitoringLoading } = useMonitoringStatus();
   const { data: queues, isLoading: queuesLoading } = useQueueStatus();
-  const { data: briefing } = useBriefing();
+  const { data: briefing, refetch: refetchBriefing, isFetching: briefingFetching } = useTodayBriefing();
   const { data: toolStats } = useToolStats();
   const { data: pendingTasks } = usePendingTasks();
   const { data: approvals } = usePendingApprovals();
@@ -558,8 +621,12 @@ export function HudPage() {
           </div>
 
           {/* Briefing section */}
-          {briefing?.briefing && (
-            <BriefingCard text={briefing.briefing} />
+          {briefing && (
+            <BriefingCard
+              briefing={briefing}
+              onRefresh={() => refetchBriefing()}
+              isRefreshing={briefingFetching}
+            />
           )}
         </>
       )}
