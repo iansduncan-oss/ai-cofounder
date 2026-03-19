@@ -8,6 +8,7 @@ import {
   listEnabledSchedules,
   listRecentlyCompletedGoals,
   listPendingApprovals,
+  upsertBriefingCache,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -23,6 +24,9 @@ export interface BriefingData {
   recentSessions: Array<{ trigger: string; status: string; summary: string | null }>;
   pendingApprovalCount: number;
   staleGoalCount: number;
+  todayEvents?: Array<{ summary: string; start: string; end: string; attendeeCount: number }>;
+  unreadEmailCount?: number;
+  importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -76,11 +80,80 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   };
 }
 
+export async function enrichWithGoogle(
+  db: Db,
+  adminUserId: string,
+): Promise<Pick<BriefingData, "todayEvents" | "unreadEmailCount" | "importantEmails"> | null> {
+  try {
+    const { CalendarService } = await import("./calendar.js");
+    const { GmailService } = await import("./gmail.js");
+
+    const calendarService = new CalendarService(db, adminUserId);
+    const gmailService = new GmailService(db, adminUserId);
+
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    const [events, unreadCount, recentEmails] = await Promise.all([
+      calendarService.listEvents({
+        timeMin: startOfDay.toISOString(),
+        timeMax: endOfDay.toISOString(),
+        maxResults: 20,
+      }),
+      gmailService.getUnreadCount(),
+      gmailService.listInbox(5),
+    ]);
+
+    return {
+      todayEvents: events.map((e) => ({
+        summary: e.summary,
+        start: e.start,
+        end: e.end,
+        attendeeCount: e.attendeeCount,
+      })),
+      unreadEmailCount: unreadCount,
+      importantEmails: recentEmails.map((e) => ({
+        from: e.from,
+        subject: e.subject,
+        snippet: e.snippet,
+      })),
+    };
+  } catch (err) {
+    logger.warn({ err }, "Google enrichment failed — briefing will proceed without calendar/email data");
+    return null;
+  }
+}
+
 export function formatBriefing(data: BriefingData): string {
   const lines: string[] = [];
   const now = new Date();
   lines.push(`**Daily Briefing** — ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`);
   lines.push("");
+
+  // Today's schedule
+  if (data.todayEvents && data.todayEvents.length > 0) {
+    lines.push(`**Today's Schedule (${data.todayEvents.length}):**`);
+    for (const e of data.todayEvents) {
+      const time = e.start.includes("T")
+        ? new Date(e.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+        : "All day";
+      const attendees = e.attendeeCount > 0 ? ` (${e.attendeeCount} attendees)` : "";
+      lines.push(`  - ${time}: ${e.summary}${attendees}`);
+    }
+    lines.push("");
+  }
+
+  // Email highlights
+  if (data.unreadEmailCount !== undefined) {
+    lines.push(`**Email:** ${data.unreadEmailCount} unread`);
+    if (data.importantEmails && data.importantEmails.length > 0) {
+      for (const e of data.importantEmails) {
+        lines.push(`  - ${e.from}: ${e.subject}`);
+      }
+    }
+    lines.push("");
+  }
 
   // Active goals
   if (data.activeGoals.length > 0) {
@@ -204,13 +277,36 @@ function buildBriefingPrompt(data: BriefingData): string {
   lines.push("");
   lines.push(`LLM costs (24h): ${costStr} across ${data.costsSinceYesterday.requestCount} requests`);
 
+  if (data.todayEvents && data.todayEvents.length > 0) {
+    lines.push("");
+    lines.push(`Today's calendar (${data.todayEvents.length} events):`);
+    for (const e of data.todayEvents) {
+      const time = e.start.includes("T")
+        ? new Date(e.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+        : "All day";
+      lines.push(`  - ${time}: "${e.summary}" (${e.attendeeCount} attendees)`);
+    }
+  }
+
+  if (data.unreadEmailCount !== undefined) {
+    lines.push("");
+    lines.push(`Unread emails: ${data.unreadEmailCount}`);
+    if (data.importantEmails && data.importantEmails.length > 0) {
+      lines.push("Recent important emails:");
+      for (const e of data.importantEmails) {
+        lines.push(`  - From: ${e.from} — "${e.subject}"`);
+      }
+    }
+  }
+
   lines.push("");
   lines.push(
     "Based on this data, write the briefing. Include: " +
       "(1) a one-line overall status, " +
       "(2) what was accomplished, " +
       "(3) what needs attention today (prioritize stale goals + pending approvals), " +
-      "(4) a suggested focus for the day. " +
+      (data.todayEvents && data.todayEvents.length > 0 ? "(4) today's meeting schedule, " : "") +
+      `(${data.todayEvents && data.todayEvents.length > 0 ? "5" : "4"}) a suggested focus for the day. ` +
       "Keep the tone like a sharp co-founder, not a corporate dashboard.",
   );
 
@@ -244,8 +340,17 @@ export async function sendDailyBriefing(
   db: Db,
   notificationService: NotificationService,
   llmRegistry?: LlmRegistry,
+  adminUserId?: string,
 ): Promise<string> {
   const data = await gatherBriefingData(db);
+
+  // Enrich with Google Calendar + Gmail data when admin user is available
+  if (adminUserId) {
+    const enrichment = await enrichWithGoogle(db, adminUserId);
+    if (enrichment) {
+      Object.assign(data, enrichment);
+    }
+  }
 
   const text = llmRegistry
     ? await generateLlmBriefing(llmRegistry, data)
@@ -253,6 +358,12 @@ export async function sendDailyBriefing(
 
   await notificationService.sendBriefing(text);
   logger.info("daily briefing sent");
+
+  // Cache the briefing for today
+  const today = new Date().toISOString().slice(0, 10);
+  await upsertBriefingCache(db, today, text).catch((err) => {
+    logger.warn({ err }, "Failed to cache briefing");
+  });
 
   return text;
 }

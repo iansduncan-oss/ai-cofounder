@@ -363,3 +363,10 @@ export function useCalendarSearch(q: string) {
     enabled: q.length > 0,
   });
 }
+
+export function useTodayBriefing(refresh = false) {
+  return useQuery({
+    queryKey: queryKeys.briefing.today,
+    queryFn: () => apiClient.getTodayBriefing(refresh),
+  });
+}

@@ -74,6 +74,7 @@ import type {
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   FreeBusyResponse,
+  TodayBriefingResponse,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1213,6 +1214,13 @@ export class ApiClient {
 
   getFreeBusy(timeMin: string, timeMax: string) {
     return this.request<FreeBusyResponse>("POST", "/api/calendar/free-busy", { timeMin, timeMax });
+  }
+
+  /* ── Briefings ── */
+
+  getTodayBriefing(refresh = false) {
+    const qs = refresh ? "?refresh=true" : "";
+    return this.request<TodayBriefingResponse>("GET", `/api/briefings/today${qs}`);
   }
 
   /* ── Database ── */

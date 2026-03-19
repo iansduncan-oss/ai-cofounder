@@ -870,6 +870,23 @@ export interface FreeBusyResponse {
   busy: Array<{ start: string; end: string }>;
 }
 
+/* ── Briefing ── */
+
+export interface BriefingSections {
+  todaySchedule?: string;
+  emailHighlights?: string;
+  goals?: string;
+  tasks?: string;
+  costs?: string;
+}
+
+export interface TodayBriefingResponse {
+  date: string;
+  text: string;
+  sections: BriefingSections | null;
+  cached: boolean;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

@@ -55,6 +55,7 @@ export const queryKeys = {
   },
   briefing: {
     latest: ["briefing", "latest"] as const,
+    today: ["briefing", "today"] as const,
   },
   tools: {
     stats: ["tools", "stats"] as const,

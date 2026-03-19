@@ -42,7 +42,7 @@ export const WS_CHANNEL_QUERY_KEYS: Record<WsChannel, readonly string[][]> = {
   health: [["health"], ["health", "providers"]],
   tools: [["tools", "stats"]],
   pipelines: [["pipelines", "list"], ["pipelines"]],
-  briefing: [["briefing", "latest"]],
+  briefing: [["briefing", "latest"], ["briefing", "today"]],
   goals: [["goals"]],
   deploys: [["deploys", "latest"], ["deploys"]],
   patterns: [["patterns"]],

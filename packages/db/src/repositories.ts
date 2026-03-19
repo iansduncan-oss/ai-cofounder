@@ -39,6 +39,7 @@ import {
   projectDependencies,
   pipelineTemplates,
   googleTokens,
+  briefingCache,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -3446,4 +3447,36 @@ export async function deletePipelineTemplate(db: Db, id: string) {
     .where(eq(pipelineTemplates.id, id))
     .returning();
   return result.length > 0;
+}
+
+/* ────────────────── Briefing Cache ─────────────────────── */
+
+export async function getBriefingCache(db: Db, date: string) {
+  const rows = await db
+    .select()
+    .from(briefingCache)
+    .where(eq(briefingCache.date, date))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertBriefingCache(
+  db: Db,
+  date: string,
+  briefingText: string,
+  sections?: Record<string, unknown>,
+) {
+  const [row] = await db
+    .insert(briefingCache)
+    .values({ date, briefingText, sections })
+    .onConflictDoUpdate({
+      target: briefingCache.date,
+      set: {
+        briefingText,
+        sections,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
 }
