@@ -76,6 +76,10 @@ import type {
   FreeBusyResponse,
   MeetingPrepResponse,
   TodayBriefingResponse,
+  FollowUp,
+  FollowUpStatus,
+  CreateFollowUpInput,
+  UpdateFollowUpInput,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1227,6 +1231,33 @@ export class ApiClient {
   getTodayBriefing(refresh = false) {
     const qs = refresh ? "?refresh=true" : "";
     return this.request<TodayBriefingResponse>("GET", `/api/briefings/today${qs}`);
+  }
+
+  /* ── Follow-Ups ── */
+
+  listFollowUps(opts?: { status?: FollowUpStatus; limit?: number; offset?: number }) {
+    const qs = new URLSearchParams();
+    if (opts?.status) qs.set("status", opts.status);
+    if (opts?.limit != null) qs.set("limit", String(opts.limit));
+    if (opts?.offset != null) qs.set("offset", String(opts.offset));
+    const q = qs.toString();
+    return this.request<{ data: FollowUp[]; total: number }>("GET", `/api/follow-ups${q ? `?${q}` : ""}`);
+  }
+
+  getFollowUp(id: string) {
+    return this.request<FollowUp>("GET", `/api/follow-ups/${id}`);
+  }
+
+  createFollowUp(data: CreateFollowUpInput) {
+    return this.request<FollowUp>("POST", "/api/follow-ups", data);
+  }
+
+  updateFollowUp(id: string, data: UpdateFollowUpInput) {
+    return this.request<FollowUp>("PATCH", `/api/follow-ups/${id}`, data);
+  }
+
+  deleteFollowUp(id: string) {
+    return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/follow-ups/${id}`);
   }
 
   /* ── Database ── */

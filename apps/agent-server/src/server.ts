@@ -70,6 +70,7 @@ const DEFAULT_TOOLS = [
   "send_message", "check_messages", "broadcast_update",
   "create_plan", "create_milestone", "request_approval",
   "browser_action",
+  "create_follow_up",
 ] as const;
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { createJournalService, type JournalService } from "./services/journal.js";

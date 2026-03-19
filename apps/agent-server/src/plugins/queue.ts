@@ -98,6 +98,25 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "follow_up_reminders": {
+          const { listDueFollowUps, markFollowUpReminderSent } = await import("@ai-cofounder/db");
+          const { getNotificationQueue } = await import("@ai-cofounder/queue");
+          const dueItems = await listDueFollowUps(app.db);
+          const notifQueue = getNotificationQueue();
+          for (const item of dueItems) {
+            await notifQueue.add("follow-up-reminder", {
+              channel: "all",
+              type: "info",
+              title: "Follow-up Due",
+              message: `"${item.title}" is due${item.dueDate ? ` (was due ${new Date(item.dueDate).toLocaleDateString()})` : ""}.`,
+            });
+            await markFollowUpReminderSent(app.db, item.id);
+          }
+          if (dueItems.length > 0) {
+            logger.info({ count: dueItems.length }, "Sent follow-up reminders");
+          }
+          break;
+        }
         default:
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();

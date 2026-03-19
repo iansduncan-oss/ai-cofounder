@@ -759,6 +759,22 @@ export const meetingPreps = pgTable("meeting_preps", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Follow-Ups (proactive task tracking with reminders) ── */
+
+export const followUpStatusEnum = pgEnum("follow_up_status", ["pending", "done", "dismissed"]);
+
+export const followUps = pgTable("follow_ups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: followUpStatusEnum("status").notNull().default("pending"),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  source: text("source"),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Pipeline Templates (content automation workflows) ── */
 
 export const pipelineTemplates = pgTable("pipeline_templates", {

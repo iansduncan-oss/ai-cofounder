@@ -41,6 +41,7 @@ import {
   googleTokens,
   briefingCache,
   meetingPreps,
+  followUps,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -3549,4 +3550,101 @@ export async function markMeetingPrepNotified(db: Db, id: string) {
     .update(meetingPreps)
     .set({ notified: true })
     .where(eq(meetingPreps.id, id));
+}
+
+/* ────────────────────────── Follow-Ups ────────────────────────── */
+
+export async function createFollowUp(
+  db: Db,
+  data: {
+    title: string;
+    description?: string;
+    dueDate?: Date;
+    source?: string;
+  },
+) {
+  const [row] = await db
+    .insert(followUps)
+    .values({
+      title: data.title,
+      description: data.description,
+      dueDate: data.dueDate,
+      source: data.source,
+    })
+    .returning();
+  return row;
+}
+
+export async function getFollowUp(db: Db, id: string) {
+  const rows = await db
+    .select()
+    .from(followUps)
+    .where(eq(followUps.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listFollowUps(
+  db: Db,
+  opts?: { status?: "pending" | "done" | "dismissed"; limit?: number; offset?: number },
+) {
+  const { status, limit = 50, offset = 0 } = opts ?? {};
+  const conditions = status ? [eq(followUps.status, status)] : [];
+
+  const rows = await db
+    .select()
+    .from(followUps)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(followUps.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return { data: rows, total: rows.length };
+}
+
+export async function updateFollowUp(
+  db: Db,
+  id: string,
+  data: {
+    title?: string;
+    description?: string;
+    status?: "pending" | "done" | "dismissed";
+    dueDate?: Date | null;
+    source?: string;
+  },
+) {
+  const [row] = await db
+    .update(followUps)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(followUps.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteFollowUp(db: Db, id: string) {
+  const [row] = await db
+    .delete(followUps)
+    .where(eq(followUps.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export async function listDueFollowUps(db: Db) {
+  return db
+    .select()
+    .from(followUps)
+    .where(
+      and(
+        eq(followUps.status, "pending"),
+        lte(followUps.dueDate, new Date()),
+        eq(followUps.reminderSent, false),
+      ),
+    );
+}
+
+export async function markFollowUpReminderSent(db: Db, id: string) {
+  await db
+    .update(followUps)
+    .set({ reminderSent: true, updatedAt: new Date() })
+    .where(eq(followUps.id, id));
 }

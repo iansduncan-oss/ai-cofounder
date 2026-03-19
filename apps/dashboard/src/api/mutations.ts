@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -537,5 +537,44 @@ export function useRespondToCalendarEvent() {
       toast.success("RSVP sent");
     },
     onError: (err) => { toast.error(`Failed to RSVP: ${err.message}`); },
+  });
+}
+
+/* ── Follow-Ups ── */
+
+export function useCreateFollowUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateFollowUpInput) => apiClient.createFollowUp(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
+      toast.success("Follow-up created");
+    },
+    onError: (err) => { toast.error(`Failed to create follow-up: ${err.message}`); },
+  });
+}
+
+export function useUpdateFollowUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateFollowUpInput }) =>
+      apiClient.updateFollowUp(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
+      toast.success("Follow-up updated");
+    },
+    onError: (err) => { toast.error(`Failed to update follow-up: ${err.message}`); },
+  });
+}
+
+export function useDeleteFollowUp() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteFollowUp(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
+      toast.success("Follow-up deleted");
+    },
+    onError: (err) => { toast.error(`Failed to delete follow-up: ${err.message}`); },
   });
 }

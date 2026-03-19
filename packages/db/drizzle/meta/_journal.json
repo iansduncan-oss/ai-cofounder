@@ -253,6 +253,13 @@
       "when": 1772801000000,
       "tag": "0035_add_meeting_preps",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1772802000000,
+      "tag": "0036_add_follow_ups",
+      "breakpoints": true
     }
   ]
 }

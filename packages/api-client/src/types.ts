@@ -898,6 +898,37 @@ export interface TodayBriefingResponse {
   cached: boolean;
 }
 
+/* ── Follow-Ups ── */
+
+export type FollowUpStatus = "pending" | "done" | "dismissed";
+
+export interface FollowUp {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: FollowUpStatus;
+  dueDate?: string | null;
+  source?: string | null;
+  reminderSent: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateFollowUpInput {
+  title: string;
+  description?: string;
+  dueDate?: string;
+  source?: string;
+}
+
+export interface UpdateFollowUpInput {
+  title?: string;
+  description?: string;
+  status?: FollowUpStatus;
+  dueDate?: string | null;
+  source?: string;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

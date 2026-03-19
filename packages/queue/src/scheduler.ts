@@ -210,6 +210,21 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled DLQ check every 5 minutes");
 
+  // ── Follow-up reminders (daily at 9 AM) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "follow-up-reminders",
+    {
+      pattern: `0 ${briefingHour} * * *`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "follow-up-reminders",
+      data: { check: "follow_up_reminders" } satisfies MonitoringJob,
+    },
+  );
+  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled daily follow-up reminders");
+
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
   const meetingPrepQueue = getMeetingPrepQueue();

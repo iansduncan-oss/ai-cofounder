@@ -305,6 +305,15 @@ export function mockDbModule() {
     listUnnotifiedMeetingPreps: vi.fn().mockResolvedValue([]),
     markMeetingPrepNotified: vi.fn().mockResolvedValue(undefined),
     meetingPreps: {},
+    // Follow-ups
+    createFollowUp: vi.fn().mockResolvedValue({ id: "fu-1", title: "Test follow-up", status: "pending" }),
+    getFollowUp: vi.fn().mockResolvedValue(null),
+    listFollowUps: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    updateFollowUp: vi.fn().mockResolvedValue(null),
+    deleteFollowUp: vi.fn().mockResolvedValue(null),
+    listDueFollowUps: vi.fn().mockResolvedValue([]),
+    markFollowUpReminderSent: vi.fn().mockResolvedValue(undefined),
+    followUps: {},
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),

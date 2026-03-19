@@ -364,9 +364,33 @@ export function useCalendarSearch(q: string) {
   });
 }
 
+export function useMeetingPrep(eventId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.calendar.prep(eventId ?? ""),
+    queryFn: () => apiClient.getMeetingPrep(eventId!),
+    enabled: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useTodayBriefing(refresh = false) {
   return useQuery({
     queryKey: queryKeys.briefing.today,
     queryFn: () => apiClient.getTodayBriefing(refresh),
+  });
+}
+
+export function useFollowUps(status?: "pending" | "done" | "dismissed") {
+  return useQuery({
+    queryKey: queryKeys.followUps.list(status),
+    queryFn: () => apiClient.listFollowUps({ status }),
+  });
+}
+
+export function useFollowUp(id: string) {
+  return useQuery({
+    queryKey: queryKeys.followUps.detail(id),
+    queryFn: () => apiClient.getFollowUp(id),
+    enabled: !!id,
   });
 }

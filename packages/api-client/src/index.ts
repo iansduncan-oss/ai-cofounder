@@ -86,4 +86,11 @@ export type {
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   FreeBusyResponse,
+  MeetingPrepResponse,
+  BriefingSections,
+  TodayBriefingResponse,
+  FollowUpStatus,
+  FollowUp,
+  CreateFollowUpInput,
+  UpdateFollowUpInput,
 } from "./types.js";

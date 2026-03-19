@@ -1,6 +1,7 @@
 import { lazy } from "react";
 import { createBrowserRouter } from "react-router";
 import { App } from "@/app";
+import { CommandCenter } from "@/components/layout/command-center";
 
 const OverviewPage = lazy(() =>
   import("./overview").then((m) => ({ default: m.OverviewPage })),
@@ -77,6 +78,9 @@ const GmailPage = lazy(() =>
 const CalendarPage = lazy(() =>
   import("./calendar").then((m) => ({ default: m.CalendarPage })),
 );
+const FollowUpsPage = lazy(() =>
+  import("./follow-ups").then((m) => ({ default: m.FollowUpsPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -91,7 +95,7 @@ export const router = createBrowserRouter([
     path: "/dashboard",
     element: <App />,
     children: [
-      { index: true, element: <OverviewPage /> },
+      { index: true, element: <CommandCenter /> },
       { path: "hud", element: <HudPage /> },
       { path: "goals", element: <GoalsPage /> },
       { path: "goals/:id", element: <GoalDetailPage /> },
@@ -113,6 +117,7 @@ export const router = createBrowserRouter([
       { path: "dlq", element: <DlqPage /> },
       { path: "gmail", element: <GmailPage /> },
       { path: "calendar", element: <CalendarPage /> },
+      { path: "follow-ups", element: <FollowUpsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

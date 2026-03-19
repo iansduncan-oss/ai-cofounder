@@ -130,5 +130,11 @@ export const queryKeys = {
     events: ["calendar", "events"] as const,
     event: (id: string) => ["calendar", "event", id] as const,
     search: (q: string) => ["calendar", "search", q] as const,
+    prep: (id: string) => ["calendar", "prep", id] as const,
+  },
+  followUps: {
+    all: ["follow-ups"] as const,
+    list: (status?: string) => ["follow-ups", "list", status ?? "all"] as const,
+    detail: (id: string) => ["follow-ups", "detail", id] as const,
   },
 };

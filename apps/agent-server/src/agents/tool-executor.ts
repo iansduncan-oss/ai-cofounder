@@ -24,6 +24,7 @@ import {
   deleteSchedule,
   createMilestone,
   touchMemory,
+  createFollowUp,
 } from "@ai-cofounder/db";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";
@@ -72,6 +73,7 @@ import {
   ANALYZE_CROSS_PROJECT_IMPACT_TOOL,
 } from "./tools/project-tools.js";
 import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
+import { CREATE_FOLLOW_UP_TOOL } from "./tools/follow-up-tools.js";
 import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import {
@@ -166,6 +168,7 @@ export function buildSharedToolList(
     add(LIST_SCHEDULES_TOOL);
     add(DELETE_SCHEDULE_TOOL);
     add(QUERY_DATABASE_TOOL);
+    add(CREATE_FOLLOW_UP_TOOL);
   }
 
   if (services.n8nService && services.db) {
@@ -913,6 +916,18 @@ export async function executeSharedTool(
       if (!db) return { error: "Database not available" };
       const input = block.input as { sql: string; limit?: number };
       return executeQueryDatabase(db, input.sql, input.limit);
+    }
+
+    case "create_follow_up": {
+      if (!db) return { error: "Database not available" };
+      const input = block.input as { title: string; description?: string; due_date?: string; source?: string };
+      const followUp = await createFollowUp(db, {
+        title: input.title,
+        description: input.description,
+        dueDate: input.due_date ? new Date(input.due_date) : undefined,
+        source: input.source,
+      });
+      return { created: true, followUpId: followUp.id, title: followUp.title };
     }
 
     case "query_vps": {
