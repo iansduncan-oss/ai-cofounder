@@ -86,7 +86,9 @@ vi.mock("../services/google-auth.js", () => ({
 }));
 
 describe("MeetingPrepService", () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   let MeetingPrepService: typeof import("../services/meeting-prep.js").MeetingPrepService;
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   let LlmRegistry: typeof import("@ai-cofounder/llm").LlmRegistry;
 
   beforeAll(async () => {
@@ -178,6 +180,7 @@ describe("MeetingPrepService", () => {
 });
 
 describe("GET /api/calendar/events/:id/prep", () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   let buildServer: typeof import("../server.js").buildServer;
   let app: Awaited<ReturnType<typeof buildServer>>["app"];
 
