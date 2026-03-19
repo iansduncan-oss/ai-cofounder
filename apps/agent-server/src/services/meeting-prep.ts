@@ -64,10 +64,10 @@ export class MeetingPrepService {
   async generatePrepForEvent(event: CalendarEventSummary, adminUserId: string): Promise<void> {
     // Recall relevant memories (attendees, topic keywords)
     const searchTerms = [event.summary];
-    const memories = await recallMemories(this.db, searchTerms.join(" "), adminUserId, 5);
+    const memories = await recallMemories(this.db, adminUserId, { query: searchTerms.join(" "), limit: 5 });
 
     const memoryContext = memories.length > 0
-      ? memories.map((m) => `- ${m.key}: ${m.value}`).join("\n")
+      ? memories.map((m) => `- ${m.key}: ${m.content}`).join("\n")
       : "No relevant memories found.";
 
     const prompt = `You are a meeting preparation assistant. Generate concise preparation notes for the following meeting.
@@ -88,9 +88,9 @@ Generate a brief prep document with:
 
 Keep it concise and actionable.`;
 
-    const response = await this.llmRegistry.complete([
-      { role: "user", content: prompt },
-    ], "conversation");
+    const response = await this.llmRegistry.complete("conversation", {
+      messages: [{ role: "user", content: prompt }],
+    });
 
     const prepText = typeof response.content === "string"
       ? response.content
@@ -106,7 +106,7 @@ Keep it concise and actionable.`;
       prepText,
       attendees: event.attendeeCount > 0 ? { count: event.attendeeCount } : null,
       relatedMemories: memories.length > 0
-        ? memories.map((m) => ({ key: m.key, value: m.value }))
+        ? memories.map((m) => ({ key: m.key, value: m.content }))
         : null,
     });
 

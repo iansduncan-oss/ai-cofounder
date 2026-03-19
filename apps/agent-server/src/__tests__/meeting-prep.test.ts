@@ -149,7 +149,7 @@ describe("MeetingPrepService", () => {
 
     expect(mockRecallMemories).toHaveBeenCalled();
     expect(mockComplete).toHaveBeenCalled();
-    const prompt = mockComplete.mock.calls[0][0][0].content;
+    const prompt = mockComplete.mock.calls[0][1].messages[0].content;
     expect(prompt).toContain("Planning");
     expect(mockUpsertMeetingPrep).toHaveBeenCalled();
   });
