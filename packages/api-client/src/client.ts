@@ -74,6 +74,7 @@ import type {
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   FreeBusyResponse,
+  MeetingPrepResponse,
   TodayBriefingResponse,
 } from "./types.js";
 
@@ -1214,6 +1215,11 @@ export class ApiClient {
 
   getFreeBusy(timeMin: string, timeMax: string) {
     return this.request<FreeBusyResponse>("POST", "/api/calendar/free-busy", { timeMin, timeMax });
+  }
+
+  getMeetingPrep(eventId: string, refresh = false) {
+    const qs = refresh ? "?refresh=true" : "";
+    return this.request<MeetingPrepResponse>("GET", `/api/calendar/events/${eventId}/prep${qs}`);
   }
 
   /* ── Briefings ── */

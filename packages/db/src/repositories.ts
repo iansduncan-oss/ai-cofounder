@@ -40,6 +40,7 @@ import {
   pipelineTemplates,
   googleTokens,
   briefingCache,
+  meetingPreps,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -3479,4 +3480,73 @@ export async function upsertBriefingCache(
     })
     .returning();
   return row;
+}
+
+/* ────────────────── Meeting Preps ─────────────────────── */
+
+export async function getMeetingPrep(db: Db, eventId: string) {
+  const rows = await db
+    .select()
+    .from(meetingPreps)
+    .where(eq(meetingPreps.eventId, eventId))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertMeetingPrep(
+  db: Db,
+  data: {
+    eventId: string;
+    eventTitle: string;
+    eventStart: Date;
+    prepText: string;
+    attendees?: unknown;
+    relatedMemories?: unknown;
+  },
+) {
+  const [row] = await db
+    .insert(meetingPreps)
+    .values({
+      eventId: data.eventId,
+      eventTitle: data.eventTitle,
+      eventStart: data.eventStart,
+      prepText: data.prepText,
+      attendees: data.attendees,
+      relatedMemories: data.relatedMemories,
+      generatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: meetingPreps.eventId,
+      set: {
+        eventTitle: data.eventTitle,
+        eventStart: data.eventStart,
+        prepText: data.prepText,
+        attendees: data.attendees,
+        relatedMemories: data.relatedMemories,
+        generatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function listUnnotifiedMeetingPreps(db: Db) {
+  const thirtyMinFromNow = new Date(Date.now() + 30 * 60 * 1000);
+  return db
+    .select()
+    .from(meetingPreps)
+    .where(
+      and(
+        eq(meetingPreps.notified, false),
+        lte(meetingPreps.eventStart, thirtyMinFromNow),
+        gt(meetingPreps.eventStart, new Date()),
+      ),
+    );
+}
+
+export async function markMeetingPrepNotified(db: Db, id: string) {
+  await db
+    .update(meetingPreps)
+    .set({ notified: true })
+    .where(eq(meetingPreps.id, id));
 }

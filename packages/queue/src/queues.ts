@@ -98,6 +98,10 @@ export interface AutonomousSessionJob {
   prompt?: string;
 }
 
+export interface MeetingPrepJob {
+  action: "generate_upcoming" | "send_notifications";
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
@@ -112,6 +116,7 @@ export const QUEUE_NAMES = {
   DEPLOY_VERIFICATION: "deploy-verification",
   DEAD_LETTER: "dead-letter",
   AUTONOMOUS_SESSIONS: "autonomous-sessions",
+  MEETING_PREP: "meeting-prep",
 } as const;
 
 export interface DeadLetterJob {
@@ -186,6 +191,10 @@ export function getDeadLetterQueue(): Queue<DeadLetterJob> {
 
 export function getAutonomousSessionQueue(): Queue<AutonomousSessionJob> {
   return getOrCreateQueue<AutonomousSessionJob>(QUEUE_NAMES.AUTONOMOUS_SESSIONS);
+}
+
+export function getMeetingPrepQueue(): Queue<MeetingPrepJob> {
+  return getOrCreateQueue<MeetingPrepJob>(QUEUE_NAMES.MEETING_PREP);
 }
 
 export async function closeAllQueues(): Promise<void> {

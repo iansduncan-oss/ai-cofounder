@@ -13,6 +13,7 @@ import {
   getDeadLetterQueue,
   getAutonomousSessionQueue,
   getDeployVerificationQueue,
+  getMeetingPrepQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
@@ -24,6 +25,7 @@ import {
   type SubagentTaskJob,
   type DeadLetterJob,
   type AutonomousSessionJob,
+  type MeetingPrepJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-helpers");
@@ -123,6 +125,15 @@ export async function enqueueSubagentTask(
     priority: PRIORITY_MAP[job.priority ?? "normal"],
   });
   logger.info({ jobId: added.id, subagentRunId: job.subagentRunId, title: job.title }, "Subagent task enqueued");
+  return added.id;
+}
+
+export async function enqueueMeetingPrep(
+  job: MeetingPrepJob,
+): Promise<string | undefined> {
+  const queue = getMeetingPrepQueue();
+  const added = await queue.add(`meeting-prep-${job.action}`, job);
+  logger.info({ jobId: added.id, action: job.action }, "Meeting prep job enqueued");
   return added.id;
 }
 

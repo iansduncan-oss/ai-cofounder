@@ -870,6 +870,17 @@ export interface FreeBusyResponse {
   busy: Array<{ start: string; end: string }>;
 }
 
+/* ── Meeting Prep ── */
+
+export interface MeetingPrepResponse {
+  eventId: string;
+  eventTitle: string;
+  prepText: string;
+  attendees: unknown;
+  relatedMemories: unknown;
+  generatedAt: string;
+}
+
 /* ── Briefing ── */
 
 export interface BriefingSections {

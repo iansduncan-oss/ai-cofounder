@@ -744,6 +744,21 @@ export const briefingCache = pgTable("briefing_cache", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Meeting Preps (AI-generated meeting preparation notes) ── */
+
+export const meetingPreps = pgTable("meeting_preps", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: text("event_id").notNull().unique(),
+  eventTitle: text("event_title").notNull(),
+  eventStart: timestamp("event_start", { withTimezone: true }).notNull(),
+  prepText: text("prep_text").notNull(),
+  attendees: jsonb("attendees"),
+  relatedMemories: jsonb("related_memories"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),
+  notified: boolean("notified").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Pipeline Templates (content automation workflows) ── */
 
 export const pipelineTemplates = pgTable("pipeline_templates", {

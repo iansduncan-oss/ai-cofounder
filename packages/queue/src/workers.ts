@@ -13,6 +13,7 @@ import {
   type SubagentTaskJob,
   type DeployVerificationJob,
   type AutonomousSessionJob,
+  type MeetingPrepJob,
 } from "./queues.js";
 import { sendToDeadLetter } from "./helpers.js";
 
@@ -34,6 +35,7 @@ export type ReflectionProcessor = (job: Job<ReflectionJob>) => Promise<void>;
 export type SubagentTaskProcessor = (job: Job<SubagentTaskJob>) => Promise<void>;
 export type DeployVerificationProcessor = (job: Job<DeployVerificationJob>) => Promise<void>;
 export type AutonomousSessionProcessor = (job: Job<AutonomousSessionJob>) => Promise<void>;
+export type MeetingPrepProcessor = (job: Job<MeetingPrepJob>) => Promise<void>;
 
 export interface WorkerProcessors {
   agentTask?: AgentTaskProcessor;
@@ -46,6 +48,7 @@ export interface WorkerProcessors {
   subagentTask?: SubagentTaskProcessor;
   deployVerification?: DeployVerificationProcessor;
   autonomousSession?: AutonomousSessionProcessor;
+  meetingPrep?: MeetingPrepProcessor;
 }
 
 const activeWorkers: Worker[] = [];
@@ -196,6 +199,20 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.AUTONOMOUS_SESSIONS);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.meetingPrep) {
+    const worker = new Worker<MeetingPrepJob>(
+      QUEUE_NAMES.MEETING_PREP,
+      processors.meetingPrep,
+      {
+        connection,
+        concurrency: 1,
+        lockDuration: 300_000, // 5 min — LLM-intensive
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.MEETING_PREP);
     activeWorkers.push(worker);
   }
 

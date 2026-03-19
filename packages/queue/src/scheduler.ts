@@ -1,6 +1,6 @@
 import { createLogger } from "@ai-cofounder/shared";
-import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue, getAutonomousSessionQueue } from "./queues.js";
-import type { MonitoringJob, BriefingJob, ReflectionJob, AutonomousSessionJob } from "./queues.js";
+import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue, getAutonomousSessionQueue, getMeetingPrepQueue } from "./queues.js";
+import type { MonitoringJob, BriefingJob, ReflectionJob, AutonomousSessionJob, MeetingPrepJob } from "./queues.js";
 
 const logger = createLogger("queue-scheduler");
 
@@ -209,6 +209,36 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled DLQ check every 5 minutes");
+
+  // ── Meeting prep: generate upcoming preps (hourly) ──
+
+  const meetingPrepQueue = getMeetingPrepQueue();
+  await meetingPrepQueue.upsertJobScheduler(
+    "meeting-prep-generate",
+    {
+      pattern: "0 * * * *", // every hour
+      tz: briefingTimezone,
+    },
+    {
+      name: "meeting-prep-generate",
+      data: { action: "generate_upcoming" } satisfies MeetingPrepJob,
+    },
+  );
+  logger.info("Scheduled meeting prep generation (hourly)");
+
+  // ── Meeting prep: send notifications (every 5 min) ──
+
+  await meetingPrepQueue.upsertJobScheduler(
+    "meeting-prep-notify",
+    {
+      every: 5 * 60 * 1000,
+    },
+    {
+      name: "meeting-prep-notify",
+      data: { action: "send_notifications" } satisfies MeetingPrepJob,
+    },
+  );
+  logger.info("Scheduled meeting prep notifications (every 5 min)");
 
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 

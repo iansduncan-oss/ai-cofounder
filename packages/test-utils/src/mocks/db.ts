@@ -299,6 +299,12 @@ export function mockDbModule() {
     getBriefingCache: vi.fn().mockResolvedValue(null),
     upsertBriefingCache: vi.fn().mockResolvedValue({}),
     briefingCache: {},
+    // Meeting preps
+    getMeetingPrep: vi.fn().mockResolvedValue(null),
+    upsertMeetingPrep: vi.fn().mockResolvedValue({}),
+    listUnnotifiedMeetingPreps: vi.fn().mockResolvedValue([]),
+    markMeetingPrepNotified: vi.fn().mockResolvedValue(undefined),
+    meetingPreps: {},
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),

@@ -54,6 +54,8 @@ export {
   type DeployVerificationJob,
   type DeadLetterJob,
   type AutonomousSessionJob,
+  getMeetingPrepQueue,
+  type MeetingPrepJob,
 } from "./queues.js";
 
 // Workers
@@ -71,6 +73,7 @@ export {
   type SubagentTaskProcessor,
   type DeployVerificationProcessor,
   type AutonomousSessionProcessor,
+  type MeetingPrepProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)
@@ -86,6 +89,7 @@ export {
   enqueueRagIngestion,
   enqueueReflection,
   enqueueSubagentTask,
+  enqueueMeetingPrep,
   enqueueAutonomousSession,
   getAllQueueStatus,
   getJobStatus,

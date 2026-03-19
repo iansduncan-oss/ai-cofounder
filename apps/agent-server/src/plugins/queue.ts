@@ -218,6 +218,25 @@ export const queuePlugin = fp(async (app) => {
       }
     },
 
+    meetingPrep: async (job) => {
+      const { action } = job.data;
+      logger.info({ jobId: job.id, action }, "Processing meeting prep job");
+      const { MeetingPrepService } = await import("../services/meeting-prep.js");
+      const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
+      const svc = new MeetingPrepService(app.db, app.llmRegistry, app.embeddingService);
+
+      if (action === "generate_upcoming") {
+        const adminUserId = await getPrimaryAdminUserId(app.db);
+        if (!adminUserId) {
+          logger.warn("No primary admin user — skipping meeting prep generation");
+          return;
+        }
+        await svc.generateUpcomingPreps(adminUserId);
+      } else if (action === "send_notifications") {
+        await svc.sendPrepNotifications(app.notificationService);
+      }
+    },
+
     ragIngestion: async (job) => {
       const { action, sourceId } = job.data;
       logger.info({ jobId: job.id, action, sourceId }, "Running RAG ingestion");

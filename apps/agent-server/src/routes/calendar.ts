@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CalendarService } from "../services/calendar.js";
+import { getMeetingPrep, upsertMeetingPrep } from "@ai-cofounder/db";
+import { MeetingPrepService } from "../services/meeting-prep.js";
 
 export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   function getService(request: FastifyRequest, reply: FastifyReply): CalendarService | null {
@@ -145,6 +147,67 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
         }
         const event = await svc.respondToEvent(request.params.id, responseStatus);
         return { success: true, eventId: event.id };
+      } catch (err) {
+        return handleError(err, reply);
+      }
+    },
+  );
+
+  // GET /api/calendar/events/:id/prep
+  app.get<{ Params: { id: string }; Querystring: { refresh?: string } }>(
+    "/events/:id/prep",
+    { schema: { tags: ["calendar"] } },
+    async (request, reply) => {
+      try {
+        const svc = getService(request, reply);
+        if (!svc) return;
+        const { id } = request.params;
+        const refresh = request.query.refresh === "true";
+
+        // Check for cached prep (unless refresh requested)
+        if (!refresh) {
+          const cached = await getMeetingPrep(app.db, id);
+          if (cached) {
+            return {
+              eventId: cached.eventId,
+              eventTitle: cached.eventTitle,
+              prepText: cached.prepText,
+              attendees: cached.attendees,
+              relatedMemories: cached.relatedMemories,
+              generatedAt: cached.generatedAt,
+            };
+          }
+        }
+
+        // Generate on-demand
+        const sub = (request.user as { sub?: string })?.sub ?? "dashboard-user";
+        const event = await svc.getEvent(id);
+        const prepService = new MeetingPrepService(app.db, app.llmRegistry, app.embeddingService);
+        await prepService.generatePrepForEvent(
+          {
+            id: event.id,
+            summary: event.summary,
+            start: event.start.dateTime ?? event.start.date ?? "",
+            end: event.end.dateTime ?? event.end.date ?? "",
+            isAllDay: !!event.start.date && !event.start.dateTime,
+            status: event.status,
+            attendeeCount: event.attendees?.length ?? 0,
+            location: event.location,
+          },
+          sub,
+        );
+
+        const prep = await getMeetingPrep(app.db, id);
+        if (!prep) return reply.code(500).send({ error: "Failed to generate meeting prep" });
+
+        return {
+          eventId: prep.eventId,
+          eventTitle: prep.eventTitle,
+          prepText: prep.prepText,
+          attendees: prep.attendees,
+          relatedMemories: prep.relatedMemories,
+          generatedAt: prep.generatedAt,
+        };
       } catch (err) {
         return handleError(err, reply);
       }
