@@ -25,6 +25,13 @@ export async function upsertAppSetting(db: Db, key: string, value: string): Prom
 }
 
 /**
+ * Convenience wrapper: returns the admin user ID used by background jobs.
+ */
+export async function getPrimaryAdminUserId(db: Db): Promise<string | null> {
+  return getAppSetting(db, "primary_admin_user_id");
+}
+
+/**
  * Return all app settings as a key-value map.
  */
 export async function getAllAppSettings(db: Db): Promise<Record<string, string>> {

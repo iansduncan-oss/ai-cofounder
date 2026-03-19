@@ -239,6 +239,13 @@
       "when": 1772799000000,
       "tag": "0033_add_goal_scope_and_proposed",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1772800000000,
+      "tag": "0034_add_briefing_cache",
+      "breakpoints": true
     }
   ]
 }

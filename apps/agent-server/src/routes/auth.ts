@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { findAdminByEmail, createAdminUser, upsertGoogleToken } from "@ai-cofounder/db";
+import { findAdminByEmail, createAdminUser, upsertGoogleToken, upsertAppSetting } from "@ai-cofounder/db";
 import { optionalEnv, createLogger } from "@ai-cofounder/shared";
 import { encryptToken, isEncryptionConfigured } from "../services/crypto.js";
 import { getGoogleConnectionStatus, disconnectGoogle } from "../services/google-auth.js";
@@ -266,6 +266,9 @@ export async function authRoutes(app: FastifyInstance) {
             scopes: tokenData.scope ?? GOOGLE_SCOPES,
           });
           logger.info({ adminUserId: admin.id }, "Google OAuth tokens stored");
+
+          // Persist as primary admin for background jobs (briefings, meeting prep)
+          await upsertAppSetting(app.db, "primary_admin_user_id", admin.id);
         } catch (err) {
           logger.warn({ err }, "Failed to store Google tokens (non-fatal)");
         }

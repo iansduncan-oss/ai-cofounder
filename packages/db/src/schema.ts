@@ -733,6 +733,17 @@ export const appSettings = pgTable("app_settings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+/* ── Briefing Cache (daily briefing storage) ── */
+
+export const briefingCache = pgTable("briefing_cache", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  date: text("date").notNull().unique(),
+  briefingText: text("briefing_text").notNull(),
+  sections: jsonb("sections"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Pipeline Templates (content automation workflows) ── */
 
 export const pipelineTemplates = pgTable("pipeline_templates", {
