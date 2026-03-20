@@ -102,10 +102,16 @@ Services available at:
 
 ## Agent System
 
-- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `create_milestone`, `request_approval`, `save_memory`, `recall_memories`, `search_web`, `browse_web`, `trigger_workflow`, `list_workflows`, `execute_code`, `create/list/delete_schedule`, `read_file`, `write_file`, `delete_file`, `delete_directory`, `list_directory`, `git_clone`, `git_status`, `git_diff`, `git_add`, `git_commit`, `git_log`, `git_pull`, `git_branch`, `git_checkout`, `git_push`, `run_tests`, `create_pr`, `submit_verification`
+- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `create_milestone`, `request_approval`, `save_memory`, `recall_memories`, `search_web`, `browse_web`, `trigger_workflow`, `list_workflows`, `execute_code`, `create/list/delete_schedule`, `read_file`, `write_file`, `delete_file`, `delete_directory`, `list_directory`, `git_clone`, `git_status`, `git_diff`, `git_add`, `git_commit`, `git_log`, `git_pull`, `git_branch`, `git_checkout`, `git_push`, `run_tests`, `create_pr`, `submit_verification`, `create_follow_up`
 - **Specialist agents** — `ResearcherAgent`, `CoderAgent` (with self-review), `ReviewerAgent`, `PlannerAgent`, `DebuggerAgent`, `DocWriterAgent`, `VerifierAgent`
 - **Base class** — `SpecialistAgent` with tool loop (max 3 rounds) and `completeWithRetry()` (single retry, 2s backoff on 429/timeout/ECONNRESET/503)
 - **TaskDispatcher** — executes goal tasks in orderIndex, passes outputs as context chain, checks pending approvals before each task, post-execution self-improvement analysis
+
+## Proactive Features (Phase 7)
+
+- **Enhanced briefings** — Google Calendar + Gmail enrichment via `GET /api/briefings/today`; aggregates upcoming meetings, unread emails, and action items into a daily narrative
+- **Meeting prep** — `MeetingPrepService` generates context docs for upcoming calendar events; `GET /api/calendar/events/:id/prep` (cached + on-demand); BullMQ recurring jobs (`meeting-prep` queue) for proactive generation and notification
+- **Follow-up tracking** — CRUD at `/api/follow-ups`, orchestrator `create_follow_up` tool for in-conversation creation, daily reminder jobs via BullMQ for overdue items
 
 ## Adding New Orchestrator Tools
 
