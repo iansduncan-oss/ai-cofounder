@@ -31,6 +31,7 @@ import {
   recordToolExecution,
   updateTaskDependencies,
   getConversation,
+  saveThinkingTrace,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
@@ -83,6 +84,10 @@ import type { MonitoringService } from "../services/monitoring.js";
 import type { BrowserService } from "../services/browser.js";
 import type { GmailService } from "../services/gmail.js";
 import type { CalendarService } from "../services/calendar.js";
+import type { EpisodicMemoryService } from "../services/episodic-memory.js";
+import type { ProceduralMemoryService } from "../services/procedural-memory.js";
+import { ToolCache } from "../services/tool-cache.js";
+import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -332,6 +337,8 @@ export interface OrchestratorOptions {
   browserService?: BrowserService;
   gmailService?: GmailService;
   calendarService?: CalendarService;
+  episodicMemoryService?: EpisodicMemoryService;
+  proceduralMemoryService?: ProceduralMemoryService;
 }
 
 /* ── Orchestrator class ── */
@@ -352,6 +359,8 @@ export class Orchestrator {
   private browserService?: BrowserService;
   private gmailService?: GmailService;
   private calendarService?: CalendarService;
+  private episodicMemoryService?: EpisodicMemoryService;
+  private proceduralMemoryService?: ProceduralMemoryService;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -369,6 +378,8 @@ export class Orchestrator {
     this.browserService = options.browserService;
     this.gmailService = options.gmailService;
     this.calendarService = options.calendarService;
+    this.episodicMemoryService = options.episodicMemoryService;
+    this.proceduralMemoryService = options.proceduralMemoryService;
   }
 
   /**
@@ -406,6 +417,63 @@ export class Orchestrator {
 
     // Unreachable, but TypeScript needs it
     throw new Error("completeWithRetry: exhausted retries");
+  }
+
+  /**
+   * Parse <thinking> blocks from response text, store as traces, and strip from output.
+   */
+  private parseAndStoreThinking(
+    text: string,
+    conversationId: string,
+    round: number,
+  ): string {
+    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+    let match: RegExpExecArray | null;
+    const blocks: string[] = [];
+
+    while ((match = thinkingRegex.exec(text)) !== null) {
+      blocks.push(match[1].trim());
+    }
+
+    if (blocks.length > 0 && this.db) {
+      for (const block of blocks) {
+        saveThinkingTrace(this.db, {
+          conversationId,
+          requestId: this.requestId,
+          round,
+          content: block,
+        }).catch(() => {}); // fire-and-forget
+      }
+    }
+
+    // Strip thinking tags from output
+    return text.replace(thinkingRegex, "").trim();
+  }
+
+  /**
+   * Filter tools by evaluating optional preconditions.
+   * Also strips the preconditions property before passing to LLM API.
+   */
+  private async filterAvailableTools(tools: LlmTool[]): Promise<LlmTool[]> {
+    const results: LlmTool[] = [];
+    for (const tool of tools) {
+      if (tool.preconditions) {
+        try {
+          const available = await tool.preconditions();
+          if (!available) {
+            this.logger.debug({ tool: tool.name }, "tool precondition failed, filtering out");
+            continue;
+          }
+        } catch {
+          this.logger.debug({ tool: tool.name }, "tool precondition threw, filtering out");
+          continue;
+        }
+      }
+      // Strip preconditions before sending to LLM
+      const { preconditions: _p, ...cleanTool } = tool;
+      results.push(cleanTool as LlmTool);
+    }
+    return results;
   }
 
   async run(
@@ -522,6 +590,17 @@ export class Orchestrator {
       memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
 
+    // Tool efficacy hints
+    if (this.db) {
+      try {
+        const efficacyService = new ToolEfficacyService(this.db);
+        const hints = await efficacyService.getEfficacyHints();
+        if (hints) {
+          memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
+        }
+      } catch { /* non-fatal */ }
+    }
+
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
 
     // Build message history for context
@@ -540,11 +619,11 @@ export class Orchestrator {
     messages.push({ role: "user", content: message });
 
     // Build tools array: orchestrator-only tools + shared tools
-    const tools: LlmTool[] = this.db
+    const rawTools: LlmTool[] = this.db
       ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
       : [];
 
-    tools.push(...buildSharedToolList({
+    rawTools.push(...buildSharedToolList({
       db: this.db,
       embeddingService: this.embeddingService,
       n8nService: this.n8nService,
@@ -556,7 +635,12 @@ export class Orchestrator {
       browserService: this.browserService,
       gmailService: this.gmailService,
       calendarService: this.calendarService,
+      episodicMemoryService: this.episodicMemoryService,
+      proceduralMemoryService: this.proceduralMemoryService,
     }, undefined, this.autonomyTierService));
+
+    const tools = await this.filterAvailableTools(rawTools);
+    const toolCache = new ToolCache();
 
     try {
       let totalInputTokens = 0;
@@ -585,7 +669,16 @@ export class Orchestrator {
         for (const block of response.content) {
           if (block.type === "tool_use") {
             this.logger.info({ tool: block.name, conversationId: id }, "executing tool");
-            const result = await this.executeTool(block, id, userId);
+
+            // Check tool cache before executing
+            const cached = toolCache.get(block.name, block.input as Record<string, unknown>);
+            let result: unknown;
+            if (cached !== undefined) {
+              result = cached;
+            } else {
+              result = await this.executeTool(block, id, userId);
+              toolCache.set(block.name, block.input as Record<string, unknown>, result);
+            }
 
             // If create_plan returned a plan, capture it
             if (block.name === "create_plan" && result && "goalId" in (result as object)) {
@@ -622,6 +715,9 @@ export class Orchestrator {
         .map((block) => block.text);
 
       let responseText = textBlocks.join("\n");
+
+      // Parse and store thinking traces, strip from user-facing response
+      responseText = this.parseAndStoreThinking(responseText, id, round);
 
       if (!responseText && plan) {
         responseText = this.buildPlanSummary(plan);
@@ -743,6 +839,17 @@ export class Orchestrator {
       memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
     }
 
+    // Tool efficacy hints (stream path)
+    if (this.db) {
+      try {
+        const efficacyService = new ToolEfficacyService(this.db);
+        const hints = await efficacyService.getEfficacyHints();
+        if (hints) {
+          memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
+        }
+      } catch { /* non-fatal */ }
+    }
+
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
     const messages: LlmMessage[] = [];
     const trimmed = history?.length ? this.trimHistory(history) : [];
@@ -751,10 +858,10 @@ export class Orchestrator {
     }
     messages.push({ role: "user", content: message });
 
-    const tools: LlmTool[] = this.db
+    const rawToolsStream: LlmTool[] = this.db
       ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
       : [];
-    tools.push(...buildSharedToolList({
+    rawToolsStream.push(...buildSharedToolList({
       db: this.db,
       embeddingService: this.embeddingService,
       n8nService: this.n8nService,
@@ -766,7 +873,12 @@ export class Orchestrator {
       browserService: this.browserService,
       gmailService: this.gmailService,
       calendarService: this.calendarService,
+      episodicMemoryService: this.episodicMemoryService,
+      proceduralMemoryService: this.proceduralMemoryService,
     }, undefined, this.autonomyTierService));
+
+    const tools = await this.filterAvailableTools(rawToolsStream);
+    const toolCache = new ToolCache();
 
     try {
       let totalInputTokens = 0;
@@ -793,7 +905,16 @@ export class Orchestrator {
             const toolInput = block.input as Record<string, unknown>;
             await onEvent({ type: "tool_call", data: { tool: block.name, input: this.sanitizeToolInput(toolInput) } });
 
-            const result = await this.executeTool(block, id, userId);
+            // Check tool cache before executing
+            const cached = toolCache.get(block.name, toolInput);
+            let result: unknown;
+            if (cached !== undefined) {
+              result = cached;
+            } else {
+              result = await this.executeTool(block, id, userId);
+              toolCache.set(block.name, toolInput, result);
+            }
+
             if (block.name === "create_plan" && result && "goalId" in (result as object)) {
               plan = result as PlanResult;
             }
@@ -815,6 +936,10 @@ export class Orchestrator {
 
       const textBlocks = response.content.filter((b): b is LlmTextContent => b.type === "text").map((b) => b.text);
       let responseText = textBlocks.join("\n");
+
+      // Parse and store thinking traces, strip from user-facing response
+      responseText = this.parseAndStoreThinking(responseText, id, round);
+
       if (!responseText && plan) responseText = this.buildPlanSummary(plan);
 
       // Emit text in chunks for progressive rendering
@@ -1064,6 +1189,8 @@ export class Orchestrator {
           browserService: this.browserService,
           gmailService: this.gmailService,
           calendarService: this.calendarService,
+          episodicMemoryService: this.episodicMemoryService,
+          proceduralMemoryService: this.proceduralMemoryService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
@@ -1079,6 +1206,8 @@ export class Orchestrator {
         limit: 5,
         minScore: 0.3,
         diversifySources: true,
+        llmRegistry: this.registry,
+        enableReranking: true,
         ...(sourceId ? { sourceId } : {}),
       });
       if (chunks.length === 0) return null;

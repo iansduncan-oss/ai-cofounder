@@ -76,6 +76,10 @@ import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
 import { CREATE_FOLLOW_UP_TOOL } from "./tools/follow-up-tools.js";
 import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
+import { RECALL_EPISODES_TOOL } from "./tools/episodic-tools.js";
+import { RECALL_PROCEDURES_TOOL } from "./tools/procedural-tools.js";
+import type { EpisodicMemoryService } from "../services/episodic-memory.js";
+import type { ProceduralMemoryService } from "../services/procedural-memory.js";
 import {
   LIST_EMAILS_TOOL,
   READ_EMAIL_TOOL,
@@ -124,6 +128,8 @@ export interface ToolExecutorServices {
   browserService?: BrowserService;
   gmailService?: GmailService;
   calendarService?: CalendarService;
+  episodicMemoryService?: EpisodicMemoryService;
+  proceduralMemoryService?: ProceduralMemoryService;
 }
 
 export interface ToolExecutorContext {
@@ -238,6 +244,14 @@ export function buildSharedToolList(
     add(UPDATE_CALENDAR_EVENT_TOOL);
     add(DELETE_CALENDAR_EVENT_TOOL);
     add(RESPOND_TO_CALENDAR_EVENT_TOOL);
+  }
+
+  if (services.episodicMemoryService) {
+    add(RECALL_EPISODES_TOOL);
+  }
+
+  if (services.proceduralMemoryService) {
+    add(RECALL_PROCEDURES_TOOL);
   }
 
   return tools;
@@ -1057,6 +1071,22 @@ export async function executeSharedTool(
       if (!eventId || !responseStatus) return { error: "eventId and responseStatus are required" };
       const event = await cal.respondToEvent(eventId, responseStatus);
       return { success: true, eventId: event.id, responseStatus };
+    }
+
+    case "recall_episodes": {
+      const { episodicMemoryService } = services;
+      if (!episodicMemoryService) return { error: "Episodic memory not available" };
+      const { query, limit } = block.input as { query: string; limit?: number };
+      const episodes = await episodicMemoryService.recallEpisodes(query, { limit });
+      return { episodes, count: episodes.length };
+    }
+
+    case "recall_procedures": {
+      const { proceduralMemoryService } = services;
+      if (!proceduralMemoryService) return { error: "Procedural memory not available" };
+      const { query, limit } = block.input as { query: string; limit?: number };
+      const procedures = await proceduralMemoryService.findMatchingProcedures(query, limit);
+      return { procedures, count: procedures.length };
     }
 
     default:

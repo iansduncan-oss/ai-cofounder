@@ -71,10 +71,17 @@ const DEFAULT_TOOLS = [
   "create_plan", "create_milestone", "request_approval",
   "browser_action",
   "create_follow_up",
+  "recall_episodes",
+  "recall_procedures",
 ] as const;
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { createJournalService, type JournalService } from "./services/journal.js";
 import { BudgetAlertService } from "./services/budget-alert.js";
+import { createDocumentWatcher } from "./services/document-watcher.js";
+import { EpisodicMemoryService } from "./services/episodic-memory.js";
+import { ProceduralMemoryService } from "./services/procedural-memory.js";
+import { MemoryLifecycleService } from "./services/memory-lifecycle.js";
+import { FailurePatternService } from "./services/failure-patterns.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
 /** Create and configure the LLM registry with all available providers */
@@ -274,6 +281,12 @@ export function buildServer(registry?: LlmRegistry) {
   // Budget alert service (created after db is ready via onReady hook)
   app.decorate("budgetAlertService", undefined as unknown as BudgetAlertService);
 
+  // Intelligence services (created after db is ready via onReady hook)
+  app.decorate("episodicMemoryService", undefined as unknown as EpisodicMemoryService);
+  app.decorate("proceduralMemoryService", undefined as unknown as ProceduralMemoryService);
+  app.decorate("memoryLifecycleService", undefined as unknown as MemoryLifecycleService);
+  app.decorate("failurePatternsService", undefined as unknown as FailurePatternService);
+
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
   app.addHook("onReady", async () => {
@@ -298,6 +311,17 @@ export function buildServer(registry?: LlmRegistry) {
     // Wire budget alert service
     app.budgetAlertService = new BudgetAlertService(app.db, notificationService);
     logger.info("budget alert service initialized");
+
+    // Wire intelligence services (episodic memory, procedural memory, memory lifecycle, failure patterns)
+    const embedFn = embeddingService ? (text: string) => embeddingService.embed(text) : undefined;
+    if (embedFn) {
+      app.episodicMemoryService = new EpisodicMemoryService(app.db, llmRegistry, embedFn);
+      app.proceduralMemoryService = new ProceduralMemoryService(app.db, llmRegistry, embedFn);
+      logger.info("episodic + procedural memory services initialized");
+    }
+    app.memoryLifecycleService = new MemoryLifecycleService(app.db);
+    app.failurePatternsService = new FailurePatternService(app.db);
+    logger.info("memory lifecycle + failure patterns services initialized");
 
     // Wire CI self-heal service (requires Redis + notification service)
     const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
@@ -367,6 +391,17 @@ export function buildServer(registry?: LlmRegistry) {
     });
     app.addHook("onClose", async () => scheduler.stop());
     logger.info("scheduler daemon started");
+
+    // Optional document watcher for RAG re-ingestion
+    const docWatchPaths = optionalEnv("DOC_WATCH_PATHS", "");
+    if (docWatchPaths) {
+      const docWatcher = createDocumentWatcher(docWatchPaths);
+      if (docWatcher) {
+        await docWatcher.start();
+        app.addHook("onClose", async () => docWatcher.stop());
+        logger.info("document watcher started");
+      }
+    }
 
     // Flush every 60 seconds
     healthFlushInterval = setInterval(async () => {
@@ -519,6 +554,10 @@ declare module "fastify" {
     ciSelfHealService?: CiSelfHealService;
     journalService: JournalService;
     budgetAlertService: BudgetAlertService;
+    episodicMemoryService?: EpisodicMemoryService;
+    proceduralMemoryService?: ProceduralMemoryService;
+    memoryLifecycleService?: MemoryLifecycleService;
+    failurePatternsService?: FailurePatternService;
     wsBroadcast: (channel: WsChannel) => void;
   }
 }

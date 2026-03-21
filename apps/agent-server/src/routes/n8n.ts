@@ -73,6 +73,8 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       projectRegistryService: app.projectRegistry,
       monitoringService: app.monitoringService,
       browserService: app.browserService,
+      episodicMemoryService: app.episodicMemoryService,
+      proceduralMemoryService: app.proceduralMemoryService,
     });
 
     const contextMessage = event_type

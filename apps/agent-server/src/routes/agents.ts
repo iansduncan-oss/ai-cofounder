@@ -51,6 +51,8 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     projectRegistryService: app.projectRegistry,
     monitoringService: app.monitoringService,
     browserService: app.browserService,
+    episodicMemoryService: app.episodicMemoryService,
+    proceduralMemoryService: app.proceduralMemoryService,
   });
 
   const conversationIngestion = new ConversationIngestionService(

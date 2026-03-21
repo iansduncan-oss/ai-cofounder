@@ -55,7 +55,7 @@ export interface RagIngestionJob {
 }
 
 export interface ReflectionJob {
-  action: "analyze_goal" | "weekly_patterns" | "analyze_user_patterns" | "extract_decision" | "consolidate_memories" | "process_pattern_feedback";
+  action: "analyze_goal" | "weekly_patterns" | "analyze_user_patterns" | "extract_decision" | "consolidate_memories" | "process_pattern_feedback" | "create_episode" | "learn_procedure" | "memory_lifecycle" | "analyze_failures";
   goalId?: string;
   goalTitle?: string;
   status?: string;

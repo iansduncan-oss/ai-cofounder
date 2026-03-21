@@ -206,6 +206,38 @@ export const queuePlugin = fp(async (app) => {
           logger.info(result, "pattern feedback processing complete");
           break;
         }
+        case "create_episode": {
+          if (app.episodicMemoryService && job.data.conversationId) {
+            const episode = await app.episodicMemoryService.createEpisode(job.data.conversationId);
+            if (episode) {
+              logger.info({ episodeId: episode.id }, "Episodic memory created");
+            }
+          }
+          break;
+        }
+        case "learn_procedure": {
+          if (app.proceduralMemoryService && job.data.goalId) {
+            const procedure = await app.proceduralMemoryService.learnProcedure(job.data.goalId);
+            if (procedure) {
+              logger.info({ procedureId: procedure.id }, "Procedural memory learned");
+            }
+          }
+          break;
+        }
+        case "memory_lifecycle": {
+          if (app.memoryLifecycleService && job.data.userId) {
+            const result = await app.memoryLifecycleService.runFullLifecycle(job.data.userId);
+            logger.info(result, "Memory lifecycle maintenance complete");
+          }
+          break;
+        }
+        case "analyze_failures": {
+          if (app.failurePatternsService) {
+            const hint = await app.failurePatternsService.formatPatternsForPrompt();
+            logger.info({ hasPatterns: hint.length > 0 }, "Failure pattern analysis complete");
+          }
+          break;
+        }
       }
     },
 

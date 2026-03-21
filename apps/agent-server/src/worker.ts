@@ -22,6 +22,8 @@ import { createNotificationService } from "./services/notifications.js";
 import { SubagentRunner } from "./services/subagent.js";
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { DistributedLockService } from "./services/distributed-lock.js";
+import { PlanRepairService } from "./services/plan-repair.js";
+import { ProceduralMemoryService } from "./services/procedural-memory.js";
 import Redis from "ioredis";
 
 const logger = createLogger("worker");
@@ -60,6 +62,10 @@ export async function main() {
     sandboxService,
   );
 
+  const planRepairService = new PlanRepairService(llmRegistry);
+  const embedFn = embeddingService ? (text: string) => embeddingService.embed(text) : undefined;
+  const proceduralMemoryService = embedFn ? new ProceduralMemoryService(db, llmRegistry, embedFn) : undefined;
+
   const dispatcher = new TaskDispatcher(
     llmRegistry,
     db,
@@ -68,6 +74,8 @@ export async function main() {
     notificationService,
     workspaceService,
     verificationService,
+    planRepairService,
+    proceduralMemoryService,
   );
 
   // Agent messaging service

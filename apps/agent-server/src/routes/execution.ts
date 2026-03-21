@@ -4,6 +4,7 @@ import { getGoal, updateGoalMetadata } from "@ai-cofounder/db";
 import { enqueueAgentTask, goalChannel } from "@ai-cofounder/queue";
 import { TaskDispatcher } from "../agents/dispatcher.js";
 import { VerificationService } from "../services/verification.js";
+import { PlanRepairService } from "../services/plan-repair.js";
 
 const logger = createLogger("execution-routes");
 
@@ -17,6 +18,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // dispatcher is still needed for GET /:id/progress
+  const planRepairService = new PlanRepairService(app.llmRegistry);
   const dispatcher = new TaskDispatcher(
     app.llmRegistry,
     app.db,
@@ -25,6 +27,8 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
     app.notificationService,
     app.workspaceService,
     verificationService,
+    planRepairService,
+    app.proceduralMemoryService,
   );
 
   // Execute all tasks for a goal — non-blocking: enqueues to BullMQ and returns 202

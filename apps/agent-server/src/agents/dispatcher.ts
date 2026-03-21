@@ -27,6 +27,8 @@ import type { NotificationService } from "../services/notifications.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { VerificationService } from "../services/verification.js";
 import { enqueueReflection } from "@ai-cofounder/queue";
+import type { PlanRepairService } from "../services/plan-repair.js";
+import type { ProceduralMemoryService } from "../services/procedural-memory.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -71,6 +73,8 @@ export class TaskDispatcher {
     private notificationService?: NotificationService,
     workspaceService?: WorkspaceService,
     private verificationService?: VerificationService,
+    private planRepairService?: PlanRepairService,
+    private proceduralMemoryService?: ProceduralMemoryService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -166,7 +170,17 @@ export class TaskDispatcher {
       this.verifyGoalCompletion(goalId, goal.title, taskResults, userId).catch((err) => {
         this.logger.warn({ err, goalId }, "goal verification failed (non-fatal)");
       });
+
+      // Learn procedure from successful goal (fire-and-forget)
+      if (this.proceduralMemoryService) {
+        this.proceduralMemoryService.learnProcedure(goalId).catch((err) => {
+          this.logger.warn({ err, goalId }, "procedural learning failed (non-fatal)");
+        });
+      }
     }
+
+    // Clean up plan repair tracking
+    this.planRepairService?.clearGoal(goalId);
 
     this.logger.info(
       {
@@ -437,6 +451,34 @@ export class TaskDispatcher {
           } else if (taskResult.status === "failed") {
             failed.add(taskId);
             await blockDownstream(taskId);
+
+            // Attempt plan repair if service is available and budget remains
+            if (this.planRepairService?.canReplan(goalId)) {
+              const failedInfo = taskMap.get(taskId);
+              if (failedInfo) {
+                const completedInfos = [...completed].map((id) => {
+                  const t = taskMap.get(id)!;
+                  return { id, title: t.title, status: "completed" as const, output: outputMap.get(id) ?? null, description: t.description, assignedAgent: t.assignedAgent, error: null };
+                });
+                const remainingInfos = [...blocked].map((id) => {
+                  const t = taskMap.get(id)!;
+                  return { id, title: t.title, status: "blocked" as const, description: t.description, assignedAgent: t.assignedAgent, output: null, error: null };
+                });
+                this.planRepairService.generateCorrectivePlan(
+                  { id: taskId, title: failedInfo.title, status: "failed", error: taskResult.output ?? null, description: failedInfo.description, assignedAgent: failedInfo.assignedAgent, output: null },
+                  completedInfos,
+                  remainingInfos,
+                  goalTitle,
+                ).then((corrective) => {
+                  if (corrective && corrective.length > 0) {
+                    this.planRepairService!.recordReplan(goalId);
+                    this.logger.info({ goalId, correctiveCount: corrective.length }, "plan repair generated corrective tasks");
+                  }
+                }).catch((err) => {
+                  this.logger.warn({ err, goalId }, "plan repair failed (non-fatal)");
+                });
+              }
+            }
           }
         } else {
           // Promise.allSettled rejected — shouldn't happen since executeTask catches errors
