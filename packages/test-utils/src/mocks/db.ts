@@ -149,6 +149,8 @@ export function mockDbModule() {
     // RAG / Document chunks
     insertChunks: vi.fn().mockResolvedValue(undefined),
     searchChunksByVector: vi.fn().mockResolvedValue([]),
+    searchChunksByText: vi.fn().mockResolvedValue([]),
+    hybridSearchChunks: vi.fn().mockResolvedValue([]),
     deleteChunksBySource: vi.fn().mockResolvedValue(undefined),
     getChunkCount: vi.fn().mockResolvedValue(0),
     // Ingestion state
@@ -314,6 +316,36 @@ export function mockDbModule() {
     listDueFollowUps: vi.fn().mockResolvedValue([]),
     markFollowUpReminderSent: vi.fn().mockResolvedValue(undefined),
     followUps: {},
+    // Thinking traces
+    saveThinkingTrace: vi.fn().mockResolvedValue({ id: "tt-1", conversationId: "conv-1", round: 0, content: "test" }),
+    getThinkingTraces: vi.fn().mockResolvedValue([]),
+    thinkingTraces: {},
+    // Tool efficacy
+    getToolEfficacyStats: vi.fn().mockResolvedValue([]),
+    // Episodic memory
+    createEpisodicMemory: vi.fn().mockResolvedValue({ id: "em-1", summary: "Test episode" }),
+    listEpisodicMemories: vi.fn().mockResolvedValue([]),
+    searchEpisodicMemoriesByVector: vi.fn().mockResolvedValue([]),
+    touchEpisodicMemory: vi.fn().mockResolvedValue(undefined),
+    episodicMemories: {},
+    // Procedural memory
+    createProceduralMemory: vi.fn().mockResolvedValue({ id: "pm-1", triggerPattern: "test" }),
+    listProceduralMemories: vi.fn().mockResolvedValue([]),
+    searchProceduralMemoriesByVector: vi.fn().mockResolvedValue([]),
+    incrementProceduralSuccess: vi.fn().mockResolvedValue(undefined),
+    incrementProceduralFailure: vi.fn().mockResolvedValue(undefined),
+    proceduralMemories: {},
+    // Memory lifecycle
+    archiveMemory: vi.fn().mockResolvedValue(undefined),
+    listMemoriesForDecay: vi.fn().mockResolvedValue([]),
+    countActiveMemories: vi.fn().mockResolvedValue(0),
+    findSimilarMemories: vi.fn().mockResolvedValue([]),
+    // Failure patterns
+    upsertFailurePattern: vi.fn().mockResolvedValue({ id: "fp-1", toolName: "test_tool", errorCategory: "error", frequency: 1 }),
+    listFailurePatterns: vi.fn().mockResolvedValue([]),
+    getFailurePatternsForTool: vi.fn().mockResolvedValue([]),
+    incrementFailureFrequency: vi.fn().mockResolvedValue(undefined),
+    failurePatterns: {},
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
