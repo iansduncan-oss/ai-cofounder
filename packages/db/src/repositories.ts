@@ -42,6 +42,10 @@ import {
   briefingCache,
   meetingPreps,
   followUps,
+  thinkingTraces,
+  episodicMemories,
+  proceduralMemories,
+  failurePatterns,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -1864,6 +1868,7 @@ export interface ChunkInsert {
   metadata?: Record<string, unknown>;
   chunkIndex: number;
   tokenCount: number;
+  contextPrefix?: string;
 }
 
 export async function insertChunks(db: Db, chunks: ChunkInsert[]) {
@@ -3647,4 +3652,452 @@ export async function markFollowUpReminderSent(db: Db, id: string) {
     .update(followUps)
     .set({ reminderSent: true, updatedAt: new Date() })
     .where(eq(followUps.id, id));
+}
+
+/* ────────────────────── Thinking Traces ────────────────────── */
+
+export async function saveThinkingTrace(
+  db: Db,
+  data: {
+    conversationId: string;
+    requestId?: string;
+    round: number;
+    content: string;
+    tokenCount?: number;
+  },
+) {
+  const rows = await db
+    .insert(thinkingTraces)
+    .values({
+      conversationId: data.conversationId,
+      requestId: data.requestId,
+      round: data.round,
+      content: data.content,
+      tokenCount: data.tokenCount ?? Math.ceil(data.content.length / 4),
+    })
+    .returning();
+  return rows[0];
+}
+
+export async function getThinkingTraces(
+  db: Db,
+  conversationId: string,
+  requestId?: string,
+) {
+  const conditions = [eq(thinkingTraces.conversationId, conversationId)];
+  if (requestId) {
+    conditions.push(eq(thinkingTraces.requestId, requestId));
+  }
+  return db
+    .select()
+    .from(thinkingTraces)
+    .where(and(...conditions))
+    .orderBy(asc(thinkingTraces.createdAt), asc(thinkingTraces.round));
+}
+
+/* ────────────────────── Tool Efficacy Stats ────────────────────── */
+
+export async function getToolEfficacyStats(db: Db, sinceDays = 7) {
+  const since = new Date();
+  since.setDate(since.getDate() - sinceDays);
+  const rows = await db
+    .select({
+      toolName: toolExecutions.toolName,
+      totalCalls: sql<number>`count(*)::int`,
+      successCount: sql<number>`count(*) filter (where ${toolExecutions.success} = true)::int`,
+      avgDurationMs: sql<number>`avg(${toolExecutions.durationMs})::int`,
+    })
+    .from(toolExecutions)
+    .where(gt(toolExecutions.createdAt, since))
+    .groupBy(toolExecutions.toolName)
+    .orderBy(sql`count(*) desc`);
+  return rows;
+}
+
+/* ────────────────────── Hybrid RAG Search (BM25 + Vector) ────────────────────── */
+
+export async function searchChunksByText(
+  db: Db,
+  query: string,
+  options?: {
+    limit?: number;
+    sourceType?: SourceType;
+    sourceId?: string;
+  },
+) {
+  const limit = options?.limit ?? 20;
+  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  let whereClause = sql`search_vector IS NOT NULL`;
+  if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
+    whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
+  }
+  if (options?.sourceId) {
+    whereClause = sql`${whereClause} AND source_id = ${options.sourceId}`;
+  }
+
+  const rows = await db.execute(
+    sql`SELECT id, source_type, source_id, content, metadata, chunk_index, token_count, created_at,
+               ts_rank_cd(search_vector, plainto_tsquery('english', ${query})) AS rank
+        FROM document_chunks
+        WHERE ${whereClause} AND search_vector @@ plainto_tsquery('english', ${query})
+        ORDER BY rank DESC
+        LIMIT ${limit}`,
+  );
+  return rows as unknown as Array<{
+    id: string;
+    source_type: string;
+    source_id: string;
+    content: string;
+    metadata: Record<string, unknown> | null;
+    chunk_index: number;
+    token_count: number;
+    created_at: Date;
+    rank: number;
+  }>;
+}
+
+export async function hybridSearchChunks(
+  db: Db,
+  embedding: number[],
+  queryText: string,
+  options?: {
+    limit?: number;
+    sourceType?: SourceType;
+    sourceId?: string;
+    vectorWeight?: number;
+    bm25Weight?: number;
+  },
+) {
+  const limit = options?.limit ?? 20;
+  const vectorWeight = options?.vectorWeight ?? 0.6;
+  const bm25Weight = options?.bm25Weight ?? 0.4;
+  const k = 60; // RRF constant
+  const vectorLiteral = `[${embedding.join(",")}]`;
+
+  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  let whereClause = sql`embedding IS NOT NULL`;
+  if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
+    whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
+  }
+  if (options?.sourceId) {
+    whereClause = sql`${whereClause} AND source_id = ${options.sourceId}`;
+  }
+
+  // Reciprocal Rank Fusion (RRF) combining vector and BM25 results
+  const rows = await db.execute(
+    sql`WITH vector_ranked AS (
+          SELECT id, content, source_type, source_id, metadata, chunk_index, token_count, created_at,
+                 ROW_NUMBER() OVER (ORDER BY embedding <=> ${vectorLiteral}::vector ASC) AS vrank
+          FROM document_chunks
+          WHERE ${whereClause}
+          LIMIT 100
+        ),
+        bm25_ranked AS (
+          SELECT id,
+                 ROW_NUMBER() OVER (ORDER BY ts_rank_cd(search_vector, plainto_tsquery('english', ${queryText})) DESC) AS brank
+          FROM document_chunks
+          WHERE search_vector IS NOT NULL AND search_vector @@ plainto_tsquery('english', ${queryText})
+          LIMIT 100
+        )
+        SELECT v.id, v.content, v.source_type, v.source_id, v.metadata, v.chunk_index, v.token_count, v.created_at,
+               (${vectorWeight} / (${k} + v.vrank)) + COALESCE(${bm25Weight} / (${k} + b.brank), 0) AS rrf_score,
+               v.vrank,
+               b.brank
+        FROM vector_ranked v
+        LEFT JOIN bm25_ranked b ON v.id = b.id
+        ORDER BY rrf_score DESC
+        LIMIT ${limit}`,
+  );
+  return rows as unknown as Array<{
+    id: string;
+    content: string;
+    source_type: string;
+    source_id: string;
+    metadata: Record<string, unknown> | null;
+    chunk_index: number;
+    token_count: number;
+    created_at: Date;
+    rrf_score: number;
+    vrank: number;
+    brank: number | null;
+  }>;
+}
+
+/* ────────────────────── Episodic Memory ────────────────────── */
+
+export async function createEpisodicMemory(
+  db: Db,
+  data: {
+    conversationId: string;
+    summary: string;
+    keyDecisions?: unknown[];
+    toolsUsed?: string[];
+    goalsWorkedOn?: unknown[];
+    emotionalContext?: string;
+    importance?: number;
+    embedding?: number[];
+  },
+) {
+  const rows = await db.insert(episodicMemories).values(data).returning();
+  return rows[0];
+}
+
+export async function listEpisodicMemories(db: Db, limit = 20, offset = 0) {
+  return db
+    .select()
+    .from(episodicMemories)
+    .orderBy(desc(episodicMemories.createdAt))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function searchEpisodicMemoriesByVector(
+  db: Db,
+  embedding: number[],
+  limit = 5,
+  minScore = 0.3,
+) {
+  const vectorLiteral = `[${embedding.join(",")}]`;
+  const rows = await db.execute(
+    sql`SELECT id, conversation_id, summary, key_decisions, tools_used, goals_worked_on,
+               emotional_context, importance, accessed_at, access_count, created_at,
+               embedding <=> ${vectorLiteral}::vector AS distance
+        FROM episodic_memories
+        WHERE embedding IS NOT NULL
+        ORDER BY distance ASC
+        LIMIT ${limit}`,
+  );
+  const results = rows as unknown as Array<{
+    id: string;
+    conversation_id: string;
+    summary: string;
+    key_decisions: unknown[];
+    tools_used: string[];
+    goals_worked_on: unknown[];
+    emotional_context: string | null;
+    importance: number;
+    accessed_at: Date;
+    access_count: number;
+    created_at: Date;
+    distance: number;
+  }>;
+  return results.filter((r) => 1 - r.distance >= minScore);
+}
+
+export async function touchEpisodicMemory(db: Db, id: string) {
+  await db
+    .update(episodicMemories)
+    .set({
+      accessedAt: new Date(),
+      accessCount: sql`${episodicMemories.accessCount} + 1`,
+    })
+    .where(eq(episodicMemories.id, id));
+}
+
+/* ────────────────────── Procedural Memory ────────────────────── */
+
+export async function createProceduralMemory(
+  db: Db,
+  data: {
+    triggerPattern: string;
+    steps: unknown[];
+    preconditions?: unknown[];
+    createdFromGoalId?: string;
+    tags?: unknown[];
+    embedding?: number[];
+  },
+) {
+  const rows = await db.insert(proceduralMemories).values(data).returning();
+  return rows[0];
+}
+
+export async function listProceduralMemories(db: Db, limit = 20, offset = 0) {
+  return db
+    .select()
+    .from(proceduralMemories)
+    .orderBy(desc(proceduralMemories.successCount))
+    .limit(limit)
+    .offset(offset);
+}
+
+export async function searchProceduralMemoriesByVector(
+  db: Db,
+  embedding: number[],
+  limit = 5,
+  minScore = 0.3,
+) {
+  const vectorLiteral = `[${embedding.join(",")}]`;
+  const rows = await db.execute(
+    sql`SELECT id, trigger_pattern, steps, preconditions, success_count, failure_count,
+               last_used, created_from_goal_id, tags, created_at, updated_at,
+               embedding <=> ${vectorLiteral}::vector AS distance
+        FROM procedural_memories
+        WHERE embedding IS NOT NULL
+        ORDER BY distance ASC
+        LIMIT ${limit}`,
+  );
+  const results = rows as unknown as Array<{
+    id: string;
+    trigger_pattern: string;
+    steps: unknown[];
+    preconditions: unknown[];
+    success_count: number;
+    failure_count: number;
+    last_used: Date | null;
+    created_from_goal_id: string | null;
+    tags: unknown[];
+    created_at: Date;
+    updated_at: Date;
+    distance: number;
+  }>;
+  return results.filter((r) => 1 - r.distance >= minScore);
+}
+
+export async function incrementProceduralSuccess(db: Db, id: string) {
+  await db
+    .update(proceduralMemories)
+    .set({
+      successCount: sql`${proceduralMemories.successCount} + 1`,
+      lastUsed: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(proceduralMemories.id, id));
+}
+
+export async function incrementProceduralFailure(db: Db, id: string) {
+  await db
+    .update(proceduralMemories)
+    .set({
+      failureCount: sql`${proceduralMemories.failureCount} + 1`,
+      lastUsed: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(proceduralMemories.id, id));
+}
+
+/* ────────────────────── Memory Lifecycle ────────────────────── */
+
+export async function archiveMemory(db: Db, id: string) {
+  await db
+    .update(memories)
+    .set({ archivedAt: new Date() })
+    .where(eq(memories.id, id));
+}
+
+export async function listMemoriesForDecay(db: Db, userId: string, limit = 500) {
+  return db
+    .select()
+    .from(memories)
+    .where(and(eq(memories.userId, userId), isNull(memories.archivedAt)))
+    .orderBy(desc(memories.lastAccessedAt))
+    .limit(limit);
+}
+
+export async function countActiveMemories(db: Db, userId: string) {
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(memories)
+    .where(and(eq(memories.userId, userId), isNull(memories.archivedAt)));
+  return rows[0]?.count ?? 0;
+}
+
+export async function findSimilarMemories(
+  db: Db,
+  userId: string,
+  embedding: number[],
+  limit = 5,
+  minScore = 0.85,
+) {
+  const vectorLiteral = `[${embedding.join(",")}]`;
+  const rows = await db.execute(
+    sql`SELECT id, key, content, category, importance, access_count, created_at,
+               embedding <=> ${vectorLiteral}::vector AS distance
+        FROM memories
+        WHERE user_id = ${userId} AND embedding IS NOT NULL AND archived_at IS NULL
+        ORDER BY distance ASC
+        LIMIT ${limit}`,
+  );
+  const results = rows as unknown as Array<{
+    id: string;
+    key: string;
+    content: string;
+    category: string;
+    importance: number;
+    access_count: number;
+    created_at: Date;
+    distance: number;
+  }>;
+  return results.filter((r) => 1 - r.distance >= minScore);
+}
+
+/* ────────────────────── Failure Patterns ────────────────────── */
+
+export async function upsertFailurePattern(
+  db: Db,
+  data: {
+    toolName: string;
+    errorCategory: string;
+    errorMessage: string;
+    context?: Record<string, unknown>;
+    resolution?: string;
+  },
+) {
+  // Try to find existing pattern for this tool+category
+  const existing = await db
+    .select()
+    .from(failurePatterns)
+    .where(
+      and(
+        eq(failurePatterns.toolName, data.toolName),
+        eq(failurePatterns.errorCategory, data.errorCategory),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) {
+    const updated = await db
+      .update(failurePatterns)
+      .set({
+        frequency: sql`${failurePatterns.frequency} + 1`,
+        lastSeen: new Date(),
+        errorMessage: data.errorMessage,
+        context: data.context ?? existing[0].context,
+        resolution: data.resolution ?? existing[0].resolution,
+        updatedAt: new Date(),
+      })
+      .where(eq(failurePatterns.id, existing[0].id))
+      .returning();
+    return updated[0];
+  }
+
+  const rows = await db.insert(failurePatterns).values(data).returning();
+  return rows[0];
+}
+
+export async function listFailurePatterns(db: Db, limit = 50) {
+  return db
+    .select()
+    .from(failurePatterns)
+    .orderBy(desc(failurePatterns.frequency))
+    .limit(limit);
+}
+
+export async function getFailurePatternsForTool(db: Db, toolName: string, limit = 5) {
+  return db
+    .select()
+    .from(failurePatterns)
+    .where(eq(failurePatterns.toolName, toolName))
+    .orderBy(desc(failurePatterns.frequency))
+    .limit(limit);
+}
+
+export async function incrementFailureFrequency(db: Db, id: string) {
+  await db
+    .update(failurePatterns)
+    .set({
+      frequency: sql`${failurePatterns.frequency} + 1`,
+      lastSeen: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(failurePatterns.id, id));
 }

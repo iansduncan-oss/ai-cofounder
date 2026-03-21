@@ -260,6 +260,48 @@
       "when": 1772802000000,
       "tag": "0036_add_follow_ups",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1772803000000,
+      "tag": "0037_add_thinking_traces",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1772804000000,
+      "tag": "0038_add_rag_hybrid_search",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1772805000000,
+      "tag": "0039_add_episodic_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1772806000000,
+      "tag": "0040_add_procedural_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1772807000000,
+      "tag": "0041_add_memory_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1772808000000,
+      "tag": "0042_add_failure_patterns",
+      "breakpoints": true
     }
   ]
 }

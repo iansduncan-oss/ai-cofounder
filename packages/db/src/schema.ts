@@ -8,6 +8,7 @@ import {
   integer,
   bigint,
   boolean,
+  real,
   customType,
 } from "drizzle-orm/pg-core";
 
@@ -208,6 +209,7 @@ export const memories = pgTable("memories", {
   lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
   source: text("source"),
   metadata: jsonb("metadata"),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -419,6 +421,8 @@ export const documentChunks = pgTable("document_chunks", {
   metadata: jsonb("metadata"), // file path, language, line range, author, timestamp
   chunkIndex: integer("chunk_index").notNull(),
   tokenCount: integer("token_count").notNull(),
+  searchVector: text("search_vector"), // tsvector managed by DB trigger
+  contextPrefix: text("context_prefix"), // contextual retrieval prefix
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -775,6 +779,20 @@ export const followUps = pgTable("follow_ups", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Thinking Traces (agent reasoning for debugging) ── */
+
+export const thinkingTraces = pgTable("thinking_traces", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  requestId: text("request_id"),
+  round: integer("round").notNull().default(0),
+  content: text("content").notNull(),
+  tokenCount: integer("token_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Pipeline Templates (content automation workflows) ── */
 
 export const pipelineTemplates = pgTable("pipeline_templates", {
@@ -784,6 +802,57 @@ export const pipelineTemplates = pgTable("pipeline_templates", {
   stages: jsonb("stages").notNull(),
   defaultContext: jsonb("default_context"),
   isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Episodic Memories (conversation-level summaries) ── */
+
+export const episodicMemories = pgTable("episodic_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  summary: text("summary").notNull(),
+  keyDecisions: jsonb("key_decisions").default([]),
+  toolsUsed: text("tools_used").array().default([]),
+  goalsWorkedOn: jsonb("goals_worked_on").default([]),
+  emotionalContext: text("emotional_context"),
+  importance: real("importance").notNull().default(0.5),
+  accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow(),
+  accessCount: integer("access_count").notNull().default(0),
+  embedding: vector("embedding"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Procedural Memories (learned procedures from completed goals) ── */
+
+export const proceduralMemories = pgTable("procedural_memories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  triggerPattern: text("trigger_pattern").notNull(),
+  steps: jsonb("steps").notNull().default([]),
+  preconditions: jsonb("preconditions").default([]),
+  successCount: integer("success_count").notNull().default(0),
+  failureCount: integer("failure_count").notNull().default(0),
+  lastUsed: timestamp("last_used", { withTimezone: true }),
+  createdFromGoalId: uuid("created_from_goal_id").references(() => goals.id, { onDelete: "set null" }),
+  tags: jsonb("tags").default([]),
+  embedding: vector("embedding"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Failure Patterns (tool error tracking and resolutions) ── */
+
+export const failurePatterns = pgTable("failure_patterns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  toolName: text("tool_name").notNull(),
+  errorCategory: text("error_category").notNull(),
+  errorMessage: text("error_message").notNull(),
+  context: jsonb("context").default({}),
+  resolution: text("resolution"),
+  frequency: integer("frequency").notNull().default(1),
+  lastSeen: timestamp("last_seen", { withTimezone: true }).notNull().defaultNow(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
