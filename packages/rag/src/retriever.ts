@@ -1,10 +1,13 @@
 /**
- * RAG retriever: embed query → pgvector similarity search → rerank → format context.
+ * RAG retriever: embed query → hybrid search (vector + BM25) → rerank → format context.
  */
 
 import type { Db } from "@ai-cofounder/db";
 import { searchChunksByVector } from "@ai-cofounder/db";
+import type { LlmRegistry } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
+import { hybridSearch } from "./hybrid-search.js";
+import { rerank } from "./reranker.js";
 
 const logger = createLogger("rag-retriever");
 
@@ -18,6 +21,8 @@ export interface RetrievalOptions {
   sourceId?: string;
   minScore?: number;
   diversifySources?: boolean;
+  llmRegistry?: LlmRegistry;
+  enableReranking?: boolean;
 }
 
 export interface RetrievedChunk {
@@ -33,9 +38,86 @@ export interface RetrievedChunk {
 
 /**
  * Retrieve relevant chunks for a query string.
- * Flow: embed query → pgvector top-N → rerank → return top-K.
+ * Delegates to hybrid search (vector + BM25) by default, with vector-only fallback.
+ * Optionally applies LLM reranking when llmRegistry + enableReranking are provided.
  */
 export async function retrieve(
+  db: Db,
+  embed: EmbedFn,
+  query: string,
+  options?: RetrievalOptions,
+): Promise<RetrievedChunk[]> {
+  const limit = options?.limit ?? 5;
+  const doRerank = options?.enableReranking && options?.llmRegistry;
+
+  // Fetch extra candidates if reranking is enabled
+  const fetchLimit = doRerank ? Math.max(limit * 3, 15) : limit;
+
+  // Delegate to hybrid search (vector + BM25 via RRF)
+  const candidates = await hybridSearch(db, embed, query, {
+    ...options,
+    limit: fetchLimit,
+  });
+
+  // Convert to RetrievedChunk format
+  let results: RetrievedChunk[];
+
+  if (doRerank && candidates.length > 0) {
+    try {
+      const ranked = await rerank(options!.llmRegistry!, query, candidates, { topK: limit });
+      results = ranked.map((c) => ({
+        id: c.id,
+        content: c.content,
+        sourceType: c.sourceType,
+        sourceId: c.sourceId,
+        distance: 0,
+        score: c.rerankScore / 10, // Normalize 0-10 to 0-1
+        metadata: c.metadata,
+        tokenCount: c.tokenCount,
+      }));
+    } catch (err) {
+      logger.warn({ err }, "Reranking failed, using hybrid order");
+      results = candidates.slice(0, limit).map((c) => ({
+        id: c.id,
+        content: c.content,
+        sourceType: c.sourceType,
+        sourceId: c.sourceId,
+        distance: 0,
+        score: c.score,
+        metadata: c.metadata,
+        tokenCount: c.tokenCount,
+      }));
+    }
+  } else {
+    results = candidates.slice(0, limit).map((c) => ({
+      id: c.id,
+      content: c.content,
+      sourceType: c.sourceType,
+      sourceId: c.sourceId,
+      distance: 0,
+      score: c.score,
+      metadata: c.metadata,
+      tokenCount: c.tokenCount,
+    }));
+  }
+
+  logger.debug(
+    {
+      query: query.slice(0, 80),
+      returned: results.length,
+      reranked: !!doRerank,
+    },
+    "RAG retrieval complete",
+  );
+
+  return results;
+}
+
+/**
+ * Pure vector-only retrieval (legacy path).
+ * Use `retrieve()` for the default hybrid path.
+ */
+export async function retrieveVectorOnly(
   db: Db,
   embed: EmbedFn,
   query: string,
@@ -53,7 +135,6 @@ export async function retrieve(
     return [];
   }
 
-  // Fetch more candidates than needed for reranking
   const candidateLimit = Math.max(limit * 4, 20);
   const candidates = await searchChunksByVector(db, queryEmbedding, {
     limit: candidateLimit,
@@ -63,56 +144,37 @@ export async function retrieve(
 
   if (candidates.length === 0) return [];
 
-  // Convert distance to similarity score (cosine distance → similarity)
   const scored = candidates.map((c) => ({
     id: c.id,
     content: c.content,
     sourceType: c.source_type,
     sourceId: c.source_id,
     distance: c.distance,
-    score: 1 - c.distance, // cosine distance to similarity
+    score: 1 - c.distance,
     metadata: c.metadata,
     tokenCount: c.token_count,
     createdAt: c.created_at,
   }));
 
-  // Filter by minimum score
   const filtered = scored.filter((c) => c.score >= minScore);
-
   if (filtered.length === 0) return [];
 
-  // Rerank: combine similarity score with recency bonus
   const now = Date.now();
   const reranked = filtered.map((c) => {
     const ageMs = now - new Date(c.createdAt).getTime();
     const ageDays = ageMs / (1000 * 60 * 60 * 24);
-    // Recency bonus: full bonus for <1 day, decays over 30 days
     const recencyBonus = Math.max(0, 0.1 * (1 - ageDays / 30));
-    return {
-      ...c,
-      finalScore: c.score + recencyBonus,
-    };
+    return { ...c, finalScore: c.score + recencyBonus };
   });
 
   reranked.sort((a, b) => b.finalScore - a.finalScore);
 
-  // Source diversity: ensure we don't return all chunks from the same source
   let results: typeof reranked;
   if (diversify && reranked.length > limit) {
     results = diversifyResults(reranked, limit);
   } else {
     results = reranked.slice(0, limit);
   }
-
-  logger.debug(
-    {
-      query: query.slice(0, 80),
-      candidates: candidates.length,
-      filtered: filtered.length,
-      returned: results.length,
-    },
-    "RAG retrieval complete",
-  );
 
   return results.map(({ createdAt: _createdAt, finalScore: _finalScore, ...rest }) => rest);
 }
@@ -132,14 +194,12 @@ function diversifyResults<T extends { sourceId: string; finalScore: number }>(
     if (selected.length >= limit) break;
 
     const count = sourceCount.get(item.sourceId) ?? 0;
-    // Allow max 2 chunks from the same source in top results
     if (count >= 2) continue;
 
     selected.push(item);
     sourceCount.set(item.sourceId, count + 1);
   }
 
-  // If we didn't fill the limit due to diversity constraints, add remaining
   if (selected.length < limit) {
     const selectedIds = new Set(selected.map((s) => s.sourceId + s.finalScore));
     for (const item of ranked) {

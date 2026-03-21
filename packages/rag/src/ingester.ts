@@ -13,6 +13,8 @@ import {
 } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 import { chunkText, type ChunkerOptions } from "./chunker.js";
+import type { LlmRegistry } from "@ai-cofounder/llm";
+import { contextualizeChunks } from "./contextualizer.js";
 import type { EmbedFn } from "./retriever.js";
 
 const logger = createLogger("rag-ingester");
@@ -110,6 +112,8 @@ export async function ingestFiles(
   options?: {
     cursor?: string;
     chunkerOptions?: ChunkerOptions;
+    contextualize?: boolean;
+    llmRegistry?: LlmRegistry;
   },
 ): Promise<IngestionResult> {
   const filteredFiles = files.filter((f) => !shouldSkipFile(f.path));
@@ -148,6 +152,29 @@ export async function ingestFiles(
         tokenCount: chunk.tokenCount,
       });
       chunkTexts.push(chunk.content);
+    }
+  }
+
+  // Optional contextualization: generate context prefixes for better retrieval
+  if (options?.contextualize && options.llmRegistry) {
+    try {
+      const rawChunks = allChunks.map((c) => ({
+        content: c.content,
+        index: c.chunkIndex,
+        tokenCount: c.tokenCount,
+        metadata: { type: "prose" as const, ...(c.metadata as Record<string, unknown> ?? {}) },
+        startLine: 0,
+        endLine: 0,
+      }));
+      const contextualized = await contextualizeChunks(options.llmRegistry, rawChunks);
+      for (let i = 0; i < contextualized.length && i < allChunks.length; i++) {
+        if (contextualized[i].contextPrefix) {
+          allChunks[i].contextPrefix = contextualized[i].contextPrefix;
+          chunkTexts[i] = `${contextualized[i].contextPrefix}\n\n${allChunks[i].content}`;
+        }
+      }
+    } catch (err) {
+      logger.warn({ err }, "Contextualization failed, proceeding without context prefixes");
     }
   }
 

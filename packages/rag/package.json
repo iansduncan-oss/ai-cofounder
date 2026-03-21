@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-cofounder/db": "*",
+    "@ai-cofounder/llm": "*",
     "@ai-cofounder/shared": "*"
   },
   "devDependencies": {

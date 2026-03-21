@@ -12,8 +12,15 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 // Mock @ai-cofounder/db
 const mockSearchChunksByVector = vi.fn();
+const mockSearchChunksByText = vi.fn().mockResolvedValue([]);
 vi.mock("@ai-cofounder/db", () => ({
   searchChunksByVector: (...args: unknown[]) => mockSearchChunksByVector(...args),
+  searchChunksByText: (...args: unknown[]) => mockSearchChunksByText(...args),
+}));
+
+// Mock @ai-cofounder/llm (used by reranker, imported by retriever)
+vi.mock("@ai-cofounder/llm", () => ({
+  LlmRegistry: class {},
 }));
 
 // Import AFTER mocks
@@ -42,7 +49,7 @@ describe("retrieve", () => {
     expect(results).toEqual([]);
   });
 
-  it("converts distance to similarity score", async () => {
+  it("returns results with RRF scores from hybrid search", async () => {
     mockSearchChunksByVector.mockResolvedValue([
       {
         id: "chunk-1",
@@ -53,47 +60,51 @@ describe("retrieve", () => {
         chunk_index: 0,
         token_count: 10,
         created_at: new Date(),
-        distance: 0.2, // → score = 0.8
+        distance: 0.2,
       },
     ]);
 
     const results = await retrieve(mockDb, mockEmbed, "test query");
 
     expect(results).toHaveLength(1);
-    expect(results[0].score).toBeCloseTo(0.8, 1);
+    expect(results[0].score).toBeGreaterThan(0); // RRF score
     expect(results[0].content).toBe("test content");
   });
 
-  it("filters results below minScore threshold", async () => {
+  it("returns both vector and text results via hybrid search", async () => {
     mockSearchChunksByVector.mockResolvedValue([
       {
-        id: "chunk-1",
+        id: "chunk-vec",
         source_type: "git",
         source_id: "/repo",
-        content: "relevant",
+        content: "vector match",
         metadata: null,
         chunk_index: 0,
         token_count: 5,
         created_at: new Date(),
-        distance: 0.1, // score = 0.9, passes
+        distance: 0.1,
       },
+    ]);
+    mockSearchChunksByText.mockResolvedValue([
       {
-        id: "chunk-2",
+        id: "chunk-text",
         source_type: "git",
         source_id: "/repo",
-        content: "irrelevant",
+        content: "text match",
         metadata: null,
         chunk_index: 1,
         token_count: 5,
         created_at: new Date(),
-        distance: 0.8, // score = 0.2, filtered
+        rank: 0.5,
       },
     ]);
 
-    const results = await retrieve(mockDb, mockEmbed, "test", { minScore: 0.3 });
+    const results = await retrieve(mockDb, mockEmbed, "test", { limit: 5 });
 
-    expect(results).toHaveLength(1);
-    expect(results[0].content).toBe("relevant");
+    expect(results).toHaveLength(2);
+    const ids = results.map((r) => r.id);
+    expect(ids).toContain("chunk-vec");
+    expect(ids).toContain("chunk-text");
   });
 
   it("respects limit parameter", async () => {
@@ -115,49 +126,28 @@ describe("retrieve", () => {
     expect(results).toHaveLength(3);
   });
 
-  it("diversifies results across sources", async () => {
-    const chunks = [
-      // 4 chunks from same source
-      ...Array.from({ length: 4 }, (_, i) => ({
-        id: `same-${i}`,
-        source_type: "git" as const,
-        source_id: "/same-repo",
-        content: `same repo content ${i}`,
-        metadata: null,
-        chunk_index: i,
-        token_count: 5,
-        created_at: new Date(),
-        distance: 0.05 + i * 0.01,
-      })),
-      // 2 chunks from different source
-      ...Array.from({ length: 2 }, (_, i) => ({
-        id: `diff-${i}`,
-        source_type: "git" as const,
-        source_id: "/diff-repo",
-        content: `diff repo content ${i}`,
-        metadata: null,
-        chunk_index: i,
-        token_count: 5,
-        created_at: new Date(),
-        distance: 0.15 + i * 0.01,
-      })),
-    ];
+  it("returns results sorted by RRF score", async () => {
+    // Chunks in vector results — lower distance = higher rank
+    const chunks = Array.from({ length: 4 }, (_, i) => ({
+      id: `chunk-${i}`,
+      source_type: "git" as const,
+      source_id: `/repo-${i}`,
+      content: `content ${i}`,
+      metadata: null,
+      chunk_index: i,
+      token_count: 5,
+      created_at: new Date(),
+      distance: 0.05 + i * 0.05,
+    }));
     mockSearchChunksByVector.mockResolvedValue(chunks);
 
-    const results = await retrieve(mockDb, mockEmbed, "test", {
-      limit: 4,
-      diversifySources: true,
-    });
+    const results = await retrieve(mockDb, mockEmbed, "test", { limit: 4 });
 
-    const sourceCounts = new Map<string, number>();
-    for (const r of results) {
-      sourceCounts.set(r.sourceId, (sourceCounts.get(r.sourceId) ?? 0) + 1);
+    expect(results).toHaveLength(4);
+    // First result should have highest score
+    for (let i = 1; i < results.length; i++) {
+      expect(results[i - 1].score).toBeGreaterThanOrEqual(results[i].score);
     }
-
-    // Should have max 2 from same source
-    expect(sourceCounts.get("/same-repo")!).toBeLessThanOrEqual(2);
-    // Should include chunks from the other source
-    expect(sourceCounts.has("/diff-repo")).toBe(true);
   });
 
   it("passes sourceType filter to vector search", async () => {
