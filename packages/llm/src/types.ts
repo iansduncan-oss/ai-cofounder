@@ -42,6 +42,8 @@ export interface LlmTool {
     properties: Record<string, LlmToolParameter>;
     required: string[];
   };
+  /** Optional precondition check — if provided and returns false, tool is filtered out before LLM sees it */
+  preconditions?: () => boolean | Promise<boolean>;
 }
 
 /** Optional metadata passed through to onCompletion hook for usage attribution */
