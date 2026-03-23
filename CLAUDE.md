@@ -102,7 +102,7 @@ Services available at:
 
 ## Agent System
 
-- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `create_milestone`, `request_approval`, `save_memory`, `recall_memories`, `search_web`, `browse_web`, `trigger_workflow`, `list_workflows`, `execute_code`, `create/list/delete_schedule`, `read_file`, `write_file`, `delete_file`, `delete_directory`, `list_directory`, `git_clone`, `git_status`, `git_diff`, `git_add`, `git_commit`, `git_log`, `git_pull`, `git_branch`, `git_checkout`, `git_push`, `run_tests`, `create_pr`, `submit_verification`, `create_follow_up`
+- **Orchestrator** — agentic tool loop (up to 5 rounds) with tools: `create_plan`, `create_milestone`, `request_approval`, `save_memory`, `recall_memories`, `recall_episodes`, `recall_procedures`, `search_web`, `browse_web`, `trigger_workflow`, `list_workflows`, `execute_code`, `create/list/delete_schedule`, `read_file`, `write_file`, `delete_file`, `delete_directory`, `list_directory`, `git_clone`, `git_status`, `git_diff`, `git_add`, `git_commit`, `git_log`, `git_pull`, `git_branch`, `git_checkout`, `git_push`, `run_tests`, `create_pr`, `submit_verification`, `create_follow_up`
 - **Specialist agents** — `ResearcherAgent`, `CoderAgent` (with self-review), `ReviewerAgent`, `PlannerAgent`, `DebuggerAgent`, `DocWriterAgent`, `VerifierAgent`
 - **Base class** — `SpecialistAgent` with tool loop (max 3 rounds) and `completeWithRetry()` (single retry, 2s backoff on 429/timeout/ECONNRESET/503)
 - **TaskDispatcher** — executes goal tasks in orderIndex, passes outputs as context chain, checks pending approvals before each task, post-execution self-improvement analysis
@@ -112,6 +112,18 @@ Services available at:
 - **Enhanced briefings** — Google Calendar + Gmail enrichment via `GET /api/briefings/today`; aggregates upcoming meetings, unread emails, and action items into a daily narrative
 - **Meeting prep** — `MeetingPrepService` generates context docs for upcoming calendar events; `GET /api/calendar/events/:id/prep` (cached + on-demand); BullMQ recurring jobs (`meeting-prep` queue) for proactive generation and notification
 - **Follow-up tracking** — CRUD at `/api/follow-ups`, orchestrator `create_follow_up` tool for in-conversation creation, daily reminder jobs via BullMQ for overdue items
+
+## v3.1 Intelligence Sprint
+
+- **Reasoning Traces** — `<thinking>` tag parsing from LLM responses, stored in `thinkingTraces` DB table, exposed via `GET /api/thinking/:conversationId`
+- **Tool Cache** — TTL-based per-conversation result caching (`ToolCache` class), skips UNCACHEABLE_TOOLS set (side-effectful tools)
+- **Tool Efficacy** — `ToolEfficacyService` generates system prompt hints from historical tool execution stats; `LlmTool.preconditions` for dynamic tool filtering
+- **Hybrid RAG** — BM25 + vector search via Reciprocal Rank Fusion (0.6/0.4, K=60); optional LLM reranker; chunk contextualizer during ingestion; chokidar-based file watcher (`ENABLE_FILE_WATCHER` env)
+- **Episodic Memory** — `EpisodicMemoryService`: session-end episode extraction, semantic+temporal+importance recall; orchestrator tool: `recall_episodes`
+- **Procedural Memory** — `ProceduralMemoryService`: learns from completed goals, matches procedures for new tasks; orchestrator tool: `recall_procedures`
+- **Memory Lifecycle** — `MemoryLifecycleService`: exponential decay (`MEMORY_DECAY_RATE`), archival, consolidation, per-user budget (`MEMORY_BUDGET_PER_USER`)
+- **Failure Patterns** — `FailurePatternsService`: records/matches failure patterns, injects known issues into orchestrator prompt
+- **Plan Repair** — `PlanRepairService`: LLM-based corrective plan generation on DAG task failure; wired into dispatcher
 
 ## Adding New Orchestrator Tools
 
@@ -180,7 +192,7 @@ Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path trav
 
 **Hooks** (in `.claude/settings.local.json`):
 - Auto-lint on Edit/Write (eslint --fix)
-- Auto-build on Edit/Write for: `packages/db`, `packages/llm`, `packages/shared`, `packages/queue`, `packages/api-client`, `packages/bot-handlers`, `packages/rag`
+- Auto-build on Edit/Write for: `packages/db`, `packages/llm`, `packages/shared`, `packages/queue`, `packages/api-client`, `packages/bot-handlers`, `packages/rag`, `packages/mcp-server`
 
 ## Production Infrastructure
 
@@ -223,6 +235,8 @@ Deployed on Hetzner VPS behind Nginx Proxy Manager with TLS termination. Project
 - Monitoring: `GITHUB_TOKEN`, `GITHUB_MONITORED_REPOS`, `VPS_HOST`, `VPS_USER`
 - Voice/TTS: `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID`
 - Security: `API_SECRET`, `RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW`, `RATE_LIMIT_EXPENSIVE_MAX`
-- Usage: `DAILY_TOKEN_LIMIT`
+- Usage: `DAILY_TOKEN_LIMIT`, `DAILY_BUDGET_USD`, `WEEKLY_BUDGET_USD`
+- Memory: `MEMORY_DECAY_RATE`, `MEMORY_BUDGET_PER_USER`
+- RAG: `ENABLE_FILE_WATCHER`
 - Scheduler: `DISCORD_FOLLOWUP_WEBHOOK_URL`, `BRIEFING_HOUR`, `BRIEFING_TIMEZONE`
 - See `.env.example` for full list
