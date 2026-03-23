@@ -1486,7 +1486,7 @@ export async function getRecentConversationSummaries(db: Db, since: Date) {
     })
     .from(conversationSummaries)
     .where(
-      sql`${conversationSummaries.createdAt} >= ${since}`,
+      sql`${conversationSummaries.createdAt} >= ${since.toISOString()}`,
     )
     .orderBy(desc(conversationSummaries.createdAt));
 }
@@ -1783,7 +1783,7 @@ export async function getRecentDecisionMemories(db: Db, userId: string, since: D
       and(
         eq(memories.userId, userId),
         eq(memories.category, "decisions"),
-        sql`${memories.createdAt} >= ${since}`,
+        sql`${memories.createdAt} >= ${since.toISOString()}`,
       ),
     )
     .orderBy(desc(memories.createdAt))
@@ -2526,7 +2526,7 @@ export async function getUserActionsSince(db: Db, userId: string, since: Date) {
     .where(
       and(
         eq(userActions.userId, userId),
-        sql`${userActions.createdAt} >= ${since}`,
+        sql`${userActions.createdAt} >= ${since.toISOString()}`,
       ),
     )
     .orderBy(desc(userActions.createdAt));
@@ -2542,7 +2542,7 @@ export async function getRecentUserActionSummary(db: Db, userId: string, since: 
     .where(
       and(
         eq(userActions.userId, userId),
-        sql`${userActions.createdAt} >= ${since}`,
+        sql`${userActions.createdAt} >= ${since.toISOString()}`,
       ),
     )
     .groupBy(userActions.actionType)
@@ -3069,7 +3069,7 @@ export async function getRecentFailedDeployments(db: Db, windowHours: number) {
     .where(
       and(
         eq(deployments.status, "failed"),
-        sql`${deployments.startedAt} >= ${since}`,
+        sql`${deployments.startedAt} >= ${since.toISOString()}`,
       ),
     )
     .orderBy(desc(deployments.startedAt));
@@ -3212,8 +3212,8 @@ export async function listJournalEntries(
   const { since, until, goalId, entryType, search, limit = 50, offset = 0 } = opts;
   const conditions = [];
 
-  if (since) conditions.push(sql`${journalEntries.occurredAt} >= ${since}`);
-  if (until) conditions.push(sql`${journalEntries.occurredAt} <= ${until}`);
+  if (since) conditions.push(sql`${journalEntries.occurredAt} >= ${since.toISOString()}`);
+  if (until) conditions.push(sql`${journalEntries.occurredAt} <= ${until.toISOString()}`);
   if (goalId) conditions.push(eq(journalEntries.goalId, goalId));
   if (entryType) conditions.push(sql`${journalEntries.entryType} = ${entryType}`);
   if (search) {
@@ -3252,8 +3252,8 @@ export async function listWorkSessionsFiltered(
   const { since, until, goalId, limit = 50, offset = 0 } = opts;
   const conditions = [];
 
-  if (since) conditions.push(sql`${workSessions.createdAt} >= ${since}`);
-  if (until) conditions.push(sql`${workSessions.createdAt} <= ${until}`);
+  if (since) conditions.push(sql`${workSessions.createdAt} >= ${since.toISOString()}`);
+  if (until) conditions.push(sql`${workSessions.createdAt} <= ${until.toISOString()}`);
   if (goalId) conditions.push(eq(workSessions.goalId, goalId));
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
