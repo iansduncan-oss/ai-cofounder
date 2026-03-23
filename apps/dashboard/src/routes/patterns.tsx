@@ -122,8 +122,8 @@ export function PatternsPage() {
         ) : (
           patterns.map((p) => (
             <Card key={p.id} className={!p.isActive ? "opacity-60" : undefined}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="flex items-center gap-2">
+              <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-base">{p.description}</CardTitle>
                   <Badge variant={typeBadgeVariant(p.patternType)}>
                     {p.patternType.replace(/_/g, " ")}

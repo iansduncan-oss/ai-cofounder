@@ -136,8 +136,8 @@ export function PersonaPage() {
         ) : (
           personas.map((p) => (
             <Card key={p.id}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <div className="flex items-center gap-2">
+              <CardHeader className="flex flex-col gap-2 pb-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
                   <CardTitle className="text-base">{p.name}</CardTitle>
                   {p.id === activePersonaId && (
                     <Badge variant="success">Active</Badge>

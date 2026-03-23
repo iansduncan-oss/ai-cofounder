@@ -91,7 +91,7 @@ export function Dialog({ open, onClose, children, className }: DialogProps) {
     >
       <div
         ref={contentRef}
-        className={cn("w-full max-w-md rounded-lg border bg-card p-6 shadow-lg animate-scale-in", className)}
+        className={cn("mx-4 w-full max-w-md rounded-lg border bg-card p-4 shadow-lg animate-scale-in sm:mx-auto sm:p-6", className)}
       >
         {children}
       </div>

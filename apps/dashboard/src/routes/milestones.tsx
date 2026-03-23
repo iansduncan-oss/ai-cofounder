@@ -57,12 +57,12 @@ export function MilestonesPage() {
           placeholder="Conversation ID"
           value={conversationId}
           onChange={(e) => setConversationId(e.target.value || "default")}
-          className="w-48"
+          className="w-full sm:w-48"
         />
         <Select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as MilestoneStatus | "all")}
-          className="w-40"
+          className="w-full sm:w-40"
         >
           <option value="all">All statuses</option>
           <option value="planned">Planned</option>

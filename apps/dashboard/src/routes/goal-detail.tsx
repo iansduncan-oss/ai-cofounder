@@ -96,7 +96,7 @@ export function GoalDetailPage() {
           Goals
         </Link>
         <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground truncate max-w-[200px]">{goal.title}</span>
+        <span className="text-foreground truncate max-w-[120px] sm:max-w-[200px]">{goal.title}</span>
       </div>
 
       <PageHeader

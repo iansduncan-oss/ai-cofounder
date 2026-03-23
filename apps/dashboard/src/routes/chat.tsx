@@ -487,7 +487,7 @@ export function ChatPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className={`h-8 w-8 rounded-full ${
+                className={`h-9 w-9 rounded-full ${
                   speech.isListening
                     ? "bg-purple-500 text-white hover:bg-purple-600"
                     : "text-muted-foreground hover:text-foreground"
@@ -506,7 +506,7 @@ export function ChatPage() {
               onClick={() => handleSend()}
               disabled={!input.trim() || stream.isStreaming}
               size="icon"
-              className="h-8 w-8 rounded-full"
+              className="h-9 w-9 rounded-full"
               aria-label="Send message"
             >
               {stream.isStreaming ? (
