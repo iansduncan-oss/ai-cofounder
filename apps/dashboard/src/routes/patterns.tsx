@@ -130,7 +130,7 @@ export function PatternsPage() {
                   </Badge>
                   {!p.isActive && <Badge variant="secondary">Inactive</Badge>}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   <Button
                     variant="ghost"
                     size="sm"

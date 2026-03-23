@@ -422,7 +422,7 @@ export function ChatPage() {
                 <p className="text-sm text-muted-foreground mb-6">
                   Chat with your AI Cofounder to plan, build, and monitor your projects.
                 </p>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {quickActions.map(({ label, icon: Icon }) => (
                     <button
                       key={label}
@@ -472,7 +472,7 @@ export function ChatPage() {
         </div>
 
         {/* Input area */}
-        <div className="mt-3 flex items-end gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2 transition-all focus-within:border-purple-500/30 focus-within:shadow-[0_0_20px_rgba(124,58,237,0.1)]">
+        <div className="sticky bottom-0 mt-3 flex items-end gap-2 rounded-2xl border border-border/50 bg-muted/30 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-all focus-within:border-purple-500/30 focus-within:shadow-[0_0_20px_rgba(124,58,237,0.1)]">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}

@@ -118,7 +118,7 @@ export function ConversationSidebar({
             onClick={onMobileClose}
             aria-hidden="true"
           />
-          <div className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r bg-card md:hidden animate-slide-in-left">
+          <div className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r bg-card md:hidden animate-slide-in-left">
             <div className="flex items-center justify-between border-b px-3 py-2">
               <span className="text-xs font-semibold">Conversations</span>
               <div className="flex gap-1">

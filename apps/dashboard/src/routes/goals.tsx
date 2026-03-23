@@ -126,7 +126,7 @@ export function GoalsPage() {
               className="block rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:shadow-md hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between">
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <h3 className="text-sm font-medium">{goal.title}</h3>
                   {goal.description && (
                     <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
@@ -138,7 +138,7 @@ export function GoalsPage() {
                     {goal.createdBy && ` · by ${goal.createdBy}`}
                   </p>
                 </div>
-                <div className="ml-4 flex items-center gap-2">
+                <div className="ml-2 sm:ml-4 flex shrink-0 items-center gap-2">
                   <Badge variant={priorityColors[goal.priority]}>
                     {goal.priority}
                   </Badge>

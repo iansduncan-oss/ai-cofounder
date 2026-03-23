@@ -29,7 +29,7 @@ export function ToolCallCard({ tool }: { tool: ToolCallInfo }) {
           {Object.keys(tool.input).length > 0 && (
             <div>
               <span className="text-muted-foreground">Input: </span>
-              <pre className="mt-0.5 max-h-32 overflow-auto rounded bg-muted p-1.5 text-[10px]">
+              <pre className="mt-0.5 max-h-32 overflow-x-auto overflow-y-auto rounded bg-muted p-1.5 text-[10px]">
                 {JSON.stringify(tool.input, null, 2)}
               </pre>
             </div>
@@ -37,7 +37,7 @@ export function ToolCallCard({ tool }: { tool: ToolCallInfo }) {
           {tool.result && (
             <div>
               <span className="text-muted-foreground">Result: </span>
-              <pre className="mt-0.5 max-h-32 overflow-auto rounded bg-muted p-1.5 text-[10px]">
+              <pre className="mt-0.5 max-h-32 overflow-x-auto overflow-y-auto rounded bg-muted p-1.5 text-[10px]">
                 {tool.result}
               </pre>
             </div>

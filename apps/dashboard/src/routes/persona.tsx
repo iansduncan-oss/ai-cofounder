@@ -143,7 +143,7 @@ export function PersonaPage() {
                     <Badge variant="success">Active</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1">
                   {p.id !== activePersonaId && (
                     <Button
                       variant="ghost"

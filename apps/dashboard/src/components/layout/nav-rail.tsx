@@ -108,6 +108,16 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
     refetchInterval: 60_000,
   });
 
+  // Lock body scroll when mobile drawer is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.classList.add("overflow-hidden");
+    } else {
+      document.body.classList.remove("overflow-hidden");
+    }
+    return () => document.body.classList.remove("overflow-hidden");
+  }, [mobileOpen]);
+
   // Close mobile on outside click
   useEffect(() => {
     if (!mobileOpen) return;
