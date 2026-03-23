@@ -1,6 +1,4 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createHash } from "node:crypto";
-
 // Mock @ai-cofounder/shared
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({

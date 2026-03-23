@@ -92,8 +92,8 @@ describe("contextualizeChunks", () => {
 
   it("respects batchSize (10 chunks / batchSize 3 = 4 batches)", async () => {
     const chunks = makeChunks(10);
-    let callOrder: number[] = [];
-    let batchCount = 0;
+    const callOrder: number[] = [];
+    const batchCount = 0;
 
     mockComplete.mockImplementation(async () => {
       callOrder.push(batchCount);
