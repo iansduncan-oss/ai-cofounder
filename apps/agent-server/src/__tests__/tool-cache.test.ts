@@ -6,6 +6,7 @@ vi.mock("@ai-cofounder/shared", () => ({
 }));
 
 describe("ToolCache", () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   let ToolCache: typeof import("../services/tool-cache.js").ToolCache;
 
   beforeEach(async () => {

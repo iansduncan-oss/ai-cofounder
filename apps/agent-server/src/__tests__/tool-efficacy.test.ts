@@ -12,6 +12,7 @@ vi.mock("@ai-cofounder/db", () => ({
 }));
 
 describe("ToolEfficacyService", () => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   let ToolEfficacyService: typeof import("../services/tool-efficacy.js").ToolEfficacyService;
 
   beforeEach(async () => {
