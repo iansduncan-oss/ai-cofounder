@@ -40,6 +40,7 @@ import { calendarRoutes } from "../routes/calendar.js";
 import { briefingRoutes } from "../routes/briefings.js";
 import { followUpRoutes } from "../routes/follow-ups.js";
 import { thinkingRoutes } from "../routes/thinking.js";
+import { searchRoutes } from "../routes/search.js";
 
 /**
  * JWT Guard Plugin — scoped Fastify plugin (NOT wrapped with fp()) so its
@@ -111,4 +112,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(briefingRoutes, { prefix: "/api/briefings" });
   app.register(followUpRoutes, { prefix: "/api/follow-ups" });
   app.register(thinkingRoutes, { prefix: "/api/thinking" });
+  app.register(searchRoutes, { prefix: "/api/search" });
 }

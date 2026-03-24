@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router";
 import {
   LayoutDashboard,
@@ -12,10 +12,13 @@ import {
   Activity,
   BarChart3,
   FolderOpen,
+  Loader2,
+  ListTodo,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useGlobalSearch } from "@/api/queries";
 
-const commands = [
+const NAV_COMMANDS = [
   { label: "Overview", to: "/dashboard", icon: LayoutDashboard },
   { label: "Goals", to: "/dashboard/goals", icon: Target },
   { label: "Milestones", to: "/dashboard/milestones", icon: Milestone },
@@ -28,16 +31,107 @@ const commands = [
   { label: "Settings", to: "/dashboard/settings", icon: Settings },
 ];
 
+interface ResultItem {
+  key: string;
+  label: string;
+  sublabel?: string;
+  to: string;
+  icon: typeof Target;
+  category: string;
+}
+
+function useDebounce(value: string, delay: number) {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(id);
+  }, [value, delay]);
+  return debounced;
+}
+
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
-  const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.toLowerCase()),
-  );
+  const debouncedQuery = useDebounce(query, 300);
+  const { data: searchResults, isFetching } = useGlobalSearch(debouncedQuery);
+
+  // Build flat list of all results
+  const allItems = useMemo(() => {
+    const items: ResultItem[] = [];
+
+    // Nav links (always filtered locally)
+    const filteredNav = NAV_COMMANDS.filter((c) =>
+      c.label.toLowerCase().includes(query.toLowerCase()),
+    );
+    for (const cmd of filteredNav) {
+      items.push({ key: `nav-${cmd.to}`, label: cmd.label, to: cmd.to, icon: cmd.icon, category: "Pages" });
+    }
+
+    if (!searchResults) return items;
+
+    for (const g of searchResults.goals) {
+      items.push({
+        key: `goal-${g.id}`,
+        label: g.title,
+        sublabel: g.status,
+        to: `/dashboard/goals/${g.id}`,
+        icon: Target,
+        category: "Goals",
+      });
+    }
+    for (const t of searchResults.tasks) {
+      items.push({
+        key: `task-${t.id}`,
+        label: t.title,
+        sublabel: t.status,
+        to: `/dashboard/goals/${t.goalId}`,
+        icon: ListTodo,
+        category: "Tasks",
+      });
+    }
+    for (const c of searchResults.conversations) {
+      items.push({
+        key: `conv-${c.id}`,
+        label: c.title || "Untitled conversation",
+        to: `/dashboard/chat?conversation=${c.id}`,
+        icon: MessageSquare,
+        category: "Conversations",
+      });
+    }
+    for (const m of searchResults.memories) {
+      items.push({
+        key: `mem-${m.id}`,
+        label: m.key,
+        sublabel: m.category,
+        to: "/dashboard/memories",
+        icon: Brain,
+        category: "Memories",
+      });
+    }
+
+    return items;
+  }, [query, searchResults]);
+
+  // Group items by category for rendering
+  const grouped = useMemo(() => {
+    const groups: { category: string; items: (ResultItem & { flatIndex: number })[] }[] = [];
+    let flatIndex = 0;
+    let currentCategory = "";
+    for (const item of allItems) {
+      if (item.category !== currentCategory) {
+        currentCategory = item.category;
+        groups.push({ category: currentCategory, items: [] });
+      }
+      groups[groups.length - 1].items.push({ ...item, flatIndex });
+      flatIndex++;
+    }
+    return groups;
+  }, [allItems]);
 
   // Global Cmd+K listener
   useEffect(() => {
@@ -61,10 +155,10 @@ export function CommandPalette() {
     }
   }, [open]);
 
-  // Reset selection when query changes
+  // Reset selection when items change
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, [allItems.length]);
 
   const handleSelect = useCallback(
     (to: string) => {
@@ -77,14 +171,21 @@ export function CommandPalette() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1));
+      setSelectedIndex((i) => Math.min(i + 1, allItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setSelectedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter" && filtered[selectedIndex]) {
-      handleSelect(filtered[selectedIndex].to);
+    } else if (e.key === "Enter" && allItems[selectedIndex]) {
+      handleSelect(allItems[selectedIndex].to);
     }
   };
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (!listRef.current) return;
+    const selected = listRef.current.querySelector("[data-selected='true']");
+    selected?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   if (!open) return null;
 
@@ -107,35 +208,47 @@ export function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search pages..."
-            aria-label="Search pages"
+            placeholder="Search everything..."
+            aria-label="Search everything"
             className="flex-1 bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
           />
+          {isFetching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Loading" />}
           <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground" aria-hidden="true">
             ESC
           </kbd>
         </div>
-        {filtered.length > 0 ? (
-          <div className="p-1">
-            {filtered.map((cmd, i) => {
-              const Icon = cmd.icon;
-              return (
-                <button
-                  key={cmd.to}
-                  onClick={() => handleSelect(cmd.to)}
-                  aria-label={`Go to ${cmd.label}`}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                    i === selectedIndex
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                  )}
-                >
-                  <Icon className="h-4 w-4" aria-hidden="true" />
-                  {cmd.label}
-                </button>
-              );
-            })}
+        {grouped.length > 0 ? (
+          <div ref={listRef} className="max-h-80 overflow-y-auto p-1">
+            {grouped.map((group) => (
+              <div key={group.category}>
+                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                  {group.category}
+                </div>
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.key}
+                      data-selected={item.flatIndex === selectedIndex}
+                      onClick={() => handleSelect(item.to)}
+                      aria-label={`Go to ${item.label}`}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                        item.flatIndex === selectedIndex
+                          ? "bg-accent text-accent-foreground"
+                          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                      )}
+                    >
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{item.label}</span>
+                      {item.sublabel && (
+                        <span className="ml-auto text-xs text-muted-foreground">{item.sublabel}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="p-4 text-center text-sm text-muted-foreground">

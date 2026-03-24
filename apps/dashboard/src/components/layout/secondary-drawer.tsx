@@ -13,7 +13,6 @@ const pageMap: Record<string, { component: React.LazyExoticComponent<React.Compo
   "/dashboard/memories": { component: lazy(() => import("@/routes/memories").then((m) => ({ default: m.MemoriesPage }))), title: "Memories" },
   "/dashboard/milestones": { component: lazy(() => import("@/routes/milestones").then((m) => ({ default: m.MilestonesPage }))), title: "Milestones" },
   "/dashboard/activity": { component: lazy(() => import("@/routes/activity").then((m) => ({ default: m.ActivityPage }))), title: "Activity" },
-  "/dashboard/usage": { component: lazy(() => import("@/routes/usage").then((m) => ({ default: m.UsagePage }))), title: "Usage" },
   "/dashboard/workspace": { component: lazy(() => import("@/routes/workspace").then((m) => ({ default: m.WorkspacePage }))), title: "Workspace" },
   "/dashboard/persona": { component: lazy(() => import("@/routes/persona").then((m) => ({ default: m.PersonaPage }))), title: "Persona" },
   "/dashboard/patterns": { component: lazy(() => import("@/routes/patterns").then((m) => ({ default: m.PatternsPage }))), title: "Patterns" },

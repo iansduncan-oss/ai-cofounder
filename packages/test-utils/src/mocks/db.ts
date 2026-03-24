@@ -346,6 +346,8 @@ export function mockDbModule() {
     getFailurePatternsForTool: vi.fn().mockResolvedValue([]),
     incrementFailureFrequency: vi.fn().mockResolvedValue(undefined),
     failurePatterns: {},
+    // Global search
+    globalSearch: vi.fn().mockResolvedValue({ goals: [], tasks: [], conversations: [], memories: [] }),
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),

@@ -80,6 +80,7 @@ import type {
   FollowUpStatus,
   CreateFollowUpInput,
   UpdateFollowUpInput,
+  GlobalSearchResults,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1258,6 +1259,12 @@ export class ApiClient {
 
   deleteFollowUp(id: string) {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/follow-ups/${id}`);
+  }
+
+  /* ── Global Search ── */
+
+  globalSearch(q: string) {
+    return this.request<GlobalSearchResults>("GET", `/api/search?q=${encodeURIComponent(q)}`);
   }
 
   /* ── Database ── */

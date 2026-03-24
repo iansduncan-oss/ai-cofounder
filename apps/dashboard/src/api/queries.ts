@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import type { SubagentRunStatus } from "@ai-cofounder/api-client";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
@@ -392,5 +392,15 @@ export function useFollowUp(id: string) {
     queryKey: queryKeys.followUps.detail(id),
     queryFn: () => apiClient.getFollowUp(id),
     enabled: !!id,
+  });
+}
+
+export function useGlobalSearch(q: string) {
+  return useQuery({
+    queryKey: queryKeys.search.results(q),
+    queryFn: () => apiClient.globalSearch(q),
+    enabled: q.length >= 2,
+    staleTime: 30_000,
+    placeholderData: keepPreviousData,
   });
 }

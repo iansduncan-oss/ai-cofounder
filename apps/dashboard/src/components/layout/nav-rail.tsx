@@ -59,6 +59,7 @@ const navSections: NavSection[] = [
       { icon: Target, label: "Goals", path: "/dashboard/goals" },
       { icon: ShieldCheck, label: "Approvals", path: "/dashboard/approvals", drawer: true },
       { icon: ListChecks, label: "Follow-Ups", path: "/dashboard/follow-ups", drawer: true },
+      { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
     ],
   },
   {
@@ -76,7 +77,6 @@ const navSections: NavSection[] = [
       { icon: Brain, label: "Memories", path: "/dashboard/memories", drawer: true },
       { icon: Milestone, label: "Milestones", path: "/dashboard/milestones", drawer: true },
       { icon: Activity, label: "Activity", path: "/dashboard/activity", drawer: true },
-      { icon: BarChart3, label: "Usage", path: "/dashboard/usage", drawer: true },
       { icon: FolderOpen, label: "Workspace", path: "/dashboard/workspace", drawer: true },
       { icon: Bot, label: "Persona", path: "/dashboard/persona", drawer: true },
       { icon: Sparkles, label: "Patterns", path: "/dashboard/patterns", drawer: true },

@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { App } from "@/app";
 import { CommandCenter } from "@/components/layout/command-center";
 
@@ -30,8 +30,8 @@ const MilestonesPage = lazy(() =>
 const ActivityPage = lazy(() =>
   import("./activity").then((m) => ({ default: m.ActivityPage })),
 );
-const UsagePage = lazy(() =>
-  import("./usage").then((m) => ({ default: m.UsagePage })),
+const AnalyticsPage = lazy(() =>
+  import("./analytics").then((m) => ({ default: m.AnalyticsPage })),
 );
 const WorkspacePage = lazy(() =>
   import("./workspace").then((m) => ({ default: m.WorkspacePage })),
@@ -104,7 +104,8 @@ export const router = createBrowserRouter([
       { path: "memories", element: <MemoriesPage /> },
       { path: "milestones", element: <MilestonesPage /> },
       { path: "activity", element: <ActivityPage /> },
-      { path: "usage", element: <UsagePage /> },
+      { path: "analytics", element: <AnalyticsPage /> },
+      { path: "usage", element: <Navigate to="/dashboard/analytics" replace /> },
       { path: "workspace", element: <WorkspacePage /> },
       { path: "pipelines", element: <PipelinesPage /> },
       { path: "pipelines/:jobId", element: <PipelineDetailPage /> },

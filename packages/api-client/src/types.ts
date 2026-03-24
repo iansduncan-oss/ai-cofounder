@@ -940,3 +940,12 @@ export interface UpdateBudgetInput {
   dailyUsd: number;
   weeklyUsd: number;
 }
+
+/* ── Global Search ── */
+
+export interface GlobalSearchResults {
+  goals: Array<{ id: string; title: string; description: string | null; status: string; createdAt: string }>;
+  tasks: Array<{ id: string; title: string; status: string; goalId: string; createdAt: string }>;
+  conversations: Array<{ id: string; title: string | null; createdAt: string }>;
+  memories: Array<{ id: string; key: string; content: string; category: string; createdAt: string }>;
+}

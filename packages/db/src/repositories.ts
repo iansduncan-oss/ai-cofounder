@@ -4101,3 +4101,43 @@ export async function incrementFailureFrequency(db: Db, id: string) {
     })
     .where(eq(failurePatterns.id, id));
 }
+
+/* ────────────────────── Global Search ────────────────────── */
+
+export async function globalSearch(
+  db: Db,
+  query: string,
+  opts?: { limitPerCategory?: number },
+) {
+  const limit = opts?.limitPerCategory ?? 5;
+  const pattern = `%${query}%`;
+
+  const [goalRows, taskRows, conversationRows, memoryRows] = await Promise.all([
+    db
+      .select({ id: goals.id, title: goals.title, description: goals.description, status: goals.status, createdAt: goals.createdAt })
+      .from(goals)
+      .where(or(ilike(goals.title, pattern), ilike(goals.description, pattern)))
+      .orderBy(desc(goals.createdAt))
+      .limit(limit),
+    db
+      .select({ id: tasks.id, title: tasks.title, status: tasks.status, goalId: tasks.goalId, createdAt: tasks.createdAt })
+      .from(tasks)
+      .where(ilike(tasks.title, pattern))
+      .orderBy(desc(tasks.createdAt))
+      .limit(limit),
+    db
+      .select({ id: conversations.id, title: conversations.title, createdAt: conversations.createdAt })
+      .from(conversations)
+      .where(ilike(conversations.title, pattern))
+      .orderBy(desc(conversations.createdAt))
+      .limit(limit),
+    db
+      .select({ id: memories.id, key: memories.key, content: memories.content, category: memories.category, createdAt: memories.createdAt })
+      .from(memories)
+      .where(or(ilike(memories.key, pattern), ilike(memories.content, pattern)))
+      .orderBy(desc(memories.createdAt))
+      .limit(limit),
+  ]);
+
+  return { goals: goalRows, tasks: taskRows, conversations: conversationRows, memories: memoryRows };
+}
