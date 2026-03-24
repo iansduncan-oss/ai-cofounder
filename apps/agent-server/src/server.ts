@@ -328,6 +328,7 @@ export function buildServer(registry?: LlmRegistry) {
     if (ciHealRedisUrl) {
       const ciHealRedis = new Redis(ciHealRedisUrl);
       app.ciSelfHealService = new CiSelfHealService(ciHealRedis, notificationService);
+      app.addHook("onClose", async () => { await ciHealRedis.quit(); });
       logger.info("CI self-heal service initialized");
     }
 

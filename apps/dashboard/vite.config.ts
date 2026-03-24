@@ -28,6 +28,7 @@ export default defineConfig({
           react: ["react", "react-dom"],
           router: ["react-router"],
           query: ["@tanstack/react-query"],
+          xyflow: ["@xyflow/react", "elkjs"],
         },
       },
     },

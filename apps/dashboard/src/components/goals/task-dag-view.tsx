@@ -172,11 +172,11 @@ export function TaskDAGView({ tasks }: TaskDAGViewProps) {
   }
 
   if (!layoutReady) {
-    return <div className="h-[400px] flex items-center justify-center text-sm text-muted-foreground">Laying out graph...</div>;
+    return <div className="h-[300px] md:h-[400px] lg:h-[500px] flex items-center justify-center text-sm text-muted-foreground">Laying out graph...</div>;
   }
 
   return (
-    <div className="h-[400px] w-full rounded-md border bg-background">
+    <div className="h-[300px] md:h-[400px] lg:h-[500px] w-full rounded-md border bg-background">
       <ReactFlow
         nodes={nodes}
         edges={edges}

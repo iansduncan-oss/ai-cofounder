@@ -8,6 +8,7 @@ import { getActivePersona } from "@ai-cofounder/db";
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
   app.get("/health", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    reply.header("Cache-Control", "public, max-age=30");
     let dbStatus = "ok";
     try {
       await app.db.execute(sql`SELECT 1`);
@@ -204,7 +205,8 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
   });
 
   /** GET /api/tools/stats — per-tool execution timing stats */
-  app.get("/api/tools/stats", { schema: { tags: ["health"] } }, async () => {
+  app.get("/api/tools/stats", { schema: { tags: ["health"] } }, async (_request, reply) => {
+    reply.header("Cache-Control", "public, max-age=60");
     const stats = await getToolStats(app.db);
     return {
       timestamp: new Date().toISOString(),

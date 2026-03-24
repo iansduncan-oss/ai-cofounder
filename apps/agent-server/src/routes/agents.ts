@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
-import { Orchestrator } from "../agents/orchestrator.js";
+import { createOrchestrator } from "../helpers/create-orchestrator.js";
 import type { StreamCallback } from "../agents/stream-events.js";
 import {
   findOrCreateUser,
@@ -39,21 +39,7 @@ const RunBody = Type.Object({
 type RunBody = Static<typeof RunBody>;
 
 export const agentRoutes: FastifyPluginAsync = async (app) => {
-  const orchestrator = new Orchestrator({
-    registry: app.llmRegistry,
-    db: app.db,
-    embeddingService: app.embeddingService,
-    n8nService: app.n8nService,
-    sandboxService: app.sandboxService,
-    workspaceService: app.workspaceService,
-    messagingService: app.messagingService,
-    autonomyTierService: app.autonomyTierService,
-    projectRegistryService: app.projectRegistry,
-    monitoringService: app.monitoringService,
-    browserService: app.browserService,
-    episodicMemoryService: app.episodicMemoryService,
-    proceduralMemoryService: app.proceduralMemoryService,
-  });
+  const orchestrator = createOrchestrator(app);
 
   const conversationIngestion = new ConversationIngestionService(
     app.db,

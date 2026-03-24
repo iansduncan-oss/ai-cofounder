@@ -3,6 +3,14 @@ import { useHealth, useProviderHealth, useToolTierConfig, useSettings, useProjec
 import { useUpdateToolTier, useUpdateBudgetThresholds, useCreateProject, useDeleteProject } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
@@ -302,6 +310,7 @@ function ProjectRegistrationCard() {
   const deleteProject = useDeleteProject();
 
   const [showForm, setShowForm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
   const [workspacePath, setWorkspacePath] = useState("");
@@ -321,12 +330,6 @@ function ProjectRegistrationCard() {
       { name, repoUrl, workspacePath, description: description || undefined },
       { onSuccess: resetForm }
     );
-  }
-
-  function handleDelete(id: string) {
-    if (window.confirm("Remove this project from the registry?")) {
-      deleteProject.mutate(id);
-    }
   }
 
   return (
@@ -367,7 +370,7 @@ function ProjectRegistrationCard() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleDelete(project.id)}
+                  onClick={() => setDeleteTarget(project.id)}
                   aria-label="Delete project"
                   className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-destructive"
                 >
@@ -461,6 +464,33 @@ function ProjectRegistrationCard() {
           </form>
         )}
       </CardContent>
+
+      <Dialog open={deleteTarget !== null} onClose={() => setDeleteTarget(null)}>
+        <DialogHeader>
+          <DialogTitle>Remove project?</DialogTitle>
+          <DialogDescription>
+            This will remove the project from the registry. It will not delete any files.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={deleteProject.isPending}
+            onClick={() => {
+              if (deleteTarget) {
+                deleteProject.mutate(deleteTarget, {
+                  onSuccess: () => setDeleteTarget(null),
+                });
+              }
+            }}
+          >
+            {deleteProject.isPending ? "Removing..." : "Remove"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </Card>
   );
 }

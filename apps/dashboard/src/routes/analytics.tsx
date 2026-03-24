@@ -24,7 +24,9 @@ import {
   Wrench,
   CheckCircle,
   Timer,
+  RefreshCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   BarChart,
   Bar,
@@ -41,7 +43,16 @@ import {
   Legend,
 } from "recharts";
 
-const COLORS = ["#3b82f6", "#8b5cf6", "#06b6d4", "#f59e0b", "#ef4444", "#10b981", "#f97316", "#ec4899"];
+const COLORS = [
+  "hsl(var(--chart-1, 217 91% 60%))",
+  "hsl(var(--chart-2, 263 70% 58%))",
+  "hsl(var(--chart-3, 187 86% 42%))",
+  "hsl(var(--chart-4, 38 92% 50%))",
+  "hsl(var(--chart-5, 0 84% 60%))",
+  "hsl(var(--chart-6, 160 84% 39%))",
+  "hsl(var(--chart-7, 24 95% 53%))",
+  "hsl(var(--chart-8, 330 81% 60%))",
+];
 
 type Period = "today" | "week" | "month" | "all";
 type Tab = "overview" | "costs" | "tools";
@@ -72,7 +83,7 @@ export function AnalyticsPage() {
   const [period, setPeriod] = useState<Period>("today");
   const navigate = useNavigate();
 
-  const { data: usage, isLoading, error } = useUsage(activeTab === "costs" ? period : "today");
+  const { data: usage, isLoading, error, refetch } = useUsage(activeTab === "costs" ? period : "today");
   const { data: providerHealthData } = useProviderHealth();
   const { data: dailyData } = useDailyCost(30);
   const { data: budgetData } = useBudgetStatus();
@@ -169,6 +180,10 @@ export function AnalyticsPage() {
               <AlertTriangle className="mb-3 h-8 w-8 text-destructive" />
               <p className="text-sm font-medium">Failed to load usage data</p>
               <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Retry
+              </Button>
             </div>
           ) : isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -266,6 +281,10 @@ export function AnalyticsPage() {
               <AlertTriangle className="mb-3 h-8 w-8 text-destructive" />
               <p className="text-sm font-medium">Failed to load usage data</p>
               <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
+              <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Retry
+              </Button>
             </div>
           ) : isLoading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

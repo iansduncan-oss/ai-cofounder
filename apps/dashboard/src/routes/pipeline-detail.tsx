@@ -6,6 +6,13 @@ import { PageHeader } from "@/components/layout/page-header";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { PipelineStateBadge } from "@/routes/pipelines";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, XCircle, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,6 +50,7 @@ export function PipelineDetailPage() {
   const retryMutation = useRetryPipeline();
 
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   function toggleStage(i: number) {
     setExpanded((prev) => {
@@ -74,11 +82,7 @@ export function PipelineDetailPage() {
                 variant="destructive"
                 size="sm"
                 disabled={cancelMutation.isPending}
-                onClick={() => {
-                  if (window.confirm("Cancel this pipeline run?")) {
-                    cancelMutation.mutate(jobId!);
-                  }
-                }}
+                onClick={() => setCancelDialogOpen(true)}
               >
                 <XCircle className="mr-1.5 h-3.5 w-3.5" />
                 {cancelMutation.isPending ? "Cancelling…" : "Cancel"}
@@ -220,6 +224,31 @@ export function PipelineDetailPage() {
           </div>
         </div>
       ) : null}
+
+      <Dialog open={cancelDialogOpen} onClose={() => setCancelDialogOpen(false)}>
+        <DialogHeader>
+          <DialogTitle>Cancel this pipeline run?</DialogTitle>
+          <DialogDescription>
+            This will cancel the pipeline and any in-progress stages. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setCancelDialogOpen(false)}>
+            Keep Running
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={cancelMutation.isPending}
+            onClick={() => {
+              cancelMutation.mutate(jobId!, {
+                onSuccess: () => setCancelDialogOpen(false),
+              });
+            }}
+          >
+            {cancelMutation.isPending ? "Cancelling..." : "Yes, Cancel"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
-import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, createTask } from "@ai-cofounder/db";
+import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, tasks } from "@ai-cofounder/db";
 import { getJobStatus } from "@ai-cofounder/queue";
 import { CreateGoalBody, UpdateGoalStatusBody, BulkGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 import { recordActionSafe } from "../services/action-recorder.js";
@@ -68,12 +68,10 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     "/bulk-status",
     { schema: { tags: ["goals"], body: BulkGoalStatusBody } },
     async (request) => {
-      let updated = 0;
-      for (const { id, status } of request.body.updates) {
-        const result = await updateGoalStatus(app.db, id, status);
-        if (result) updated++;
-      }
-      return { updated };
+      const results = await Promise.all(
+        request.body.updates.map(({ id, status }) => updateGoalStatus(app.db, id, status)),
+      );
+      return { updated: results.filter(Boolean).length };
     },
   );
 
@@ -123,18 +121,20 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
         milestoneId: original.milestoneId ?? undefined,
       });
 
-      // Clone all tasks with reset statuses
-      const tasks = await listTasksByGoal(app.db, original.id);
-      for (const task of tasks) {
-        await createTask(app.db, {
-          goalId: cloned.id,
-          title: task.title,
-          description: task.description ?? undefined,
-          assignedAgent: (task.assignedAgent ?? undefined) as Parameters<typeof createTask>[1]["assignedAgent"],
-          orderIndex: task.orderIndex,
-          parallelGroup: task.parallelGroup ?? undefined,
-          input: task.input ?? undefined,
-        });
+      // Clone all tasks with reset statuses (batch insert)
+      const originalTasks = await listTasksByGoal(app.db, original.id);
+      if (originalTasks.length > 0) {
+        await app.db.insert(tasks).values(
+          originalTasks.map((task) => ({
+            goalId: cloned.id,
+            title: task.title,
+            description: task.description,
+            assignedAgent: task.assignedAgent,
+            orderIndex: task.orderIndex,
+            parallelGroup: task.parallelGroup,
+            input: task.input,
+          })),
+        );
       }
 
       return reply.status(201).send(cloned);

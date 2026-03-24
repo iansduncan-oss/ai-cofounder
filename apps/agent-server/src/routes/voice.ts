@@ -1,14 +1,13 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
-import { Orchestrator } from "../agents/orchestrator.js";
+import { createOrchestrator } from "../helpers/create-orchestrator.js";
 import {
-  findOrCreateUser,
-  createConversation,
   getConversationMessages,
   createMessage,
   getActivePersona,
 } from "@ai-cofounder/db";
+import { resolveUserContext } from "../helpers/resolve-user-context.js";
 import { createLogger } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
 
@@ -22,21 +21,7 @@ const VoiceChatBody = Type.Object({
 type VoiceChatBody = Static<typeof VoiceChatBody>;
 
 export const voiceRoutes: FastifyPluginAsync = async (app) => {
-  const orchestrator = new Orchestrator({
-    registry: app.llmRegistry,
-    db: app.db,
-    embeddingService: app.embeddingService,
-    n8nService: app.n8nService,
-    sandboxService: app.sandboxService,
-    workspaceService: app.workspaceService,
-    messagingService: app.messagingService,
-    autonomyTierService: app.autonomyTierService,
-    projectRegistryService: app.projectRegistry,
-    monitoringService: app.monitoringService,
-    browserService: app.browserService,
-    episodicMemoryService: app.episodicMemoryService,
-    proceduralMemoryService: app.proceduralMemoryService,
-  });
+  const orchestrator = createOrchestrator(app);
 
   // ── Original non-streaming chat endpoint ──
   app.post<{ Body: VoiceChatBody }>("/chat", { schema: { body: VoiceChatBody } }, async (request) => {
@@ -46,13 +31,9 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
     let dbUserId: string | undefined;
 
     if (userId) {
-      const user = await findOrCreateUser(app.db, userId, "voice");
-      dbUserId = user.id;
-
-      if (!convId) {
-        const conv = await createConversation(app.db, { userId: user.id });
-        convId = conv.id;
-      }
+      const ctx = await resolveUserContext(app.db, userId, "voice", conversationId);
+      dbUserId = ctx.dbUserId;
+      convId = ctx.conversationId;
     }
 
     // Load conversation history from DB
@@ -122,13 +103,9 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
       let dbUserId: string | undefined;
 
       if (userId) {
-        const user = await findOrCreateUser(app.db, userId, "voice");
-        dbUserId = user.id;
-
-        if (!convId) {
-          const conv = await createConversation(app.db, { userId: user.id });
-          convId = conv.id;
-        }
+        const ctx = await resolveUserContext(app.db, userId, "voice", conversationId);
+        dbUserId = ctx.dbUserId;
+        convId = ctx.conversationId;
       }
 
       let resolvedHistory: AgentMessage[] | undefined;

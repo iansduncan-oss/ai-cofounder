@@ -6,13 +6,14 @@ import { Badge } from "@/components/ui/badge";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDate } from "@/lib/utils";
-import { Scale, Search } from "lucide-react";
+import { AlertTriangle, RefreshCw, Scale, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function DecisionsPage() {
   usePageTitle("Decisions");
   const { data: user } = useDashboardUser();
   const [search, setSearch] = useState("");
-  const { data, isLoading } = useDecisions(user?.id ?? "", search || undefined);
+  const { data, isLoading, error, refetch } = useDecisions(user?.id ?? "", search || undefined);
   const decisions = data?.data ?? [];
 
   return (
@@ -32,7 +33,17 @@ export function DecisionsPage() {
         </div>
       </div>
 
-      {isLoading ? (
+      {error ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <AlertTriangle className="mb-3 h-8 w-8 text-destructive" />
+          <p className="text-sm font-medium">Failed to load decisions</p>
+          <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
+          <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      ) : isLoading ? (
         <ListSkeleton rows={5} />
       ) : decisions.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">

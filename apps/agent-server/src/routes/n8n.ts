@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-import { Orchestrator } from "../agents/orchestrator.js";
+import { createOrchestrator } from "../helpers/create-orchestrator.js";
 import {
   createN8nWorkflow,
   updateN8nWorkflow,
@@ -61,21 +61,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       convId = conv.id;
     }
 
-    const orchestrator = new Orchestrator({
-      registry: app.llmRegistry,
-      db: app.db,
-      embeddingService: app.embeddingService,
-      n8nService: app.n8nService,
-      sandboxService: app.sandboxService,
-      workspaceService: app.workspaceService,
-      messagingService: app.messagingService,
-      autonomyTierService: app.autonomyTierService,
-      projectRegistryService: app.projectRegistry,
-      monitoringService: app.monitoringService,
-      browserService: app.browserService,
-      episodicMemoryService: app.episodicMemoryService,
-      proceduralMemoryService: app.proceduralMemoryService,
-    });
+    const orchestrator = createOrchestrator(app);
 
     const contextMessage = event_type
       ? `[n8n event: ${event_type}] ${message}`

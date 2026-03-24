@@ -160,14 +160,14 @@ export function GoalDetailPage() {
                     <button
                       onClick={() => setTaskView("list")}
                       aria-label="List view"
-                      className={`rounded px-2 py-1 text-xs transition-colors ${taskView === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`rounded px-2 py-1 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${taskView === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <List className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => setTaskView("dag")}
                       aria-label="DAG view"
-                      className={`rounded px-2 py-1 text-xs transition-colors ${taskView === "dag" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`rounded px-2 py-1 text-xs transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 ${taskView === "dag" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
                     >
                       <GitBranch className="h-3.5 w-3.5" />
                     </button>
