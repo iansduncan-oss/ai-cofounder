@@ -19,6 +19,7 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 1500,
     commonjsOptions: {
       include: [/api-client/, /shared/, /node_modules/],
     },
@@ -28,7 +29,8 @@ export default defineConfig({
           react: ["react", "react-dom"],
           router: ["react-router"],
           query: ["@tanstack/react-query"],
-          xyflow: ["@xyflow/react", "elkjs/lib/elk.bundled.js"],
+          xyflow: ["@xyflow/react"],
+          elkjs: ["elkjs/lib/elk.bundled.js"],
         },
       },
     },
