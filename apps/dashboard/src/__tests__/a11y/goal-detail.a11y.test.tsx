@@ -10,6 +10,7 @@ vi.mock("react-router", async () => {
 vi.mock("@/api/queries", () => ({
   useGoal: vi.fn(),
   useTasks: vi.fn(),
+  useCostByGoal: vi.fn().mockReturnValue({ data: null }),
 }));
 
 vi.mock("@/api/mutations", () => ({

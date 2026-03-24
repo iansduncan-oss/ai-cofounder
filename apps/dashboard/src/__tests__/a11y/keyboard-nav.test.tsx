@@ -47,6 +47,7 @@ vi.mock("@/api/queries", () => ({
   useDashboardUser: vi.fn().mockReturnValue({ data: { id: "user-uuid-1" } }),
   useConversationMessages: vi.fn().mockReturnValue({ data: null }),
   useConversations: vi.fn().mockReturnValue({ data: null }),
+  useCostByGoal: vi.fn().mockReturnValue({ data: null }),
   useGoal: vi.fn().mockReturnValue({
     data: {
       id: "goal-1",

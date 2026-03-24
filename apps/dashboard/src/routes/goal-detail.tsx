@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useParams, Link } from "react-router";
-import { useGoal, useTasks } from "@/api/queries";
+import { useGoal, useTasks, useCostByGoal } from "@/api/queries";
 import { useUpdateGoalStatus, useApproveGoal, useRejectGoal } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +18,12 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { ExecutionPanel } from "@/components/goals/execution-panel";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDate } from "@/lib/utils";
-import { ChevronRight, AlertTriangle, XCircle, CheckCircle, ShieldAlert } from "lucide-react";
+import { ChevronRight, AlertTriangle, XCircle, CheckCircle, ShieldAlert, List, GitBranch, DollarSign } from "lucide-react";
 import type { GoalStatus } from "@ai-cofounder/api-client";
+
+const TaskDAGView = lazy(() =>
+  import("@/components/goals/task-dag-view").then((m) => ({ default: m.TaskDAGView })),
+);
 
 export function GoalDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -29,6 +33,9 @@ export function GoalDetailPage() {
   const updateStatus = useUpdateGoalStatus();
   const approveGoal = useApproveGoal();
   const rejectGoal = useRejectGoal();
+
+  const { data: costData } = useCostByGoal(id!);
+  const [taskView, setTaskView] = useState<"list" | "dag">("list");
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -146,50 +153,81 @@ export function GoalDetailPage() {
         <div className="md:col-span-2 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Tasks</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Tasks</CardTitle>
+                {sortedTasks.length > 1 && (
+                  <div className="flex items-center rounded-md border p-0.5">
+                    <button
+                      onClick={() => setTaskView("list")}
+                      aria-label="List view"
+                      className={`rounded px-2 py-1 text-xs transition-colors ${taskView === "list" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <List className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setTaskView("dag")}
+                      aria-label="DAG view"
+                      className={`rounded px-2 py-1 text-xs transition-colors ${taskView === "dag" ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      <GitBranch className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {tasksLoading ? (
                 <ListSkeleton rows={3} />
               ) : sortedTasks.length > 0 ? (
-                <div className="space-y-2">
-                  {sortedTasks.map((task, i) => (
-                    <div
-                      key={task.id}
-                      className="flex items-start gap-3 rounded-md border p-3"
-                    >
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                        {i + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">{task.title}</p>
-                          <TaskStatusBadge status={task.status} />
+                taskView === "dag" ? (
+                  <Suspense fallback={<div className="h-[400px] flex items-center justify-center text-sm text-muted-foreground">Loading graph...</div>}>
+                    <TaskDAGView tasks={sortedTasks} />
+                  </Suspense>
+                ) : (
+                  <div className="space-y-2">
+                    {sortedTasks.map((task, i) => (
+                      <div
+                        key={task.id}
+                        className="flex items-start gap-3 rounded-md border p-3"
+                      >
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                          {i + 1}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium">{task.title}</p>
+                            <TaskStatusBadge status={task.status} />
+                          </div>
+                          {task.description && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {task.description}
+                            </p>
+                          )}
+                          {task.assignedAgent && (
+                            <Badge variant="outline" className="mt-1">
+                              {task.assignedAgent}
+                            </Badge>
+                          )}
+                          {task.dependsOn && task.dependsOn.length > 0 && (
+                            <Badge variant="secondary" className="mt-1 text-[10px]">
+                              depends on {task.dependsOn.length} task{task.dependsOn.length > 1 ? "s" : ""}
+                            </Badge>
+                          )}
+                          {task.output && (
+                            <pre className="mt-2 max-h-32 overflow-auto rounded bg-muted p-2 text-xs">
+                              {task.output}
+                            </pre>
+                          )}
+                          {task.error && (
+                            <p className="mt-1 text-xs text-destructive">
+                              {task.error}
+                            </p>
+                          )}
                         </div>
-                        {task.description && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {task.description}
-                          </p>
-                        )}
-                        {task.assignedAgent && (
-                          <Badge variant="outline" className="mt-1">
-                            {task.assignedAgent}
-                          </Badge>
-                        )}
-                        {task.output && (
-                          <pre className="mt-2 max-h-32 overflow-auto rounded bg-muted p-2 text-xs">
-                            {task.output}
-                          </pre>
-                        )}
-                        {task.error && (
-                          <p className="mt-1 text-xs text-destructive">
-                            {task.error}
-                          </p>
-                        )}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No tasks created yet
@@ -240,6 +278,35 @@ export function GoalDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {costData && costData.requestCount > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <DollarSign className="h-4 w-4" />
+                  Cost
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total</span>
+                  <span className="font-mono font-medium">${costData.totalCostUsd.toFixed(4)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Requests</span>
+                  <span className="font-medium">{costData.requestCount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Input tokens</span>
+                  <span className="font-mono text-xs">{costData.totalInputTokens.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Output tokens</span>
+                  <span className="font-mono text-xs">{costData.totalOutputTokens.toLocaleString()}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <ExecutionPanel goalId={goal.id} goalStatus={goal.status} />
         </div>
