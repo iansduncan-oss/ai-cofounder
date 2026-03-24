@@ -476,12 +476,19 @@ export class ApiClient {
 
   /* ── Events ── */
 
-  listEvents(pagination?: PaginationParams) {
+  listEvents(opts?: PaginationParams & { source?: string; type?: string; processed?: boolean }) {
     const params = new URLSearchParams();
-    if (pagination?.limit != null) params.set("limit", String(pagination.limit));
-    if (pagination?.offset != null) params.set("offset", String(pagination.offset));
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    if (opts?.source) params.set("source", opts.source);
+    if (opts?.type) params.set("type", opts.type);
+    if (opts?.processed != null) params.set("processed", String(opts.processed));
     const qs = params.toString();
     return this.request<PaginatedResponse<Event>>("GET", `/api/events${qs ? `?${qs}` : ""}`);
+  }
+
+  reprocessEvent(id: string) {
+    return this.request<{ eventId: string; status: string }>("POST", `/api/events/${id}/reprocess`);
   }
 
   /* ── Usage ── */

@@ -1277,13 +1277,33 @@ export async function markEventProcessed(db: Db, id: string, result?: string) {
   return updated;
 }
 
+export async function resetEventProcessed(db: Db, id: string) {
+  const [updated] = await db
+    .update(events)
+    .set({ processed: false, result: null })
+    .where(eq(events.id, id))
+    .returning();
+  return updated;
+}
+
+export interface EventFilterOptions {
+  limit?: number;
+  offset?: number;
+  source?: string;
+  type?: string;
+  processed?: boolean;
+}
+
 export async function listEvents(
   db: Db,
-  options?: { limit?: number; offset?: number },
+  options?: EventFilterOptions,
 ) {
+  const conditions = buildEventConditions(options);
+
   let query = db
     .select()
     .from(events)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(events.createdAt))
     .$dynamic();
 
@@ -1293,11 +1313,27 @@ export async function listEvents(
   return query;
 }
 
-export async function countEvents(db: Db): Promise<number> {
+export async function countEvents(db: Db, options?: EventFilterOptions): Promise<number> {
+  const conditions = buildEventConditions(options);
+
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
-    .from(events);
+    .from(events)
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
   return rows[0]?.count ?? 0;
+}
+
+export async function getEventById(db: Db, id: string) {
+  const [event] = await db.select().from(events).where(eq(events.id, id));
+  return event ?? null;
+}
+
+function buildEventConditions(options?: EventFilterOptions) {
+  const conditions = [];
+  if (options?.source) conditions.push(eq(events.source, options.source));
+  if (options?.type) conditions.push(eq(events.type, options.type));
+  if (options?.processed != null) conditions.push(eq(events.processed, options.processed));
+  return conditions;
 }
 
 export async function listUnprocessedEvents(db: Db, limit = 20) {

@@ -87,6 +87,9 @@ const SubagentsPage = lazy(() =>
 const DecisionsPage = lazy(() =>
   import("./decisions").then((m) => ({ default: m.DecisionsPage })),
 );
+const EventsPage = lazy(() =>
+  import("./events").then((m) => ({ default: m.EventsPage })),
+);
 const PipelineTemplatesPage = lazy(() =>
   import("./pipeline-templates").then((m) => ({ default: m.PipelineTemplatesPage })),
 );
@@ -131,6 +134,7 @@ export const router = createBrowserRouter([
       { path: "subagents", element: <SubagentsPage /> },
       { path: "decisions", element: <DecisionsPage /> },
       { path: "pipeline-templates", element: <PipelineTemplatesPage /> },
+      { path: "events", element: <EventsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

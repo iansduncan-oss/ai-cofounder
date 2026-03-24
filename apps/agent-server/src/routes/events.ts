@@ -1,8 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
-import { createEvent, listEvents, countEvents } from "@ai-cofounder/db";
+import { createEvent, listEvents, countEvents, getEventById, resetEventProcessed } from "@ai-cofounder/db";
 import { processEvent } from "../events.js";
-import { PaginationQuery } from "../schemas.js";
+import { PaginationQuery, IdParams } from "../schemas.js";
 
 const InboundEventBody = Type.Object({
   source: Type.String({ minLength: 1, maxLength: 100 }),
@@ -10,19 +10,65 @@ const InboundEventBody = Type.Object({
   payload: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
 });
 
+const EventListQuery = Type.Intersect([
+  PaginationQuery,
+  Type.Object({
+    source: Type.Optional(Type.String()),
+    type: Type.Optional(Type.String()),
+    processed: Type.Optional(Type.Union([Type.Literal("true"), Type.Literal("false")])),
+  }),
+]);
+
 export const eventRoutes: FastifyPluginAsync = async (app) => {
-  /* GET / — list events (paginated) */
-  app.get<{ Querystring: typeof PaginationQuery.static }>(
+  /* GET / — list events (paginated, filterable) */
+  app.get<{ Querystring: typeof EventListQuery.static }>(
     "/",
-    { schema: { tags: ["events"], querystring: PaginationQuery } },
+    { schema: { tags: ["events"], querystring: EventListQuery } },
     async (request) => {
       const limit = Math.min(request.query.limit ?? 50, 200);
       const offset = request.query.offset ?? 0;
+      const filters = {
+        limit,
+        offset,
+        source: request.query.source,
+        type: request.query.type,
+        processed: request.query.processed != null ? request.query.processed === "true" : undefined,
+      };
       const [data, total] = await Promise.all([
-        listEvents(app.db, { limit, offset }),
-        countEvents(app.db),
+        listEvents(app.db, filters),
+        countEvents(app.db, filters),
       ]);
       return { data, total, limit, offset };
+    },
+  );
+
+  /* POST /:id/reprocess — re-trigger event processing */
+  app.post<{ Params: typeof IdParams.static }>(
+    "/:id/reprocess",
+    { schema: { tags: ["events"], params: IdParams } },
+    async (request, reply) => {
+      const event = await getEventById(app.db, request.params.id);
+      if (!event) {
+        return reply.status(404).send({ error: "Event not found" });
+      }
+
+      // Reset processed state
+      await resetEventProcessed(app.db, event.id);
+
+      // Re-trigger processing in the background
+      processEvent(
+        app.db,
+        app.llmRegistry,
+        event,
+        app.embeddingService,
+        app.sandboxService,
+        app.workspaceService,
+        app.messagingService,
+      ).catch((err) => {
+        app.log.error({ err, eventId: event.id }, "reprocess event failed");
+      });
+
+      return reply.status(202).send({ eventId: event.id, status: "reprocessing" });
     },
   );
 

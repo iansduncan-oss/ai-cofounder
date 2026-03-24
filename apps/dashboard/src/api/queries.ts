@@ -1,4 +1,4 @@
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import type { SubagentRunStatus } from "@ai-cofounder/api-client";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
@@ -407,6 +407,25 @@ export function usePipelineTemplates() {
   return useQuery({
     queryKey: queryKeys.pipelineTemplates.list,
     queryFn: () => apiClient.listPipelineTemplates(),
+  });
+}
+
+export function useEvents(filters?: { source?: string; type?: string; processed?: boolean }) {
+  const filterKey = JSON.stringify(filters ?? {});
+  return useQuery({
+    queryKey: queryKeys.events.list(filterKey),
+    queryFn: () => apiClient.listEvents({ limit: 100, ...filters }),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useReprocessEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.reprocessEvent(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.events.all });
+    },
   });
 }
 

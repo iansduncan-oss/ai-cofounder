@@ -141,6 +141,10 @@ export const queryKeys = {
     all: ["decisions"] as const,
     list: (userId?: string) => ["decisions", "list", userId ?? "all"] as const,
   },
+  events: {
+    all: ["events"] as const,
+    list: (filters?: string) => ["events", "list", filters ?? "all"] as const,
+  },
   search: {
     results: (q: string) => ["search", q] as const,
   },
