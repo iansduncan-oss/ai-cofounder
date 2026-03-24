@@ -1,0 +1,64 @@
+#!/bin/bash
+# Deploy VPS automation scripts to the server
+# Run from local machine: ./infra/scripts/deploy-vps.sh
+set -euo pipefail
+
+VPS_HOST="vps"  # SSH config alias
+REMOTE_DIR="/opt/scripts"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VPS_SCRIPTS_DIR="${SCRIPT_DIR}/vps"
+
+echo "=== Deploying VPS automation scripts ==="
+
+# Create remote directories
+echo "Creating directories on VPS..."
+ssh "$VPS_HOST" "sudo mkdir -p ${REMOTE_DIR} /backups/ai-cofounder/latest /backups/n8n /var/log/automation"
+
+# Copy scripts
+echo "Copying scripts..."
+scp "${VPS_SCRIPTS_DIR}/common.sh" \
+    "${VPS_SCRIPTS_DIR}/backup-db.sh" \
+    "${VPS_SCRIPTS_DIR}/docker-cleanup.sh" \
+    "${VPS_SCRIPTS_DIR}/check-ssl.sh" \
+    "${VPS_HOST}:/tmp/automation-scripts/"
+
+ssh "$VPS_HOST" "sudo mv /tmp/automation-scripts/* ${REMOTE_DIR}/ && rmdir /tmp/automation-scripts"
+
+# Make executable
+echo "Setting permissions..."
+ssh "$VPS_HOST" "sudo chmod +x ${REMOTE_DIR}/*.sh"
+
+# Check if .env exists, create from example if not
+ssh "$VPS_HOST" "test -f ${REMOTE_DIR}/.env" || {
+  echo ""
+  echo "WARNING: No .env file found on VPS at ${REMOTE_DIR}/.env"
+  echo "Create it manually:"
+  echo "  ssh ${VPS_HOST} 'sudo tee ${REMOTE_DIR}/.env <<< \"DISCORD_NOTIFICATION_WEBHOOK_URL=your_webhook_url\"'"
+  echo ""
+}
+
+# Install crontab entries (merge with existing, replace old backup entry)
+echo "Installing crontab entries..."
+ssh "$VPS_HOST" 'bash -s' << 'CRON_SCRIPT'
+# Get existing crontab, remove old backup entries
+EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|check-ssl' || true)
+
+# Write new crontab
+{
+  echo "$EXISTING"
+  echo ""
+  echo "# === Automation Scripts (managed by deploy-vps.sh) ==="
+  echo "0 2 * * * /opt/scripts/backup-db.sh >> /var/log/automation/backup-db.log 2>&1"
+  echo "0 3 * * 0 /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1"
+  echo "0 8 * * * /opt/scripts/check-ssl.sh >> /var/log/automation/check-ssl.log 2>&1"
+} | sudo crontab -
+CRON_SCRIPT
+
+echo ""
+echo "=== Deployment complete ==="
+echo ""
+echo "Installed crontab:"
+ssh "$VPS_HOST" "sudo crontab -l | grep -A1 'Automation\|backup-db\|docker-cleanup\|check-ssl'"
+echo ""
+echo "To run backup manually:  ssh ${VPS_HOST} 'sudo /opt/scripts/backup-db.sh'"
+echo "To verify symlink:       ssh ${VPS_HOST} 'ls -la /backups/ai-cofounder/latest/db.dump'"
