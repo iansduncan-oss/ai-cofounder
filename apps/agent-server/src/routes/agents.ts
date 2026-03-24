@@ -1,6 +1,8 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
+import type { Db } from "@ai-cofounder/db";
+import type { LlmRegistry } from "@ai-cofounder/llm";
 import { createOrchestrator } from "../helpers/create-orchestrator.js";
 import type { StreamCallback } from "../agents/stream-events.js";
 import {
@@ -42,7 +44,7 @@ type RunBody = Static<typeof RunBody>;
 
 /** Fire-and-forget: generate a 3-6 word title for a new conversation */
 async function generateConversationTitle(
-  app: { db: import("@ai-cofounder/db").Db; llmRegistry: import("@ai-cofounder/llm").LlmRegistry },
+  app: { db: Db; llmRegistry: LlmRegistry },
   conversationId: string,
   userMessage: string,
   agentResponse: string,
