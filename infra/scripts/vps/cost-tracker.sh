@@ -12,18 +12,35 @@ API_BASE="http://localhost:3100"
 
 log "Starting daily cost report..."
 
-# Fetch usage data
-TODAY=$(curl -sf --max-time 10 "${API_BASE}/api/usage?period=today" 2>/dev/null)
-DAILY=$(curl -sf --max-time 10 "${API_BASE}/api/usage/daily?days=7" 2>/dev/null)
-BUDGET=$(curl -sf --max-time 10 "${API_BASE}/api/usage/budget" 2>/dev/null)
-TOP_GOALS=$(curl -sf --max-time 10 "${API_BASE}/api/usage/top-goals?limit=3" 2>/dev/null)
+# Build curl auth args
+CURL_AUTH=()
+if [[ -n "${API_SECRET:-}" ]]; then
+  CURL_AUTH=(-H "Authorization: Bearer ${API_SECRET}")
+fi
+
+# Helper: fetch endpoint, return body only on 200, else empty
+fetch() {
+  local url="$1"
+  local raw
+  raw=$(curl -s --max-time 10 -o - -w '\n%{http_code}' "${CURL_AUTH[@]}" "$url" 2>/dev/null)
+  local code
+  code=$(echo "$raw" | tail -1)
+  if [[ "$code" == "200" ]]; then
+    echo "$raw" | sed '$d'
+  fi
+}
+
+TODAY=$(fetch "${API_BASE}/api/usage?period=today")
+DAILY=$(fetch "${API_BASE}/api/usage/daily?days=7")
+BUDGET=$(fetch "${API_BASE}/api/usage/budget")
+TOP_GOALS=$(fetch "${API_BASE}/api/usage/top-goals?limit=3")
 
 if [[ -z "$TODAY" ]]; then
   notify_discord \
-    "Cost Tracker: Agent Server Unreachable" \
-    "Could not reach usage endpoints at ${API_BASE}" \
+    "Cost Tracker: Usage Data Unavailable" \
+    "Could not fetch usage data from ${API_BASE}/api/usage" \
     "$COLOR_RED"
-  log_error "Agent server unreachable"
+  log_error "Usage endpoint unavailable"
   exit 1
 fi
 
@@ -40,21 +57,29 @@ echo "${BUDGET:-{}}" > "$BUDGET_FILE"
 echo "${TOP_GOALS:-[]}" > "$GOALS_FILE"
 
 # Parse and format
-read -r DESCRIPTION EMBED_COLOR < <(python3 - "$TODAY_FILE" "$DAILY_FILE" "$BUDGET_FILE" "$GOALS_FILE" << 'PYEOF'
+RESULT=$(python3 - "$TODAY_FILE" "$DAILY_FILE" "$BUDGET_FILE" "$GOALS_FILE" << 'PYEOF'
 import json, sys
 
 with open(sys.argv[1]) as f:
     today = json.load(f)
-with open(sys.argv[2]) as f:
-    daily = json.load(f)
-with open(sys.argv[3]) as f:
-    budget = json.load(f)
-with open(sys.argv[4]) as f:
-    goals = json.load(f)
+try:
+    with open(sys.argv[2]) as f:
+        daily = json.load(f)
+except:
+    daily = {}
+try:
+    with open(sys.argv[3]) as f:
+        budget = json.load(f)
+except:
+    budget = {}
+try:
+    with open(sys.argv[4]) as f:
+        goals = json.load(f)
+except:
+    goals = []
 
 lines = []
 
-# Today's spend
 cost = today.get("totalCostUsd", 0)
 tokens_in = today.get("inputTokens", 0)
 tokens_out = today.get("outputTokens", 0)
@@ -70,7 +95,7 @@ if days:
     costs = [d.get("costUsd", 0) for d in days]
     if costs:
         max_c = max(costs) if max(costs) > 0 else 1
-        bars = "▁▂▃▄▅▆▇█"
+        bars = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
         sparkline = ""
         for c in costs:
             idx = min(int(c / max_c * (len(bars) - 1)), len(bars) - 1)
@@ -79,7 +104,6 @@ if days:
         lines.append(f"**7-Day Trend:** {sparkline}  (${week_total:.4f} total)")
         lines.append("")
 
-# Budget
 daily_budget = budget.get("daily", {})
 weekly_budget = budget.get("weekly", {})
 if daily_budget:
@@ -89,7 +113,6 @@ if weekly_budget:
     pct = weekly_budget.get("percentUsed", 0)
     lines.append(f"**Weekly Budget:** ${weekly_budget.get('spentUsd', 0):.4f} / ${weekly_budget.get('limitUsd', 0):.2f} ({pct:.0f}%)")
 
-# Top goals
 if isinstance(goals, list) and goals:
     lines.append("")
     lines.append("**Top Spenders**")
@@ -98,28 +121,28 @@ if isinstance(goals, list) and goals:
         gcost = g.get("costUsd", 0)
         lines.append(f"- {title}: ${gcost:.4f}")
 
-# Color based on budget utilization
 budget_pct = daily_budget.get("percentUsed", 0) if daily_budget else 0
 if budget_pct < 50:
-    color = 2278400    # green
+    color = 2278400
 elif budget_pct < 70:
-    color = 16776160   # yellow
+    color = 16776160
 elif budget_pct < 90:
-    color = 15105570   # orange
+    color = 15105570
 else:
-    color = 15548997   # red
+    color = 15548997
 
 desc = "\\n".join(lines)
-print(json.dumps(desc) + "\t" + str(color))
+print(json.dumps({"description": desc, "color": color}))
 PYEOF
 )
 
-if [[ -z "$DESCRIPTION" ]]; then
+if [[ -z "$RESULT" ]]; then
   log_error "Failed to parse usage data"
   exit 1
 fi
 
-DESCRIPTION=$(python3 -c "import json,sys; print(json.loads(sys.argv[1]))" "$DESCRIPTION")
+DESCRIPTION=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['description'])")
+EMBED_COLOR=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['color'])")
 TIMESTAMP=$(date '+%H:%M %Z')
 
 notify_discord \

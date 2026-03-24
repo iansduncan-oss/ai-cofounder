@@ -12,35 +12,54 @@ API_BASE="http://localhost:3100"
 
 log "Starting daily status report..."
 
-# Fetch health and monitoring data
-HEALTH=$(curl -sf --max-time 10 "${API_BASE}/health/full" 2>/dev/null)
-MONITORING=$(curl -sf --max-time 15 "${API_BASE}/api/monitoring/status" 2>/dev/null)
+# Build curl auth args
+CURL_AUTH=()
+if [[ -n "${API_SECRET:-}" ]]; then
+  CURL_AUTH=(-H "Authorization: Bearer ${API_SECRET}")
+fi
 
-if [[ -z "$HEALTH" ]]; then
+# Fetch health (unauthenticated) and monitoring (authenticated)
+HEALTH=$(curl -s --max-time 10 -o - -w '\n%{http_code}' "${API_BASE}/health/full" 2>/dev/null)
+HEALTH_CODE=$(echo "$HEALTH" | tail -1)
+HEALTH=$(echo "$HEALTH" | sed '$d')
+
+if [[ "$HEALTH_CODE" != "200" ]]; then
   notify_discord \
     "Daily Status: Agent Server Unreachable" \
-    "Could not reach agent-server at ${API_BASE}/health/full" \
+    "Could not reach agent-server at ${API_BASE}/health/full (HTTP ${HEALTH_CODE})" \
     "$COLOR_RED"
-  log_error "Agent server unreachable"
+  log_error "Agent server unreachable (HTTP ${HEALTH_CODE})"
   exit 1
 fi
 
-# Write JSON to temp files so python can read them safely
+MONITORING_RAW=$(curl -s --max-time 15 -o - -w '\n%{http_code}' "${CURL_AUTH[@]}" "${API_BASE}/api/monitoring/status" 2>/dev/null)
+MONITORING_CODE=$(echo "$MONITORING_RAW" | tail -1)
+if [[ "$MONITORING_CODE" == "200" ]]; then
+  MONITORING=$(echo "$MONITORING_RAW" | sed '$d')
+else
+  MONITORING="{}"
+  log "Monitoring endpoint returned HTTP ${MONITORING_CODE}, skipping"
+fi
+
+# Write JSON to temp files for python
 HEALTH_FILE=$(mktemp)
 MONITORING_FILE=$(mktemp)
 trap 'rm -f "$HEALTH_FILE" "$MONITORING_FILE"' EXIT
 
 echo "$HEALTH" > "$HEALTH_FILE"
-echo "${MONITORING:-{}}" > "$MONITORING_FILE"
+echo "$MONITORING" > "$MONITORING_FILE"
 
 # Parse and format with python3
-read -r DESCRIPTION EMBED_COLOR < <(python3 - "$HEALTH_FILE" "$MONITORING_FILE" << 'PYEOF'
+RESULT=$(python3 - "$HEALTH_FILE" "$MONITORING_FILE" << 'PYEOF'
 import json, sys
 
 with open(sys.argv[1]) as f:
     h = json.load(f)
-with open(sys.argv[2]) as f:
-    m = json.load(f)
+try:
+    with open(sys.argv[2]) as f:
+        m = json.load(f)
+except:
+    m = {}
 
 status = h.get("status", "unknown")
 
@@ -53,7 +72,6 @@ queue = h.get("queue", {})
 
 lines = [f"**Overall: {status.upper()}**", ""]
 
-# Core services
 lines.append("**Core Services**")
 lines.append(f"Database: {db}")
 lines.append(f"Redis: {redis}")
@@ -62,7 +80,6 @@ qs = queue.get("status", "unknown")
 if qs != "unknown":
     lines.append(f"Queue: {qs} (DLQ: {queue.get('dlqSize', 0)})")
 
-# Monitoring data
 if m and m != {}:
     lines.append("")
     lines.append("**Infrastructure**")
@@ -97,21 +114,21 @@ if m and m != {}:
 
 desc = "\\n".join(lines)
 color = 2278400 if status == "ok" else (15105570 if status == "degraded" else 15548997)
+uptime = round(h.get("uptime", 0) / 3600, 1)
 
-# Output as tab-separated: description\tcolor
-print(json.dumps(desc) + "\t" + str(color))
+# Output JSON object
+print(json.dumps({"description": desc, "color": color, "uptime": uptime}))
 PYEOF
 )
 
-if [[ -z "$DESCRIPTION" ]]; then
+if [[ -z "$RESULT" ]]; then
   log_error "Failed to parse health data"
   exit 1
 fi
 
-# Unescape the JSON string
-DESCRIPTION=$(python3 -c "import json,sys; print(json.loads(sys.argv[1]))" "$DESCRIPTION")
-
-UPTIME=$(python3 -c "import json,sys; print(round(json.load(open(sys.argv[1])).get('uptime',0)/3600,1))" "$HEALTH_FILE" 2>/dev/null || echo "?")
+DESCRIPTION=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['description'])")
+EMBED_COLOR=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['color'])")
+UPTIME=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin)['uptime'])")
 TIMESTAMP=$(date '+%H:%M %Z')
 
 notify_discord \
