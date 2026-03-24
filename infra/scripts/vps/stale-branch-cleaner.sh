@@ -25,7 +25,7 @@ MERGED_BRANCHES=$(git branch -r --merged origin/main 2>/dev/null \
   | grep -v 'HEAD' \
   | grep -Ev "origin/(${PROTECTED_BRANCHES})" \
   | sed 's|origin/||' \
-  | xargs)
+  | xargs || true)
 
 if [[ -z "$MERGED_BRANCHES" ]]; then
   log "No merged branches found"
