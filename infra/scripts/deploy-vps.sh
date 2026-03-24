@@ -20,6 +20,9 @@ scp "${VPS_SCRIPTS_DIR}/common.sh" \
     "${VPS_SCRIPTS_DIR}/backup-db.sh" \
     "${VPS_SCRIPTS_DIR}/docker-cleanup.sh" \
     "${VPS_SCRIPTS_DIR}/check-ssl.sh" \
+    "${VPS_SCRIPTS_DIR}/daily-status.sh" \
+    "${VPS_SCRIPTS_DIR}/cost-tracker.sh" \
+    "${VPS_SCRIPTS_DIR}/stale-branch-cleaner.sh" \
     "${VPS_HOST}:/tmp/automation-scripts/"
 
 ssh "$VPS_HOST" "sudo mv /tmp/automation-scripts/* ${REMOTE_DIR}/ && rmdir /tmp/automation-scripts"
@@ -41,7 +44,7 @@ ssh "$VPS_HOST" "test -f ${REMOTE_DIR}/.env" || {
 echo "Installing crontab entries..."
 ssh "$VPS_HOST" 'bash -s' << 'CRON_SCRIPT'
 # Get existing crontab, remove old backup entries
-EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|check-ssl' || true)
+EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner' || true)
 
 # Write new crontab
 {
@@ -51,6 +54,9 @@ EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|che
   echo "0 2 * * * /opt/scripts/backup-db.sh >> /var/log/automation/backup-db.log 2>&1"
   echo "0 3 * * 0 /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1"
   echo "0 8 * * * /opt/scripts/check-ssl.sh >> /var/log/automation/check-ssl.log 2>&1"
+  echo "0 7 * * * /opt/scripts/daily-status.sh >> /var/log/automation/daily-status.log 2>&1"
+  echo "0 20 * * * /opt/scripts/cost-tracker.sh >> /var/log/automation/cost-tracker.log 2>&1"
+  echo "30 3 * * 0 /opt/scripts/stale-branch-cleaner.sh >> /var/log/automation/stale-branch-cleaner.log 2>&1"
 } | sudo crontab -
 CRON_SCRIPT
 
@@ -58,7 +64,9 @@ echo ""
 echo "=== Deployment complete ==="
 echo ""
 echo "Installed crontab:"
-ssh "$VPS_HOST" "sudo crontab -l | grep -A1 'Automation\|backup-db\|docker-cleanup\|check-ssl'"
+ssh "$VPS_HOST" "sudo crontab -l | grep -A1 'Automation\|backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner'"
 echo ""
-echo "To run backup manually:  ssh ${VPS_HOST} 'sudo /opt/scripts/backup-db.sh'"
-echo "To verify symlink:       ssh ${VPS_HOST} 'ls -la /backups/ai-cofounder/latest/db.dump'"
+echo "To run backup manually:     ssh ${VPS_HOST} 'sudo /opt/scripts/backup-db.sh'"
+echo "To run status manually:     ssh ${VPS_HOST} 'sudo /opt/scripts/daily-status.sh'"
+echo "To run cost report:         ssh ${VPS_HOST} 'sudo /opt/scripts/cost-tracker.sh'"
+echo "To verify symlink:          ssh ${VPS_HOST} 'ls -la /backups/ai-cofounder/latest/db.dump'"

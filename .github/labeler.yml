@@ -1,0 +1,70 @@
+# PR Auto-Labeler configuration
+# Used by actions/labeler@v5 in label-pr.yml
+
+area:backend:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/agent-server/**'
+
+area:frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/dashboard/**'
+
+area:discord:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/discord-bot/**'
+
+area:slack:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/slack-bot/**'
+
+area:voice:
+  - changed-files:
+      - any-glob-to-any-file: 'apps/voice-ui/**'
+
+area:database:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/db/**'
+
+area:llm:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/llm/**'
+
+area:queue:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/queue/**'
+
+area:shared:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/shared/**'
+
+area:mcp:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/mcp-server/**'
+
+area:api-client:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/api-client/**'
+
+area:bot-handlers:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/bot-handlers/**'
+
+area:rag:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/rag/**'
+
+area:test-utils:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/test-utils/**'
+
+area:sandbox:
+  - changed-files:
+      - any-glob-to-any-file: 'packages/sandbox/**'
+
+area:infra:
+  - changed-files:
+      - any-glob-to-any-file: 'infra/**'
+
+area:ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**'

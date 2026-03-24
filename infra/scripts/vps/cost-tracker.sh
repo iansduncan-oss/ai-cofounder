@@ -1,0 +1,131 @@
+#!/bin/bash
+# Daily cost tracker
+# Curls agent-server usage endpoints and posts Discord embed
+# Runs daily at 8 PM via cron
+#
+# Cron: 0 20 * * * /opt/scripts/cost-tracker.sh >> /var/log/automation/cost-tracker.log 2>&1
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/common.sh"
+
+API_BASE="http://localhost:3100"
+
+log "Starting daily cost report..."
+
+# Fetch usage data
+TODAY=$(curl -sf --max-time 10 "${API_BASE}/api/usage?period=today" 2>/dev/null)
+DAILY=$(curl -sf --max-time 10 "${API_BASE}/api/usage/daily?days=7" 2>/dev/null)
+BUDGET=$(curl -sf --max-time 10 "${API_BASE}/api/usage/budget" 2>/dev/null)
+TOP_GOALS=$(curl -sf --max-time 10 "${API_BASE}/api/usage/top-goals?limit=3" 2>/dev/null)
+
+if [[ -z "$TODAY" ]]; then
+  notify_discord \
+    "Cost Tracker: Agent Server Unreachable" \
+    "Could not reach usage endpoints at ${API_BASE}" \
+    "$COLOR_RED"
+  log_error "Agent server unreachable"
+  exit 1
+fi
+
+# Write to temp files
+TODAY_FILE=$(mktemp)
+DAILY_FILE=$(mktemp)
+BUDGET_FILE=$(mktemp)
+GOALS_FILE=$(mktemp)
+trap 'rm -f "$TODAY_FILE" "$DAILY_FILE" "$BUDGET_FILE" "$GOALS_FILE"' EXIT
+
+echo "$TODAY" > "$TODAY_FILE"
+echo "${DAILY:-{}}" > "$DAILY_FILE"
+echo "${BUDGET:-{}}" > "$BUDGET_FILE"
+echo "${TOP_GOALS:-[]}" > "$GOALS_FILE"
+
+# Parse and format
+read -r DESCRIPTION EMBED_COLOR < <(python3 - "$TODAY_FILE" "$DAILY_FILE" "$BUDGET_FILE" "$GOALS_FILE" << 'PYEOF'
+import json, sys
+
+with open(sys.argv[1]) as f:
+    today = json.load(f)
+with open(sys.argv[2]) as f:
+    daily = json.load(f)
+with open(sys.argv[3]) as f:
+    budget = json.load(f)
+with open(sys.argv[4]) as f:
+    goals = json.load(f)
+
+lines = []
+
+# Today's spend
+cost = today.get("totalCostUsd", 0)
+tokens_in = today.get("inputTokens", 0)
+tokens_out = today.get("outputTokens", 0)
+requests = today.get("requestCount", 0)
+
+lines.append(f"**Today's Spend: ${cost:.4f}**")
+lines.append(f"Requests: {requests} | Tokens: {tokens_in + tokens_out:,}")
+lines.append("")
+
+# 7-day sparkline
+days = daily.get("days", [])
+if days:
+    costs = [d.get("costUsd", 0) for d in days]
+    if costs:
+        max_c = max(costs) if max(costs) > 0 else 1
+        bars = "▁▂▃▄▅▆▇█"
+        sparkline = ""
+        for c in costs:
+            idx = min(int(c / max_c * (len(bars) - 1)), len(bars) - 1)
+            sparkline += bars[idx]
+        week_total = sum(costs)
+        lines.append(f"**7-Day Trend:** {sparkline}  (${week_total:.4f} total)")
+        lines.append("")
+
+# Budget
+daily_budget = budget.get("daily", {})
+weekly_budget = budget.get("weekly", {})
+if daily_budget:
+    pct = daily_budget.get("percentUsed", 0)
+    lines.append(f"**Daily Budget:** ${daily_budget.get('spentUsd', 0):.4f} / ${daily_budget.get('limitUsd', 0):.2f} ({pct:.0f}%)")
+if weekly_budget:
+    pct = weekly_budget.get("percentUsed", 0)
+    lines.append(f"**Weekly Budget:** ${weekly_budget.get('spentUsd', 0):.4f} / ${weekly_budget.get('limitUsd', 0):.2f} ({pct:.0f}%)")
+
+# Top goals
+if isinstance(goals, list) and goals:
+    lines.append("")
+    lines.append("**Top Spenders**")
+    for g in goals[:3]:
+        title = g.get("title", "Unknown")[:40]
+        gcost = g.get("costUsd", 0)
+        lines.append(f"- {title}: ${gcost:.4f}")
+
+# Color based on budget utilization
+budget_pct = daily_budget.get("percentUsed", 0) if daily_budget else 0
+if budget_pct < 50:
+    color = 2278400    # green
+elif budget_pct < 70:
+    color = 16776160   # yellow
+elif budget_pct < 90:
+    color = 15105570   # orange
+else:
+    color = 15548997   # red
+
+desc = "\\n".join(lines)
+print(json.dumps(desc) + "\t" + str(color))
+PYEOF
+)
+
+if [[ -z "$DESCRIPTION" ]]; then
+  log_error "Failed to parse usage data"
+  exit 1
+fi
+
+DESCRIPTION=$(python3 -c "import json,sys; print(json.loads(sys.argv[1]))" "$DESCRIPTION")
+TIMESTAMP=$(date '+%H:%M %Z')
+
+notify_discord \
+  "Daily Cost Report" \
+  "$DESCRIPTION" \
+  "$EMBED_COLOR" \
+  "[{\"name\":\"Report Time\",\"value\":\"${TIMESTAMP}\",\"inline\":true}]"
+
+log "Daily cost report sent"
