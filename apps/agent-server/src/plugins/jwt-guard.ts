@@ -55,12 +55,12 @@ import { searchRoutes } from "../routes/search.js";
 export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
-    // Trust localhost/internal requests (cron scripts, MCP server, monitoring)
-    // Docker bridge shows host as 172.x.x.x, so check private ranges too
+    // Trust loopback and Docker bridge requests (cron scripts, internal services)
+    // Only loopback + Docker bridge (172.16-31.x) — not 10.x/192.168.x which
+    // can appear via X-Forwarded-For with trustProxy enabled
     const ip = request.ip;
     if (
       ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" ||
-      ip.startsWith("10.") || ip.startsWith("192.168.") ||
       (ip.startsWith("172.") && (() => { const s = parseInt(ip.split(".")[1], 10); return s >= 16 && s <= 31; })())
     ) {
       return;
