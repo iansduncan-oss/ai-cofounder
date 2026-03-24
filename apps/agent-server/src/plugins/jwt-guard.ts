@@ -56,8 +56,13 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
     // Trust localhost/internal requests (cron scripts, MCP server, monitoring)
+    // Docker bridge shows host as 172.x.x.x, so check private ranges too
     const ip = request.ip;
-    if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") {
+    if (
+      ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" ||
+      ip.startsWith("10.") || ip.startsWith("192.168.") ||
+      (ip.startsWith("172.") && (() => { const s = parseInt(ip.split(".")[1], 10); return s >= 16 && s <= 31; })())
+    ) {
       return;
     }
 
