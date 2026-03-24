@@ -13,6 +13,7 @@ import { VoiceModeOverlay } from "@/components/chat/voice-mode-overlay";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { useCommandCenter } from "@/providers/command-center-provider";
+import { useAutoHighlight } from "@/hooks/use-auto-highlight";
 import type { PlanInfo, ToolCallInfo } from "@/hooks/use-stream-chat";
 import {
   Send,
@@ -71,6 +72,7 @@ export function ChatPanel() {
   const speech = useSpeechRecognition();
   const tts = useTextToSpeech();
   const { chatPrefill, clearChatPrefill } = useCommandCenter();
+  useAutoHighlight(stream.richCards);
 
   // Consume prefill from cross-panel communication
   useEffect(() => {

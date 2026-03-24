@@ -16,7 +16,7 @@ export function CommandCenter() {
   const layout = usePanelLayout();
   const containerRef = useRef<HTMLDivElement>(null);
   const rightColumnRef = useRef<HTMLDivElement>(null);
-  const { mobileTab, setMobileTab } = useCommandCenter();
+  const { mobileTab, setMobileTab, highlightedPanel } = useCommandCenter();
   const { data: approvals } = usePendingApprovals();
   const { data: monitoring } = useMonitoringStatus();
 
@@ -66,6 +66,7 @@ export function CommandCenter() {
             collapsed={layout.chatCollapsed}
             onToggle={() => layout.togglePanel("chat")}
             glowColor="chat"
+            isHighlighted={highlightedPanel === "chat"}
           >
             <ChatPanel />
           </Panel>
@@ -104,6 +105,7 @@ export function CommandCenter() {
               collapsed={layout.goalsCollapsed}
               onToggle={() => layout.togglePanel("goals")}
               glowColor="goals"
+              isHighlighted={highlightedPanel === "goals"}
               badge={
                 approvalCount > 0 ? (
                   <Badge variant="warning" className="text-[9px] px-1 py-0">{approvalCount}</Badge>
@@ -142,6 +144,7 @@ export function CommandCenter() {
               collapsed={layout.monitorCollapsed}
               onToggle={() => layout.togglePanel("monitor")}
               glowColor="monitor"
+              isHighlighted={highlightedPanel === "monitor"}
               badge={
                 alertCount > 0 ? (
                   <Badge variant="destructive" className="text-[9px] px-1 py-0">{alertCount}</Badge>

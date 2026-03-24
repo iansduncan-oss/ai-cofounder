@@ -8,6 +8,7 @@ interface PanelProps {
   collapsed: boolean;
   onToggle: () => void;
   glowColor?: "chat" | "goals" | "monitor";
+  isHighlighted?: boolean;
   headerActions?: ReactNode;
   badge?: ReactNode;
   children: ReactNode;
@@ -26,6 +27,7 @@ export function Panel({
   collapsed,
   onToggle,
   glowColor,
+  isHighlighted,
   headerActions,
   badge,
   children,
@@ -36,6 +38,7 @@ export function Panel({
       className={cn(
         "flex flex-col rounded-lg border bg-surface-1 overflow-hidden transition-[flex] duration-200 ease-out",
         glowColor && glowClasses[glowColor],
+        isHighlighted && "animate-glow-pulse",
         collapsed ? "flex-none" : "flex-1 min-h-0",
         className,
       )}

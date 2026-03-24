@@ -1,4 +1,6 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
+
+export type PanelName = "chat" | "goals" | "monitor";
 
 interface CommandCenterContextValue {
   /** Switch focus to chat panel, optionally pre-filling the input */
@@ -16,9 +18,13 @@ interface CommandCenterContextValue {
   /** Go back to goals list */
   clearSelectedGoal: () => void;
   /** Active mobile tab */
-  mobileTab: "chat" | "goals" | "monitor";
+  mobileTab: PanelName;
   /** Set mobile tab */
-  setMobileTab: (tab: "chat" | "goals" | "monitor") => void;
+  setMobileTab: (tab: PanelName) => void;
+  /** Currently highlighted panel (pulse animation), null = none */
+  highlightedPanel: PanelName | null;
+  /** Highlight a panel for 3 seconds */
+  highlightPanel: (panel: PanelName) => void;
 }
 
 const CommandCenterContext = createContext<CommandCenterContextValue | null>(null);
@@ -26,7 +32,9 @@ const CommandCenterContext = createContext<CommandCenterContextValue | null>(nul
 export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const [chatPrefill, setChatPrefill] = useState("");
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
-  const [mobileTab, setMobileTab] = useState<"chat" | "goals" | "monitor">("chat");
+  const [mobileTab, setMobileTab] = useState<PanelName>("chat");
+  const [highlightedPanel, setHighlightedPanel] = useState<PanelName | null>(null);
+  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const focusChat = useCallback((prefill?: string) => {
     if (prefill) setChatPrefill(prefill);
@@ -46,6 +54,12 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
   const clearChatPrefill = useCallback(() => setChatPrefill(""), []);
   const clearSelectedGoal = useCallback(() => setSelectedGoalId(null), []);
 
+  const highlightPanel = useCallback((panel: PanelName) => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+    setHighlightedPanel(panel);
+    highlightTimerRef.current = setTimeout(() => setHighlightedPanel(null), 3000);
+  }, []);
+
   return (
     <CommandCenterContext.Provider
       value={{
@@ -58,6 +72,8 @@ export function CommandCenterProvider({ children }: { children: ReactNode }) {
         clearSelectedGoal,
         mobileTab,
         setMobileTab,
+        highlightedPanel,
+        highlightPanel,
       }}
     >
       {children}
