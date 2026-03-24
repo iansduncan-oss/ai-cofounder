@@ -1,4 +1,4 @@
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent } from "@testing-library/react";
 import { SettingsPage } from "@/routes/settings";
 import { renderWithProviders } from "../test-utils";
 
@@ -217,7 +217,7 @@ describe("SettingsPage — Budget Thresholds + Project Registration", () => {
     );
   });
 
-  // Test 6: Delete button on project calls deleteProject mutation
+  // Test 6: Delete button on project calls deleteProject mutation via confirmation dialog
   it("calls deleteProject mutation when delete button is clicked", async () => {
     mockUseProjects.mockReturnValue({
       data: [
@@ -235,15 +235,17 @@ describe("SettingsPage — Budget Thresholds + Project Registration", () => {
       error: null,
     } as ReturnType<typeof useProjects>);
 
-    // Mock window.confirm to return true
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-
     renderWithProviders(<SettingsPage />);
 
+    // Click the delete icon button to open confirmation dialog
     const deleteButton = screen.getByRole("button", { name: /delete project/i });
     fireEvent.click(deleteButton);
 
-    expect(mockDeleteProjectMutate).toHaveBeenCalledWith("p1");
+    // Confirm via the dialog's Remove button
+    const removeButton = screen.getByRole("button", { name: /remove/i });
+    fireEvent.click(removeButton);
+
+    expect(mockDeleteProjectMutate).toHaveBeenCalledWith("p1", expect.objectContaining({ onSuccess: expect.any(Function) }));
   });
 
   // Test 7: Empty projects list shows "No projects registered" message
