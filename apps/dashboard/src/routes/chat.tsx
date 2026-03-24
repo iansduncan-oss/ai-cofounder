@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useStreamChat } from "@/hooks/use-stream-chat";
-import { useDashboardUser, useConversationMessages } from "@/api/queries";
+import { useDashboardUser, useConversationMessages, useQuickActions } from "@/api/queries";
 import { useAcceptSuggestion } from "@/api/mutations";
 import { StreamingMessage } from "@/components/chat/streaming-message";
 import { PlanCard } from "@/components/chat/plan-card";
@@ -31,6 +31,17 @@ import {
   MessageSquare,
   Zap,
   BarChart3,
+  Coffee,
+  Sun,
+  Moon,
+  CheckCircle,
+  AlertTriangle,
+  Target,
+  Mail,
+  Rocket,
+  DollarSign,
+  Calendar,
+  type LucideIcon,
 } from "lucide-react";
 
 interface Message {
@@ -47,11 +58,28 @@ interface Message {
 
 const CONVERSATION_STORAGE_KEY = "ai-cofounder-conversation-id";
 
-const quickActions = [
-  { label: "What's the status?", icon: BarChart3 },
-  { label: "Create a plan", icon: Zap },
-  { label: "Search my memories", icon: MessageSquare },
-  { label: "Run monitoring check", icon: Sparkles },
+const ICON_MAP: Record<string, LucideIcon> = {
+  "bar-chart": BarChart3,
+  coffee: Coffee,
+  sun: Sun,
+  moon: Moon,
+  "check-circle": CheckCircle,
+  "alert-triangle": AlertTriangle,
+  target: Target,
+  mail: Mail,
+  rocket: Rocket,
+  "dollar-sign": DollarSign,
+  calendar: Calendar,
+  sparkles: Sparkles,
+  zap: Zap,
+  "message-square": MessageSquare,
+};
+
+const FALLBACK_QUICK_ACTIONS = [
+  { label: "What's the status?", icon: "bar-chart" },
+  { label: "Create a plan", icon: "zap" },
+  { label: "Search my memories", icon: "message-square" },
+  { label: "Run monitoring check", icon: "sparkles" },
 ];
 
 export function ChatPage() {
@@ -68,6 +96,8 @@ export function ChatPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { data: dashboardUser } = useDashboardUser();
+  const { data: quickActionsData } = useQuickActions();
+  const quickActions = quickActionsData?.data ?? FALLBACK_QUICK_ACTIONS;
   const stream = useStreamChat();
   const acceptSuggestion = useAcceptSuggestion();
   const speech = useSpeechRecognition();
@@ -423,16 +453,19 @@ export function ChatPage() {
                   Chat with your AI Cofounder to plan, build, and monitor your projects.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {quickActions.map(({ label, icon: Icon }) => (
-                    <button
-                      key={label}
-                      onClick={() => handleSend(label)}
-                      className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/50 px-3 py-2.5 text-left text-sm text-muted-foreground transition-all hover:border-purple-500/30 hover:bg-muted hover:text-foreground"
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-purple-400" />
-                      {label}
-                    </button>
-                  ))}
+                  {quickActions.map(({ label, icon }) => {
+                    const Icon = ICON_MAP[icon] ?? Sparkles;
+                    return (
+                      <button
+                        key={label}
+                        onClick={() => handleSend(label)}
+                        className="flex items-center gap-2 rounded-xl border border-border/50 bg-muted/50 px-3 py-2.5 text-left text-sm text-muted-foreground transition-all hover:border-purple-500/30 hover:bg-muted hover:text-foreground"
+                      >
+                        <Icon className="h-4 w-4 shrink-0 text-purple-400" />
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="mt-4 text-xs text-muted-foreground/60">
                   Cmd+N new chat · Escape cancel · Enter send
@@ -447,6 +480,7 @@ export function ChatPage() {
                 <StreamingMessage
                   text={stream.accumulatedText}
                   toolCalls={stream.toolCalls}
+                  richCards={stream.richCards}
                   thinkingMessage={stream.thinkingMessage}
                   isStreaming={stream.isStreaming}
                   model={stream.model}

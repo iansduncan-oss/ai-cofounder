@@ -7,6 +7,8 @@ import {
   findOrCreateUser,
   createConversation,
   createMessage,
+  getConversation,
+  updateConversationTitle,
   getTodayTokenTotal,
   incrementPatternAcceptCount,
 } from "@ai-cofounder/db";
@@ -37,6 +39,47 @@ const RunBody = Type.Object({
   ),
 });
 type RunBody = Static<typeof RunBody>;
+
+/** Fire-and-forget: generate a 3-6 word title for a new conversation */
+async function generateConversationTitle(
+  app: { db: import("@ai-cofounder/db").Db; llmRegistry: import("@ai-cofounder/llm").LlmRegistry },
+  conversationId: string,
+  userMessage: string,
+  agentResponse: string,
+): Promise<void> {
+  try {
+    const conv = await getConversation(app.db, conversationId);
+    if (conv?.title) return; // already has a title
+
+    const response = await app.llmRegistry.complete("simple", {
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Generate a 3-6 word title for this conversation. Return ONLY the title, nothing else.\n\nUser: ${userMessage.slice(0, 300)}\nAssistant: ${agentResponse.slice(0, 300)}`,
+            },
+          ],
+        },
+      ],
+    });
+
+    const title =
+      response.content
+        .filter((c): c is { type: "text"; text: string } => c.type === "text")
+        .map((c) => c.text)
+        .join("")
+        .replace(/^["']|["']$/g, "")
+        .trim() || "";
+
+    if (title && title.length <= 100) {
+      await updateConversationTitle(app.db, conversationId, title);
+    }
+  } catch {
+    // Non-fatal — title generation is best-effort
+  }
+}
 
 export const agentRoutes: FastifyPluginAsync = async (app) => {
   const orchestrator = createOrchestrator(app);
@@ -124,6 +167,11 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           ? { usage: result.usage, model: result.model, provider: result.provider }
           : undefined,
       });
+    }
+
+    // Fire-and-forget conversation title generation for new conversations
+    if (result.conversationId && !conversationId) {
+      generateConversationTitle(app, result.conversationId, message, result.response).catch(() => {});
     }
 
     // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
@@ -262,6 +310,11 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Usage recording handled automatically by LlmRegistry.onCompletion hook
+
+      // Fire-and-forget conversation title generation for new conversations
+      if (result.conversationId && !conversationId) {
+        generateConversationTitle(app, result.conversationId, message, result.response).catch(() => {});
+      }
 
       // Record user action (fire-and-forget)
       if (dbUserId) {

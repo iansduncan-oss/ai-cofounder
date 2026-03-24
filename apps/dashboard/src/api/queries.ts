@@ -151,6 +151,15 @@ export function useDashboardUser() {
   });
 }
 
+export function useQuickActions() {
+  return useQuery({
+    queryKey: ["quick-actions"],
+    queryFn: () => apiClient.getQuickActions(),
+    staleTime: 60_000,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
 export function useConversations(userId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.conversations.list(userId ?? ""),

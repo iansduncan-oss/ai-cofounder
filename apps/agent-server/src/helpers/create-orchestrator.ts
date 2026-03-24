@@ -1,11 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import { Orchestrator } from "../agents/orchestrator.js";
+import { PrReviewService } from "../services/pr-review.js";
+import { OutboundWebhookService } from "../services/outbound-webhooks.js";
+import { ConversationBranchingService } from "../services/conversation-branching.js";
 
 /**
  * Create an Orchestrator wired to all services available on the Fastify app.
  * Eliminates the 12+ property copy-paste across routes.
  */
 export function createOrchestrator(app: FastifyInstance): Orchestrator {
+  // Create PrReviewService if workspace is available
+  const prReviewService = app.workspaceService
+    ? new PrReviewService(app.llmRegistry, app.workspaceService)
+    : undefined;
+
+  // Create services that only need db
+  const outboundWebhookService = app.db ? new OutboundWebhookService(app.db) : undefined;
+  const conversationBranchingService = app.db ? new ConversationBranchingService(app.db) : undefined;
+
   return new Orchestrator({
     registry: app.llmRegistry,
     db: app.db,
@@ -20,5 +32,8 @@ export function createOrchestrator(app: FastifyInstance): Orchestrator {
     browserService: app.browserService,
     episodicMemoryService: app.episodicMemoryService,
     proceduralMemoryService: app.proceduralMemoryService,
+    prReviewService,
+    outboundWebhookService,
+    conversationBranchingService,
   });
 }

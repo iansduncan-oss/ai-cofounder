@@ -86,6 +86,9 @@ import type { GmailService } from "../services/gmail.js";
 import type { CalendarService } from "../services/calendar.js";
 import type { EpisodicMemoryService } from "../services/episodic-memory.js";
 import type { ProceduralMemoryService } from "../services/procedural-memory.js";
+import type { PrReviewService } from "../services/pr-review.js";
+import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
+import type { ConversationBranchingService } from "../services/conversation-branching.js";
 import { ToolCache } from "../services/tool-cache.js";
 import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
@@ -339,6 +342,9 @@ export interface OrchestratorOptions {
   calendarService?: CalendarService;
   episodicMemoryService?: EpisodicMemoryService;
   proceduralMemoryService?: ProceduralMemoryService;
+  prReviewService?: PrReviewService;
+  outboundWebhookService?: OutboundWebhookService;
+  conversationBranchingService?: ConversationBranchingService;
 }
 
 /* ── Orchestrator class ── */
@@ -361,6 +367,9 @@ export class Orchestrator {
   private calendarService?: CalendarService;
   private episodicMemoryService?: EpisodicMemoryService;
   private proceduralMemoryService?: ProceduralMemoryService;
+  private prReviewService?: PrReviewService;
+  private outboundWebhookService?: OutboundWebhookService;
+  private conversationBranchingService?: ConversationBranchingService;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -380,6 +389,9 @@ export class Orchestrator {
     this.calendarService = options.calendarService;
     this.episodicMemoryService = options.episodicMemoryService;
     this.proceduralMemoryService = options.proceduralMemoryService;
+    this.prReviewService = options.prReviewService;
+    this.outboundWebhookService = options.outboundWebhookService;
+    this.conversationBranchingService = options.conversationBranchingService;
   }
 
   /**
@@ -637,6 +649,7 @@ export class Orchestrator {
       calendarService: this.calendarService,
       episodicMemoryService: this.episodicMemoryService,
       proceduralMemoryService: this.proceduralMemoryService,
+      prReviewService: this.prReviewService,
     }, undefined, this.autonomyTierService));
 
     const tools = await this.filterAvailableTools(rawTools);
@@ -1191,6 +1204,8 @@ export class Orchestrator {
           calendarService: this.calendarService,
           episodicMemoryService: this.episodicMemoryService,
           proceduralMemoryService: this.proceduralMemoryService,
+          outboundWebhookService: this.outboundWebhookService,
+          conversationBranchingService: this.conversationBranchingService,
         }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

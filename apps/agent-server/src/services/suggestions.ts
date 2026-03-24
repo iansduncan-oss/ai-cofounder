@@ -18,7 +18,7 @@ export async function generateSuggestions(
       const parts: string[] = [];
       if (data.activeGoals.length > 0) {
         parts.push(
-          `Active goals: ${data.activeGoals.map((g) => `${g.title} (${g.progress})`).join(", ")}`,
+          `Active goals: ${data.activeGoals.map((g) => `${g.title} (${g.progress}, ${g.hoursStale}h since update)`).join(", ")}`,
         );
       }
       if (data.staleGoalCount > 0) {
@@ -29,6 +29,19 @@ export async function generateSuggestions(
       }
       if (data.taskBreakdown.pending) {
         parts.push(`${data.taskBreakdown.pending} pending tasks`);
+      }
+      if (data.completedYesterday.length > 0) {
+        parts.push(`Recently completed: ${data.completedYesterday.map((g) => g.title).join(", ")}`);
+      }
+      if (data.recentSessions.length > 0) {
+        const lastSession = data.recentSessions[0];
+        parts.push(`Last session: ${lastSession.trigger} (${lastSession.status})`);
+      }
+      if (data.unreadEmailCount && data.unreadEmailCount > 0) {
+        parts.push(`${data.unreadEmailCount} unread email(s)`);
+      }
+      if (data.todayEvents && data.todayEvents.length > 0) {
+        parts.push(`Today's meetings: ${data.todayEvents.map((e) => e.summary).join(", ")}`);
       }
       projectState = parts.length > 0 ? parts.join(". ") : "No active work.";
     } catch {
@@ -62,8 +75,19 @@ export async function generateSuggestions(
           content: [
             {
               type: "text",
-              text: `Given this conversation turn and project state, suggest 2-3 concise next actions the user could take. Each should be phrased as a direct instruction they could send as their next message. Return ONLY a JSON array of strings, no other text.
+              text: `Given this conversation turn and project state, suggest 2-3 specific next actions the user could take.
 
+Rules:
+- Each should be phrased as a natural message they could send in chat (not a button label)
+- Be SPECIFIC: reference actual goal names, email subjects, meeting names, recent events
+- Good: "How did the deploy from 2 hours ago go?" Bad: "Run monitoring check"
+- Good: "Pull up that pricing discussion from last week" Bad: "Search my memories"
+- If there are pending approvals, suggest reviewing them
+- If goals are stale, suggest checking on the specific goal by name
+- Match the conversation's topic for at least one suggestion
+- Return ONLY a JSON array of strings, no other text
+
+Current time: ${new Date().toLocaleString("en-US", { hour: "numeric", minute: "2-digit", weekday: "short" })}
 Project state: ${projectState}${patternContext}
 
 User said: ${context.userMessage}

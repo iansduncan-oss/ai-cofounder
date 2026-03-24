@@ -133,6 +133,15 @@ export async function updateConversationMetadata(
   return updated ?? null;
 }
 
+export async function updateConversationTitle(db: Db, id: string, title: string) {
+  const [updated] = await db
+    .update(conversations)
+    .set({ title })
+    .where(eq(conversations.id, id))
+    .returning();
+  return updated ?? null;
+}
+
 /* ────────────────────── Messages ────────────────────────── */
 
 export async function createMessage(

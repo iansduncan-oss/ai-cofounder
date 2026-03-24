@@ -1285,6 +1285,12 @@ export class ApiClient {
     return this.request<GlobalSearchResults>("GET", `/api/search?q=${encodeURIComponent(q)}`);
   }
 
+  /* ── Quick Actions ── */
+
+  getQuickActions() {
+    return this.request<{ data: Array<{ label: string; icon: string }> }>("GET", "/api/context/quick-actions");
+  }
+
   /* ── Database ── */
 
   async queryDatabase(sqlQuery: string) {

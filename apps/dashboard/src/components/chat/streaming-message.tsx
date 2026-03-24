@@ -2,12 +2,14 @@ import { Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { ToolCallCard } from "./tool-call-card";
 import { ThinkingIndicator } from "./thinking-indicator";
-import type { ToolCallInfo, PlanInfo } from "@/hooks/use-stream-chat";
+import type { ToolCallInfo, PlanInfo, RichCardInfo } from "@/hooks/use-stream-chat";
 import { PlanCard } from "./plan-card";
+import { RichCard } from "./rich-card";
 
 interface StreamingMessageProps {
   text: string;
   toolCalls: ToolCallInfo[];
+  richCards?: RichCardInfo[];
   thinkingMessage: string | null;
   isStreaming: boolean;
   model?: string;
@@ -18,6 +20,7 @@ interface StreamingMessageProps {
 export function StreamingMessage({
   text,
   toolCalls,
+  richCards,
   thinkingMessage,
   isStreaming,
   model,
@@ -59,6 +62,9 @@ export function StreamingMessage({
             )}
           </div>
         )}
+        {richCards && richCards.length > 0 && richCards.map((card, i) => (
+          <RichCard key={i} type={card.type as "email_preview" | "calendar_day" | "goal_progress" | "cost_summary" | "deploy_status"} data={card.data} />
+        ))}
         {plan && <PlanCard plan={plan} />}
         {model && !isStreaming && (
           <p className="mt-1 text-xs opacity-60">

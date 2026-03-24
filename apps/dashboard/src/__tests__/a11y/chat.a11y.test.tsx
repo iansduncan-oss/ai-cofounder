@@ -13,6 +13,8 @@ vi.mock("@/hooks/use-stream-chat", () => ({
     model: undefined,
     provider: undefined,
     plan: undefined,
+    richCards: [],
+    suggestions: [],
     sendMessage: vi.fn(),
     cancel: vi.fn(),
     reset: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock("@/api/queries", () => ({
   useDashboardUser: vi.fn().mockReturnValue({ data: { id: "user-uuid-1" } }),
   useConversationMessages: vi.fn().mockReturnValue({ data: null }),
   useConversations: vi.fn().mockReturnValue({ data: null }),
+  useQuickActions: vi.fn().mockReturnValue({ data: [] }),
 }));
 
 vi.mock("@/api/mutations", () => ({

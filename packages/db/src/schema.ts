@@ -52,6 +52,8 @@ export const conversations = pgTable("conversations", {
     .references(() => users.id),
   title: text("title"),
   metadata: jsonb("metadata"),
+  parentConversationId: uuid("parent_conversation_id"),
+  branchPointMessageId: uuid("branch_point_message_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -805,6 +807,23 @@ export const pipelineTemplates = pgTable("pipeline_templates", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/* ── Outbound Webhooks ── */
+
+export const outboundWebhooks = pgTable("outbound_webhooks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  url: text("url").notNull(),
+  description: text("description"),
+  eventTypes: jsonb("event_types").notNull().$type<string[]>(),
+  headers: jsonb("headers").$type<Record<string, string>>(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/* ── Conversation Branching ── */
+// parent_conversation_id and branch_point_message_id are added via ALTER TABLE
+// to avoid circular reference issues in the schema definition
 
 /* ── Episodic Memories (conversation-level summaries) ── */
 

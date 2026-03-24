@@ -25,6 +25,15 @@ import {
   createMilestone,
   touchMemory,
   createFollowUp,
+  getChunkCount,
+  listIngestionStates,
+  getToolStats,
+  getProviderHealthRecords,
+  getUsageSummary,
+  getCostByDay,
+  listPipelineTemplates,
+  getPipelineTemplateByName,
+  createPipelineTemplate,
 } from "@ai-cofounder/db";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";
@@ -78,6 +87,22 @@ import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tool
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import { RECALL_EPISODES_TOOL } from "./tools/episodic-tools.js";
 import { RECALL_PROCEDURES_TOOL } from "./tools/procedural-tools.js";
+import {
+  SEARCH_KNOWLEDGE_TOOL,
+  INGEST_DOCUMENT_TOOL,
+  KNOWLEDGE_STATUS_TOOL,
+} from "./tools/knowledge-tools.js";
+import { QUERY_ANALYTICS_TOOL } from "./tools/analytics-tools.js";
+import {
+  LIST_TEMPLATES_TOOL,
+  RUN_TEMPLATE_TOOL,
+  CREATE_TEMPLATE_TOOL,
+} from "./tools/template-tools.js";
+import { REVIEW_PR_TOOL } from "./tools/review-tools.js";
+import { REGISTER_WEBHOOK_TOOL, LIST_WEBHOOKS_TOOL } from "./tools/webhook-tools.js";
+import type { PrReviewService } from "../services/pr-review.js";
+import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
+import type { ConversationBranchingService } from "../services/conversation-branching.js";
 import type { EpisodicMemoryService } from "../services/episodic-memory.js";
 import type { ProceduralMemoryService } from "../services/procedural-memory.js";
 import {
@@ -130,6 +155,9 @@ export interface ToolExecutorServices {
   calendarService?: CalendarService;
   episodicMemoryService?: EpisodicMemoryService;
   proceduralMemoryService?: ProceduralMemoryService;
+  prReviewService?: PrReviewService;
+  outboundWebhookService?: OutboundWebhookService;
+  conversationBranchingService?: ConversationBranchingService;
 }
 
 export interface ToolExecutorContext {
@@ -252,6 +280,32 @@ export function buildSharedToolList(
 
   if (services.proceduralMemoryService) {
     add(RECALL_PROCEDURES_TOOL);
+  }
+
+  // Knowledge base tools (require db + embedding)
+  if (services.db && services.embeddingService) {
+    add(SEARCH_KNOWLEDGE_TOOL);
+    add(INGEST_DOCUMENT_TOOL);
+    add(KNOWLEDGE_STATUS_TOOL);
+  }
+
+  // PR review tool (requires workspace + LLM — PrReviewService wraps both)
+  if (services.prReviewService) {
+    add(REVIEW_PR_TOOL);
+  }
+
+  // Analytics + template tools (requires db)
+  if (services.db) {
+    add(QUERY_ANALYTICS_TOOL);
+    add(LIST_TEMPLATES_TOOL);
+    add(RUN_TEMPLATE_TOOL);
+    add(CREATE_TEMPLATE_TOOL);
+  }
+
+  // Outbound webhook tools
+  if (services.outboundWebhookService) {
+    add(REGISTER_WEBHOOK_TOOL);
+    add(LIST_WEBHOOKS_TOOL);
   }
 
   return tools;
@@ -1087,6 +1141,219 @@ export async function executeSharedTool(
       const { query, limit } = block.input as { query: string; limit?: number };
       const procedures = await proceduralMemoryService.findMatchingProcedures(query, limit);
       return { procedures, count: procedures.length };
+    }
+
+    /* ── PR review tool ── */
+
+    case "review_pr": {
+      if (!services.prReviewService) return { error: "PR review service not available" };
+      const { pr_identifier, repo_dir } = block.input as {
+        pr_identifier: string;
+        repo_dir?: string;
+      };
+      const result = await services.prReviewService.reviewPr(repo_dir ?? ".", pr_identifier);
+      return result;
+    }
+
+    /* ── Knowledge base tools ── */
+
+    case "search_knowledge": {
+      if (!services.db || !services.embeddingService) return { error: "Knowledge base not available" };
+      const { query, limit: kLimit, source_type } = block.input as {
+        query: string;
+        limit?: number;
+        source_type?: string;
+      };
+      const chunks = await retrieve(services.db, services.embeddingService.embed.bind(services.embeddingService), query, {
+        limit: kLimit ?? 5,
+        sourceType: source_type as "git" | "conversation" | "slack" | "memory" | "reflection" | "markdown" | undefined,
+      });
+      if (chunks.length === 0) return { results: [], message: "No matching documents found." };
+      return {
+        results: chunks.map((c) => ({
+          content: c.content.slice(0, 500),
+          source_type: c.sourceType,
+          source_id: c.sourceId,
+          score: c.score,
+        })),
+        count: chunks.length,
+      };
+    }
+
+    case "ingest_document": {
+      if (!services.db || !services.embeddingService) return { error: "Knowledge base not available" };
+      const { content, source_id, source_type } = block.input as {
+        content: string;
+        source_id: string;
+        source_type?: string;
+      };
+      const { ingestText } = await import("@ai-cofounder/rag");
+      const result = await ingestText(
+        services.db,
+        services.embeddingService.embed.bind(services.embeddingService),
+        (source_type ?? "markdown") as "git" | "conversation" | "slack" | "memory" | "reflection" | "markdown",
+        source_id,
+        content,
+      );
+      return { ingested: true, source_id, chunks_created: result.chunksCreated };
+    }
+
+    case "knowledge_status": {
+      if (!services.db) return { error: "Database not available" };
+      const [chunkCount, ingestions] = await Promise.all([
+        getChunkCount(services.db),
+        listIngestionStates(services.db),
+      ]);
+      return {
+        total_chunks: chunkCount,
+        ingestions: ingestions.map((i) => ({
+          source_type: i.sourceType,
+          source_id: i.sourceId,
+          chunk_count: i.chunkCount,
+          last_ingested: i.lastIngestedAt,
+        })),
+        ingestion_count: ingestions.length,
+      };
+    }
+
+    /* ── Analytics tool ── */
+
+    case "query_analytics": {
+      if (!services.db) return { error: "Database not available" };
+      const { metric, time_range } = block.input as {
+        metric: string;
+        time_range?: string;
+      };
+      const since = new Date();
+      if (time_range === "today") {
+        since.setHours(0, 0, 0, 0);
+      } else if (time_range === "month") {
+        since.setDate(since.getDate() - 30);
+      } else {
+        since.setDate(since.getDate() - 7); // default: week
+      }
+
+      switch (metric) {
+        case "cost_summary": {
+          const usage = await getUsageSummary(services.db, { since });
+          const costSince = new Date();
+          costSince.setDate(costSince.getDate() - 7);
+          const daily = await getCostByDay(services.db, costSince);
+          return { ...usage, daily_breakdown: daily, period: time_range ?? "week" };
+        }
+        case "tool_performance": {
+          const stats = await getToolStats(services.db);
+          return { tools: stats, period: time_range ?? "week" };
+        }
+        case "provider_health": {
+          const health = await getProviderHealthRecords(services.db);
+          return { providers: health };
+        }
+        case "usage_trend": {
+          const trendSince = new Date();
+          trendSince.setDate(trendSince.getDate() - (time_range === "month" ? 30 : 7));
+          const daily = await getCostByDay(services.db, trendSince);
+          return { daily, period: time_range ?? "week" };
+        }
+        case "error_rate": {
+          const stats = await getToolStats(services.db);
+          const withErrors = stats.filter((s) => s.errorCount > 0);
+          return { tools_with_errors: withErrors, total_tools_tracked: stats.length };
+        }
+        default:
+          return { error: `Unknown metric: ${metric}` };
+      }
+    }
+
+    /* ── Template tools ── */
+
+    case "list_templates": {
+      if (!services.db) return { error: "Database not available" };
+      const templates = await listPipelineTemplates(services.db);
+      return {
+        templates: templates.map((t) => ({
+          name: t.name,
+          stages: t.stages,
+          created_at: t.createdAt,
+        })),
+        count: templates.length,
+      };
+    }
+
+    case "run_template": {
+      if (!services.db) return { error: "Database not available" };
+      const { template_name, context: templateCtx } = block.input as {
+        template_name: string;
+        context?: Record<string, unknown>;
+      };
+      const template = await getPipelineTemplateByName(services.db, template_name);
+      if (!template) return { error: `Template "${template_name}" not found` };
+      const { enqueuePipeline } = await import("@ai-cofounder/queue");
+      const stages = (template.stages as Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>).map((s) => ({
+        agent: s.agent as "researcher" | "coder" | "reviewer" | "planner",
+        prompt: s.prompt,
+        dependsOnPrevious: s.dependsOnPrevious ?? false,
+      }));
+      const pipelineId = await enqueuePipeline({
+        goalId: context.goalId ?? context.conversationId,
+        stages,
+        context: templateCtx,
+      });
+      return { started: true, pipeline_id: pipelineId, template_name, stages: stages.length };
+    }
+
+    case "create_template": {
+      if (!services.db) return { error: "Database not available" };
+      const { name, stages, default_context } = block.input as {
+        name: string;
+        stages: Array<{ agent: string; prompt: string; depends_on_previous?: boolean }>;
+        default_context?: Record<string, unknown>;
+      };
+      const pipelineStages = stages.map((s) => ({
+        agent: s.agent,
+        prompt: s.prompt,
+        dependsOnPrevious: s.depends_on_previous ?? false,
+      }));
+      const created = await createPipelineTemplate(services.db, {
+        name,
+        stages: pipelineStages,
+        defaultContext: default_context ?? {},
+      });
+      return { created: true, name: created.name };
+    }
+
+    /* ── Webhook tools ── */
+
+    case "register_webhook": {
+      if (!services.outboundWebhookService) return { error: "Webhook service not available" };
+      const { url, event_types, description, headers } = block.input as {
+        url: string; event_types: string[]; description?: string; headers?: Record<string, string>;
+      };
+      const webhook = await services.outboundWebhookService.register(url, event_types, headers, description);
+      return { registered: true, id: webhook.id, url, event_types };
+    }
+
+    case "list_webhooks": {
+      if (!services.outboundWebhookService) return { error: "Webhook service not available" };
+      const webhooks = await services.outboundWebhookService.list();
+      return {
+        webhooks: webhooks.map((w) => ({
+          id: w.id, url: w.url, event_types: w.eventTypes, description: w.description,
+        })),
+        count: webhooks.length,
+      };
+    }
+
+    /* ── Conversation branching ── */
+
+    case "branch_conversation": {
+      if (!services.conversationBranchingService) return { error: "Branching not available" };
+      const { branch_point_message_id } = block.input as { branch_point_message_id?: string };
+      if (!context.userId) return { error: "User ID required for branching" };
+      const result = await services.conversationBranchingService.branch(
+        context.conversationId, context.userId, branch_point_message_id,
+      );
+      return { branched: true, new_conversation_id: result.id, messages_copied: result.messagesCopied };
     }
 
     default:

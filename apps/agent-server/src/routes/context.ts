@@ -1,7 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
-import { getUserTimezone, setUserTimezone } from "@ai-cofounder/db";
+import { getUserTimezone, setUserTimezone, listPendingApprovals, listActiveGoals } from "@ai-cofounder/db";
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
+import { gatherBriefingData } from "../services/briefing.js";
 
 const logger = createLogger("context-routes");
 
@@ -69,5 +70,74 @@ export async function contextRoutes(app: FastifyInstance): Promise<void> {
     const service = new ContextualAwarenessService(app.db, { timezone });
     const block = await service.getContextBlock(query.userId);
     return { data: block };
+  });
+
+  // GET /api/context/quick-actions — dynamic context-aware quick actions
+  app.get("/quick-actions", { schema: { tags: ["context"] } }, async () => {
+    const actions: Array<{ label: string; icon: string }> = [];
+
+    try {
+      const data = await gatherBriefingData(app.db);
+      const hour = new Date().getHours();
+
+      // Time-based actions
+      if (hour >= 5 && hour < 12) {
+        actions.push({ label: "Catch me up on this morning", icon: "coffee" });
+      } else if (hour >= 12 && hour < 17) {
+        actions.push({ label: "How's the day going?", icon: "sun" });
+      } else {
+        actions.push({ label: "Wrap up the day for me", icon: "moon" });
+      }
+
+      // Pending approvals
+      if (data.pendingApprovalCount > 0) {
+        actions.push({
+          label: `Review ${data.pendingApprovalCount} pending approval${data.pendingApprovalCount > 1 ? "s" : ""}`,
+          icon: "check-circle",
+        });
+      }
+
+      // Stale goals
+      if (data.staleGoalCount > 0) {
+        const staleGoal = data.activeGoals.find((g) => g.hoursStale >= 48);
+        actions.push({
+          label: staleGoal ? `Check on "${staleGoal.title}"` : "Review stale goals",
+          icon: "alert-triangle",
+        });
+      }
+
+      // Active goals progress
+      if (data.activeGoals.length > 0 && data.pendingApprovalCount === 0) {
+        actions.push({ label: "What's the status on my goals?", icon: "target" });
+      }
+
+      // Unread emails
+      if (data.unreadEmailCount && data.unreadEmailCount > 0) {
+        actions.push({
+          label: `${data.unreadEmailCount} unread email${data.unreadEmailCount > 1 ? "s" : ""} — check them?`,
+          icon: "mail",
+        });
+      }
+
+      // Recent deploys
+      if (data.recentSessions.some((s) => s.trigger === "deploy" || s.trigger === "ci")) {
+        actions.push({ label: "How did the last deploy go?", icon: "rocket" });
+      }
+
+      // Costs
+      if (data.costsSinceYesterday.requestCount > 0) {
+        actions.push({ label: "How much have we spent recently?", icon: "dollar-sign" });
+      }
+    } catch (err) {
+      logger.debug({ err }, "quick-actions generation failed (non-fatal)");
+      // Return sensible defaults on failure
+      actions.push(
+        { label: "What's the status?", icon: "bar-chart" },
+        { label: "Check my email", icon: "mail" },
+        { label: "What's my day look like?", icon: "calendar" },
+      );
+    }
+
+    return { data: actions.slice(0, 6) };
   });
 }

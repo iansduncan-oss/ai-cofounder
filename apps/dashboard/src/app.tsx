@@ -5,6 +5,7 @@ import { StatusBar } from "@/components/layout/status-bar";
 import { SecondaryDrawer } from "@/components/layout/secondary-drawer";
 import { ErrorBoundary } from "@/components/common/error-boundary";
 import { CommandPalette } from "@/components/common/command-palette";
+import { GlobalChatBar } from "@/components/layout/global-chat-bar";
 import { AuthGuard } from "@/components/auth/auth-guard";
 import { CommandCenterProvider } from "@/providers/command-center-provider";
 
@@ -38,6 +39,7 @@ export function App() {
           </div>
           <SecondaryDrawer activePath={drawerPath} onClose={() => setDrawerPath(null)} />
           <CommandPalette />
+          <GlobalChatBar />
         </div>
       </CommandCenterProvider>
     </AuthGuard>

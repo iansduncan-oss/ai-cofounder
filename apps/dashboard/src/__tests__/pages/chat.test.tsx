@@ -19,6 +19,8 @@ vi.mock("@/hooks/use-stream-chat", () => ({
     model: undefined,
     provider: undefined,
     plan: undefined,
+    richCards: [],
+    suggestions: [],
     sendMessage: mockSendMessage,
     cancel: mockCancel,
     reset: mockReset,
@@ -29,6 +31,7 @@ vi.mock("@/api/queries", () => ({
   useDashboardUser: vi.fn().mockReturnValue({ data: { id: "user-uuid-1" } }),
   useConversationMessages: vi.fn().mockReturnValue({ data: null }),
   useConversations: vi.fn().mockReturnValue({ data: null }),
+  useQuickActions: vi.fn().mockReturnValue({ data: [] }),
 }));
 
 describe("ChatPage", () => {

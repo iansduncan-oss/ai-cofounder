@@ -20,10 +20,16 @@ export interface PlanInfo {
   }>;
 }
 
+export interface RichCardInfo {
+  type: string;
+  data: Record<string, unknown>;
+}
+
 interface StreamState {
   isStreaming: boolean;
   accumulatedText: string;
   toolCalls: ToolCallInfo[];
+  richCards: RichCardInfo[];
   thinkingMessage: string | null;
   error: string | null;
   conversationId?: string;
@@ -47,6 +53,7 @@ type StreamAction =
       plan?: PlanInfo;
     }
   | { type: "suggestions"; suggestions: string[] }
+  | { type: "rich_card"; cardType: string; data: Record<string, unknown> }
   | { type: "error"; message: string }
   | { type: "reset" };
 
@@ -54,6 +61,7 @@ const initialState: StreamState = {
   isStreaming: false,
   accumulatedText: "",
   toolCalls: [],
+  richCards: [],
   thinkingMessage: null,
   error: null,
 };
@@ -88,6 +96,8 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
       };
     case "suggestions":
       return { ...state, suggestions: action.suggestions };
+    case "rich_card":
+      return { ...state, richCards: [...state.richCards, { type: action.cardType, data: action.data }] };
     case "done":
       return {
         ...state,
@@ -152,6 +162,13 @@ export function useStreamChat() {
               break;
             case "text_delta":
               dispatch({ type: "text_delta", text: (event.data.text as string) ?? "" });
+              break;
+            case "rich_card":
+              dispatch({
+                type: "rich_card",
+                cardType: (event.data.type as string) ?? "goal_progress",
+                data: (event.data.data as Record<string, unknown>) ?? {},
+              });
               break;
             case "suggestions":
               dispatch({

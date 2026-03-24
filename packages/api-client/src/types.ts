@@ -112,7 +112,7 @@ export interface ExecutionProgress {
 
 export type StreamEventType =
   | "thinking" | "tool_call" | "tool_result" | "text_delta" | "done" | "error"
-  | "started" | "progress" | "completed" | "suggestions";
+  | "started" | "progress" | "completed" | "suggestions" | "rich_card";
 
 export interface StreamEvent {
   type: StreamEventType;
