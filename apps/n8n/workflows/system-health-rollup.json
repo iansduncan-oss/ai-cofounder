@@ -1,0 +1,169 @@
+{
+  "name": "System Health Rollup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily 7:30 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/health/full",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-health",
+      "name": "Fetch System Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 200],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/monitoring/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-monitoring",
+      "name": "Fetch Monitoring Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 400],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/errors/summary?hours=24",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "fetch-errors",
+      "name": "Fetch Error Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 600],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const https = require('https');\n\nconst domains = [\n  'api.aviontechs.com',\n  'app.aviontechs.com',\n  'n8n.aviontechs.com',\n  'grafana.aviontechs.com',\n  'status.aviontechs.com'\n];\n\nconst results = [];\n\nfor (const domain of domains) {\n  try {\n    const cert = await new Promise((resolve, reject) => {\n      const req = https.get({ hostname: domain, port: 443, method: 'HEAD', rejectUnauthorized: false }, (res) => {\n        const cert = res.socket.getPeerCertificate();\n        resolve(cert);\n      });\n      req.on('error', reject);\n      req.setTimeout(5000, () => { req.destroy(); reject(new Error('timeout')); });\n    });\n    const validTo = new Date(cert.valid_to);\n    const daysLeft = Math.floor((validTo - Date.now()) / 86400000);\n    results.push({ domain, daysLeft, validTo: validTo.toISOString().split('T')[0], ok: daysLeft > 14 });\n  } catch (e) {\n    results.push({ domain, daysLeft: -1, validTo: 'ERROR', ok: false, error: e.message });\n  }\n}\n\nreturn [{ json: { sslCerts: results } }];"
+      },
+      "id": "check-ssl",
+      "name": "Check SSL Certs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 800]
+    },
+    {
+      "parameters": {
+        "jsCode": "const health = $('Fetch System Health').item.json;\nconst monitoring = $('Fetch Monitoring Status').item.json;\nconst errors = $('Fetch Error Summary').item.json;\nconst ssl = $('Check SSL Certs').item.json;\n\n// --- Severity tracking ---\nlet severity = 'ok'; // ok → warning → critical\nfunction escalate(level) {\n  if (level === 'critical') severity = 'critical';\n  else if (level === 'warning' && severity !== 'critical') severity = 'warning';\n}\n\n// --- 1. System Health ---\nconst healthLines = [];\nconst subsystems = health.subsystems || health.services || {};\nfor (const [name, info] of Object.entries(subsystems)) {\n  const status = typeof info === 'object' ? (info.status || info.state || 'unknown') : info;\n  const icon = status === 'ok' || status === 'healthy' || status === 'connected' ? '✅' : status === 'degraded' ? '⚠️' : '❌';\n  healthLines.push(`${icon} ${name}: ${status}`);\n  if (icon === '❌') escalate('critical');\n  else if (icon === '⚠️') escalate('warning');\n}\nif (healthLines.length === 0) healthLines.push(health.status === 'ok' ? '✅ All systems operational' : '⚠️ Status: ' + (health.status || 'unknown'));\n\n// --- 2. VPS Resources ---\nconst vps = monitoring.vps || monitoring.server || {};\nconst vpsLines = [];\nif (vps.cpu !== undefined) vpsLines.push(`CPU: ${vps.cpu}%`);\nif (vps.memory !== undefined) vpsLines.push(`Memory: ${vps.memory}%`);\nif (vps.disk !== undefined) vpsLines.push(`Disk: ${vps.disk}%`);\nif (vps.uptime) vpsLines.push(`Uptime: ${vps.uptime}`);\nif (vpsLines.length === 0) vpsLines.push('No VPS metrics available');\nif (vps.cpu > 90 || vps.memory > 90 || vps.disk > 90) escalate('critical');\nelse if (vps.cpu > 75 || vps.memory > 75 || vps.disk > 85) escalate('warning');\n\n// --- 3. SSL Certs ---\nconst sslCerts = ssl.sslCerts || [];\nconst sslLines = sslCerts.map(c => {\n  const icon = c.error ? '❌' : c.daysLeft > 14 ? '✅' : c.daysLeft > 7 ? '⚠️' : '❌';\n  if (icon === '❌') escalate('critical');\n  else if (icon === '⚠️') escalate('warning');\n  return `${icon} ${c.domain}: ${c.error ? c.error : c.daysLeft + 'd left (expires ' + c.validTo + ')'}`;\n});\nif (sslLines.length === 0) sslLines.push('No SSL data');\n\n// --- 4. Backups ---\nconst backups = monitoring.backups || monitoring.backup || {};\nconst backupLines = [];\nif (backups.lastRun) backupLines.push(`Last: ${backups.lastRun}`);\nif (backups.status) backupLines.push(`Status: ${backups.status}`);\nif (backups.size) backupLines.push(`Size: ${backups.size}`);\nif (backupLines.length === 0) backupLines.push('No backup info available');\nif (backups.status === 'failed') escalate('critical');\n\n// --- 5. Errors (24h) ---\nconst errorList = errors.errors || errors.summary || [];\nconst totalErrors = errors.totalErrors || errors.total || errorList.length || 0;\nconst errorLines = [];\nif (totalErrors > 0) {\n  errorLines.push(`**${totalErrors}** errors in last 24h`);\n  const topErrors = (Array.isArray(errorList) ? errorList : []).slice(0, 5);\n  topErrors.forEach(e => {\n    errorLines.push(`  • ${e.message || e.error || e.name || 'Unknown'} (×${e.count || 1})`);\n  });\n  if (totalErrors > 10) escalate('warning');\n  if (totalErrors > 50) escalate('critical');\n} else {\n  errorLines.push('No errors in last 24h');\n}\n\n// --- 6. Active Alerts / Open PRs ---\nconst alerts = monitoring.alerts || [];\nconst prs = monitoring.pullRequests || monitoring.prs || [];\nconst alertLines = [];\nif (alerts.length > 0) {\n  alerts.forEach(a => alertLines.push(`🔔 ${a.name || a.alertname || a.title}: ${a.status || a.state || 'firing'}`));\n  escalate('warning');\n} else {\n  alertLines.push('No active alerts');\n}\nif (prs.length > 0) {\n  prs.forEach(pr => alertLines.push(`📝 PR #${pr.number || '?'}: ${pr.title || 'Untitled'}`));\n}\n\n// --- Color ---\nconst colors = { ok: 3066993, warning: 16776960, critical: 15548997 }; // green, yellow, red\n\n// --- Build Discord embed ---\nconst embed = {\n  title: '🏥 Daily System Health Rollup',\n  color: colors[severity],\n  timestamp: new Date().toISOString(),\n  fields: [\n    { name: '🖥️ System Health', value: healthLines.join('\\n'), inline: false },\n    { name: '📊 VPS Resources', value: vpsLines.join('\\n'), inline: true },\n    { name: '🔒 SSL Certificates', value: sslLines.join('\\n'), inline: false },\n    { name: '💾 Backups', value: backupLines.join('\\n'), inline: true },\n    { name: '🐛 Errors (24h)', value: errorLines.join('\\n'), inline: false },\n    { name: '🔔 Alerts & PRs', value: alertLines.join('\\n'), inline: false },\n  ],\n  footer: { text: `Severity: ${severity.toUpperCase()}` },\n};\n\nreturn [{ json: { embed, severity } }];"
+      },
+      "id": "format-rollup",
+      "name": "Format Health Rollup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ embeds: [$json.embed] }) }}",
+        "options": {}
+      },
+      "id": "post-discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [980, 400]
+    }
+  ],
+  "connections": {
+    "Daily 7:30 AM": {
+      "main": [
+        [
+          { "node": "Fetch System Health", "type": "main", "index": 0 },
+          { "node": "Fetch Monitoring Status", "type": "main", "index": 0 },
+          { "node": "Fetch Error Summary", "type": "main", "index": 0 },
+          { "node": "Check SSL Certs", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch System Health": {
+      "main": [
+        [{ "node": "Format Health Rollup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Monitoring Status": {
+      "main": [
+        [{ "node": "Format Health Rollup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Error Summary": {
+      "main": [
+        [{ "node": "Format Health Rollup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check SSL Certs": {
+      "main": [
+        [{ "node": "Format Health Rollup", "type": "main", "index": 0 }]
+      ]
+    },
+    "Format Health Rollup": {
+      "main": [
+        [{ "node": "Post to Discord", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "monitoring" },
+    { "name": "scheduled" },
+    { "name": "health" }
+  ]
+}

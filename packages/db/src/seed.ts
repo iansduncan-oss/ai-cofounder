@@ -182,8 +182,8 @@ async function seed() {
     .insert(n8nWorkflows)
     .values([
       {
-        name: "GitHub Issue → Goal",
-        description: "Creates an agent goal when a GitHub issue is opened, then notifies Discord",
+        name: "Enhanced GitHub Issue Pipeline",
+        description: "Classifies GitHub issues (bug/feature/question), auto-labels, creates prioritized goals, and notifies Discord",
         webhookUrl: "http://localhost:5678/webhook/github-issue",
         direction: "inbound",
         eventType: "issue_opened",
@@ -199,15 +199,39 @@ async function seed() {
       },
       {
         name: "Weekly LLM Cost Digest",
-        description: "Fetches weekly usage stats every Monday at 9 AM and posts a cost digest to Discord and Slack",
+        description: "Superseded by Weekly Digest — fetches weekly usage stats every Monday at 9 AM",
         webhookUrl: "http://localhost:5678/webhook/cost-digest",
+        direction: "outbound",
+        eventType: "scheduled",
+        isActive: false,
+      },
+      {
+        name: "Smart Error Triage",
+        description: "Receives Alertmanager webhooks, deduplicates alerts (30min window), enriches with error context, and sends classified Discord embeds",
+        webhookUrl: "http://localhost:5678/webhook/alertmanager-triage",
+        direction: "inbound",
+        eventType: "alert_fired",
+        isActive: true,
+      },
+      {
+        name: "Weekly Digest",
+        description: "Comprehensive weekly report: commits by type, deploy stats, error summary, and LLM cost data — posted to Discord and Slack",
+        webhookUrl: "http://localhost:5678/webhook/weekly-digest",
+        direction: "outbound",
+        eventType: "scheduled",
+        isActive: true,
+      },
+      {
+        name: "System Health Rollup",
+        description: "Daily 7:30 AM health check: system status, VPS resources, SSL certs, backups, errors, and active alerts — single Discord embed",
+        webhookUrl: "http://localhost:5678/webhook/health-rollup",
         direction: "outbound",
         eventType: "scheduled",
         isActive: true,
       },
     ])
     .onConflictDoNothing();
-  console.log(`  Created ${3} n8n workflows`);
+  console.log(`  Created ${6} n8n workflows`);
 
   console.log("\nSeed complete!");
   process.exit(0);

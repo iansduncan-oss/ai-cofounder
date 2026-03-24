@@ -11,7 +11,7 @@ route:
 receivers:
   - name: "discord"
     webhook_configs:
-      - url: "${ALERTMANAGER_DISCORD_WEBHOOK_URL}"
+      - url: "http://n8n:5678/webhook/alertmanager-triage"
         send_resolved: true
 
 templates: []

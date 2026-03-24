@@ -1,0 +1,109 @@
+{
+  "name": "Smart Error Triage",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alertmanager-triage",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Alertmanager Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Alertmanager sends { alerts: [...] }\nconst payload = $input.item.json;\nconst alerts = payload.alerts || [payload];\nconst now = Date.now();\nconst SUPPRESS_WINDOW_MS = 30 * 60 * 1000; // 30 minutes\n\n// Get or init staticData for dedup\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.seen) staticData.seen = {};\n\n// Clean up expired entries\nfor (const [fp, ts] of Object.entries(staticData.seen)) {\n  if (now - ts > SUPPRESS_WINDOW_MS) delete staticData.seen[fp];\n}\n\nconst passThrough = [];\n\nfor (const alert of alerts) {\n  const fingerprint = alert.fingerprint || `${alert.labels?.alertname || 'unknown'}-${alert.labels?.instance || ''}`;\n  const status = alert.status || 'firing';\n\n  // Always pass resolved alerts\n  if (status === 'resolved') {\n    delete staticData.seen[fingerprint];\n    passThrough.push({ ...alert, _fingerprint: fingerprint, _dedupStatus: 'resolved-passthrough' });\n    continue;\n  }\n\n  // Check dedup window for firing alerts\n  if (staticData.seen[fingerprint]) {\n    continue; // Suppressed\n  }\n\n  staticData.seen[fingerprint] = now;\n  passThrough.push({ ...alert, _fingerprint: fingerprint, _dedupStatus: 'new' });\n}\n\nif (passThrough.length === 0) {\n  return []; // All suppressed — stop workflow\n}\n\nreturn passThrough.map(a => ({ json: a }));"
+      },
+      "id": "dedup-alerts",
+      "name": "Dedup Alerts (30min)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/errors/summary?hours=1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "enrich-errors",
+      "name": "Enrich from Error Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [690, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const alert = $('Dedup Alerts (30min)').item.json;\nconst errorSummary = $('Enrich from Error Summary').item.json;\n\nconst alertname = alert.labels?.alertname || 'Unknown Alert';\nconst status = alert.status || 'firing';\nconst severity = alert.labels?.severity || 'warning';\nconst instance = alert.labels?.instance || 'unknown';\nconst description = alert.annotations?.description || alert.annotations?.summary || alertname;\nconst startsAt = alert.startsAt || '';\nconst endsAt = alert.endsAt || '';\nconst dedupStatus = alert._dedupStatus;\n\n// Severity classification\nlet level;\nif (status === 'resolved') {\n  level = 'resolved';\n} else if (severity === 'critical' || alertname.toLowerCase().includes('down') || alertname.toLowerCase().includes('critical')) {\n  level = 'critical';\n} else if (severity === 'warning') {\n  level = 'warning';\n} else {\n  level = 'info';\n}\n\nconst colors = { critical: 15548997, warning: 16776960, info: 3447003, resolved: 3066993 };\nconst icons = { critical: '🔴', warning: '🟡', info: '🔵', resolved: '🟢' };\n\n// Recent error context\nconst recentErrors = errorSummary.errors || errorSummary.summary || [];\nconst totalRecentErrors = errorSummary.totalErrors || errorSummary.total || 0;\nlet errorContext = `${totalRecentErrors} errors in the last hour`;\nif (recentErrors.length > 0) {\n  const topErrors = recentErrors.slice(0, 3).map(e => `• ${e.message || e.error || 'Unknown'} (×${e.count || 1})`).join('\\n');\n  errorContext += '\\n' + topErrors;\n}\n\nconst embed = {\n  title: `${icons[level]} ${alertname}`,\n  description: description,\n  color: colors[level],\n  timestamp: new Date().toISOString(),\n  fields: [\n    { name: 'Status', value: status.toUpperCase(), inline: true },\n    { name: 'Severity', value: level.toUpperCase(), inline: true },\n    { name: 'Instance', value: instance, inline: true },\n  ],\n};\n\nif (status !== 'resolved') {\n  embed.fields.push({ name: 'Recent Errors (1h)', value: errorContext, inline: false });\n}\n\nif (startsAt) {\n  embed.fields.push({ name: 'Started', value: new Date(startsAt).toLocaleString(), inline: true });\n}\n\nif (status === 'resolved' && endsAt) {\n  embed.fields.push({ name: 'Resolved', value: new Date(endsAt).toLocaleString(), inline: true });\n}\n\nembed.footer = { text: `Fingerprint: ${alert._fingerprint} | Dedup: ${dedupStatus}` };\n\nreturn [{ json: { embed, level } }];"
+      },
+      "id": "classify-format",
+      "name": "Classify & Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ embeds: [$json.embed] }) }}",
+        "options": {}
+      },
+      "id": "post-discord",
+      "name": "Send to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "Alertmanager Webhook": {
+      "main": [
+        [{ "node": "Dedup Alerts (30min)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Dedup Alerts (30min)": {
+      "main": [
+        [{ "node": "Enrich from Error Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Enrich from Error Summary": {
+      "main": [
+        [{ "node": "Classify & Format", "type": "main", "index": 0 }]
+      ]
+    },
+    "Classify & Format": {
+      "main": [
+        [{ "node": "Send to Discord", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "global": {
+      "seen": {}
+    }
+  },
+  "tags": [
+    { "name": "alerting" },
+    { "name": "monitoring" },
+    { "name": "triage" }
+  ]
+}
