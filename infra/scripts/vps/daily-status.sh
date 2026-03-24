@@ -12,33 +12,18 @@ API_BASE="http://localhost:3100"
 
 log "Starting daily status report..."
 
-# Build curl auth args
-CURL_AUTH=()
-if [[ -n "${API_SECRET:-}" ]]; then
-  CURL_AUTH=(-H "Authorization: Bearer ${API_SECRET}")
-fi
+# Fetch health and monitoring data
+# Localhost requests bypass JWT auth in the agent-server
+HEALTH=$(curl -sf --max-time 10 "${API_BASE}/health/full" 2>/dev/null)
+MONITORING=$(curl -sf --max-time 15 "${API_BASE}/api/monitoring/status" 2>/dev/null || true)
 
-# Fetch health (unauthenticated) and monitoring (authenticated)
-HEALTH=$(curl -s --max-time 10 -o - -w '\n%{http_code}' "${API_BASE}/health/full" 2>/dev/null)
-HEALTH_CODE=$(echo "$HEALTH" | tail -1)
-HEALTH=$(echo "$HEALTH" | sed '$d')
-
-if [[ "$HEALTH_CODE" != "200" ]]; then
+if [[ -z "$HEALTH" ]]; then
   notify_discord \
     "Daily Status: Agent Server Unreachable" \
-    "Could not reach agent-server at ${API_BASE}/health/full (HTTP ${HEALTH_CODE})" \
+    "Could not reach agent-server at ${API_BASE}/health/full" \
     "$COLOR_RED"
-  log_error "Agent server unreachable (HTTP ${HEALTH_CODE})"
+  log_error "Agent server unreachable"
   exit 1
-fi
-
-MONITORING_RAW=$(curl -s --max-time 15 -o - -w '\n%{http_code}' "${CURL_AUTH[@]}" "${API_BASE}/api/monitoring/status" 2>/dev/null)
-MONITORING_CODE=$(echo "$MONITORING_RAW" | tail -1)
-if [[ "$MONITORING_CODE" == "200" ]]; then
-  MONITORING=$(echo "$MONITORING_RAW" | sed '$d')
-else
-  MONITORING="{}"
-  log "Monitoring endpoint returned HTTP ${MONITORING_CODE}, skipping"
 fi
 
 # Write JSON to temp files for python

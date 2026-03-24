@@ -12,28 +12,11 @@ API_BASE="http://localhost:3100"
 
 log "Starting daily cost report..."
 
-# Build curl auth args
-CURL_AUTH=()
-if [[ -n "${API_SECRET:-}" ]]; then
-  CURL_AUTH=(-H "Authorization: Bearer ${API_SECRET}")
-fi
-
-# Helper: fetch endpoint, return body only on 200, else empty
-fetch() {
-  local url="$1"
-  local raw
-  raw=$(curl -s --max-time 10 -o - -w '\n%{http_code}' "${CURL_AUTH[@]}" "$url" 2>/dev/null)
-  local code
-  code=$(echo "$raw" | tail -1)
-  if [[ "$code" == "200" ]]; then
-    echo "$raw" | sed '$d'
-  fi
-}
-
-TODAY=$(fetch "${API_BASE}/api/usage?period=today")
-DAILY=$(fetch "${API_BASE}/api/usage/daily?days=7")
-BUDGET=$(fetch "${API_BASE}/api/usage/budget")
-TOP_GOALS=$(fetch "${API_BASE}/api/usage/top-goals?limit=3")
+# Localhost requests bypass JWT auth in the agent-server
+TODAY=$(curl -sf --max-time 10 "${API_BASE}/api/usage?period=today" 2>/dev/null)
+DAILY=$(curl -sf --max-time 10 "${API_BASE}/api/usage/daily?days=7" 2>/dev/null || true)
+BUDGET=$(curl -sf --max-time 10 "${API_BASE}/api/usage/budget" 2>/dev/null || true)
+TOP_GOALS=$(curl -sf --max-time 10 "${API_BASE}/api/usage/top-goals?limit=3" 2>/dev/null || true)
 
 if [[ -z "$TODAY" ]]; then
   notify_discord \

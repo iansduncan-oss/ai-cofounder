@@ -55,6 +55,12 @@ import { searchRoutes } from "../routes/search.js";
 export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
+    // Trust localhost/internal requests (cron scripts, MCP server, monitoring)
+    const ip = request.ip;
+    if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") {
+      return;
+    }
+
     if (typeof request.jwtVerify !== "function") {
       if (process.env.NODE_ENV === "production") {
         reply.code(503).send({ error: "Authentication not configured — JWT_SECRET is required in production" });
