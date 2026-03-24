@@ -395,6 +395,21 @@ export function useFollowUp(id: string) {
   });
 }
 
+export function useDecisions(userId: string, search?: string) {
+  return useQuery({
+    queryKey: queryKeys.decisions.list(userId),
+    queryFn: () => apiClient.listDecisions(userId, { q: search, limit: 100 }),
+    enabled: !!userId,
+  });
+}
+
+export function usePipelineTemplates() {
+  return useQuery({
+    queryKey: queryKeys.pipelineTemplates.list,
+    queryFn: () => apiClient.listPipelineTemplates(),
+  });
+}
+
 export function useGlobalSearch(q: string) {
   return useQuery({
     queryKey: queryKeys.search.results(q),

@@ -1261,6 +1261,17 @@ export class ApiClient {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/follow-ups/${id}`);
   }
 
+  /* ── Decisions ── */
+
+  listDecisions(userId: string, opts?: { q?: string; limit?: number; offset?: number }) {
+    const params = new URLSearchParams({ userId });
+    if (opts?.q) params.set("q", opts.q);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const qs = params.toString();
+    return this.request<PaginatedResponse<Memory>>("GET", `/api/decisions?${qs}`);
+  }
+
   /* ── Global Search ── */
 
   globalSearch(q: string) {

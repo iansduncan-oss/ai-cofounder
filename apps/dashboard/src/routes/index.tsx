@@ -81,6 +81,15 @@ const CalendarPage = lazy(() =>
 const FollowUpsPage = lazy(() =>
   import("./follow-ups").then((m) => ({ default: m.FollowUpsPage })),
 );
+const SubagentsPage = lazy(() =>
+  import("./subagents").then((m) => ({ default: m.SubagentsPage })),
+);
+const DecisionsPage = lazy(() =>
+  import("./decisions").then((m) => ({ default: m.DecisionsPage })),
+);
+const PipelineTemplatesPage = lazy(() =>
+  import("./pipeline-templates").then((m) => ({ default: m.PipelineTemplatesPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -119,6 +128,9 @@ export const router = createBrowserRouter([
       { path: "gmail", element: <GmailPage /> },
       { path: "calendar", element: <CalendarPage /> },
       { path: "follow-ups", element: <FollowUpsPage /> },
+      { path: "subagents", element: <SubagentsPage /> },
+      { path: "decisions", element: <DecisionsPage /> },
+      { path: "pipeline-templates", element: <PipelineTemplatesPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

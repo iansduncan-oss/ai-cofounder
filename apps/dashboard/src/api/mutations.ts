@@ -578,3 +578,16 @@ export function useDeleteFollowUp() {
     onError: (err) => { toast.error(`Failed to delete follow-up: ${err.message}`); },
   });
 }
+
+export function useTriggerPipelineTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ name, goalId, context }: { name: string; goalId?: string; context?: Record<string, unknown> }) =>
+      apiClient.triggerPipelineTemplate(name, { goalId, context }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
+      toast.success(`Pipeline triggered: ${data.template}`);
+    },
+    onError: (err) => { toast.error(`Failed to trigger template: ${err.message}`); },
+  });
+}

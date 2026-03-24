@@ -3,7 +3,7 @@
 import type { AgentRole, GoalStatus, GoalScope } from "@ai-cofounder/shared";
 export type { AgentRole, GoalStatus, GoalScope } from "@ai-cofounder/shared";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
-export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled" | "blocked";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export interface Goal {

@@ -27,6 +27,9 @@ import {
   Activity,
   FolderOpen,
   ListChecks,
+  Boxes,
+  Scale,
+  LayoutTemplate,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -69,6 +72,7 @@ const navSections: NavSection[] = [
       { icon: CalendarDays, label: "Calendar", path: "/dashboard/calendar", drawer: true },
       { icon: Workflow, label: "N8n", path: "/dashboard/n8n", drawer: true },
       { icon: GitBranch, label: "Pipelines", path: "/dashboard/pipelines", drawer: true },
+      { icon: LayoutTemplate, label: "Templates", path: "/dashboard/pipeline-templates", drawer: true },
     ],
   },
   {
@@ -81,6 +85,8 @@ const navSections: NavSection[] = [
       { icon: Bot, label: "Persona", path: "/dashboard/persona", drawer: true },
       { icon: Sparkles, label: "Patterns", path: "/dashboard/patterns", drawer: true },
       { icon: BookOpen, label: "Journal", path: "/dashboard/journal", drawer: true },
+      { icon: Boxes, label: "Subagents", path: "/dashboard/subagents", drawer: true },
+      { icon: Scale, label: "Decisions", path: "/dashboard/decisions", drawer: true },
       { icon: PlayCircle, label: "Autonomous", path: "/dashboard/autonomous", drawer: true },
       { icon: Inbox, label: "DLQ", path: "/dashboard/dlq", drawer: true },
       { icon: Bell, label: "Notifications", path: "/dashboard/notifications", drawer: true },

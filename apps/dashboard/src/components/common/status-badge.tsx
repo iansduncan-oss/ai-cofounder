@@ -17,6 +17,7 @@ const taskStatusConfig: Record<TaskStatus, { label: string; variant: "default" |
   completed: { label: "Completed", variant: "success" },
   failed: { label: "Failed", variant: "destructive" },
   cancelled: { label: "Cancelled", variant: "destructive" },
+  blocked: { label: "Blocked", variant: "warning" },
 };
 
 const approvalStatusConfig: Record<ApprovalStatus, { label: string; variant: "default" | "secondary" | "success" | "warning" | "destructive" }> = {
