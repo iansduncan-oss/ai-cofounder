@@ -55,7 +55,7 @@ jobs:
         run: npm run db:push
 
       - name: Run tests with coverage
-        run: npx turbo run test -- --coverage
+        run: npx vitest run --coverage
 
       - name: Upload coverage artifact
         if: always()
