@@ -13,6 +13,7 @@ import {
   updateConversationTitle,
   getTodayTokenTotal,
   incrementPatternAcceptCount,
+  adjustPatternConfidence,
 } from "@ai-cofounder/db";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
@@ -133,7 +134,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           convId,
           resolvedHistory as AgentMessage[] | undefined,
         );
-        resolvedHistory = prepared.messages;
+        resolvedHistory = contextWindow.trimToFit(prepared.messages);
         if (prepared.wasSummarized) {
           logger.info({ convId, totalMessages: prepared.totalDbMessages, estimatedTokens: prepared.estimatedTokens }, "context window managed");
         }
@@ -260,7 +261,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           convId,
           resolvedHistory as AgentMessage[] | undefined,
         );
-        resolvedHistory = prepared.messages;
+        resolvedHistory = contextWindow.trimToFit(prepared.messages);
       } catch (err) {
         logger.warn({ err, convId }, "context window management failed (non-fatal)");
       }
@@ -285,6 +286,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       send(event.type, event.data);
     };
 
+    const streamLlmStart = Date.now();
     try {
       const result = await orchestrator.runStream(
         message,
@@ -316,6 +318,18 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       // Fire-and-forget conversation title generation for new conversations
       if (result.conversationId && !conversationId) {
         generateConversationTitle(app, result.conversationId, message, result.response).catch(() => {});
+      }
+
+      if (result.usage && result.model) {
+        recordLlmMetrics({
+          provider: result.provider ?? "unknown",
+          model: result.model,
+          taskCategory: "conversation",
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          durationMs: Date.now() - streamLlmStart,
+          success: true,
+        });
       }
 
       // Record user action (fire-and-forget)
@@ -385,6 +399,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
 
       if (patternId) {
         incrementPatternAcceptCount(app.db, patternId).catch(() => {});
+        adjustPatternConfidence(app.db, patternId, 5).catch(() => {});
       }
 
       return { ok: true };

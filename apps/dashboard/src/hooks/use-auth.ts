@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 // Module-level token — survives React re-renders, cleared on page reload
 let _accessToken: string | null = null;
@@ -9,6 +9,16 @@ export function getAccessToken(): string | null {
 
 export function setAccessToken(token: string | null): void {
   _accessToken = token;
+}
+
+/** Decode JWT payload without verification (client-side only) */
+function decodeJwtExp(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -80,4 +90,51 @@ export function useAuth() {
   }, [baseUrl]);
 
   return { isAuthenticated, login, logout, refresh };
+}
+
+/**
+ * useProactiveRefresh — schedules a token refresh 60s before JWT expiry.
+ * Re-schedules after each successful refresh. Call from App or AuthGuard.
+ */
+export function useProactiveRefresh() {
+  const { refresh } = useAuth();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleRefresh = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+
+    const token = getAccessToken();
+    if (!token) return;
+
+    const exp = decodeJwtExp(token);
+    if (!exp) return;
+
+    const msUntilExpiry = exp * 1000 - Date.now();
+    // Refresh 60s before expiry, minimum 5s from now
+    const refreshIn = Math.max(msUntilExpiry - 60_000, 5_000);
+
+    timerRef.current = setTimeout(async () => {
+      const newToken = await refresh();
+      if (newToken) {
+        scheduleRefresh();
+      }
+    }, refreshIn);
+  }, [refresh]);
+
+  useEffect(() => {
+    scheduleRefresh();
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, [scheduleRefresh]);
+
+  // Re-schedule whenever the token changes
+  useEffect(() => {
+    if (_accessToken) {
+      scheduleRefresh();
+    }
+  }, [_accessToken, scheduleRefresh]);
 }

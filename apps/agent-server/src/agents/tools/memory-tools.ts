@@ -64,6 +64,13 @@ export const RECALL_MEMORIES_TOOL: LlmTool = {
         type: "string",
         description: "Optional keyword to search across memory keys and content",
       },
+      scope: {
+        type: "string",
+        enum: ["own", "all"],
+        description:
+          "Memory scope: 'own' (default) returns only your memories + shared memories, " +
+          "'all' returns memories from all agents. Use 'all' when you need cross-agent context.",
+      },
     },
     required: [],
   },

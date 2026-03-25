@@ -14,6 +14,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["goals"], body: CreateGoalBody } },
     async (request, reply) => {
       const goal = await createGoal(app.db, request.body);
+      app.wsBroadcast?.("goals");
       recordActionSafe(app.db, {
         userId: request.body.createdBy,
         actionType: "goal_created",
@@ -59,6 +60,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const goal = await updateGoalStatus(app.db, request.params.id, request.body.status);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      app.wsBroadcast?.("goals");
       return goal;
     },
   );
@@ -71,7 +73,9 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       const results = await Promise.all(
         request.body.updates.map(({ id, status }) => updateGoalStatus(app.db, id, status)),
       );
-      return { updated: results.filter(Boolean).length };
+      const updated = results.filter(Boolean).length;
+      if (updated > 0) app.wsBroadcast?.("goals");
+      return { updated };
     },
   );
 

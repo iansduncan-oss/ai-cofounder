@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -24,9 +25,7 @@ vi.mock("@ai-cofounder/rag", () => ({
 }));
 
 vi.mock("@ai-cofounder/db", () => ({
-  createDb: vi.fn().mockReturnValue({
-    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
-  }),
+  ...mockDbModule(),
   getChunkCount: (...args: unknown[]) => mockGetChunkCount(...args),
   listIngestionStates: (...args: unknown[]) => mockListIngestionStates(...args),
   deleteChunksBySource: (...args: unknown[]) => mockDeleteChunksBySource(...args),

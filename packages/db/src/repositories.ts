@@ -470,17 +470,22 @@ export async function saveMemory(
     key: string;
     content: string;
     source?: string;
+    agentRole?: string;
     metadata?: Record<string, unknown>;
     embedding?: number[];
   },
 ) {
   const importance = computeImportance(data.category, data.content);
 
-  // Upsert: if same userId + key exists, update
+  // Upsert: if same userId + agentRole + key exists, update
+  const agentRoleCondition = data.agentRole
+    ? eq(memories.agentRole, data.agentRole as (typeof memories.agentRole.enumValues)[number])
+    : isNull(memories.agentRole);
+
   const existing = await db
     .select()
     .from(memories)
-    .where(and(eq(memories.userId, data.userId), eq(memories.key, data.key)))
+    .where(and(eq(memories.userId, data.userId), agentRoleCondition, eq(memories.key, data.key)))
     .limit(1);
 
   if (existing.length > 0) {
@@ -499,14 +504,24 @@ export async function saveMemory(
     return updated;
   }
 
-  const [created] = await db.insert(memories).values({ ...data, importance }).returning();
+  const { agentRole: rawRole, ...rest } = data;
+  const [created] = await db
+    .insert(memories)
+    .values({
+      ...rest,
+      importance,
+      ...(rawRole
+        ? { agentRole: rawRole as (typeof memories.agentRole.enumValues)[number] }
+        : {}),
+    })
+    .returning();
   return created;
 }
 
 export async function recallMemories(
   db: Db,
   userId: string,
-  options?: { category?: string; query?: string; limit?: number },
+  options?: { category?: string; query?: string; limit?: number; agentRole?: string; scope?: "own" | "all" },
 ) {
   const limit = options?.limit ?? 20;
   const conditions = [eq(memories.userId, userId)];
@@ -518,6 +533,16 @@ export async function recallMemories(
   if (options?.query) {
     conditions.push(
       or(ilike(memories.key, `%${options.query}%`), ilike(memories.content, `%${options.query}%`))!,
+    );
+  }
+
+  // Agent-scoped filtering: "own" shows agent's memories + shared (null role)
+  if (options?.agentRole && options?.scope !== "all") {
+    conditions.push(
+      or(
+        eq(memories.agentRole, options.agentRole as (typeof memories.agentRole.enumValues)[number]),
+        isNull(memories.agentRole),
+      )!,
     );
   }
 
@@ -534,13 +559,17 @@ export async function searchMemoriesByVector(
   embedding: number[],
   userId: string,
   limit = 10,
+  agentRole?: string,
 ) {
   const vectorLiteral = `[${embedding.join(",")}]`;
+  const agentFilter = agentRole
+    ? sql`AND (agent_role = ${agentRole} OR agent_role IS NULL)`
+    : sql``;
   const rows = await db.execute(
-    sql`SELECT id, user_id, category, key, content, source, metadata, created_at, updated_at,
+    sql`SELECT id, user_id, category, key, content, source, agent_role, metadata, created_at, updated_at,
                embedding <=> ${vectorLiteral}::vector AS distance
         FROM memories
-        WHERE user_id = ${userId} AND embedding IS NOT NULL
+        WHERE user_id = ${userId} AND embedding IS NOT NULL ${agentFilter}
         ORDER BY distance ASC
         LIMIT ${limit}`,
   );
@@ -551,6 +580,7 @@ export async function searchMemoriesByVector(
     key: string;
     content: string;
     source: string | null;
+    agent_role: string | null;
     metadata: unknown;
     created_at: Date;
     updated_at: Date;
@@ -2124,6 +2154,15 @@ export async function findAdminByEmail(db: Db, email: string) {
   return rows[0] ?? undefined;
 }
 
+export async function findAdminById(db: Db, id: string) {
+  const rows = await db
+    .select()
+    .from(adminUsers)
+    .where(eq(adminUsers.id, id))
+    .limit(1);
+  return rows[0] ?? undefined;
+}
+
 export async function createAdminUser(
   db: Db,
   data: { email: string; passwordHash: string | null },
@@ -2602,7 +2641,56 @@ export async function deleteOldUserActions(db: Db, olderThan: Date) {
   return result.length;
 }
 
+export async function getDistinctActionUserIds(db: Db, since: Date) {
+  const rows = await db
+    .selectDistinct({ userId: userActions.userId })
+    .from(userActions)
+    .where(
+      and(
+        sql`${userActions.createdAt} >= ${since}`,
+        sql`${userActions.userId} IS NOT NULL`,
+      ),
+    );
+  return rows.map((r) => r.userId!);
+}
+
+export async function getUserActionsForAnalysis(
+  db: Db,
+  userId: string,
+  since: Date,
+) {
+  return db
+    .select()
+    .from(userActions)
+    .where(
+      and(
+        eq(userActions.userId, userId),
+        sql`${userActions.createdAt} >= ${since}`,
+      ),
+    )
+    .orderBy(asc(userActions.createdAt));
+}
+
 /* ────────────────── User Patterns ─────────────── */
+
+export async function deactivateLowConfidencePatterns(
+  db: Db,
+  threshold = 15,
+  minHits = 5,
+) {
+  const result = await db
+    .update(userPatterns)
+    .set({ isActive: false, updatedAt: new Date() })
+    .where(
+      and(
+        eq(userPatterns.isActive, true),
+        lte(userPatterns.confidence, threshold),
+        sql`${userPatterns.hitCount} >= ${minHits}`,
+      ),
+    )
+    .returning({ id: userPatterns.id });
+  return result.length;
+}
 
 export async function upsertUserPattern(
   db: Db,
@@ -2663,7 +2751,7 @@ export async function getActiveUserPatterns(db: Db, userId: string) {
     .from(userPatterns)
     .where(
       and(
-        eq(userPatterns.userId, userId),
+        or(eq(userPatterns.userId, userId), isNull(userPatterns.userId)),
         eq(userPatterns.isActive, true),
         or(
           isNull(userPatterns.expiresAt),
@@ -2709,6 +2797,18 @@ export async function incrementPatternAcceptCount(db: Db, patternId: string) {
     .update(userPatterns)
     .set({
       acceptCount: sql`${userPatterns.acceptCount} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(eq(userPatterns.id, patternId))
+    .returning();
+  return updated;
+}
+
+export async function incrementPatternHitCount(db: Db, patternId: string) {
+  const [updated] = await db
+    .update(userPatterns)
+    .set({
+      hitCount: sql`${userPatterns.hitCount} + 1`,
       updatedAt: new Date(),
     })
     .where(eq(userPatterns.id, patternId))
@@ -2825,33 +2925,6 @@ export async function adjustPatternConfidence(db: Db, patternId: string, delta: 
   return updated;
 }
 
-export async function deactivateLowConfidencePatterns(db: Db, threshold = 10, minHits = 5) {
-  const result = await db
-    .update(userPatterns)
-    .set({ isActive: false, updatedAt: new Date() })
-    .where(
-      and(
-        eq(userPatterns.isActive, true),
-        sql`${userPatterns.confidence} <= ${threshold}`,
-        sql`${userPatterns.hitCount} >= ${minHits}`,
-      ),
-    )
-    .returning({ id: userPatterns.id });
-  return result.length;
-}
-
-export async function incrementPatternHitCount(db: Db, patternId: string) {
-  const [updated] = await db
-    .update(userPatterns)
-    .set({
-      hitCount: sql`${userPatterns.hitCount} + 1`,
-      updatedAt: new Date(),
-    })
-    .where(eq(userPatterns.id, patternId))
-    .returning();
-  return updated;
-}
-
 export async function getPatternAnalytics(db: Db, userId?: string) {
   const conditions = [];
   if (userId) conditions.push(eq(userPatterns.userId, userId));
@@ -2889,6 +2962,20 @@ export async function getPatternAnalytics(db: Db, userId?: string) {
     patterns,
   };
 }
+
+export async function getActionHeatmap(db: Db, userId?: string) {
+  const conditions = userId ? sql`WHERE user_id = ${userId}` : sql``;
+
+  const rows = await db.execute(
+    sql`SELECT day_of_week, hour_of_day, COUNT(*)::int AS count
+        FROM user_actions ${conditions}
+        GROUP BY day_of_week, hour_of_day
+        ORDER BY day_of_week, hour_of_day`,
+  );
+
+  return rows as unknown as Array<{ day_of_week: number; hour_of_day: number; count: number }>;
+}
+
 
 /* ────────────────── Deployments ─────────────── */
 
@@ -3053,45 +3140,31 @@ export async function upsertDeployCircuitBreaker(
   db: Db,
   data: {
     isPaused: boolean;
-    pausedAt: Date | null;
-    pausedReason: string | null;
+    pausedAt?: Date | null;
+    pausedReason?: string | null;
     failureCount: number;
-    failureWindowStart: Date | null;
+    failureWindowStart?: Date | null;
+    resumedAt?: Date | null;
+    resumedBy?: string | null;
   },
 ) {
   const existing = await getDeployCircuitBreaker(db);
   if (existing) {
     const [row] = await db
       .update(deployCircuitBreaker)
-      .set({
-        isPaused: data.isPaused,
-        pausedAt: data.pausedAt,
-        pausedReason: data.pausedReason,
-        failureCount: data.failureCount,
-        failureWindowStart: data.failureWindowStart,
-        updatedAt: new Date(),
-      })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(deployCircuitBreaker.id, existing.id))
       .returning();
     return row;
   }
-  const [row] = await db
-    .insert(deployCircuitBreaker)
-    .values({
-      isPaused: data.isPaused,
-      pausedAt: data.pausedAt,
-      pausedReason: data.pausedReason,
-      failureCount: data.failureCount,
-      failureWindowStart: data.failureWindowStart,
-    })
-    .returning();
+  const [row] = await db.insert(deployCircuitBreaker).values(data).returning();
   return row;
 }
 
 export async function resetCircuitBreaker(db: Db, resumedBy?: string) {
   const existing = await getDeployCircuitBreaker(db);
-  if (!existing) return;
-  await db
+  if (!existing) return null;
+  const [row] = await db
     .update(deployCircuitBreaker)
     .set({
       isPaused: false,
@@ -3103,21 +3176,44 @@ export async function resetCircuitBreaker(db: Db, resumedBy?: string) {
       resumedBy: resumedBy ?? null,
       updatedAt: new Date(),
     })
-    .where(eq(deployCircuitBreaker.id, existing.id));
+    .where(eq(deployCircuitBreaker.id, existing.id))
+    .returning();
+  return row;
 }
 
 export async function getRecentFailedDeployments(db: Db, windowHours: number) {
   const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
-  return db
+  const rows = await db
     .select()
     .from(deployments)
     .where(
       and(
-        eq(deployments.status, "failed"),
-        sql`${deployments.startedAt} >= ${since.toISOString()}`,
+        or(eq(deployments.status, "failed"), eq(deployments.status, "rolled_back")),
+        sql`${deployments.startedAt} >= ${since}`,
       ),
     )
     .orderBy(desc(deployments.startedAt));
+  return rows;
+}
+
+export async function updateDeploymentSoakStatus(
+  db: Db,
+  id: string,
+  data: {
+    soakStatus?: string;
+    soakStartedAt?: Date;
+    soakCompletedAt?: Date;
+    soakMetrics?: unknown;
+    remediationActions?: unknown;
+    gitDiffSummary?: string;
+  },
+) {
+  const [row] = await db
+    .update(deployments)
+    .set(data)
+    .where(eq(deployments.id, id))
+    .returning();
+  return row;
 }
 
 /* ────────────────── Session Engagement ─────────────── */
@@ -3126,28 +3222,21 @@ export async function upsertSessionEngagement(
   db: Db,
   data: {
     id?: string;
-    userId: string;
+    userId?: string;
     sessionStart?: Date;
     messageCount: number;
     avgMessageLength: number;
     avgResponseIntervalMs: number;
     complexityScore: number;
     energyLevel: string;
-    lastMessageAt: Date;
+    lastMessageAt?: Date;
+    metadata?: Record<string, unknown>;
   },
 ) {
   if (data.id) {
     const [row] = await db
       .update(sessionEngagement)
-      .set({
-        messageCount: data.messageCount,
-        avgMessageLength: data.avgMessageLength,
-        avgResponseIntervalMs: data.avgResponseIntervalMs,
-        complexityScore: data.complexityScore,
-        energyLevel: data.energyLevel,
-        lastMessageAt: data.lastMessageAt,
-        updatedAt: new Date(),
-      })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(sessionEngagement.id, data.id))
       .returning();
     return row;
@@ -3163,6 +3252,7 @@ export async function upsertSessionEngagement(
       complexityScore: data.complexityScore,
       energyLevel: data.energyLevel,
       lastMessageAt: data.lastMessageAt,
+      metadata: data.metadata,
     })
     .returning();
   return row;
@@ -3190,10 +3280,21 @@ export async function getUserTimezone(db: Db, userId: string) {
 }
 
 export async function setUserTimezone(db: Db, userId: string, timezone: string) {
-  await db
+  const [row] = await db
     .update(users)
     .set({ timezone })
-    .where(eq(users.id, userId));
+    .where(eq(users.id, userId))
+    .returning();
+  return row;
+}
+
+export async function getSessionEngagementHistory(db: Db, userId: string, limit = 10) {
+  return db
+    .select()
+    .from(sessionEngagement)
+    .where(eq(sessionEngagement.userId, userId))
+    .orderBy(desc(sessionEngagement.sessionStart))
+    .limit(limit);
 }
 
 /* ────────────────── Journal Entries ─────────────────────── */

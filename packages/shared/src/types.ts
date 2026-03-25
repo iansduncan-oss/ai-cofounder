@@ -26,7 +26,7 @@ export interface Conversation {
 export type GoalStatus = "draft" | "proposed" | "active" | "completed" | "cancelled" | "needs_review";
 export type GoalScope = "read_only" | "local" | "external" | "destructive";
 export type GoalPriority = "low" | "medium" | "high" | "critical";
-export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "pending" | "assigned" | "running" | "completed" | "failed" | "cancelled" | "blocked";
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export interface Goal {
@@ -53,6 +53,7 @@ export interface Task {
   assignedAgent?: AgentRole;
   orderIndex: number;
   parallelGroup?: number | null;
+  dependsOn?: string[] | null;
   input?: string;
   output?: string;
   error?: string;

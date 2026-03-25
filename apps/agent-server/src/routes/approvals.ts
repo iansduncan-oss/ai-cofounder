@@ -23,6 +23,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["approvals"], body: CreateApprovalBody } },
     async (request, reply) => {
       const approval = await createApproval(app.db, request.body);
+      app.wsBroadcast?.("approvals");
       notifyApprovalCreated({
         approvalId: approval.id,
         taskId: request.body.taskId,
@@ -79,6 +80,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
         request.body.decidedBy,
       );
       if (!approval) return reply.status(404).send({ error: "Approval not found" });
+      app.wsBroadcast?.("approvals");
       recordActionSafe(app.db, {
         userId: request.body.decidedBy,
         actionType: "approval_submitted",

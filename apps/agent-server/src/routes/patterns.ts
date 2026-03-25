@@ -6,6 +6,7 @@ import {
   createPattern,
   updatePattern,
   getPatternAnalytics,
+  getActionHeatmap,
 } from "@ai-cofounder/db";
 import {
   PatternListQuery,
@@ -30,12 +31,17 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 
-  /* GET /analytics — pattern analytics & heatmap data */
+  /* GET /analytics — pattern analytics + action heatmap */
   app.get<{ Querystring: { userId?: string } }>(
     "/analytics",
-    { schema: { tags: ["patterns"] } },
+    { schema: { tags: ["patterns"], querystring: { type: "object", properties: { userId: { type: "string" } } } } },
     async (request) => {
-      return getPatternAnalytics(app.db, request.query.userId);
+      const userId = request.query.userId;
+      const [analytics, heatmap] = await Promise.all([
+        getPatternAnalytics(app.db, userId),
+        getActionHeatmap(app.db, userId),
+      ]);
+      return { ...analytics, heatmap };
     },
   );
 
@@ -44,7 +50,14 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
     "/",
     { schema: { tags: ["patterns"], body: CreatePatternBody } },
     async (request, reply) => {
-      const pattern = await createPattern(app.db, request.body);
+      const pattern = await createPattern(app.db, {
+        userId: request.body.userId,
+        patternType: request.body.patternType,
+        description: request.body.description,
+        suggestedAction: request.body.suggestedAction,
+        triggerCondition: request.body.triggerCondition ?? {},
+        confidence: request.body.confidence,
+      });
       app.agentEvents?.emit("ws:pattern_change");
       return reply.status(201).send(pattern);
     },

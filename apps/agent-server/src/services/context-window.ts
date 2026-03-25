@@ -40,6 +40,11 @@ export interface PreparedHistory {
   estimatedTokens: number;
 }
 
+interface SummarizationResult {
+  messages: AgentMessage[];
+  didSummarize: boolean;
+}
+
 /**
  * ContextWindowManager
  *
@@ -103,17 +108,18 @@ export class ContextWindowManager {
     }
 
     // Try to use cached summary or create a new one
-    const summarized = await this.applySummarization(
+    const result = await this.applySummarization(
       conversationId,
       history,
       totalDbMessages,
+      !!clientHistory,
     );
 
     return {
-      messages: summarized,
-      wasSummarized: true,
+      messages: result.messages,
+      wasSummarized: result.didSummarize,
       totalDbMessages,
-      estimatedTokens: this.estimateTokens(summarized),
+      estimatedTokens: this.estimateTokens(result.messages),
     };
   }
 
@@ -124,29 +130,35 @@ export class ContextWindowManager {
     conversationId: string,
     history: AgentMessage[],
     totalDbMessages: number,
-  ): Promise<AgentMessage[]> {
+    hasClientHistory: boolean,
+  ): Promise<SummarizationResult> {
     const existingSummary = await getLatestConversationSummary(this.db, conversationId);
     const isStale =
       !existingSummary ||
-      existingSummary.messageCount < totalDbMessages - this.config.staleSummaryDelta;
+      existingSummary.messageCount <= totalDbMessages - this.config.staleSummaryDelta;
 
     let summaryText: string;
 
     if (isStale) {
-      // Fetch older messages beyond the recent window for summarization
+      // When client provides history, we don't know its DB offset — use recentMessageCount
+      // When we loaded from DB ourselves, offset matches dbFetchLimit
+      const offset = hasClientHistory
+        ? this.config.recentMessageCount
+        : this.config.dbFetchLimit;
+
       const olderMessages = await getConversationMessages(
         this.db,
         conversationId,
         this.config.dbFetchLimit,
-        this.config.dbFetchLimit,
+        offset,
       );
 
       if (olderMessages.length === 0) {
-        // No older messages to summarize — just return history as-is
+        // No older messages to summarize
         if (existingSummary) {
-          return this.prependSummary(existingSummary.summary, history);
+          return { messages: this.prependSummary(existingSummary.summary, history), didSummarize: true };
         }
-        return history;
+        return { messages: history, didSummarize: false };
       }
 
       const olderFormatted = olderMessages.reverse().map((m) => ({
@@ -163,8 +175,8 @@ export class ContextWindowManager {
         conversationId,
         summary: summaryText,
         messageCount: totalDbMessages,
-        fromMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
-        toMessageCreatedAt: olderMessages[0]?.createdAt,
+        fromMessageCreatedAt: olderMessages[0]?.createdAt,
+        toMessageCreatedAt: olderMessages[olderMessages.length - 1]?.createdAt,
       });
 
       logger.info(
@@ -176,7 +188,7 @@ export class ContextWindowManager {
       logger.debug({ conversationId }, "using cached conversation summary");
     }
 
-    return this.prependSummary(summaryText, history);
+    return { messages: this.prependSummary(summaryText, history), didSummarize: true };
   }
 
   /**

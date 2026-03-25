@@ -92,6 +92,13 @@ interface ProviderStats {
   lastErrorAt?: Date;
 }
 
+export interface RoutingOptions {
+  /** 0-1 weight for cost vs quality. 0 = pure quality (default), 1 = cheapest first */
+  costWeight?: number;
+  /** Exclude models with estimated cost above this (microdollars, assumes 1K in + 500 out) */
+  maxCostMicrodollars?: number;
+}
+
 /**
  * Task-based model routing with fallback chains.
  *
@@ -240,6 +247,47 @@ export class LlmRegistry {
     return MODEL_COSTS[model];
   }
 
+  /** Estimate request cost in microdollars for a given model and token counts */
+  estimateRequestCost(model: string, inputTokens = 1000, outputTokens = 500): number {
+    return this.estimateCost(model, inputTokens, outputTokens);
+  }
+
+  /** Score a route for cost-aware ranking */
+  private scoreRoute(
+    route: ModelRoute,
+    routeIndex: number,
+    chain: ModelRoute[],
+    options: RoutingOptions,
+  ): number {
+    const costWeight = options.costWeight ?? 0;
+    const chainLength = chain.length;
+
+    // Quality score: first in chain = highest quality
+    const qualityScore = 1 - (routeIndex / Math.max(chainLength, 1));
+
+    // Cost score: estimate cost for a typical request (1K in, 500 out)
+    const routeCost = this.estimateRequestCost(route.model);
+    const maxCostInChain = Math.max(
+      1,
+      ...chain.map((r) => this.estimateRequestCost(r.model)),
+    );
+    const costScore = 1 - (routeCost / maxCostInChain);
+
+    // Error penalty: penalize unreliable providers
+    const stats = this.stats.get(route.provider);
+    const errorPenalty = stats
+      ? (stats.errorCount / Math.max(stats.totalRequests, 1)) * 0.3
+      : 0;
+
+    // Latency penalty: light penalty for slow providers
+    const avgLatency = stats && stats.successCount > 0
+      ? stats.totalLatencyMs / stats.successCount
+      : 0;
+    const latencyPenalty = Math.min(avgLatency / 10_000, 0.2);
+
+    return (1 - costWeight) * qualityScore + costWeight * costScore - errorPenalty - latencyPenalty;
+  }
+
   /** Get cumulative session cost in microdollars */
   getTotalCost(): number {
     return this.totalCostMicrodollars;
@@ -303,8 +351,27 @@ export class LlmRegistry {
   async complete(
     task: TaskCategory,
     request: Omit<LlmCompletionRequest, "model">,
+    routingOptions?: RoutingOptions,
   ): Promise<LlmCompletionResponse & { provider: string; costMicrodollars: number }> {
-    const chain = this.routes[task];
+    let chain = [...this.routes[task]];
+
+    // Apply cost-aware scoring if costWeight > 0
+    const costWeight = routingOptions?.costWeight ?? 0;
+    if (costWeight > 0) {
+      const scored = chain.map((route, idx) => ({
+        route,
+        score: this.scoreRoute(route, idx, chain, routingOptions!),
+      }));
+      scored.sort((a, b) => b.score - a.score);
+      chain = scored.map((s) => s.route);
+    }
+
+    // Filter by maxCostMicrodollars if set
+    if (routingOptions?.maxCostMicrodollars != null) {
+      const maxCost = routingOptions.maxCostMicrodollars;
+      chain = chain.filter((route) => this.estimateRequestCost(route.model) <= maxCost);
+    }
+
     const errors: Array<{ provider: string; model: string; error: unknown }> = [];
 
     for (const route of chain) {

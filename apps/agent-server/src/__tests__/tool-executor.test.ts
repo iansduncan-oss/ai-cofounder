@@ -194,6 +194,26 @@ describe("executeSharedTool", () => {
       expect(result).toEqual({ saved: true, key: "test", category: "projects" });
     });
 
+    it("passes agentRole when present in context", async () => {
+      await executeSharedTool(
+        {
+          type: "tool_use",
+          id: "tu-1",
+          name: "save_memory",
+          input: { category: "projects", key: "test", content: "test" },
+        },
+        { db },
+        { conversationId: "conv-1", userId: "user-1", agentRole: "coder" },
+      );
+
+      expect(mockSaveMemory).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({
+          agentRole: "coder",
+        }),
+      );
+    });
+
     it("returns error when userId is missing", async () => {
       const result = await executeSharedTool(
         {
@@ -222,8 +242,28 @@ describe("executeSharedTool", () => {
         context,
       );
 
-      expect(mockRecallMemories).toHaveBeenCalledWith(db, "user-1", {});
+      expect(mockRecallMemories).toHaveBeenCalledWith(
+        db,
+        "user-1",
+        expect.objectContaining({ agentRole: undefined }),
+      );
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it("passes agentRole and scope to recallMemories", async () => {
+      mockRecallMemories.mockResolvedValueOnce([]);
+
+      await executeSharedTool(
+        { type: "tool_use", id: "tu-1", name: "recall_memories", input: { scope: "all" } },
+        { db },
+        { conversationId: "conv-1", userId: "user-1", agentRole: "researcher" },
+      );
+
+      expect(mockRecallMemories).toHaveBeenCalledWith(
+        db,
+        "user-1",
+        expect.objectContaining({ agentRole: "researcher", scope: "all" }),
+      );
     });
   });
 

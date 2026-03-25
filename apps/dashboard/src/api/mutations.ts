@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, SubagentRunStatus, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -281,37 +281,6 @@ export function useDeletePersona() {
   });
 }
 
-export function useTogglePattern() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      apiClient.togglePattern(id, isActive),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
-      toast.success("Pattern updated");
-    },
-    onError: (err) => {
-      toast.error(`Failed to toggle pattern: ${err.message}`);
-    },
-  });
-}
-
-export function useDeletePattern() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: string) => apiClient.deletePattern(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
-      toast.success("Pattern deleted");
-    },
-    onError: (err) => {
-      toast.error(`Failed to delete pattern: ${err.message}`);
-    },
-  });
-}
-
 export function useCreatePattern() {
   const queryClient = useQueryClient();
 
@@ -320,9 +289,9 @@ export function useCreatePattern() {
       patternType: string;
       description: string;
       suggestedAction: string;
-      userId?: string;
       triggerCondition?: Record<string, unknown>;
       confidence?: number;
+      userId?: string;
     }) => apiClient.createPattern(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
@@ -355,6 +324,37 @@ export function useUpdatePattern() {
     },
     onError: (err) => {
       toast.error(`Failed to update pattern: ${err.message}`);
+    },
+  });
+}
+
+export function useTogglePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      apiClient.togglePattern(id, isActive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern updated");
+    },
+    onError: (err) => {
+      toast.error(`Failed to toggle pattern: ${err.message}`);
+    },
+  });
+}
+
+export function useDeletePattern() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deletePattern(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.patterns.all });
+      toast.success("Pattern deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete pattern: ${err.message}`);
     },
   });
 }
@@ -540,7 +540,7 @@ export function useRespondToCalendarEvent() {
   });
 }
 
-/* ── Follow-Ups ── */
+/* -- Follow-Ups -- */
 
 export function useCreateFollowUp() {
   const queryClient = useQueryClient();

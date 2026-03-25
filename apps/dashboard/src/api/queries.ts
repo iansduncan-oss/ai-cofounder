@@ -7,7 +7,6 @@ export function useHealth() {
   return useQuery({
     queryKey: queryKeys.health.status,
     queryFn: () => apiClient.health(),
-    refetchInterval: 60_000,
   });
 }
 
@@ -15,7 +14,6 @@ export function useProviderHealth() {
   return useQuery({
     queryKey: queryKeys.health.providers,
     queryFn: () => apiClient.providerHealth(),
-    refetchInterval: 60_000,
   });
 }
 
@@ -55,7 +53,6 @@ export function usePendingTasks() {
   return useQuery({
     queryKey: queryKeys.tasks.pending,
     queryFn: () => apiClient.listPendingTasks(),
-    refetchInterval: 30_000,
   });
 }
 
@@ -63,7 +60,6 @@ export function usePendingApprovals() {
   return useQuery({
     queryKey: queryKeys.approvals.pending,
     queryFn: () => apiClient.listPendingApprovals(),
-    refetchInterval: 30_000,
   });
 }
 
@@ -180,7 +176,6 @@ export function useMonitoringStatus() {
   return useQuery({
     queryKey: queryKeys.monitoring.status,
     queryFn: () => apiClient.getMonitoringStatus(),
-    refetchInterval: 60_000,
   });
 }
 
@@ -188,7 +183,6 @@ export function useQueueStatus() {
   return useQuery({
     queryKey: queryKeys.queue.status,
     queryFn: () => apiClient.getQueueStatus(),
-    refetchInterval: 30_000,
   });
 }
 
@@ -203,7 +197,6 @@ export function useToolStats() {
   return useQuery({
     queryKey: queryKeys.tools.stats,
     queryFn: () => apiClient.getToolStats(),
-    refetchInterval: 60_000,
   });
 }
 
@@ -226,7 +219,6 @@ export function useListPipelines() {
   return useQuery({
     queryKey: queryKeys.pipelines.list,
     queryFn: () => apiClient.listPipelines(),
-    refetchInterval: 10_000,
   });
 }
 
@@ -254,6 +246,13 @@ export function usePatterns(userId?: string, includeInactive?: boolean) {
   return useQuery({
     queryKey: queryKeys.patterns.list(userId),
     queryFn: () => apiClient.listPatterns(userId, includeInactive),
+  });
+}
+
+export function usePatternAnalytics(userId?: string) {
+  return useQuery({
+    queryKey: queryKeys.patterns.analytics(userId),
+    queryFn: () => apiClient.getPatternAnalytics(userId),
   });
 }
 
@@ -445,5 +444,19 @@ export function useGlobalSearch(q: string) {
     enabled: q.length >= 2,
     staleTime: 30_000,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useLatestDeployment() {
+  return useQuery({
+    queryKey: queryKeys.deploys.latest,
+    queryFn: () => apiClient.getLatestDeployment(),
+  });
+}
+
+export function useDeployments(limit = 20) {
+  return useQuery({
+    queryKey: queryKeys.deploys.list,
+    queryFn: () => apiClient.listDeployments(limit),
   });
 }

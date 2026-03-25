@@ -85,6 +85,10 @@ export class AutonomousExecutorService {
   /**
    * Execute a goal end-to-end: run tasks, commit, optionally open a PR.
    * Returns the dispatcher progress result and a structured work log.
+   *
+   * If tokenBudget is set, throws TokenBudgetExceededError after a completed task
+   * pushes cumulative token usage over the budget. The session runner should catch
+   * this error and return an "aborted" status.
    */
   async executeGoal(opts: {
     goalId: string;
@@ -124,23 +128,22 @@ export class AutonomousExecutorService {
         output: event.output?.slice(0, 500),
       });
 
-      // Check token budget between tasks
+      await opts.onProgress?.(event);
+
+      // After a task completes, check token budget using DB cost data as source of truth
       if (event.status === "completed" && opts.tokenBudget) {
         try {
-          const cost = await getCostByGoal(this.db, opts.goalId);
-          if (cost) {
-            cumulativeTokens = cost.totalInputTokens + cost.totalOutputTokens;
-            if (cumulativeTokens > opts.tokenBudget) {
-              throw new TokenBudgetExceededError(cumulativeTokens, opts.tokenBudget, event.taskTitle);
-            }
+          const costData = await getCostByGoal(this.db, opts.goalId);
+          cumulativeTokens = (costData?.totalInputTokens ?? 0) + (costData?.totalOutputTokens ?? 0);
+          if (cumulativeTokens > opts.tokenBudget) {
+            throw new TokenBudgetExceededError(cumulativeTokens, opts.tokenBudget, event.taskTitle);
           }
         } catch (err) {
+          // Re-throw TokenBudgetExceededError, log other errors
           if (err instanceof TokenBudgetExceededError) throw err;
-          this.logger.warn({ err }, "failed to check token budget (non-fatal)");
+          this.logger.warn({ err, goalId: opts.goalId }, "failed to fetch token cost for budget check");
         }
       }
-
-      await opts.onProgress?.(event);
     });
 
     this.logger.info({ goalId: opts.goalId, status: progress.status, completedTasks: progress.completedTasks }, "goal execution finished");
@@ -150,10 +153,13 @@ export class AutonomousExecutorService {
       await this.commitAndOptionalPr(opts, progress, actions);
     }
 
-    // 4. Fetch cost summary
+    // 4. Fetch final cost summary (also updates cumulativeTokens for accurate tokensUsed return)
     let costSummary: { totalCostUsd: number; totalInputTokens: number; totalOutputTokens: number; requestCount: number } | undefined;
     try {
       costSummary = await getCostByGoal(this.db, opts.goalId);
+      if (costSummary) {
+        cumulativeTokens = costSummary.totalInputTokens + costSummary.totalOutputTokens;
+      }
     } catch (err) {
       this.logger.warn({ err, goalId: opts.goalId }, "failed to fetch cost summary");
     }

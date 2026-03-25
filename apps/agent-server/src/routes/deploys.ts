@@ -106,6 +106,7 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
           logger.debug("deploy verification queue not available");
         }
 
+        app.agentEvents?.emit("ws:deploy_change");
         return reply.code(201).send({ id: deployment.id, status: "started" });
       }
 
@@ -116,6 +117,7 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
         }
         await updateDeploymentStatus(db, existing.id, { status: "verifying" });
         logger.info({ deploymentId: existing.id }, "deploy completed, verifying");
+        app.agentEvents?.emit("ws:deploy_change");
         return { id: existing.id, status: "verifying" };
       }
 
@@ -151,6 +153,7 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
           logger.debug("deploy verification queue not available");
         }
 
+        app.agentEvents?.emit("ws:deploy_change");
         return { id: existing.id, status: "failed" };
       }
 
@@ -211,7 +214,62 @@ export async function deployRoutes(app: FastifyInstance): Promise<void> {
     }
     const body = request.body as { resumedBy?: string } | undefined;
     await app.deployCircuitBreakerService.resume(body?.resumedBy ?? "dashboard");
-    app.agentEvents?.emit("ws:deploys");
+    app.agentEvents?.emit("ws:deploy_change");
     return { status: "resumed" };
+  });
+
+  // POST /api/deploys/:id/rollback — manual rollback trigger
+  app.post("/:id/rollback", { schema: { tags: ["deploys"] } }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { previousSha: string } | undefined;
+    if (!body?.previousSha) {
+      return reply.code(400).send({ error: "previousSha is required" });
+    }
+
+    const { DeployHealthService } = await import("../services/deploy-health.js");
+    const deployHealthService = new DeployHealthService(
+      app.db,
+      app.llmRegistry,
+      app.notificationService,
+      app.monitoringService,
+      app.deployCircuitBreakerService,
+    );
+
+    try {
+      await deployHealthService.executeRollback(body.previousSha);
+      await updateDeploymentStatus(app.db, id, {
+        status: "rolled_back",
+        rolledBack: true,
+        rollbackSha: body.previousSha,
+        completedAt: new Date(),
+      });
+      app.agentEvents?.emit("ws:deploy_change");
+      return { status: "rolled_back", rollbackSha: body.previousSha };
+    } catch (err) {
+      logger.error({ err, id }, "manual rollback failed");
+      return reply.code(500).send({
+        error: `Rollback failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    }
+  });
+
+  // POST /api/deploys/:id/remediate — trigger remediation action
+  app.post("/:id/remediate", { schema: { tags: ["deploys"] } }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { action?: "restart_containers" | "clear_cache" } | undefined;
+    const action = body?.action ?? "restart_containers";
+
+    const { DeployHealthService } = await import("../services/deploy-health.js");
+    const deployHealthService = new DeployHealthService(
+      app.db,
+      app.llmRegistry,
+      app.notificationService,
+      app.monitoringService,
+      app.deployCircuitBreakerService,
+    );
+
+    const result = await deployHealthService.executeRemediation(action, id);
+    app.agentEvents?.emit("ws:deploy_change");
+    return result;
   });
 }

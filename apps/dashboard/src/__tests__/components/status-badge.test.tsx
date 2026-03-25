@@ -26,6 +26,7 @@ describe("TaskStatusBadge", () => {
     ["completed", "Completed"],
     ["failed", "Failed"],
     ["cancelled", "Cancelled"],
+    ["blocked", "Blocked"],
   ] as const)("renders %s as %s", (status, label) => {
     renderWithProviders(<TaskStatusBadge status={status} />);
     expect(screen.getByText(label)).toBeInTheDocument();

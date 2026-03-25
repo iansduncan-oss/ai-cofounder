@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { findAdminByEmail, createAdminUser, upsertGoogleToken, upsertAppSetting } from "@ai-cofounder/db";
+import { findAdminByEmail, findAdminById, createAdminUser, upsertGoogleToken, upsertAppSetting } from "@ai-cofounder/db";
 import { optionalEnv, createLogger } from "@ai-cofounder/shared";
 import { encryptToken, isEncryptionConfigured } from "../services/crypto.js";
 import { getGoogleConnectionStatus, disconnectGoogle } from "../services/google-auth.js";
@@ -92,14 +92,37 @@ export async function authRoutes(app: FastifyInstance) {
       const payload = app.jwt.verify(refreshToken) as Record<string, unknown>;
 
       if (payload.type !== "refresh") {
-        reply.clearCookie("refreshToken");
+        reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
         return reply.status(401).send({ error: "Invalid refresh token" });
       }
 
-      const accessToken = await reply.jwtSign({ sub: payload.sub });
+      // Verify user still exists (reject deleted users)
+      const admin = await findAdminById(app.db, payload.sub as string);
+      if (!admin) {
+        reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+        return reply.status(401).send({ error: "User not found" });
+      }
+
+      // Sign access token with email claim
+      const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
+
+      // Rotate refresh token — issue new one on each refresh
+      const newRefreshToken = app.jwt.sign(
+        { sub: admin.id, type: "refresh" },
+        { expiresIn: "7d" },
+      );
+
+      reply.setCookie("refreshToken", newRefreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "strict",
+        path: "/api/auth/refresh",
+        maxAge: 7 * 24 * 60 * 60,
+      });
+
       return reply.status(200).send({ accessToken });
     } catch {
-      reply.clearCookie("refreshToken");
+      reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
       return reply.status(401).send({ error: "Invalid or expired refresh token" });
     }
   });

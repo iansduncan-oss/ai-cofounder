@@ -16,6 +16,7 @@ import {
   createGoal,
   createTask,
   updateGoalStatus,
+  updateTaskDependencies,
   saveMemory,
   recallMemories,
   searchMemoriesByVector,
@@ -29,9 +30,9 @@ import {
   createMilestone,
   touchMemory,
   recordToolExecution,
-  updateTaskDependencies,
   getConversation,
   saveThinkingTrace,
+  recordLlmUsage,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
@@ -115,6 +116,7 @@ export interface PlanResult {
     assignedAgent: AgentRole;
     orderIndex: number;
     parallelGroup?: number | null;
+    dependsOn?: string[] | null;
   }>;
 }
 
@@ -185,7 +187,8 @@ const CREATE_PLAN_TOOL: LlmTool = {
               items: { type: "integer" },
               description:
                 "Optional array of zero-based task indices that must complete before this task runs. " +
-                "Enables DAG-based parallel execution. Prefer this over parallel_group for complex dependencies.",
+                "Enables DAG-based parallel execution. Tasks with no dependencies run as soon as possible " +
+                "(up to concurrency limit). Prefer this over parallel_group for complex dependencies.",
             },
           },
           required: ["title", "description", "assigned_agent"],
@@ -749,6 +752,23 @@ export class Orchestrator {
         "orchestrator run completed",
       );
 
+      // Record LLM usage for the orchestrator's own calls
+      if (this.db) {
+        try {
+          await recordLlmUsage(this.db, {
+            provider: providerName,
+            model: response.model,
+            taskCategory: this.taskCategory,
+            agentRole: "orchestrator",
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            conversationId: id,
+          });
+        } catch (usageErr) {
+          this.logger.warn({ err: usageErr }, "failed to record orchestrator LLM usage");
+        }
+      }
+
       return {
         conversationId: id,
         agentRole: "orchestrator",
@@ -961,6 +981,23 @@ export class Orchestrator {
         await onEvent({ type: "text_delta", data: { text: responseText.slice(i, i + CHUNK_SIZE) } });
       }
       await onEvent({ type: "done", data: { response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens } } });
+
+      // Record LLM usage for the orchestrator's streaming calls
+      if (this.db) {
+        try {
+          await recordLlmUsage(this.db, {
+            provider: providerName,
+            model: response.model,
+            taskCategory: this.taskCategory,
+            agentRole: "orchestrator",
+            inputTokens: totalInputTokens,
+            outputTokens: totalOutputTokens,
+            conversationId: id,
+          });
+        } catch (usageErr) {
+          this.logger.warn({ err: usageErr }, "failed to record orchestrator LLM usage");
+        }
+      }
 
       return { conversationId: id, agentRole: "orchestrator", response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }, plan };
     } catch (err) {
@@ -1248,7 +1285,7 @@ export class Orchestrator {
   private async persistPlan(conversationId: string, input: CreatePlanInput, userId?: string): Promise<PlanResult> {
     const db = this.db!;
 
-    // Validate dependency graph before creating anything
+    // Validate dependency graph before creating anything (cycle detection)
     const hasDeps = input.tasks.some((t) => t.depends_on && t.depends_on.length > 0);
     if (hasDeps) {
       validateDependencyGraph(input.tasks);
@@ -1257,6 +1294,7 @@ export class Orchestrator {
     // Classify scope — server-side keyword analysis merged with optional LLM hint
     const scope = classifyGoalScope(input.tasks, input.scope);
     const requiresApproval = scopeRequiresApproval(scope);
+
 
     const goal = await createGoal(db, {
       conversationId,
@@ -1273,6 +1311,7 @@ export class Orchestrator {
     const initialStatus = requiresApproval ? "proposed" : "active";
     await updateGoalStatus(db, goal.id, initialStatus);
 
+    // Pass 1: create all tasks to get UUIDs
     const createdTasks: PlanResult["tasks"] = [];
 
     // Pass 1: create all tasks (without dependencies)
@@ -1300,10 +1339,15 @@ export class Orchestrator {
     // Pass 2: resolve index-based depends_on to UUIDs and update tasks
     if (hasDeps) {
       for (let i = 0; i < input.tasks.length; i++) {
-        const deps = input.tasks[i].depends_on;
-        if (deps && deps.length > 0) {
-          const depUuids = deps.map((idx) => createdTasks[idx].id);
-          await updateTaskDependencies(db, createdTasks[i].id, depUuids);
+        const depIndices = input.tasks[i].depends_on;
+        if (depIndices && depIndices.length > 0) {
+          const depUuids = depIndices
+            .filter((idx) => idx >= 0 && idx < createdTasks.length)
+            .map((idx) => createdTasks[idx].id);
+          if (depUuids.length > 0) {
+            await updateTaskDependencies(db, createdTasks[i].id, depUuids);
+            createdTasks[i].dependsOn = depUuids;
+          }
         }
       }
     }
@@ -1318,6 +1362,7 @@ export class Orchestrator {
       }).catch((err) => this.logger.warn({ err }, "Failed to notify goal proposed"));
     }
 
+
     return {
       goalId: goal.id,
       goalTitle: goal.title,
@@ -1325,6 +1370,48 @@ export class Orchestrator {
       requiresApproval,
       tasks: createdTasks,
     };
+  }
+
+  /** Validate that task dependencies form a DAG (no cycles) using Kahn's algorithm */
+  private validateDependencyGraph(tasks: CreatePlanInput["tasks"]): void {
+    const n = tasks.length;
+    const inDegree = new Array(n).fill(0);
+    const adjacency: number[][] = Array.from({ length: n }, () => []);
+
+    for (let i = 0; i < n; i++) {
+      const deps = tasks[i].depends_on;
+      if (!deps) continue;
+      for (const dep of deps) {
+        if (dep < 0 || dep >= n) {
+          throw new Error(`Task ${i} depends on invalid index ${dep}`);
+        }
+        if (dep === i) {
+          throw new Error(`Task ${i} depends on itself`);
+        }
+        adjacency[dep].push(i);
+        inDegree[i]++;
+      }
+    }
+
+    // Kahn's algorithm
+    const queue: number[] = [];
+    for (let i = 0; i < n; i++) {
+      if (inDegree[i] === 0) queue.push(i);
+    }
+
+    let processed = 0;
+    while (queue.length > 0) {
+      const node = queue.shift()!;
+      processed++;
+      for (const neighbor of adjacency[node]) {
+        inDegree[neighbor]--;
+        if (inDegree[neighbor] === 0) queue.push(neighbor);
+      }
+    }
+
+    if (processed < n) {
+      throw new Error("Circular dependency detected in task graph");
+    }
   }
 
   private buildPlanSummary(plan: PlanResult): string {

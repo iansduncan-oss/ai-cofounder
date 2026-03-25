@@ -165,6 +165,7 @@ export function mockDbModule() {
     getReflectionStats: vi.fn().mockResolvedValue({ total: 0 }),
     // Admin users
     findAdminByEmail: vi.fn().mockResolvedValue(null),
+    findAdminById: vi.fn().mockResolvedValue(undefined),
     createAdminUser: vi.fn().mockResolvedValue({ id: "admin-1" }),
     countAdminUsers: vi.fn().mockResolvedValue(0),
     // Subagent runs
@@ -220,11 +221,16 @@ export function mockDbModule() {
     // User actions & patterns
     recordUserAction: vi.fn().mockResolvedValue({ id: "ua-1", actionType: "chat_message" }),
     getUserActionsSince: vi.fn().mockResolvedValue([]),
+    getDistinctActionUserIds: vi.fn().mockResolvedValue([]),
+    getUserActionsForAnalysis: vi.fn().mockResolvedValue([]),
     deleteOldUserActions: vi.fn().mockResolvedValue(0),
     upsertUserPattern: vi.fn().mockResolvedValue({ id: "up-1", patternType: "time_preference" }),
     getActiveUserPatterns: vi.fn().mockResolvedValue([]),
     getTriggeredPatterns: vi.fn().mockResolvedValue([]),
     incrementPatternAcceptCount: vi.fn().mockResolvedValue({ id: "up-1" }),
+    incrementPatternHitCount: vi.fn().mockResolvedValue({ id: "up-1", hitCount: 1 }),
+    getPatternAnalytics: vi.fn().mockResolvedValue({ totalPatterns: 0, activePatterns: 0, totalHits: 0, totalAccepts: 0, overallAcceptRate: 0, avgConfidence: 0, byType: {}, patterns: [] }),
+    getActionHeatmap: vi.fn().mockResolvedValue([]),
     getRecentUserActionSummary: vi.fn().mockResolvedValue([]),
     getLastUserMessageTimestamp: vi.fn().mockResolvedValue(null),
     getRecentDecisionMemories: vi.fn().mockResolvedValue([]),
@@ -235,8 +241,6 @@ export function mockDbModule() {
     updatePattern: vi.fn().mockResolvedValue({ id: "up-1", description: "Updated" }),
     adjustPatternConfidence: vi.fn().mockResolvedValue({ id: "up-1", confidence: 55 }),
     deactivateLowConfidencePatterns: vi.fn().mockResolvedValue(0),
-    incrementPatternHitCount: vi.fn().mockResolvedValue({ id: "up-1", hitCount: 1 }),
-    getPatternAnalytics: vi.fn().mockResolvedValue({ totalPatterns: 0, activePatterns: 0, totalHits: 0, totalAccepts: 0, overallAcceptRate: 0, avgConfidence: 0, byType: {}, patterns: [] }),
     userActions: {},
     userPatterns: {},
     // Deployments
@@ -254,17 +258,19 @@ export function mockDbModule() {
     toolTierConfig: {},
     // Deploy circuit breaker
     getDeployCircuitBreaker: vi.fn().mockResolvedValue(null),
-    upsertDeployCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false }),
-    resetCircuitBreaker: vi.fn().mockResolvedValue(undefined),
+    upsertDeployCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
+    resetCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
     getRecentFailedDeployments: vi.fn().mockResolvedValue([]),
+    updateDeploymentSoakStatus: vi.fn().mockResolvedValue({ id: "deploy-1" }),
     deployCircuitBreaker: {},
-    // Session engagement
-    upsertSessionEngagement: vi.fn().mockResolvedValue({ id: "se-1", messageCount: 1 }),
-    getLatestSessionEngagement: vi.fn().mockResolvedValue(null),
-    sessionEngagement: {},
     // User timezone
     getUserTimezone: vi.fn().mockResolvedValue(null),
-    setUserTimezone: vi.fn().mockResolvedValue(undefined),
+    setUserTimezone: vi.fn().mockResolvedValue({ id: "user-1" }),
+    // Session engagement
+    upsertSessionEngagement: vi.fn().mockResolvedValue({ id: "se-1", messageCount: 0, complexityScore: 50, energyLevel: "normal" }),
+    getLatestSessionEngagement: vi.fn().mockResolvedValue(null),
+    getSessionEngagementHistory: vi.fn().mockResolvedValue([]),
+    sessionEngagement: {},
     // Journal entries
     createJournalEntry: vi.fn().mockResolvedValue({ id: "je-1", entryType: "work_session", title: "Test" }),
     getJournalEntry: vi.fn().mockResolvedValue(null),
@@ -348,6 +354,8 @@ export function mockDbModule() {
     failurePatterns: {},
     // Global search
     globalSearch: vi.fn().mockResolvedValue({ goals: [], tasks: [], conversations: [], memories: [] }),
+    // Action heatmap
+    getActionHeatmap: vi.fn().mockResolvedValue([]),
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),
@@ -396,6 +404,8 @@ export function createControllableDbMocks() {
     startTask: vi.fn(),
     completeTask: vi.fn().mockResolvedValue({}),
     failTask: vi.fn().mockResolvedValue({}),
+    blockTask: vi.fn().mockResolvedValue({}),
+    updateTaskDependencies: vi.fn().mockResolvedValue({}),
     createApproval: vi.fn().mockResolvedValue({ id: "approval-1" }),
     getApproval: vi.fn(),
     listPendingApprovals: vi.fn().mockResolvedValue([]),

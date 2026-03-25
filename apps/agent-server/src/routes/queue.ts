@@ -36,6 +36,7 @@ export async function queueRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(503).send({ error: "Queue system not enabled" });
       }
       const jobId = await enqueueAgentTask(request.body);
+      app.wsBroadcast?.("queue");
       return { jobId, status: "queued" };
     },
   );
@@ -52,6 +53,7 @@ export async function queueRoutes(app: FastifyInstance): Promise<void> {
         type: request.body.type ?? "on_demand",
         deliveryChannels: request.body.deliveryChannels ?? ["slack", "discord"],
       });
+      app.wsBroadcast?.("queue");
       return { jobId, status: "queued" };
     },
   );
@@ -65,6 +67,7 @@ export async function queueRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(503).send({ error: "Queue system not enabled" });
       }
       const jobId = await enqueueNotification(request.body);
+      app.wsBroadcast?.("queue");
       return { jobId, status: "queued" };
     },
   );

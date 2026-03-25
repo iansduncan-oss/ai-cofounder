@@ -379,6 +379,158 @@ describe("generatePrDescription", () => {
 });
 
 /* ─────────────────────────────────────────────────────────────────────────
+   TokenBudgetExceededError (SCHED-03)
+   ───────────────────────────────────────────────────────────────────────── */
+
+describe("TokenBudgetExceededError", () => {
+  // Import TokenBudgetExceededError from the already-imported module
+  it("throws TokenBudgetExceededError when cumulative tokens exceed budget", async () => {
+    const { TokenBudgetExceededError: TBE } = await import("../services/autonomous-executor.js");
+
+    // Mock getCostByGoal to return increasing token counts
+    // First call (after task 1 completes): 60_000 tokens — exceeds budget of 50_000
+    mockGetCostByGoal.mockResolvedValueOnce({
+      totalCostUsd: 0.05,
+      totalInputTokens: 40_000,
+      totalOutputTokens: 20_000, // 60_000 total > 50_000 budget
+      requestCount: 20,
+    });
+
+    const dispatcher = {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+        if (cb) {
+          await cb({
+            goalId: "goal-abc12345",
+            goalTitle: "Heavy workload",
+            taskId: "task-1",
+            taskTitle: "Expensive task",
+            agent: "coder",
+            status: "completed" as const,
+            completedTasks: 1,
+            totalTasks: 2,
+            output: "Done",
+          });
+        }
+        return {
+          goalId: "goal-abc12345",
+          goalTitle: "Heavy workload",
+          status: "completed",
+          totalTasks: 2,
+          completedTasks: 2,
+          tasks: [],
+        };
+      }),
+    };
+    const registry = new LlmRegistry();
+    const db = {} as any;
+
+    const executor = new AutonomousExecutorService(dispatcher as any, undefined, db, registry);
+
+    await expect(
+      executor.executeGoal({
+        goalId: "goal-abc12345",
+        workSessionId: "ws-1",
+        tokenBudget: 50_000,
+      }),
+    ).rejects.toThrow(TBE);
+
+    // Also verify the error properties
+    try {
+      await executor.executeGoal({
+        goalId: "goal-abc12345",
+        workSessionId: "ws-1",
+        tokenBudget: 50_000,
+      });
+    } catch (err) {
+      expect(err).toBeInstanceOf(TBE);
+      if (err instanceof TBE) {
+        expect(err.tokensUsed).toBe(60_000);
+        expect(err.budget).toBe(50_000);
+        expect(err.lastTaskTitle).toBe("Expensive task");
+        expect(err.name).toBe("TokenBudgetExceededError");
+      }
+    }
+  });
+
+  it("does not throw when tokens are within budget", async () => {
+    // getCostByGoal returns 30_000 tokens — under budget of 50_000
+    mockGetCostByGoal.mockResolvedValue({
+      totalCostUsd: 0.02,
+      totalInputTokens: 20_000,
+      totalOutputTokens: 10_000, // 30_000 total < 50_000 budget
+      requestCount: 10,
+    });
+
+    const dispatcher = {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+        if (cb) {
+          await cb({
+            goalId: "goal-abc12345",
+            goalTitle: "Normal workload",
+            taskId: "task-1",
+            taskTitle: "Simple task",
+            agent: "coder",
+            status: "completed" as const,
+            completedTasks: 1,
+            totalTasks: 1,
+            output: "Done",
+          });
+        }
+        return {
+          goalId: "goal-abc12345",
+          goalTitle: "Normal workload",
+          status: "completed",
+          totalTasks: 1,
+          completedTasks: 1,
+          tasks: [],
+        };
+      }),
+    };
+    const registry = new LlmRegistry();
+    const db = {} as any;
+
+    const executor = new AutonomousExecutorService(dispatcher as any, undefined, db, registry);
+
+    // Should resolve without throwing
+    const result = await executor.executeGoal({
+      goalId: "goal-abc12345",
+      workSessionId: "ws-1",
+      tokenBudget: 50_000,
+    });
+    expect(result.progress.status).toBe("completed");
+  });
+
+  it("returns tokensUsed in the result", async () => {
+    mockGetCostByGoal.mockResolvedValue({
+      totalCostUsd: 0.025,
+      totalInputTokens: 5000,
+      totalOutputTokens: 2000,
+      requestCount: 10,
+    });
+    const dispatcher = {
+      runGoal: vi.fn().mockResolvedValue({
+        goalId: "goal-abc12345",
+        goalTitle: "Test",
+        status: "completed",
+        totalTasks: 1,
+        completedTasks: 1,
+        tasks: [],
+      }),
+    };
+    const registry = new LlmRegistry();
+    const db = {} as any;
+
+    const executor = new AutonomousExecutorService(dispatcher as any, undefined, db, registry);
+    const result = await executor.executeGoal({
+      goalId: "goal-abc12345",
+      workSessionId: "ws-1",
+    });
+
+    expect(result.tokensUsed).toBe(7000); // 5000 + 2000
+  });
+});
+
+/* ─────────────────────────────────────────────────────────────────────────
    Work log structure (TERM-05)
    ───────────────────────────────────────────────────────────────────────── */
 

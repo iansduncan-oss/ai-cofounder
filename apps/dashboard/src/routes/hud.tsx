@@ -9,6 +9,7 @@ import {
   usePendingTasks,
   usePendingApprovals,
   useErrorSummary,
+  useLatestDeployment,
 } from "@/api/queries";
 import type { TodayBriefingResponse } from "@ai-cofounder/api-client";
 import { apiClient } from "@/api/client";
@@ -25,6 +26,7 @@ import {
   CircleDot,
   Cpu,
   GitBranch,
+  GitCommit,
   GitPullRequest,
   HardDrive,
   Layers,
@@ -245,8 +247,10 @@ export function HudPage() {
   const { data: pendingTasks } = usePendingTasks();
   const { data: approvals } = usePendingApprovals();
   const { data: errorSummary } = useErrorSummary();
+  const { data: latestDeploy } = useLatestDeployment();
 
   const isLoading = monitoringLoading || queuesLoading;
+  const deploy = latestDeploy?.data;
 
   const allProvidersHealthy = providers?.providers.every((p) => p.available) ?? false;
   const alertCount = monitoring?.alerts?.length ?? 0;
@@ -300,8 +304,8 @@ export function HudPage() {
             />
           </div>
 
-          {/* Second row: Pending work */}
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+          {/* Second row: Pending work + deploy + errors */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             <MetricCard
               label="Pending Tasks"
               value={pendingTasks?.length ?? 0}
@@ -364,6 +368,25 @@ export function HudPage() {
                   : (errorSummary?.totalErrors ?? 0) > 0
                     ? "warning"
                     : "ok"
+              }
+            />
+            <MetricCard
+              label="Latest Deploy"
+              value={deploy ? deploy.shortSha : "None"}
+              subtext={
+                deploy
+                  ? `${deploy.branch} \u00b7 ${deploy.status}${deploy.rootCauseAnalysis ? " \u00b7 " + deploy.rootCauseAnalysis.slice(0, 40) + "\u2026" : ""}`
+                  : "No deploys recorded"
+              }
+              icon={GitCommit}
+              status={
+                deploy
+                  ? deploy.status === "healthy"
+                    ? "ok"
+                    : deploy.status === "failed" || deploy.status === "rolled_back"
+                      ? "critical"
+                      : "warning"
+                  : "unknown"
               }
             />
           </div>

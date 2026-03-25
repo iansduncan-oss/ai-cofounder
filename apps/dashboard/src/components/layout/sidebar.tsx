@@ -28,6 +28,9 @@ import {
   Mail,
   CalendarDays,
   ListTodo,
+  TrendingUp,
+  AlertTriangle,
+  Boxes,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiClient } from "@/api/client";
@@ -50,14 +53,16 @@ const navItems = [
   { to: "/dashboard/milestones", icon: Milestone, label: "Milestones" },
   { to: "/dashboard/activity", icon: Activity, label: "Activity" },
   { to: "/dashboard/usage", icon: BarChart3, label: "Usage" },
+  { to: "/dashboard/analytics", icon: TrendingUp, label: "Analytics" },
   { to: "/dashboard/workspace", icon: FolderOpen, label: "Workspace" },
   { to: "/dashboard/pipelines", icon: GitBranch, label: "Pipelines" },
   { to: "/dashboard/n8n", icon: Workflow, label: "N8n Workflows" },
+  { to: "/dashboard/dlq", icon: AlertTriangle, label: "Dead Letters" },
+  { to: "/dashboard/subagents", icon: Boxes, label: "Subagents" },
   { to: "/dashboard/persona", icon: Bot, label: "Persona" },
   { to: "/dashboard/patterns", icon: Sparkles, label: "Patterns" },
   { to: "/dashboard/journal", icon: BookOpen, label: "Journal" },
   { to: "/dashboard/autonomous", icon: PlayCircle, label: "Autonomous" },
-  { to: "/dashboard/dlq", icon: Inbox, label: "Dead Letter Queue" },
   { to: "/dashboard/follow-ups", icon: ListTodo, label: "Follow-ups" },
   { to: "/dashboard/notifications", icon: Bell, label: "Notifications" },
   { to: "/dashboard/settings", icon: Settings, label: "Settings" },

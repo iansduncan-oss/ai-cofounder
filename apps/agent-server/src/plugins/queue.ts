@@ -79,6 +79,7 @@ export const queuePlugin = fp(async (app) => {
           }
           if (expired.length > 0) {
             logger.info({ count: expired.length }, "Auto-denied expired pending approvals");
+            app.agentEvents.emit("ws:approval_change");
           }
           break;
         }
@@ -121,12 +122,14 @@ export const queuePlugin = fp(async (app) => {
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();
       }
+      app.agentEvents.emit("ws:monitoring_complete");
     },
 
     notification: async (job) => {
       const { title, message } = job.data;
       await app.notificationService.sendBriefing(`**${title}**\n${message}`);
       logger.info({ jobId: job.id, type: job.data.type }, "Notification delivered");
+      app.agentEvents.emit("ws:notification_complete");
     },
 
     briefing: async (job) => {
@@ -136,6 +139,7 @@ export const queuePlugin = fp(async (app) => {
       const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
       const adminUserId = await getPrimaryAdminUserId(app.db);
       await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry, adminUserId ?? undefined);
+      app.agentEvents.emit("ws:briefing_complete");
     },
 
     pipeline: async (job) => {
@@ -151,6 +155,7 @@ export const queuePlugin = fp(async (app) => {
         app.n8nService,       // n8n post-pipeline trigger
       );
       await executor.execute(job.data);
+      app.agentEvents.emit("ws:pipeline_complete");
     },
 
     reflection: async (job) => {
@@ -184,6 +189,13 @@ export const queuePlugin = fp(async (app) => {
         case "analyze_user_patterns":
           await reflectionService.analyzeUserPatterns();
           break;
+        case "process_pattern_feedback": {
+          const { PatternFeedbackProcessor } = await import("../services/pattern-feedback.js");
+          const processor = new PatternFeedbackProcessor(app.db);
+          const result = await processor.processConfidenceAdjustments();
+          logger.info(result, "pattern feedback processing complete");
+          break;
+        }
         case "extract_decision": {
           const { DecisionExtractorService } = await import("../services/decision-extractor.js");
           const svc = new DecisionExtractorService(app.db, app.llmRegistry, app.embeddingService);
@@ -243,13 +255,14 @@ export const queuePlugin = fp(async (app) => {
 
     deployVerification: async (job) => {
       const { deploymentId, commitSha, previousSha } = job.data;
-      logger.info({ jobId: job.id, deploymentId, commitSha: commitSha?.slice(0, 7) }, "Running deploy verification");
+      logger.info({ jobId: job.id, deploymentId, commitSha: commitSha?.slice(0, 7), jobName: job.name }, "Running deploy verification");
       const { DeployHealthService } = await import("../services/deploy-health.js");
       const deployHealthService = new DeployHealthService(
         app.db,
         app.llmRegistry,
         app.notificationService,
         app.monitoringService,
+        app.deployCircuitBreakerService,
       );
 
       if (job.name === "analyze-failure") {
@@ -264,9 +277,31 @@ export const queuePlugin = fp(async (app) => {
             logger.warn({ err }, "circuit breaker failure recording failed");
           });
         }
+      } else if (job.name === "soak-check") {
+        await deployHealthService.startSoakMonitoring(
+          deploymentId,
+          commitSha,
+          previousSha,
+        );
       } else {
         await deployHealthService.verifyDeployment(deploymentId, commitSha, previousSha);
+
+        // After successful verification, enqueue soak monitoring
+        try {
+          const { getDeployVerificationQueue } = await import("@ai-cofounder/queue");
+          await getDeployVerificationQueue().add(
+            "soak-check",
+            { deploymentId, commitSha, previousSha },
+            { delay: 30_000 }, // 30s after initial verify
+          );
+          logger.info({ deploymentId }, "soak-check job enqueued");
+        } catch {
+          logger.debug("failed to enqueue soak-check job");
+        }
       }
+
+      // Notify dashboard via WS
+      app.agentEvents.emit("ws:deploy_change");
     },
 
     meetingPrep: async (job) => {

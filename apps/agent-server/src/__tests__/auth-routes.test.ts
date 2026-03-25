@@ -13,6 +13,7 @@ beforeAll(() => {
 
 // --- Mocked DB functions ---
 const mockFindAdminByEmail = vi.fn();
+const mockFindAdminById = vi.fn();
 const mockCreateAdminUser = vi.fn();
 const mockCountAdminUsers = vi.fn().mockResolvedValue(0);
 
@@ -23,6 +24,7 @@ vi.mock("@ai-cofounder/db", () => ({
   }),
   runMigrations: vi.fn().mockResolvedValue(undefined),
   findAdminByEmail: (...args: unknown[]) => mockFindAdminByEmail(...args),
+  findAdminById: (...args: unknown[]) => mockFindAdminById(...args),
   createAdminUser: (...args: unknown[]) => mockCreateAdminUser(...args),
   countAdminUsers: (...args: unknown[]) => mockCountAdminUsers(...args),
   // Required by transitive imports
@@ -306,6 +308,7 @@ describe("AUTH-05: POST /api/auth/refresh", () => {
     // First, log in to get a real refresh token
     mockFindAdminByEmail.mockResolvedValueOnce(MOCK_ADMIN);
     mockBcryptCompare.mockResolvedValueOnce(true);
+    mockFindAdminById.mockResolvedValueOnce(MOCK_ADMIN);
 
     const { app } = buildServer();
     await app.ready();
@@ -544,5 +547,110 @@ describe("AUTH-09: Bot routes work without JWT", () => {
     // The key is that the route responds — it's not blocked by jwtGuardPlugin
     expect(res.statusCode).toBe(401);
     expect(res.json().error).toBe("Invalid credentials");
+  });
+});
+
+/* ───────────────────── Refresh Extended Tests ─────────────────────── */
+
+describe("AUTH-10: POST /api/auth/refresh (extended)", () => {
+  /** Helper: log in and return the refreshToken cookie value */
+  async function loginAndGetRefreshToken(app: ReturnType<typeof buildServer>["app"]) {
+    mockFindAdminByEmail.mockResolvedValueOnce(MOCK_ADMIN);
+    mockBcryptCompare.mockResolvedValueOnce(true);
+
+    const loginRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      payload: { email: "admin@example.com", password: "supersecret" },
+      headers: { "x-forwarded-for": "10.0.0.1" },
+    });
+    expect(loginRes.statusCode).toBe(200);
+
+    const setCookieHeader = loginRes.headers["set-cookie"];
+    const cookieStr = Array.isArray(setCookieHeader) ? setCookieHeader[0] : String(setCookieHeader ?? "");
+    const refreshTokenMatch = cookieStr.match(/refreshToken=([^;]+)/);
+    const refreshToken = refreshTokenMatch?.[1] ?? "";
+    expect(refreshToken).toBeTruthy();
+    return refreshToken;
+  }
+
+  beforeEach(() => {
+    // Default: findAdminById returns a valid admin with email
+    mockFindAdminById.mockResolvedValue({ id: "admin-1", email: "test@example.com" });
+  });
+
+  it("refresh includes email claim", async () => {
+    const { app } = buildServer();
+    await app.ready();
+
+    const refreshToken = await loginAndGetRefreshToken(app);
+
+    const refreshRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/refresh",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+        cookie: `refreshToken=${refreshToken}`,
+      },
+    });
+    await app.close();
+
+    expect(refreshRes.statusCode).toBe(200);
+    const { accessToken } = refreshRes.json();
+    expect(accessToken).toBeDefined();
+
+    // Decode JWT payload (base64url) without verification
+    const [, payloadBase64] = accessToken.split(".");
+    const payload = JSON.parse(Buffer.from(payloadBase64, "base64url").toString("utf8"));
+    expect(payload.email).toBe("test@example.com");
+  });
+
+  it("refresh rotates cookie", async () => {
+    const { app } = buildServer();
+    await app.ready();
+
+    const refreshToken = await loginAndGetRefreshToken(app);
+
+    const refreshRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/refresh",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+        cookie: `refreshToken=${refreshToken}`,
+      },
+    });
+    await app.close();
+
+    expect(refreshRes.statusCode).toBe(200);
+
+    // Verify the response includes a new refreshToken cookie with the correct path
+    const setCookieHeader = refreshRes.headers["set-cookie"];
+    const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [String(setCookieHeader ?? "")];
+    const refreshCookie = cookies.find((c) => c.includes("refreshToken="));
+    expect(refreshCookie).toBeDefined();
+    expect(refreshCookie!.toLowerCase()).toContain("path=/api/auth/refresh");
+  });
+
+  it("refresh rejects deleted user", async () => {
+    // Override: user no longer exists in DB
+    mockFindAdminById.mockResolvedValue(undefined);
+
+    const { app } = buildServer();
+    await app.ready();
+
+    const refreshToken = await loginAndGetRefreshToken(app);
+
+    const refreshRes = await app.inject({
+      method: "POST",
+      url: "/api/auth/refresh",
+      headers: {
+        "x-forwarded-for": "10.0.0.1",
+        cookie: `refreshToken=${refreshToken}`,
+      },
+    });
+    await app.close();
+
+    expect(refreshRes.statusCode).toBe(401);
+    expect(refreshRes.json()).toEqual({ error: "User not found" });
   });
 });

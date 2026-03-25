@@ -48,6 +48,12 @@ const PipelineDetailPage = lazy(() =>
 const PersonaPage = lazy(() =>
   import("./persona").then((m) => ({ default: m.PersonaPage })),
 );
+const DlqPage = lazy(() =>
+  import("./dlq").then((m) => ({ default: m.DlqPage })),
+);
+const SubagentsPage = lazy(() =>
+  import("./subagents").then((m) => ({ default: m.SubagentsPage })),
+);
 const PatternsPage = lazy(() =>
   import("./patterns").then((m) => ({ default: m.PatternsPage })),
 );
@@ -69,9 +75,6 @@ const NotificationsPage = lazy(() =>
 const AutonomousSessionsPage = lazy(() =>
   import("./autonomous-sessions").then((m) => ({ default: m.AutonomousSessionsPage })),
 );
-const DlqPage = lazy(() =>
-  import("./dlq").then((m) => ({ default: m.DlqPage })),
-);
 const GmailPage = lazy(() =>
   import("./gmail").then((m) => ({ default: m.GmailPage })),
 );
@@ -80,9 +83,6 @@ const CalendarPage = lazy(() =>
 );
 const FollowUpsPage = lazy(() =>
   import("./follow-ups").then((m) => ({ default: m.FollowUpsPage })),
-);
-const SubagentsPage = lazy(() =>
-  import("./subagents").then((m) => ({ default: m.SubagentsPage })),
 );
 const DecisionsPage = lazy(() =>
   import("./decisions").then((m) => ({ default: m.DecisionsPage })),
@@ -122,16 +122,16 @@ export const router = createBrowserRouter([
       { path: "pipelines", element: <PipelinesPage /> },
       { path: "pipelines/:jobId", element: <PipelineDetailPage /> },
       { path: "n8n", element: <N8nWorkflowsPage /> },
+      { path: "dlq", element: <DlqPage /> },
+      { path: "subagents", element: <SubagentsPage /> },
       { path: "persona", element: <PersonaPage /> },
       { path: "patterns", element: <PatternsPage /> },
       { path: "journal", element: <JournalPage /> },
       { path: "notifications", element: <NotificationsPage /> },
       { path: "autonomous", element: <AutonomousSessionsPage /> },
-      { path: "dlq", element: <DlqPage /> },
       { path: "gmail", element: <GmailPage /> },
       { path: "calendar", element: <CalendarPage /> },
       { path: "follow-ups", element: <FollowUpsPage /> },
-      { path: "subagents", element: <SubagentsPage /> },
       { path: "decisions", element: <DecisionsPage /> },
       { path: "pipeline-templates", element: <PipelineTemplatesPage /> },
       { path: "events", element: <EventsPage /> },

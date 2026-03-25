@@ -123,7 +123,7 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled user pattern analysis at Sunday 4 AM");
 
-  // ── Daily pattern feedback processing (2 AM) ──
+  // ── Daily pattern feedback processing (2 AM — adjusts confidence based on acceptance rates) ──
 
   await reflectionQueue.upsertJobScheduler(
     "daily-pattern-feedback",

@@ -9,10 +9,12 @@ beforeAll(() => {
 // ── Mock DB ──
 
 const mockGetTriggeredPatterns = vi.fn().mockResolvedValue([]);
+const mockIncrementPatternHitCount = vi.fn().mockResolvedValue({ id: "up-1" });
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
   getTriggeredPatterns: (...args: unknown[]) => mockGetTriggeredPatterns(...args),
+  incrementPatternHitCount: (...args: unknown[]) => mockIncrementPatternHitCount(...args),
 }));
 
 vi.mock("@ai-cofounder/shared", () => ({
@@ -193,5 +195,38 @@ describe("generateSuggestions (pattern-aware)", () => {
     const promptText = mockComplete.mock.calls[0][1].messages[0].content[0].text;
     expect(promptText).toContain("Active in mornings");
     expect(promptText).toContain("Usually checks CI on Mondays");
+  });
+
+  it("increments hitCount for each triggered pattern", async () => {
+    mockGetTriggeredPatterns.mockResolvedValue([
+      {
+        id: "p-1",
+        description: "Morning user",
+        suggestedAction: "Check alerts",
+        confidence: 80,
+        triggerCondition: { hourRange: [8, 12] },
+      },
+      {
+        id: "p-2",
+        description: "Monday deployer",
+        suggestedAction: "Run tests",
+        confidence: 60,
+        triggerCondition: { dayOfWeek: 1 },
+      },
+    ]);
+
+    mockComplete.mockResolvedValue({
+      content: [{ type: "text", text: '["Check alerts"]' }],
+    });
+
+    await generateSuggestions(db, registry, {
+      userMessage: "Hello",
+      agentResponse: "Hi!",
+      userId: "user-1",
+    });
+
+    expect(mockIncrementPatternHitCount).toHaveBeenCalledTimes(2);
+    expect(mockIncrementPatternHitCount).toHaveBeenCalledWith(db, "p-1");
+    expect(mockIncrementPatternHitCount).toHaveBeenCalledWith(db, "p-2");
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { usePatterns } from "@/api/queries";
+import { usePatterns, usePatternAnalytics } from "@/api/queries";
 import { useTogglePattern, useDeletePattern } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,10 +17,105 @@ import { EmptyState } from "@/components/common/empty-state";
 import { CreatePatternDialog } from "@/components/patterns/create-pattern-dialog";
 import { EditPatternDialog } from "@/components/patterns/edit-pattern-dialog";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { AlertTriangle, Trash2, ToggleLeft, ToggleRight, Plus, Pencil } from "lucide-react";
+import { AlertTriangle, Trash2, ToggleLeft, ToggleRight, Plus, Pencil, TrendingUp, TrendingDown } from "lucide-react";
 import type { UserPattern } from "@ai-cofounder/api-client";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { ActivityHeatmap } from "@/components/patterns/activity-heatmap";
 
 type PatternType = "all" | "time_preference" | "sequence" | "recurring_action";
+
+const PIE_COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#c4b5fd"];
+
+function AcceptanceRateIndicator({ hitCount, acceptCount }: { hitCount: number; acceptCount: number }) {
+  if (hitCount < 3) return null;
+  const rate = (acceptCount / hitCount) * 100;
+  if (rate >= 50) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-xs text-emerald-500">
+        <TrendingUp className="h-3 w-3" />
+        {rate.toFixed(0)}%
+      </span>
+    );
+  }
+  if (rate < 20) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-xs text-red-500">
+        <TrendingDown className="h-3 w-3" />
+        {rate.toFixed(0)}%
+      </span>
+    );
+  }
+  return <span className="text-xs text-muted-foreground">{rate.toFixed(0)}%</span>;
+}
+
+function AnalyticsSection() {
+  const { data, isLoading } = usePatternAnalytics();
+
+  if (isLoading || !data) return null;
+  if (data.totalPatterns === 0 && (!data.heatmap || data.heatmap.length === 0)) return null;
+
+  const barData = (data.perPattern ?? [])
+    .filter((p) => p.hit_count > 0)
+    .slice(0, 8)
+    .map((p) => ({
+      name: p.description.length > 25 ? p.description.slice(0, 22) + "..." : p.description,
+      hitCount: p.hit_count,
+      acceptRate: Number(p.accept_rate),
+    }));
+
+  const pieData = (data.typeDistribution ?? []).map((t) => ({
+    name: t.pattern_type.replace(/_/g, " "),
+    value: t.count,
+  }));
+
+  return (
+    <div className="mb-6 space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        {barData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Acceptance Rate by Pattern</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={barData} layout="vertical" margin={{ left: 0, right: 12 }}>
+                  <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} fontSize={12} />
+                  <YAxis type="category" dataKey="name" width={120} fontSize={11} />
+                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Bar dataKey="acceptRate" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
+        {pieData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Type Distribution</CardTitle>
+            </CardHeader>
+            <CardContent className="flex items-center justify-center">
+              <ResponsiveContainer width="100%" height={200}>
+                <PieChart>
+                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} label={(e) => e.name}>
+                    {pieData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {data.heatmap && data.heatmap.length > 0 && (
+        <ActivityHeatmap data={data.heatmap} />
+      )}
+    </div>
+  );
+}
 
 export function PatternsPage() {
   usePageTitle("Patterns");
@@ -71,7 +166,7 @@ export function PatternsPage() {
         title="Patterns"
         description="Learned behavioral patterns that power anticipatory suggestions"
         actions={
-          <Button onClick={() => setCreateDialogOpen(true)}>
+          <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
             Create Pattern
           </Button>
@@ -101,6 +196,8 @@ export function PatternsPage() {
           Include inactive
         </label>
       </div>
+
+      <AnalyticsSection />
 
       <div className="space-y-4">
         {isLoading ? (
@@ -188,6 +285,7 @@ export function PatternsPage() {
                         {p.hitCount} / {p.acceptCount}
                       </span>
                     </span>
+                    <AcceptanceRateIndicator hitCount={p.hitCount} acceptCount={p.acceptCount} />
                   </div>
                 </div>
               </CardContent>

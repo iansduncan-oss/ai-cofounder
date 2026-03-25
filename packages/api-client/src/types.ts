@@ -29,10 +29,10 @@ export interface Task {
   status: TaskStatus;
   assignedAgent?: AgentRole;
   orderIndex: number;
+  dependsOn?: string[] | null;
   input?: string;
   output?: string;
   error?: string;
-  dependsOn?: string[];
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -59,6 +59,7 @@ export interface Memory {
   importance: number;
   accessCount: number;
   source?: string;
+  agentRole?: string;
   metadata?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -523,6 +524,18 @@ export interface UserPattern {
   updatedAt: string;
 }
 
+/* ── Pattern Analytics ── */
+
+export interface PatternAnalyticsItem {
+  id: string;
+  description: string;
+  pattern_type: string;
+  confidence: number;
+  hit_count: number;
+  accept_count: number;
+  accept_rate: number;
+}
+
 export interface PatternAnalytics {
   totalPatterns: number;
   activePatterns: number;
@@ -532,6 +545,22 @@ export interface PatternAnalytics {
   avgConfidence: number;
   byType: Record<string, number>;
   patterns: UserPattern[];
+  perPattern?: PatternAnalyticsItem[];
+  typeDistribution?: Array<{ pattern_type: string; count: number }>;
+  topByConfidence?: Array<{ id: string; description: string; confidence: number }>;
+  heatmap?: Array<{ day_of_week: number; hour_of_day: number; count: number }>;
+}
+
+/* ── Dead Letter Queue ── */
+
+export interface DeadLetterEntry {
+  dlqJobId: string;
+  originalQueue: string;
+  originalJobId: string;
+  originalJobName: string;
+  failedReason: string;
+  attemptsMade: number;
+  failedAt: string;
 }
 
 export type AutonomyTier = "green" | "yellow" | "red";
@@ -564,22 +593,16 @@ export interface AutonomousRunResponse {
   goalId: string;
 }
 
-export interface DeadLetterEntry {
-  dlqJobId: string;
-  originalQueue: string;
-  originalJobId: string;
-  originalJobName: string;
-  failedReason: string;
-  failedAt: string;
-  attemptsMade: number;
-}
+/* ── Deployments ── */
+
+export type DeployStatus = "started" | "building" | "deploying" | "verifying" | "healthy" | "failed" | "rolled_back";
 
 export interface Deployment {
   id: string;
   commitSha: string;
   shortSha: string;
   branch: string;
-  status: string;
+  status: DeployStatus;
   services: string[] | null;
   previousSha: string | null;
   triggeredBy: string;
@@ -588,8 +611,45 @@ export interface Deployment {
   rootCauseAnalysis: string | null;
   rolledBack: boolean;
   rollbackSha: string | null;
+  soakStatus?: string;
+  soakMetrics?: unknown;
+  remediationActions?: unknown;
+  gitDiffSummary?: string;
   startedAt: string;
   completedAt: string | null;
+}
+
+/* ── Circuit Breaker ── */
+
+export interface DeployCircuitBreakerStatus {
+  isPaused: boolean;
+  pausedAt: string | null;
+  pausedReason: string | null;
+  failureCount: number;
+  failureWindowStart: string | null;
+  resumedAt: string | null;
+  resumedBy: string | null;
+}
+
+/* ── Session Engagement ── */
+
+export interface SessionEngagement {
+  id: string;
+  userId: string;
+  sessionStart: string;
+  messageCount: number;
+  avgMessageLength: number;
+  avgResponseIntervalMs: number;
+  complexityScore: number;
+  energyLevel: string;
+  lastMessageAt: string | null;
+}
+
+/* ── Context ── */
+
+export interface WorkFocus {
+  recentActions: Array<{ actionType: string; count: number }>;
+  activeGoals: Array<{ id: string; title: string }>;
 }
 
 /* ── Work Sessions ── */

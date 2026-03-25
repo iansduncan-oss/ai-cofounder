@@ -70,6 +70,8 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
       });
 
       logger.info({ goalId: id, jobId, userId }, "Goal execution enqueued");
+      app.wsBroadcast?.("goals");
+      app.wsBroadcast?.("queue");
 
       return reply.status(202).send({
         jobId,

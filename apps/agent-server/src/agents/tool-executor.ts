@@ -435,6 +435,7 @@ export async function executeSharedTool(
         key: input.key,
         content: input.content,
         source: context.conversationId,
+        agentRole: context.agentRole,
         embedding,
       });
       return { saved: true, key: mem.key, category: mem.category };
@@ -442,12 +443,13 @@ export async function executeSharedTool(
 
     case "recall_memories": {
       if (!context.userId || !db) return { error: "No user context available" };
-      const input = block.input as { category?: string; query?: string };
+      const input = block.input as { category?: string; query?: string; scope?: "own" | "all" };
 
       if (input.query && embeddingService) {
         try {
           const queryEmbedding = await embeddingService.embed(input.query);
-          const results = await searchMemoriesByVector(db, queryEmbedding, context.userId, 10);
+          const agentRoleForSearch = input.scope !== "all" ? context.agentRole : undefined;
+          const results = await searchMemoriesByVector(db, queryEmbedding, context.userId, 10, agentRoleForSearch);
           if (results.length > 0) {
             for (const m of results) {
               touchMemory(db, m.id).catch(() => {});
@@ -456,6 +458,7 @@ export async function executeSharedTool(
               key: m.key,
               category: m.category,
               content: m.content,
+              agentRole: m.agent_role,
               updatedAt: m.updated_at,
               distance: m.distance,
             }));
@@ -465,7 +468,11 @@ export async function executeSharedTool(
         }
       }
 
-      const memories = await recallMemories(db, context.userId, input);
+      const memories = await recallMemories(db, context.userId, {
+        ...input,
+        agentRole: context.agentRole,
+        scope: input.scope,
+      });
       for (const m of memories) {
         touchMemory(db, m.id).catch(() => {});
       }

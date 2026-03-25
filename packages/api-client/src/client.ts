@@ -81,6 +81,7 @@ import type {
   CreateFollowUpInput,
   UpdateFollowUpInput,
   GlobalSearchResults,
+  DeployCircuitBreakerStatus,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -966,6 +967,37 @@ export class ApiClient {
 
   getLatestDeployment() {
     return this.request<{ data: Deployment | null }>("GET", "/api/deploys/latest");
+  }
+
+  getCircuitBreakerStatus() {
+    return this.request<DeployCircuitBreakerStatus>("GET", "/api/deploys/circuit-breaker");
+  }
+
+  resumeCircuitBreaker(resumedBy?: string) {
+    return this.request<{ status: string }>("POST", "/api/deploys/circuit-breaker/resume", { resumedBy });
+  }
+
+  rollbackDeployment(id: string, previousSha: string) {
+    return this.request<{ status: string; rollbackSha: string }>("POST", `/api/deploys/${id}/rollback`, { previousSha });
+  }
+
+  remediateDeploy(id: string, action: "restart_containers" | "clear_cache" = "restart_containers") {
+    return this.request<{ action: string; result: string; timestamp: string }>("POST", `/api/deploys/${id}/remediate`, { action });
+  }
+
+  /* ── Context ── */
+
+  getCurrentContext(userId?: string) {
+    const q = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+    return this.request<{ data: string | null }>("GET", `/api/context/current${q}`);
+  }
+
+  getEngagement(userId: string) {
+    return this.request<{ data: string | null }>("GET", `/api/context/engagement?userId=${encodeURIComponent(userId)}`);
+  }
+
+  setTimezone(userId: string, timezone: string) {
+    return this.request<{ status: string; timezone: string }>("PUT", "/api/context/timezone", { userId, timezone });
   }
 
   /* ── Streaming ── */

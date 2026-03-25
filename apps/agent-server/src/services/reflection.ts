@@ -6,7 +6,8 @@ import {
   asc,
   insertReflection,
   listReflections,
-  getUserActionsSince,
+  getDistinctActionUserIds,
+  getUserActionsForAnalysis,
   upsertUserPattern,
   deleteOldUserActions,
   userActions,
@@ -267,56 +268,100 @@ LESSONS:
 
   /**
    * Analyze user actions over the past 30 days to identify behavioral patterns.
-   * Patterns are upserted into userPatterns for anticipatory suggestions.
+   * Runs per-user: fetches distinct userIds, analyzes each separately,
+   * and upserts patterns with the actual userId.
    */
   async analyzeUserPatterns() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Fetch actions for all users (userId can be null for anonymous)
-    // We use a generic query — getUserActionsSince requires a userId,
-    // so we'll call it per-user. For now, analyze global patterns.
-    let actions: Array<{
+    let userIds: string[];
+    try {
+      userIds = await getDistinctActionUserIds(this.db, thirtyDaysAgo);
+    } catch (err) {
+      logger.warn({ err }, "failed to fetch distinct user IDs for pattern analysis");
+      return [];
+    }
+
+    if (userIds.length === 0) {
+      logger.info("no users with recent actions — skipping pattern analysis");
+      return [];
+    }
+
+    const allResults = [];
+
+    for (const userId of userIds) {
+      try {
+        const actions = await getUserActionsForAnalysis(this.db, userId, thirtyDaysAgo);
+
+        if (actions.length < 5) {
+          logger.debug({ userId, count: actions.length }, "skipping user with < 5 actions");
+          continue;
+        }
+
+        const patterns = await this.analyzeActionsForUser(userId, actions);
+        allResults.push(...patterns);
+      } catch (err) {
+        logger.warn({ err, userId }, "failed to analyze patterns for user");
+      }
+    }
+
+    // Clean up old actions (> 90 days) — once after all users
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    try {
+      const deleted = await deleteOldUserActions(this.db, ninetyDaysAgo);
+      if (deleted > 0) {
+        logger.info({ deleted }, "cleaned up old user actions");
+      }
+    } catch {
+      // cleanup failure is non-fatal
+    }
+
+    logger.info(
+      { patternsFound: allResults.length, usersAnalyzed: userIds.length },
+      "user pattern analysis complete",
+    );
+
+    return allResults;
+  }
+
+  /** Analyze actions for a single user and upsert discovered patterns. */
+  private async analyzeActionsForUser(
+    userId: string,
+    actions: Array<{
       actionType: string;
       actionDetail: string | null;
       dayOfWeek: number;
       hourOfDay: number;
-      userId: string | null;
       createdAt: Date;
-    }>;
-
-    try {
-      // Get all recent actions via a direct query approach
-      actions = await this.db
-        .select()
-        .from(userActions)
-        .where(gte(userActions.createdAt, thirtyDaysAgo))
-        .orderBy(asc(userActions.createdAt));
-    } catch (err) {
-      logger.warn({ err }, "failed to fetch user actions for pattern analysis");
-      return [];
-    }
-
-    if (actions.length < 5) {
-      logger.info(
-        { count: actions.length },
-        "not enough user actions for pattern analysis (need ≥5)",
-      );
-      return [];
-    }
-
-    // Build a summary of actions by day/hour
+    }>,
+  ) {
+    // Build summary stats
     const dayCounts: Record<number, number> = {};
     const hourCounts: Record<number, number> = {};
     const actionTypeCounts: Record<string, number> = {};
-    const dayHourActions: Record<string, string[]> = {};
 
     for (const a of actions) {
       dayCounts[a.dayOfWeek] = (dayCounts[a.dayOfWeek] ?? 0) + 1;
       hourCounts[a.hourOfDay] = (hourCounts[a.hourOfDay] ?? 0) + 1;
       actionTypeCounts[a.actionType] = (actionTypeCounts[a.actionType] ?? 0) + 1;
-      const key = `${a.dayOfWeek}-${a.hourOfDay}`;
-      (dayHourActions[key] ??= []).push(a.actionType + (a.actionDetail ? `: ${a.actionDetail}` : ""));
+    }
+
+    // Compute action-pair sequences (consecutive actions within 30 min)
+    const sequences: string[] = [];
+    for (let i = 1; i < actions.length; i++) {
+      const prev = actions[i - 1];
+      const curr = actions[i];
+      const diffMs = curr.createdAt.getTime() - prev.createdAt.getTime();
+      if (diffMs <= 30 * 60 * 1000) {
+        sequences.push(`${prev.actionType} → ${curr.actionType}`);
+      }
+    }
+
+    const sequenceCounts: Record<string, number> = {};
+    for (const seq of sequences) {
+      sequenceCounts[seq] = (sequenceCounts[seq] ?? 0) + 1;
     }
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -331,9 +376,13 @@ Action counts by hour: ${Object.entries(hourCounts)
 Action type counts: ${Object.entries(actionTypeCounts)
       .map(([t, c]) => `${t}: ${c}`)
       .join(", ")}
+Action sequences (within 30 min): ${Object.entries(sequenceCounts)
+      .filter(([, c]) => c >= 2)
+      .map(([s, c]) => `${s} (${c}x)`)
+      .join(", ") || "none"}
 Total actions analyzed: ${actions.length}`;
 
-    const prompt = `You are analyzing user behavioral patterns over the past 30 days to enable anticipatory suggestions.
+    const prompt = `You are analyzing a single user's behavioral patterns over the past 30 days to enable anticipatory suggestions.
 
 ${summary}
 
@@ -360,71 +409,46 @@ Format as JSON array:
 
 Return ONLY the JSON array, no other text. Return an empty array [] if no clear patterns are found.`;
 
-    try {
-      const response = await this.llmRegistry.complete("simple", {
-        messages: [{ role: "user", content: prompt }],
-      });
+    const response = await this.llmRegistry.complete("simple", {
+      messages: [{ role: "user", content: prompt }],
+    });
 
-      const responseText = response.content
-        .filter((b): b is { type: "text"; text: string } => b.type === "text")
-        .map((b) => b.text)
-        .join("");
+    const responseText = response.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("");
 
-      const match = responseText.match(/\[[\s\S]*\]/);
-      if (!match) {
-        logger.info("no patterns found in LLM response");
-        return [];
-      }
+    const match = responseText.match(/\[[\s\S]*\]/);
+    if (!match) return [];
 
-      const patterns = JSON.parse(match[0]) as Array<{
-        patternType: string;
-        description: string;
-        triggerCondition: Record<string, unknown>;
-        suggestedAction: string;
-        confidence: number;
-      }>;
+    const parsed = JSON.parse(match[0]) as Array<{
+      patternType: string;
+      description: string;
+      triggerCondition: Record<string, unknown>;
+      suggestedAction: string;
+      confidence: number;
+    }>;
 
-      if (!Array.isArray(patterns)) return [];
+    if (!Array.isArray(parsed)) return [];
 
-      // Upsert each pattern
-      const results = [];
-      for (const p of patterns) {
-        try {
-          const result = await upsertUserPattern(this.db, {
-            patternType: p.patternType,
-            description: p.description,
-            triggerCondition: p.triggerCondition,
-            suggestedAction: p.suggestedAction,
-            confidence: Math.min(100, Math.max(0, p.confidence)),
-          });
-          results.push(result);
-        } catch (err) {
-          logger.warn({ err, pattern: p.description }, "failed to upsert pattern");
-        }
-      }
-
-      // Clean up old actions (> 90 days)
-      const ninetyDaysAgo = new Date();
-      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    const results = [];
+    for (const p of parsed) {
       try {
-        const deleted = await deleteOldUserActions(this.db, ninetyDaysAgo);
-        if (deleted > 0) {
-          logger.info({ deleted }, "cleaned up old user actions");
-        }
-      } catch {
-        // cleanup failure is non-fatal
+        const result = await upsertUserPattern(this.db, {
+          userId,
+          patternType: p.patternType,
+          description: p.description,
+          triggerCondition: p.triggerCondition,
+          suggestedAction: p.suggestedAction,
+          confidence: Math.min(100, Math.max(0, p.confidence)),
+        });
+        results.push(result);
+      } catch (err) {
+        logger.warn({ err, pattern: p.description }, "failed to upsert pattern");
       }
-
-      logger.info(
-        { patternsFound: results.length, actionsAnalyzed: actions.length },
-        "user pattern analysis complete",
-      );
-
-      return results;
-    } catch (err) {
-      logger.warn({ err }, "user pattern analysis LLM call failed");
-      return [];
     }
+
+    return results;
   }
 
   private buildReflectionPrompt(

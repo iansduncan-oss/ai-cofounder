@@ -30,6 +30,8 @@ import { voiceRoutes } from "./routes/voice.js";
 import { deployWebhookRoute } from "./routes/deploys.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
+import { websocketPlugin } from "./plugins/websocket.js";
+import { wsEmitterPlugin } from "./plugins/ws-emitter.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
 import { createMonitoringService, type MonitoringService } from "./services/monitoring.js";
 import { createTTSService, type TTSService } from "./services/tts.js";
@@ -51,8 +53,6 @@ import { startScheduler } from "./services/scheduler.js";
 import { AutonomyTierService } from "./services/autonomy-tier.js";
 import { DeployCircuitBreakerService } from "./services/deploy-circuit-breaker.js";
 import { SessionEngagementService } from "./services/session-engagement.js";
-import { websocketPlugin } from "./plugins/websocket.js";
-import { wsEmitterPlugin } from "./plugins/ws-emitter.js";
 import { CiSelfHealService } from "./services/ci-self-heal.js";
 import { projectRegistryPlugin } from "./plugins/project-registry.js";
 import Redis from "ioredis";
@@ -162,7 +162,7 @@ export function buildServer(registry?: LlmRegistry) {
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "blob:"],
-        connectSrc: ["'self'", "wss:", "blob:"],
+        connectSrc: ["'self'", "ws:", "wss:", "blob:"],
         fontSrc: ["'self'"],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
@@ -259,6 +259,21 @@ export function buildServer(registry?: LlmRegistry) {
   const ttsService = createTTSService();
   app.decorate("ttsService", ttsService);
 
+  // Create CI self-heal service if Redis is available (requires Redis for failure state tracking)
+  const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
+  if (ciHealRedisUrl) {
+    const ciHealRedis = new Redis(ciHealRedisUrl);
+    const ciSelfHealService = new CiSelfHealService(ciHealRedis, notificationService);
+    app.decorate("ciSelfHealService", ciSelfHealService);
+    app.addHook("onClose", async () => {
+      await ciHealRedis.quit();
+    });
+    logger.info("CI self-heal service initialized");
+  } else {
+    app.decorate("ciSelfHealService", undefined as unknown as CiSelfHealService);
+    logger.debug("CI self-heal service disabled (REDIS_URL not set)");
+  }
+
   // Agent-to-agent messaging service (created after db is ready via onReady hook)
   // Decorated as undefined initially, wired with db in onReady
   app.decorate("messagingService", undefined as unknown as AgentMessagingService);
@@ -272,9 +287,6 @@ export function buildServer(registry?: LlmRegistry) {
   // Session engagement service (created after db is ready via onReady hook)
   app.decorate("sessionEngagementService", undefined as unknown as SessionEngagementService);
 
-  // CI self-heal service (created after Redis + notification check, via onReady hook)
-  app.decorate("ciSelfHealService", undefined as unknown as CiSelfHealService | undefined);
-
   // Journal service (created after db is ready via onReady hook)
   app.decorate("journalService", undefined as unknown as JournalService);
 
@@ -286,6 +298,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.decorate("proceduralMemoryService", undefined as unknown as ProceduralMemoryService);
   app.decorate("memoryLifecycleService", undefined as unknown as MemoryLifecycleService);
   app.decorate("failurePatternsService", undefined as unknown as FailurePatternService);
+
 
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
@@ -322,15 +335,6 @@ export function buildServer(registry?: LlmRegistry) {
     app.memoryLifecycleService = new MemoryLifecycleService(app.db);
     app.failurePatternsService = new FailurePatternService(app.db);
     logger.info("memory lifecycle + failure patterns services initialized");
-
-    // Wire CI self-heal service (requires Redis + notification service)
-    const ciHealRedisUrl = optionalEnv("REDIS_URL", "");
-    if (ciHealRedisUrl) {
-      const ciHealRedis = new Redis(ciHealRedisUrl);
-      app.ciSelfHealService = new CiSelfHealService(ciHealRedis, notificationService);
-      app.addHook("onClose", async () => { await ciHealRedis.quit(); });
-      logger.info("CI self-heal service initialized");
-    }
 
     // Wire autonomy tier service and seed default tool tiers on first start
     const tierService = new AutonomyTierService(app.db);

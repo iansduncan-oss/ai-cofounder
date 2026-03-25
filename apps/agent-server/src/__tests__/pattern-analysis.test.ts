@@ -10,7 +10,8 @@ beforeAll(() => {
 
 const mockInsertReflection = vi.fn().mockResolvedValue({ id: "ref-1" });
 const mockListReflections = vi.fn().mockResolvedValue({ data: [], total: 0 });
-const mockGetUserActionsSince = vi.fn().mockResolvedValue([]);
+const mockGetDistinctActionUserIds = vi.fn().mockResolvedValue([]);
+const mockGetUserActionsForAnalysis = vi.fn().mockResolvedValue([]);
 const mockUpsertUserPattern = vi.fn().mockResolvedValue({ id: "up-1", patternType: "time_preference" });
 const mockDeleteOldUserActions = vi.fn().mockResolvedValue(0);
 
@@ -18,13 +19,10 @@ vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
   insertReflection: (...args: unknown[]) => mockInsertReflection(...args),
   listReflections: (...args: unknown[]) => mockListReflections(...args),
-  getUserActionsSince: (...args: unknown[]) => mockGetUserActionsSince(...args),
+  getDistinctActionUserIds: (...args: unknown[]) => mockGetDistinctActionUserIds(...args),
+  getUserActionsForAnalysis: (...args: unknown[]) => mockGetUserActionsForAnalysis(...args),
   upsertUserPattern: (...args: unknown[]) => mockUpsertUserPattern(...args),
   deleteOldUserActions: (...args: unknown[]) => mockDeleteOldUserActions(...args),
-  // Expose userActions table for the direct query in analyzeUserPatterns
-  userActions: {
-    createdAt: "created_at",
-  },
 }));
 
 vi.mock("@ai-cofounder/shared", () => ({
@@ -65,29 +63,11 @@ beforeEach(() => {
 });
 
 describe("ReflectionService.analyzeUserPatterns", () => {
-  // Create a mock db that supports .select().from().where().orderBy() chain
-  const createMockDb = (actions: unknown[]) => {
-    const chain = {
-      from: vi.fn().mockReturnThis(),
-      where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue(actions),
-      select: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockResolvedValue(actions),
-          }),
-        }),
-      }),
-    };
-    return chain as any;
-  };
-
+  const db = {} as any;
   const registry = { complete: mockComplete, completeDirect: mockComplete } as any;
 
-  it("returns empty when fewer than 5 actions", async () => {
-    const db = createMockDb([
-      { actionType: "chat_message", dayOfWeek: 1, hourOfDay: 10, userId: "u1", createdAt: new Date() },
-    ]);
+  it("returns empty when no users have actions", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce([]);
     const service = new ReflectionService(db, registry);
     const result = await service.analyzeUserPatterns();
 
@@ -95,33 +75,42 @@ describe("ReflectionService.analyzeUserPatterns", () => {
     expect(mockComplete).not.toHaveBeenCalled();
   });
 
-  it("calls LLM with action summary when enough actions exist", async () => {
+  it("skips users with fewer than 5 actions", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce(["user-1"]);
+    mockGetUserActionsForAnalysis.mockResolvedValueOnce([
+      { actionType: "chat_message", dayOfWeek: 1, hourOfDay: 10, createdAt: new Date() },
+    ]);
+
+    const service = new ReflectionService(db, registry);
+    const result = await service.analyzeUserPatterns();
+
+    expect(result).toEqual([]);
+    expect(mockComplete).not.toHaveBeenCalled();
+  });
+
+  it("passes userId to upsertUserPattern for per-user analysis", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce(["user-1"]);
+
     const actions = Array.from({ length: 10 }, (_, i) => ({
       actionType: "chat_message",
       actionDetail: null,
       dayOfWeek: i % 7,
       hourOfDay: 10 + (i % 4),
-      userId: "u1",
-      createdAt: new Date(),
+      createdAt: new Date(Date.now() - i * 3600_000),
     }));
-
-    const db = createMockDb(actions);
+    mockGetUserActionsForAnalysis.mockResolvedValueOnce(actions);
 
     mockComplete.mockResolvedValue({
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify([
-            {
-              patternType: "time_preference",
-              description: "Active on weekday mornings",
-              triggerCondition: { hourRange: [9, 12] },
-              suggestedAction: "Check today's goals",
-              confidence: 70,
-            },
-          ]),
-        },
-      ],
+      content: [{
+        type: "text",
+        text: JSON.stringify([{
+          patternType: "time_preference",
+          description: "Active on weekday mornings",
+          triggerCondition: { hourRange: [9, 12] },
+          suggestedAction: "Check today's goals",
+          confidence: 70,
+        }]),
+      }],
     });
 
     const service = new ReflectionService(db, registry);
@@ -130,32 +119,55 @@ describe("ReflectionService.analyzeUserPatterns", () => {
     expect(mockComplete).toHaveBeenCalledOnce();
     expect(mockUpsertUserPattern).toHaveBeenCalledOnce();
     expect(mockUpsertUserPattern.mock.calls[0][1]).toMatchObject({
+      userId: "user-1",
       patternType: "time_preference",
-      description: "Active on weekday mornings",
-      suggestedAction: "Check today's goals",
-      confidence: 70,
     });
     expect(result).toHaveLength(1);
   });
 
+  it("computes action-pair sequences in the LLM prompt", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce(["user-1"]);
+
+    const now = Date.now();
+    const actions = [
+      { actionType: "goal_created", actionDetail: null, dayOfWeek: 1, hourOfDay: 10, createdAt: new Date(now) },
+      { actionType: "chat_message", actionDetail: null, dayOfWeek: 1, hourOfDay: 10, createdAt: new Date(now + 60_000) },
+      { actionType: "deploy_triggered", actionDetail: null, dayOfWeek: 1, hourOfDay: 10, createdAt: new Date(now + 120_000) },
+      { actionType: "goal_created", actionDetail: null, dayOfWeek: 1, hourOfDay: 10, createdAt: new Date(now + 180_000) },
+      { actionType: "chat_message", actionDetail: null, dayOfWeek: 1, hourOfDay: 10, createdAt: new Date(now + 240_000) },
+    ];
+    mockGetUserActionsForAnalysis.mockResolvedValueOnce(actions);
+
+    mockComplete.mockResolvedValue({
+      content: [{ type: "text", text: "[]" }],
+    });
+
+    const service = new ReflectionService(db, registry);
+    await service.analyzeUserPatterns();
+
+    expect(mockComplete).toHaveBeenCalledOnce();
+    const prompt = mockComplete.mock.calls[0][1].messages[0].content;
+    expect(prompt).toContain("goal_created → chat_message");
+  });
+
   it("clamps confidence to 0-100 range", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce(["user-1"]);
+
     const actions = Array.from({ length: 6 }, () => ({
       actionType: "chat_message",
       actionDetail: null,
       dayOfWeek: 1,
       hourOfDay: 10,
-      userId: "u1",
       createdAt: new Date(),
     }));
-
-    const db = createMockDb(actions);
+    mockGetUserActionsForAnalysis.mockResolvedValueOnce(actions);
 
     mockComplete.mockResolvedValue({
       content: [{
         type: "text",
         text: JSON.stringify([{
           patternType: "recurring_action",
-          description: "Over-confident pattern",
+          description: "Over-confident",
           triggerCondition: { dayOfWeek: 1 },
           suggestedAction: "Do something",
           confidence: 150,
@@ -169,40 +181,17 @@ describe("ReflectionService.analyzeUserPatterns", () => {
     expect(mockUpsertUserPattern.mock.calls[0][1].confidence).toBe(100);
   });
 
-  it("returns empty array when LLM returns no patterns", async () => {
-    const actions = Array.from({ length: 6 }, () => ({
-      actionType: "chat_message",
-      actionDetail: null,
-      dayOfWeek: 3,
-      hourOfDay: 14,
-      userId: "u1",
-      createdAt: new Date(),
-    }));
-
-    const db = createMockDb(actions);
-
-    mockComplete.mockResolvedValue({
-      content: [{ type: "text", text: "[]" }],
-    });
-
-    const service = new ReflectionService(db, registry);
-    const result = await service.analyzeUserPatterns();
-
-    expect(result).toEqual([]);
-    expect(mockUpsertUserPattern).not.toHaveBeenCalled();
-  });
-
-  it("cleans up old actions (> 90 days)", async () => {
-    const actions = Array.from({ length: 6 }, () => ({
-      actionType: "chat_message",
-      actionDetail: null,
-      dayOfWeek: 1,
-      hourOfDay: 10,
-      userId: "u1",
-      createdAt: new Date(),
-    }));
-
-    const db = createMockDb(actions);
+  it("cleans up old actions once after all users", async () => {
+    mockGetDistinctActionUserIds.mockResolvedValueOnce(["user-1"]);
+    mockGetUserActionsForAnalysis.mockResolvedValueOnce(
+      Array.from({ length: 6 }, () => ({
+        actionType: "chat_message",
+        actionDetail: null,
+        dayOfWeek: 1,
+        hourOfDay: 10,
+        createdAt: new Date(),
+      })),
+    );
 
     mockComplete.mockResolvedValue({
       content: [{ type: "text", text: "[]" }],
@@ -212,46 +201,5 @@ describe("ReflectionService.analyzeUserPatterns", () => {
     await service.analyzeUserPatterns();
 
     expect(mockDeleteOldUserActions).toHaveBeenCalledOnce();
-  });
-
-  it("handles multiple patterns from LLM", async () => {
-    const actions = Array.from({ length: 10 }, (_, i) => ({
-      actionType: i % 2 === 0 ? "chat_message" : "deploy_triggered",
-      actionDetail: null,
-      dayOfWeek: 5, // Friday
-      hourOfDay: 15,
-      userId: "u1",
-      createdAt: new Date(),
-    }));
-
-    const db = createMockDb(actions);
-
-    mockComplete.mockResolvedValue({
-      content: [{
-        type: "text",
-        text: JSON.stringify([
-          {
-            patternType: "recurring_action",
-            description: "Deploys on Fridays around 3 PM",
-            triggerCondition: { dayOfWeek: 5, hourRange: [14, 16] },
-            suggestedAction: "Run the test suite before deploying",
-            confidence: 85,
-          },
-          {
-            patternType: "time_preference",
-            description: "Most active on Friday afternoons",
-            triggerCondition: { dayOfWeek: 5, hourRange: [13, 17] },
-            suggestedAction: "Review pending approvals",
-            confidence: 60,
-          },
-        ]),
-      }],
-    });
-
-    const service = new ReflectionService(db, registry);
-    const result = await service.analyzeUserPatterns();
-
-    expect(result).toHaveLength(2);
-    expect(mockUpsertUserPattern).toHaveBeenCalledTimes(2);
   });
 });

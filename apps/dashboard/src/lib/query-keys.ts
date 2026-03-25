@@ -76,6 +76,7 @@ export const queryKeys = {
   patterns: {
     all: ["patterns"] as const,
     list: (userId?: string) => ["patterns", "list", userId ?? "all"] as const,
+    analytics: (userId?: string) => ["patterns", "analytics", userId ?? "all"] as const,
   },
   autonomy: {
     tiers: ["autonomy", "tiers"] as const,
@@ -147,5 +148,10 @@ export const queryKeys = {
   },
   search: {
     results: (q: string) => ["search", q] as const,
+  },
+  deploys: {
+    all: ["deploys"] as const,
+    latest: ["deploys", "latest"] as const,
+    list: ["deploys", "list"] as const,
   },
 };

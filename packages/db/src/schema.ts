@@ -210,6 +210,7 @@ export const memories = pgTable("memories", {
   accessCount: integer("access_count").notNull().default(0),
   lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
   source: text("source"),
+  agentRole: agentRoleEnum("agent_role"),
   metadata: jsonb("metadata"),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -547,17 +548,17 @@ export const deployments = pgTable("deployments", {
   rootCauseAnalysis: text("root_cause_analysis"),
   rolledBack: boolean("rolled_back").notNull().default(false),
   rollbackSha: text("rollback_sha"),
-  soakStatus: text("soak_status"),
+  soakStatus: text("soak_status"), // "monitoring" | "passed" | "degraded" | "failed"
   soakStartedAt: timestamp("soak_started_at", { withTimezone: true }),
   soakCompletedAt: timestamp("soak_completed_at", { withTimezone: true }),
-  soakMetrics: jsonb("soak_metrics"),
-  remediationActions: jsonb("remediation_actions"),
+  soakMetrics: jsonb("soak_metrics"), // [{checkAt, latencyMs, containerRestarts, healthy}]
+  remediationActions: jsonb("remediation_actions"), // [{action, result, timestamp}]
   gitDiffSummary: text("git_diff_summary"),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   completedAt: timestamp("completed_at", { withTimezone: true }),
 });
 
-/* ── Deploy Circuit Breaker ── */
+/* ── Deploy Circuit Breaker (single-row state for auto-deploy pause) ── */
 
 export const deployCircuitBreaker = pgTable("deploy_circuit_breaker", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -572,7 +573,7 @@ export const deployCircuitBreaker = pgTable("deploy_circuit_breaker", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-/* ── Session Engagement ── */
+/* ── Session Engagement (tracks user session interaction metrics) ── */
 
 export const sessionEngagement = pgTable("session_engagement", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -581,8 +582,8 @@ export const sessionEngagement = pgTable("session_engagement", {
   messageCount: integer("message_count").notNull().default(0),
   avgMessageLength: integer("avg_message_length").notNull().default(0),
   avgResponseIntervalMs: integer("avg_response_interval_ms").notNull().default(0),
-  complexityScore: integer("complexity_score").notNull().default(50),
-  energyLevel: text("energy_level").notNull().default("normal"),
+  complexityScore: integer("complexity_score").notNull().default(50), // 0-100
+  energyLevel: text("energy_level").notNull().default("normal"), // "high" | "normal" | "low"
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

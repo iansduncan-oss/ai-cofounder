@@ -1,6 +1,6 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
-import { getTriggeredPatterns } from "@ai-cofounder/db";
+import { getTriggeredPatterns, incrementPatternHitCount } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import { gatherBriefingData } from "./briefing.js";
 
@@ -58,6 +58,9 @@ export async function generateSuggestions(
           hourOfDay: now.getHours(),
         });
         if (patterns.length > 0) {
+          for (const p of patterns) {
+            incrementPatternHitCount(db, p.id).catch(() => {});
+          }
           const patternDescs = patterns
             .map((p) => `- ${p.description} → suggested: "${p.suggestedAction}" (confidence: ${p.confidence}%)`)
             .join("\n");

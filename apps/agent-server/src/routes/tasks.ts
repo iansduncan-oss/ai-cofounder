@@ -28,6 +28,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["tasks"], body: CreateTaskBody } },
     async (request, reply) => {
       const task = await createTask(app.db, request.body);
+      app.wsBroadcast?.("tasks");
       return reply.status(201).send(task);
     },
   );
@@ -78,6 +79,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const task = await assignTask(app.db, request.params.id, request.body.agent);
       if (!task) return reply.status(404).send({ error: "Task not found" });
+      app.wsBroadcast?.("tasks");
       return task;
     },
   );
@@ -89,6 +91,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const task = await startTask(app.db, request.params.id);
       if (!task) return reply.status(404).send({ error: "Task not found" });
+      app.wsBroadcast?.("tasks");
       return task;
     },
   );
@@ -103,6 +106,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const task = await completeTask(app.db, request.params.id, request.body.result);
       if (!task) return reply.status(404).send({ error: "Task not found" });
+      app.wsBroadcast?.("tasks");
       return task;
     },
   );
@@ -114,6 +118,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
   }>("/:id/fail", { schema: { tags: ["tasks"], params: IdParams, body: FailTaskBody } }, async (request, reply) => {
     const task = await failTask(app.db, request.params.id, request.body.error);
     if (!task) return reply.status(404).send({ error: "Task not found" });
+    app.wsBroadcast?.("tasks");
     return task;
   });
 };

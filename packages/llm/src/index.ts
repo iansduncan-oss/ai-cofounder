@@ -20,6 +20,7 @@ export {
   type ProviderStatsSnapshot,
   type CompletionEvent,
   type OnCompletionCallback,
+  type RoutingOptions,
 } from "./registry.js";
 
 export { AnthropicProvider } from "./providers/anthropic.js";
