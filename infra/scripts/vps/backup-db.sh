@@ -23,10 +23,10 @@ mkdir -p "$AVION_BACKUP_DIR" "$AVION_LATEST_DIR" "$N8N_BACKUP_DIR"
 
 ERRORS=()
 
-# Backup avion database
-log "Starting avion database backup..."
+# Backup ai_cofounder database
+log "Starting ai_cofounder database backup..."
 AVION_FILE="${AVION_BACKUP_DIR}/avion_${TIMESTAMP}.sql.gz"
-if docker exec "$PG_CONTAINER" pg_dump -U avion avion | gzip > "$AVION_FILE" 2>/dev/null; then
+if docker exec "$PG_CONTAINER" pg_dump -U avion ai_cofounder | gzip > "$AVION_FILE" 2>/dev/null; then
   AVION_SIZE=$(du -sh "$AVION_FILE" | cut -f1)
   log "avion backup complete: ${AVION_FILE} (${AVION_SIZE})"
 
