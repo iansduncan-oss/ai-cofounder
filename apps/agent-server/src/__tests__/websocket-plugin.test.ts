@@ -77,11 +77,13 @@ vi.mock("@ai-cofounder/sandbox", () => ({
 }));
 
 import WebSocket from "ws";
+import { _wsClients } from "../plugins/websocket.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
 
 beforeEach(async () => {
+  _wsClients.clear();
   const { buildServer } = await import("../server.js");
   const server = buildServer();
   app = server.app;
@@ -90,6 +92,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  _wsClients.clear();
   await app?.close();
 });
 
@@ -201,12 +204,15 @@ describe("WebSocket plugin", () => {
   it("handles unsubscribe", async () => {
     const ws = await connectWs();
 
-    // Subscribe then unsubscribe
+    // Subscribe, then confirm via ping/pong
     ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
-    await new Promise((r) => setTimeout(r, 50));
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    await waitForMessage(ws); // pong confirms subscribe processed
 
+    // Unsubscribe, then confirm via ping/pong
     ws.send(JSON.stringify({ type: "unsubscribe", channels: ["tasks"] } satisfies WsClientMessage));
-    await new Promise((r) => setTimeout(r, 50));
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    await waitForMessage(ws); // pong confirms unsubscribe processed
 
     // Broadcast to tasks — should not receive
     let received = false;
@@ -224,10 +230,12 @@ describe("WebSocket plugin", () => {
 
     const goalId = "test-goal-123";
     ws.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
-    await new Promise((r) => setTimeout(r, 50));
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    await waitForMessage(ws); // pong confirms subscribe_goal processed
 
     ws.send(JSON.stringify({ type: "unsubscribe_goal", goalId } satisfies WsClientMessage));
-    await new Promise((r) => setTimeout(r, 50));
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    await waitForMessage(ws); // pong confirms unsubscribe_goal processed
 
     // Should not crash
     ws.close();
