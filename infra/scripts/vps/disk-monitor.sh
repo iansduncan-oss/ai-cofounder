@@ -17,8 +17,8 @@ ALERTS=()
 log "Checking disk usage..."
 
 # Check root partition disk usage
-ROOT_PCT=$(df / --output=pcent | tail -1 | tr -dc '0-9')
-ROOT_FREE=$(df -h / --output=avail | tail -1 | xargs)
+ROOT_PCT=$(df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
+ROOT_FREE=$(df -h / | awk 'NR==2 {print $4}')
 log "Root partition: ${ROOT_PCT}% used (${ROOT_FREE} free)"
 
 if [[ $ROOT_PCT -ge 95 ]]; then
@@ -30,7 +30,7 @@ elif [[ $ROOT_PCT -ge $DISK_WARN_PCT ]]; then
 fi
 
 # Check inode usage
-INODE_PCT=$(df -i / --output=ipcent | tail -1 | tr -dc '0-9')
+INODE_PCT=$(df -i / | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
 log "Root inodes: ${INODE_PCT}% used"
 
 if [[ $INODE_PCT -ge $INODE_WARN_PCT ]]; then
@@ -40,8 +40,8 @@ fi
 
 # Check /backups partition if mounted
 if mountpoint -q /backups 2>/dev/null; then
-  BACKUP_PCT=$(df /backups --output=pcent | tail -1 | tr -dc '0-9')
-  BACKUP_FREE=$(df -h /backups --output=avail | tail -1 | xargs)
+  BACKUP_PCT=$(df /backups | awk 'NR==2 {gsub(/%/,"",$5); print $5}')
+  BACKUP_FREE=$(df -h /backups | awk 'NR==2 {print $4}')
   log "Backup partition: ${BACKUP_PCT}% used (${BACKUP_FREE} free)"
 
   if [[ $BACKUP_PCT -ge $DISK_WARN_PCT ]]; then

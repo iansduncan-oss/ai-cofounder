@@ -48,7 +48,8 @@ else
     log "Decompression successful"
 
     # Count tables in the dump (look for CREATE TABLE statements)
-    TABLE_COUNT=$(grep -c 'CREATE TABLE' "$TEMP_SQL" 2>/dev/null || echo "0")
+    TABLE_COUNT=$(grep -c 'CREATE TABLE' "$TEMP_SQL" 2>/dev/null || true)
+    TABLE_COUNT=${TABLE_COUNT:-0}
     log "Found ${TABLE_COUNT} CREATE TABLE statements"
 
     if [[ $TABLE_COUNT -lt $EXPECTED_MIN_TABLES ]]; then
