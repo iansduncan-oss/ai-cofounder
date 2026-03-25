@@ -102,7 +102,14 @@ async function run() {
 
   if (needSetup) {
     console.log("First-time setup detected. Creating admin account...");
-    await emit(socket, "setup", { username: USERNAME, password: PASSWORD });
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("Timeout on setup")), 15_000);
+      socket.emit("setup", USERNAME, PASSWORD, (res) => {
+        clearTimeout(timeout);
+        if (res.ok) resolve(res);
+        else reject(new Error(res.msg || "setup failed"));
+      });
+    });
     console.log("Admin account created.");
   }
 
@@ -149,7 +156,7 @@ async function run() {
       maxretries: 3,
       accepted_statuscodes: ["200-299"],
       notificationIDList: {},
-      ...(mon.type === "keyword" ? { keyword: mon.keyword, keywordType: "json" } : {}),
+      ...(mon.type === "keyword" ? { keyword: mon.keyword } : {}),
     };
 
     const res = await emit(socket, "add", monitorData);
@@ -174,6 +181,7 @@ async function run() {
       interval: mon.interval,
       retryInterval: 60,
       maxretries: 3,
+      accepted_statuscodes: ["200-299"],
       notificationIDList: {},
     };
 
