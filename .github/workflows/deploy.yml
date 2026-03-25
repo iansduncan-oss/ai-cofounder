@@ -45,7 +45,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
             -d "{\"event\":\"deploy_started\",\"commitSha\":\"${COMMIT_SHA}\",\"shortSha\":\"${SHORT_SHA}\",\"branch\":\"main\",\"previousSha\":\"${PREVIOUS_SHA}\",\"services\":[\"agent-server\",\"discord-bot\",\"slack-bot\"],\"triggeredBy\":\"ci\"}" \
-            || true
+            || echo "::warning::Deploy webhook notification failed (deploy_started)"
 
       - name: Deploy via SSH
         id: deploy
@@ -70,9 +70,22 @@ jobs:
           echo "==> Saving previous image SHA for rollback..."
           PREVIOUS_SHA=$(sudo docker inspect --format='{{index .Config.Labels "git.sha"}}' ai-cofounder-agent-server:latest 2>/dev/null || echo "")
 
+          DEPLOY_START=$(date +%s)
+
           echo "==> Pulling latest code..."
           git fetch origin main
           git reset --hard origin/main
+
+          echo "==> Validating compose files..."
+          for f in docker-compose.prod.yml docker-compose.n8n.yml docker-compose.uptimekuma.yml docker-compose.monitoring.yml; do
+            if [ -f "$f" ]; then
+              if ! sudo docker compose -f "$f" config --quiet 2>&1; then
+                echo "ERROR: Invalid compose file: $f"
+                exit 1
+              fi
+              echo "  ok: $f"
+            fi
+          done
 
           echo "==> Building Docker images (tagged: ${SHORT_SHA})..."
           sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-agent-server:${SHA} -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
@@ -167,7 +180,9 @@ jobs:
           echo "==> Pruning images older than 72h..."
           sudo docker image prune -a --filter "until=72h" -f
 
-          echo "==> Deploy complete (${SHORT_SHA})!"
+          DEPLOY_END=$(date +%s)
+          DEPLOY_DURATION=$((DEPLOY_END - DEPLOY_START))
+          echo "==> Deploy complete (${SHORT_SHA}) in ${DEPLOY_DURATION}s!"
           DEPLOY
 
       - name: Notify deploy completed
@@ -181,7 +196,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
             -d "{\"event\":\"deploy_completed\",\"commitSha\":\"${COMMIT_SHA}\"}" \
-            || true
+            || echo "::warning::Deploy webhook notification failed (deploy_completed)"
 
       - name: Notify deploy failed
         if: failure() && inputs.dry_run != true
@@ -194,7 +209,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${DEPLOY_WEBHOOK_SECRET}" \
             -d "{\"event\":\"deploy_failed\",\"commitSha\":\"${COMMIT_SHA}\",\"error\":\"Deploy step failed — check GitHub Actions logs\"}" \
-            || true
+            || echo "::warning::Deploy webhook notification failed (deploy_failed)"
 
       - name: Notify deploy rolled back
         if: failure() && inputs.dry_run != true

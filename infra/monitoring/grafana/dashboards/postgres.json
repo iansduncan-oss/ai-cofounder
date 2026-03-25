@@ -1,0 +1,246 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Active Connections",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count{datname=\"avion\"}",
+          "legendFormat": "Connections",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Transaction Rate",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"avion\"}[5m]) + rate(pg_stat_database_xact_rollback{datname=\"avion\"}[5m])",
+          "legendFormat": "TPS",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hit Ratio",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.9 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_database_blks_hit{datname=\"avion\"} / (pg_stat_database_blks_hit{datname=\"avion\"} + pg_stat_database_blks_read{datname=\"avion\"})",
+          "legendFormat": "Cache Hit %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Database Size",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1073741824 },
+              { "color": "red", "value": 5368709120 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_database_size_bytes{datname=\"avion\"}",
+          "legendFormat": "avion",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Connections Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20 },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count{datname=\"avion\"}",
+          "legendFormat": "avion",
+          "refId": "A"
+        },
+        {
+          "expr": "pg_stat_activity_count{datname=\"n8n\"}",
+          "legendFormat": "n8n",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Transaction Rate Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 15 },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "rollback.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_xact_commit{datname=\"avion\"}[5m])",
+          "legendFormat": "commits",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(pg_stat_database_xact_rollback{datname=\"avion\"}[5m])",
+          "legendFormat": "rollbacks",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hit Ratio Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 },
+          "unit": "percentunit",
+          "min": 0.8,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_blks_hit{datname=\"avion\"}[5m]) / (rate(pg_stat_database_blks_hit{datname=\"avion\"}[5m]) + rate(pg_stat_database_blks_read{datname=\"avion\"}[5m]))",
+          "legendFormat": "Cache Hit %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Table Sizes (Top 10)",
+      "type": "bargauge",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "yellow", "value": 104857600 },
+              { "color": "red", "value": 536870912 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "topk(10, pg_stat_user_tables_size_bytes{datname=\"avion\"})",
+          "legendFormat": "{{relname}}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": ["ai-cofounder", "postgres"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI Cofounder — PostgreSQL",
+  "uid": "ai-cofounder-postgres",
+  "version": 1
+}

@@ -7,16 +7,12 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands gh jq
+start_timer
 
 REPO="iansduncan-oss/ai-cofounder"
 
 log "Checking Dependabot alerts for ${REPO}..."
-
-# Verify gh CLI is available and authenticated
-if ! command -v gh &>/dev/null; then
-  log_error "gh CLI not found"
-  exit 1
-fi
 
 # Fetch open Dependabot alerts (critical + high only)
 ALERTS_JSON=$(gh api "repos/${REPO}/dependabot/alerts?state=open&severity=critical,high&per_page=100" 2>&1) || {
@@ -67,3 +63,4 @@ notify_discord \
   "[{\"name\":\"Critical\",\"value\":\"${CRITICAL}\",\"inline\":true},{\"name\":\"High\",\"value\":\"${HIGH}\",\"inline\":true},{\"name\":\"Total\",\"value\":\"${TOTAL}\",\"inline\":true}]"
 
 log "Alert sent"
+heartbeat "github-security"

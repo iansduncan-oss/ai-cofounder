@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands brew
+start_timer
 
 log "Starting weekly Mac maintenance..."
 
@@ -15,19 +17,32 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 SUMMARY=()
 
-# --- Homebrew updates ---
-log "Running brew update..."
-BREW_UPDATE=$(brew update 2>&1)
-
-# Check for outdated packages
-OUTDATED=$(brew outdated 2>/dev/null)
-if [[ -n "$OUTDATED" ]]; then
-  OUTDATED_COUNT=$(echo "$OUTDATED" | wc -l | tr -d ' ')
-  log "Upgrading ${OUTDATED_COUNT} packages..."
-  brew upgrade 2>&1 | tail -5
-  SUMMARY+=("Upgraded **${OUTDATED_COUNT}** brew packages")
+# --- Disk space pre-check ---
+FREE_KB=$(df -k / | awk 'NR==2{print $4}')
+FREE_GB=$((FREE_KB / 1048576))
+if [[ $FREE_GB -lt 2 ]]; then
+  log_error "Only ${FREE_GB}GB free — skipping brew upgrade"
+  notify_discord \
+    "Mac Maintenance: Low Disk Space" \
+    "Only **${FREE_GB}GB** free on root — skipping brew upgrade to avoid filling disk." \
+    "$COLOR_RED" \
+    "[{\"name\":\"Free Space\",\"value\":\"${FREE_GB}GB\",\"inline\":true}]"
+  SUMMARY+=("Skipped brew upgrade — only ${FREE_GB}GB free")
 else
-  SUMMARY+=("All brew packages up to date")
+  # --- Homebrew updates ---
+  log "Running brew update..."
+  BREW_UPDATE=$(brew update 2>&1)
+
+  # Check for outdated packages
+  OUTDATED=$(brew outdated 2>/dev/null)
+  if [[ -n "$OUTDATED" ]]; then
+    OUTDATED_COUNT=$(echo "$OUTDATED" | wc -l | tr -d ' ')
+    log "Upgrading ${OUTDATED_COUNT} packages..."
+    brew upgrade 2>&1 | tail -5
+    SUMMARY+=("Upgraded **${OUTDATED_COUNT}** brew packages")
+  else
+    SUMMARY+=("All brew packages up to date")
+  fi
 fi
 
 # Cleanup old versions
@@ -73,3 +88,4 @@ notify_discord \
   "[{\"name\":\"Disk Used\",\"value\":\"${DISK_USAGE}\",\"inline\":true},{\"name\":\"Free\",\"value\":\"${DISK_FREE}\",\"inline\":true},{\"name\":\"Total\",\"value\":\"${DISK_TOTAL}\",\"inline\":true}]"
 
 log "Weekly maintenance complete"
+heartbeat "mac-maintenance"

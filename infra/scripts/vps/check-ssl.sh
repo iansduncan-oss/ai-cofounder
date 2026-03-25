@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands openssl
+start_timer
 
 DOMAINS=(
   "api.aviontechs.com"
@@ -70,3 +72,4 @@ if [[ ${#WARNINGS[@]} -gt 0 ]]; then
 fi
 
 log "SSL check complete"
+heartbeat "check-ssl"

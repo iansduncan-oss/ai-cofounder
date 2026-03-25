@@ -78,3 +78,84 @@ groups:
         annotations:
           summary: "Backup is stale"
           description: "No successful backup recorded in the last 36 hours."
+
+  - name: infrastructure
+    rules:
+      - alert: HighDiskUsage
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/"}) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on root partition"
+          description: "Root partition is {{ $value | humanize }}% full."
+
+      - alert: CriticalDiskUsage
+        expr: 100 - ((node_filesystem_avail_bytes{mountpoint="/",fstype!="tmpfs"} / node_filesystem_size_bytes{mountpoint="/"}) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical disk usage on root partition"
+          description: "Root partition is {{ $value | humanize }}% full — immediate action required."
+
+      - alert: HighContainerMemory
+        expr: (container_memory_usage_bytes{name=~"ai-cofounder.*"} / container_spec_memory_limit_bytes{name=~"ai-cofounder.*"}) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} memory usage high"
+          description: "Container {{ $labels.name }} is using {{ $value | humanizePercentage }} of its memory limit."
+
+      - alert: HighHostMemory
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High host memory usage"
+          description: "Host memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: HighDatabaseConnections
+        expr: pg_stat_activity_count{datname="avion"} > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connections"
+          description: "Avion database has {{ $value }} active connections (threshold: 80)."
+
+  - name: llm-health
+    rules:
+      - alert: LlmProviderHighErrorRate
+        expr: |
+          sum by (provider) (rate(llm_requests_total{status="error"}[10m]))
+          / sum by (provider) (rate(llm_requests_total[10m]))
+          > 0.2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} high error rate"
+          description: "Provider {{ $labels.provider }} error rate is {{ $value | humanizePercentage }} over 10 minutes."
+
+      - alert: LlmHighLatency
+        expr: histogram_quantile(0.95, sum by (le, provider) (rate(llm_request_duration_seconds_bucket[10m]))) > 30
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} high latency"
+          description: "Provider {{ $labels.provider }} p95 latency is {{ $value | humanize }}s."
+
+  - name: http
+    rules:
+      - alert: HighHttpLatency
+        expr: histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{job="agent-server"}[5m]))) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP latency on agent-server"
+          description: "p99 HTTP latency is {{ $value | humanize }}s (threshold: 5s)."

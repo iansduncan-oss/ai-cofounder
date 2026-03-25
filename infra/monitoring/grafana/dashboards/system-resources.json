@@ -1,0 +1,294 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "CPU Usage",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.7 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+          "legendFormat": "CPU",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Memory Usage",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.7 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+          "legendFormat": "Memory",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Disk Usage (/)",
+      "type": "gauge",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.75 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "1 - (node_filesystem_avail_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"} / node_filesystem_size_bytes{mountpoint=\"/\",fstype!=\"tmpfs\"})",
+          "legendFormat": "Disk",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Network I/O",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{device=\"eth0\"}[5m])",
+          "legendFormat": "RX",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total{device=\"eth0\"}[5m])",
+          "legendFormat": "TX",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "CPU Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "gradientMode": "scheme" },
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.7 },
+              { "color": "red", "value": 0.9 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+          "legendFormat": "CPU %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Memory Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "gradientMode": "scheme" },
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 7516192768 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes",
+          "legendFormat": "Used",
+          "refId": "A"
+        },
+        {
+          "expr": "node_memory_MemTotal_bytes",
+          "legendFormat": "Total",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Disk I/O Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 15 },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(node_disk_read_bytes_total[5m])",
+          "legendFormat": "Read {{device}}",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_disk_written_bytes_total[5m])",
+          "legendFormat": "Write {{device}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Network Traffic",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20 },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "TX.*" },
+            "properties": [{ "id": "custom.transform", "value": "negative-Y" }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{device=\"eth0\"}[5m])",
+          "legendFormat": "RX eth0",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total{device=\"eth0\"}[5m])",
+          "legendFormat": "TX eth0",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Container Resource Usage",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "CPU %" },
+            "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "decimals", "value": 2 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Memory" },
+            "properties": [{ "id": "unit", "value": "bytes" }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum by (name) (rate(container_cpu_usage_seconds_total{name=~\"ai-cofounder.*|n8n|uptime-kuma|avion-postgres-1\"}[5m]))",
+          "legendFormat": "{{name}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        },
+        {
+          "expr": "container_memory_usage_bytes{name=~\"ai-cofounder.*|n8n|uptime-kuma|avion-postgres-1\"}",
+          "legendFormat": "{{name}}",
+          "refId": "B",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "id": true, "image": true, "instance": true, "job": true },
+            "renameByName": { "name": "Container", "Value #A": "CPU %", "Value #B": "Memory" }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ai-cofounder", "system"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI Cofounder — System Resources",
+  "uid": "ai-cofounder-system-resources",
+  "version": 1
+}

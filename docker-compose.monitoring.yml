@@ -85,6 +85,24 @@ services:
     networks:
       - avion_avion_net
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: ai-cofounder-postgres-exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://avion:${POSTGRES_PASSWORD}@avion-postgres-1:5432/avion?sslmode=disable
+    networks:
+      - avion_avion_net
+
+  alertmanager-discord:
+    image: benjojo/alertmanager-discord:latest
+    container_name: ai-cofounder-alertmanager-discord
+    restart: unless-stopped
+    environment:
+      - DISCORD_WEBHOOK=${ALERTMANAGER_DISCORD_WEBHOOK_URL}
+    networks:
+      - avion_avion_net
+
 volumes:
   prometheus_data:
   grafana_data:

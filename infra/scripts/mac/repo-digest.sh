@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands git
+start_timer
 
 PROJECTS_DIR="$HOME/Projects"
 STALE_BRANCH_DAYS=30
@@ -85,3 +87,5 @@ if [[ ${#SECTIONS[@]} -gt 0 ]]; then
 else
   log "All repos clean — no notification sent"
 fi
+
+heartbeat "repo-digest"

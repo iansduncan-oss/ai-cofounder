@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands docker gzip
+start_timer
 
 PG_CONTAINER="avion-postgres-1"
 RETENTION_DAYS=7
@@ -68,3 +70,4 @@ if [[ ${#ERRORS[@]} -gt 0 ]]; then
 fi
 
 log "All backups completed successfully"
+heartbeat "backup-db"

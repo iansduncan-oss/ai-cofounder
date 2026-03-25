@@ -28,6 +28,13 @@ const httpRequestDurationAvgMs = new client.Gauge({
   labelNames: ["route"] as const,
 });
 
+const httpRequestDurationSeconds = new client.Histogram({
+  name: "http_request_duration_seconds",
+  help: "HTTP request duration in seconds",
+  labelNames: ["method", "route", "status"] as const,
+  buckets: [0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+});
+
 const processMemoryRssBytes = new client.Gauge({
   name: "process_memory_rss_bytes",
   help: "Process RSS memory in bytes",
@@ -329,6 +336,10 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
     if (startTime && !skipDuration) {
       const durationMs = Number(process.hrtime.bigint() - startTime) / 1_000_000;
       recordDuration(normalizedRoute, durationMs);
+      httpRequestDurationSeconds.observe(
+        { method, route: normalizedRoute, status: String(statusCode) },
+        durationMs / 1000,
+      );
     }
   });
 

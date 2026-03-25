@@ -37,6 +37,41 @@ log_error() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $*" >&2
 }
 
+# Validate required commands exist — call after sourcing common.sh
+require_commands() {
+  local missing=()
+  for cmd in "$@"; do
+    if ! command -v "$cmd" &>/dev/null; then
+      missing+=("$cmd")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    log_error "Missing required commands: ${missing[*]}"
+    exit 1
+  fi
+}
+
+# Execution timing — call start_timer at script start, heartbeat at end
+_SCRIPT_START_EPOCH=""
+start_timer() {
+  _SCRIPT_START_EPOCH=$(date +%s)
+}
+
+heartbeat() {
+  local script_name="${1:-$(basename "$0" .sh)}"
+  if [[ "${HEARTBEAT_ENABLED:-false}" != "true" || -z "$_SCRIPT_START_EPOCH" ]]; then
+    return 0
+  fi
+  local elapsed=$(( $(date +%s) - _SCRIPT_START_EPOCH ))
+  local mins=$((elapsed / 60))
+  local secs=$((elapsed % 60))
+  notify_discord \
+    "${script_name} completed" \
+    "Finished in ${mins}m ${secs}s" \
+    "$COLOR_GREEN" \
+    "[{\"name\":\"Host\",\"value\":\"$(hostname)\",\"inline\":true},{\"name\":\"Duration\",\"value\":\"${mins}m ${secs}s\",\"inline\":true}]"
+}
+
 # Discord notification with retry (max 3 attempts)
 notify_discord() {
   local title="$1"
@@ -65,7 +100,8 @@ EOF
   local attempt
   for attempt in 1 2 3; do
     local http_code
-    http_code=$(curl -s -o /dev/null -w '%{http_code}' \
+    http_code=$(curl --connect-timeout 5 --max-time 10 \
+      -s -o /dev/null -w '%{http_code}' \
       -H "Content-Type: application/json" \
       -d "$payload" \
       "$DISCORD_NOTIFICATION_WEBHOOK_URL") || true

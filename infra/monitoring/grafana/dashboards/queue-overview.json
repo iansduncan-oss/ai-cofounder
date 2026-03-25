@@ -1,0 +1,196 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Queue Depth by Name",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "queue_depth{job=\"agent-server\"}",
+          "legendFormat": "{{queue}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "DLQ Size",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "dlq_size_total{job=\"agent-server\"}",
+          "legendFormat": "DLQ",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Active Jobs",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(queue_active_jobs{job=\"agent-server\"})",
+          "legendFormat": "Active",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Stale Jobs",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(queue_stale_jobs{job=\"agent-server\"})",
+          "legendFormat": "Stale",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Completion Rate (1m)",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "thresholds": {
+            "steps": [{ "color": "green", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(queue_jobs_completed_total{job=\"agent-server\"}[1m]))",
+          "legendFormat": "Completed/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Completed vs Failed Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 15 },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "failed.*" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "expr": "sum by (queue) (rate(queue_jobs_completed_total{job=\"agent-server\"}[5m]))",
+          "legendFormat": "completed: {{queue}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (queue) (rate(queue_jobs_failed_total{job=\"agent-server\"}[5m]))",
+          "legendFormat": "failed: {{queue}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Queue Breakdown",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [{ "displayName": "queue", "desc": false }]
+      },
+      "targets": [
+        {
+          "expr": "queue_depth{job=\"agent-server\"}",
+          "legendFormat": "{{queue}}",
+          "refId": "A",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "__name__": true, "instance": true, "job": true },
+            "renameByName": { "queue": "Queue", "Value": "Waiting" }
+          }
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["ai-cofounder", "queues"],
+  "templating": { "list": [] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "AI Cofounder — Queue Overview",
+  "uid": "ai-cofounder-queue-overview",
+  "version": 1
+}

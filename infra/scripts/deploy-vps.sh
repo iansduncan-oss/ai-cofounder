@@ -23,6 +23,11 @@ scp "${VPS_SCRIPTS_DIR}/common.sh" \
     "${VPS_SCRIPTS_DIR}/daily-status.sh" \
     "${VPS_SCRIPTS_DIR}/cost-tracker.sh" \
     "${VPS_SCRIPTS_DIR}/stale-branch-cleaner.sh" \
+    "${VPS_SCRIPTS_DIR}/log-rotation.sh" \
+    "${VPS_SCRIPTS_DIR}/disk-monitor.sh" \
+    "${VPS_SCRIPTS_DIR}/container-health.sh" \
+    "${VPS_SCRIPTS_DIR}/backup-verify.sh" \
+    "${VPS_SCRIPTS_DIR}/cron-verify.sh" \
     "${VPS_HOST}:/tmp/automation-scripts/"
 
 ssh "$VPS_HOST" "sudo mv /tmp/automation-scripts/* ${REMOTE_DIR}/ && rmdir /tmp/automation-scripts"
@@ -44,7 +49,7 @@ ssh "$VPS_HOST" "test -f ${REMOTE_DIR}/.env" || {
 echo "Installing crontab entries..."
 ssh "$VPS_HOST" 'bash -s' << 'CRON_SCRIPT'
 # Get existing crontab, remove old backup entries
-EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner' || true)
+EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner\|log-rotation\|disk-monitor\|container-health\|backup-verify\|cron-verify' || true)
 
 # Write new crontab
 {
@@ -57,6 +62,11 @@ EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|che
   echo "0 7 * * * /opt/scripts/daily-status.sh >> /var/log/automation/daily-status.log 2>&1"
   echo "0 20 * * * /opt/scripts/cost-tracker.sh >> /var/log/automation/cost-tracker.log 2>&1"
   echo "30 3 * * 0 /opt/scripts/stale-branch-cleaner.sh >> /var/log/automation/stale-branch-cleaner.log 2>&1"
+  echo "30 3 * * * /opt/scripts/log-rotation.sh >> /var/log/automation/log-rotation.log 2>&1"
+  echo "0 */6 * * * /opt/scripts/disk-monitor.sh >> /var/log/automation/disk-monitor.log 2>&1"
+  echo "*/30 * * * * /opt/scripts/container-health.sh >> /var/log/automation/container-health.log 2>&1"
+  echo "0 4 * * 0 /opt/scripts/backup-verify.sh >> /var/log/automation/backup-verify.log 2>&1"
+  echo "0 6 * * 1 /opt/scripts/cron-verify.sh >> /var/log/automation/cron-verify.log 2>&1"
 } | sudo crontab -
 CRON_SCRIPT
 
@@ -64,7 +74,7 @@ echo ""
 echo "=== Deployment complete ==="
 echo ""
 echo "Installed crontab:"
-ssh "$VPS_HOST" "sudo crontab -l | grep -A1 'Automation\|backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner'"
+ssh "$VPS_HOST" "sudo crontab -l | grep -A1 'Automation\|backup-db\|docker-cleanup\|check-ssl\|daily-status\|cost-tracker\|stale-branch-cleaner\|log-rotation\|disk-monitor\|container-health\|backup-verify\|cron-verify'"
 echo ""
 echo "To run backup manually:     ssh ${VPS_HOST} 'sudo /opt/scripts/backup-db.sh'"
 echo "To run status manually:     ssh ${VPS_HOST} 'sudo /opt/scripts/daily-status.sh'"

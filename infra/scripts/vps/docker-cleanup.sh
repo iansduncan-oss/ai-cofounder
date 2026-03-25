@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands docker
+start_timer
 
 log "Starting Docker cleanup..."
 
@@ -15,19 +17,35 @@ BEFORE=$(df / --output=used | tail -1 | tr -d ' ')
 
 # Prune dangling images
 log "Pruning dangling images..."
-docker image prune -f 2>/dev/null || true
+if OUTPUT=$(docker image prune -f 2>&1); then
+  log "Image prune done"
+else
+  log_error "Image prune failed: ${OUTPUT}"
+fi
 
 # Prune stopped containers older than 24h
 log "Pruning stopped containers (>24h)..."
-docker container prune -f --filter "until=24h" 2>/dev/null || true
+if OUTPUT=$(docker container prune -f --filter "until=24h" 2>&1); then
+  log "Container prune done"
+else
+  log_error "Container prune failed: ${OUTPUT}"
+fi
 
 # Prune unused volumes (not attached to any container)
 log "Pruning unused volumes..."
-docker volume prune -f 2>/dev/null || true
+if OUTPUT=$(docker volume prune -f 2>&1); then
+  log "Volume prune done"
+else
+  log_error "Volume prune failed: ${OUTPUT}"
+fi
 
 # Prune build cache older than 7 days
 log "Pruning build cache (>7d)..."
-docker builder prune -f --filter "until=168h" 2>/dev/null || true
+if OUTPUT=$(docker builder prune -f --filter "until=168h" 2>&1); then
+  log "Build cache prune done"
+else
+  log_error "Build cache prune failed: ${OUTPUT}"
+fi
 
 # Capture disk usage after
 AFTER=$(df / --output=used | tail -1 | tr -d ' ')
@@ -51,3 +69,4 @@ if [[ $FREED_MB -gt 500 ]]; then
 fi
 
 log "Docker cleanup complete"
+heartbeat "docker-cleanup"

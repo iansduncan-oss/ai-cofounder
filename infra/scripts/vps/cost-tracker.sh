@@ -7,8 +7,10 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands curl python3
+start_timer
 
-API_BASE="http://localhost:3100"
+API_BASE="${AGENT_SERVER_URL:-http://localhost:3100}"
 
 log "Starting daily cost report..."
 
@@ -135,3 +137,4 @@ notify_discord \
   "[{\"name\":\"Report Time\",\"value\":\"${TIMESTAMP}\",\"inline\":true}]"
 
 log "Daily cost report sent"
+heartbeat "cost-tracker"

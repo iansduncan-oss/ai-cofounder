@@ -7,6 +7,8 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
+require_commands git
+start_timer
 
 REPO_DIR="/opt/ai-cofounder"
 PROTECTED_BRANCHES="main|develop|staging"
@@ -65,3 +67,5 @@ if [[ ${#DELETED[@]} -gt 0 ]]; then
 else
   log "No stale branches to delete (all merged branches are recent)"
 fi
+
+heartbeat "stale-branch-cleaner"
