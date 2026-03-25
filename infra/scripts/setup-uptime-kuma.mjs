@@ -95,7 +95,18 @@ async function run() {
     socket.on("connect_error", (err) => reject(new Error(`Connection failed: ${err.message}`)));
   });
 
-  console.log("Connected. Logging in...");
+  // Check if initial setup is needed (no admin account yet)
+  const needSetup = await new Promise((resolve) => {
+    socket.emit("needSetup", (needSetup) => resolve(needSetup));
+  });
+
+  if (needSetup) {
+    console.log("First-time setup detected. Creating admin account...");
+    await emit(socket, "setup", { username: USERNAME, password: PASSWORD });
+    console.log("Admin account created.");
+  }
+
+  console.log("Logging in...");
 
   const loginRes = await emit(socket, "login", {
     username: USERNAME,
