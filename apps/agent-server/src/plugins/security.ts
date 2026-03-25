@@ -197,6 +197,14 @@ function startCleanup(): NodeJS.Timeout {
   return interval;
 }
 
+/** Reset all module-level security state. For testing only. */
+export function _resetSecurityState(): void {
+  ipHits.clear();
+  bannedIps.clear();
+  generalBucket.map.clear();
+  expensiveBucket.map.clear();
+}
+
 export const securityPlugin = fp(async (app: FastifyInstance) => {
   // Make DB available to recordHit for ban logging once ready
   app.addHook("onReady", async () => {
