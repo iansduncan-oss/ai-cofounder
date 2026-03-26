@@ -354,8 +354,11 @@ export function mockDbModule() {
     failurePatterns: {},
     // Global search
     globalSearch: vi.fn().mockResolvedValue({ goals: [], tasks: [], conversations: [], memories: [] }),
-    // Action heatmap
-    getActionHeatmap: vi.fn().mockResolvedValue([]),
+    // Missing event mocks
+    getEventById: vi.fn().mockResolvedValue(null),
+    resetEventProcessed: vi.fn().mockResolvedValue(undefined),
+    // Missing conversation mock
+    updateConversationTitle: vi.fn().mockResolvedValue(undefined),
     // Drizzle ORM operators (re-exported by @ai-cofounder/db)
     eq: vi.fn((...args: unknown[]) => ({ op: "eq", args })),
     and: vi.fn((...args: unknown[]) => ({ op: "and", args })),

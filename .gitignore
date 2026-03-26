@@ -20,6 +20,7 @@ dist/
 .claude/git-state.md
 .claude/commit-log.md
 .claude/next-session-prompt.md
+.claude/settings.local.json
 
 # Build artifacts
 **/tsconfig.tsbuildinfo

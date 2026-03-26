@@ -24,7 +24,6 @@ import {
   Workflow,
   Bell,
   PlayCircle,
-  Inbox,
   Mail,
   CalendarDays,
   ListTodo,
