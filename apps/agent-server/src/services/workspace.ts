@@ -149,6 +149,13 @@ export class WorkspaceService {
 
   async gitAdd(repoDir: string, paths: string[]): Promise<GitResult> {
     const fullPath = this.resolveSafe(repoDir);
+    // Validate each path resolves within the repo directory
+    for (const p of paths) {
+      const resolved = path.resolve(fullPath, p);
+      if (!resolved.startsWith(fullPath + path.sep) && resolved !== fullPath) {
+        throw new Error(`Path traversal denied in gitAdd: ${p}`);
+      }
+    }
     return this.runGit(["add", ...paths], fullPath);
   }
 

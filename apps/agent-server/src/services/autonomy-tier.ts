@@ -7,6 +7,13 @@ export type AutonomyTier = "green" | "yellow" | "red";
 const logger = createLogger("autonomy-tier");
 
 export class AutonomyTierService {
+  private static readonly DEFAULT_TIERS: Record<string, AutonomyTier> = {
+    git_push: "yellow",
+    delete_file: "yellow",
+    delete_directory: "yellow",
+    create_pr: "yellow",
+  };
+
   private tiers: Map<string, { tier: AutonomyTier; timeoutMs: number }> = new Map();
   private loaded = false;
   private loadPromise: Promise<void> | null = null;
@@ -28,7 +35,9 @@ export class AutonomyTierService {
   }
 
   getTier(toolName: string): AutonomyTier {
-    return this.tiers.get(toolName)?.tier ?? "green";
+    return this.tiers.get(toolName)?.tier
+      ?? AutonomyTierService.DEFAULT_TIERS[toolName]
+      ?? "green";
   }
 
   getTimeoutMs(toolName: string): number {

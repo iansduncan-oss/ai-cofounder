@@ -1,13 +1,14 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 import { createEvent, listEvents, countEvents, getEventById, resetEventProcessed } from "@ai-cofounder/db";
+import { optionalEnv } from "@ai-cofounder/shared";
 import { processEvent } from "../events.js";
 import { PaginationQuery, IdParams } from "../schemas.js";
 
 const InboundEventBody = Type.Object({
   source: Type.String({ minLength: 1, maxLength: 100 }),
   type: Type.String({ minLength: 1, maxLength: 100 }),
-  payload: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
+  payload: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { maxProperties: 20 })),
 });
 
 const EventListQuery = Type.Intersect([
@@ -78,6 +79,12 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["events"], body: InboundEventBody } },
     async (request, reply) => {
       const { source, type, payload } = request.body;
+
+      // Optional source whitelist
+      const allowedSources = optionalEnv("ALLOWED_EVENT_SOURCES", "").split(",").filter(Boolean);
+      if (allowedSources.length > 0 && !allowedSources.includes(source)) {
+        return reply.status(403).send({ error: "Source not allowed" });
+      }
 
       const event = await createEvent(app.db, {
         source,

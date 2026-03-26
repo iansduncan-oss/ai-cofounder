@@ -71,6 +71,27 @@ describe("AutonomyTierService", () => {
     expect(service.getTier("unknown_tool")).toBe("green");
   });
 
+  it("returns yellow for destructive tools via static defaults when DB has no config", async () => {
+    const service = new AutonomyTierService(mockDb);
+    await service.load();
+    expect(service.getTier("git_push")).toBe("yellow");
+    expect(service.getTier("delete_file")).toBe("yellow");
+    expect(service.getTier("delete_directory")).toBe("yellow");
+    expect(service.getTier("create_pr")).toBe("yellow");
+  });
+
+  it("DB config overrides static defaults", async () => {
+    mockListToolTierConfigs.mockResolvedValue([
+      { toolName: "git_push", tier: "green", timeoutMs: 300000 },
+    ]);
+    const service = new AutonomyTierService(mockDb);
+    await service.load();
+    // DB says green, static default says yellow — DB wins
+    expect(service.getTier("git_push")).toBe("green");
+    // delete_file still uses static default since not in DB
+    expect(service.getTier("delete_file")).toBe("yellow");
+  });
+
   it("returns configured tier after load", async () => {
     mockListToolTierConfigs.mockResolvedValue([
       { toolName: "git_push", tier: "yellow", timeoutMs: 60000 },

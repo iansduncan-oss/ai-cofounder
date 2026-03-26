@@ -23,6 +23,8 @@ EXPECTED_CONTAINERS=(
   "ai-cofounder-uptime-kuma"
   "ai-cofounder-node-exporter"
   "ai-cofounder-cadvisor"
+  "ai-cofounder-postgres-exporter"
+  "ai-cofounder-alertmanager-discord"
   "avion-postgres-1"
 )
 

@@ -33,11 +33,12 @@ const RunBody = Type.Object({
     Type.Array(
       Type.Object(
         {
-          role: Type.Union([Type.Literal("user"), Type.Literal("agent"), Type.Literal("system")]),
-          content: Type.String(),
+          role: Type.Union([Type.Literal("user"), Type.Literal("agent")]),
+          content: Type.String({ maxLength: 10_000 }),
         },
         { additionalProperties: true },
       ),
+      { maxItems: 100 },
     ),
   ),
 });
@@ -127,12 +128,12 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     }
 
     // Load history from DB (with automatic summarization for long conversations)
-    let resolvedHistory = history;
+    let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
     if (convId) {
       try {
         const prepared = await contextWindow.prepareHistory(
           convId,
-          resolvedHistory as AgentMessage[] | undefined,
+          resolvedHistory,
         );
         resolvedHistory = contextWindow.trimToFit(prepared.messages);
         if (prepared.wasSummarized) {
@@ -147,7 +148,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     const result = await orchestrator.run(
       message,
       convId,
-      resolvedHistory as AgentMessage[] | undefined,
+      resolvedHistory,
       dbUserId,
       (request as unknown as Record<string, unknown>).requestId as string | undefined,
     );
@@ -254,12 +255,12 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
-    let resolvedHistory = history;
+    let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
     if (convId) {
       try {
         const prepared = await contextWindow.prepareHistory(
           convId,
-          resolvedHistory as AgentMessage[] | undefined,
+          resolvedHistory,
         );
         resolvedHistory = contextWindow.trimToFit(prepared.messages);
       } catch (err) {
@@ -292,7 +293,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         message,
         onEvent,
         convId,
-        resolvedHistory as AgentMessage[] | undefined,
+        resolvedHistory,
         dbUserId,
         (request as unknown as Record<string, unknown>).requestId as string | undefined,
         abortController.signal,

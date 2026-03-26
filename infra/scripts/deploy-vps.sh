@@ -16,6 +16,7 @@ ssh "$VPS_HOST" "sudo mkdir -p ${REMOTE_DIR} /backups/ai-cofounder/latest /backu
 
 # Copy scripts
 echo "Copying scripts..."
+ssh "$VPS_HOST" "mkdir -p /tmp/automation-scripts"
 scp "${VPS_SCRIPTS_DIR}/common.sh" \
     "${VPS_SCRIPTS_DIR}/backup-db.sh" \
     "${VPS_SCRIPTS_DIR}/docker-cleanup.sh" \
@@ -62,7 +63,7 @@ EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|che
   echo "0 7 * * * /opt/scripts/daily-status.sh >> /var/log/automation/daily-status.log 2>&1"
   echo "0 20 * * * /opt/scripts/cost-tracker.sh >> /var/log/automation/cost-tracker.log 2>&1"
   echo "30 3 * * 0 /opt/scripts/stale-branch-cleaner.sh >> /var/log/automation/stale-branch-cleaner.log 2>&1"
-  echo "30 3 * * * /opt/scripts/log-rotation.sh >> /var/log/automation/log-rotation.log 2>&1"
+  echo "45 3 * * * /opt/scripts/log-rotation.sh >> /var/log/automation/log-rotation.log 2>&1"
   echo "0 */6 * * * /opt/scripts/disk-monitor.sh >> /var/log/automation/disk-monitor.log 2>&1"
   echo "*/30 * * * * /opt/scripts/container-health.sh >> /var/log/automation/container-health.log 2>&1"
   echo "0 4 * * 0 /opt/scripts/backup-verify.sh >> /var/log/automation/backup-verify.log 2>&1"

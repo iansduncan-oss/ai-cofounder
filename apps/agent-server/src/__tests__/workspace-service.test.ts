@@ -235,6 +235,19 @@ describe("WorkspaceService", () => {
       expect(status.stdout).toContain("b.txt");
     });
 
+    it("rejects path traversal in gitAdd paths", async () => {
+      await expect(
+        workspace.gitAdd("test-repo", ["../../etc/passwd"]),
+      ).rejects.toThrow("Path traversal denied in gitAdd");
+    });
+
+    it("rejects mixed valid and traversal paths in gitAdd", async () => {
+      await fs.writeFile(path.join(repoDir, "safe.txt"), "ok");
+      await expect(
+        workspace.gitAdd("test-repo", ["safe.txt", "../../../etc/shadow"]),
+      ).rejects.toThrow("Path traversal denied in gitAdd");
+    });
+
     it("commits staged changes", async () => {
       await fs.writeFile(path.join(repoDir, "committed.txt"), "data");
       await workspace.gitAdd("test-repo", ["committed.txt"]);

@@ -218,9 +218,9 @@ describe("ContextWindowManager", () => {
       const cwm = new ContextWindowManager(db, registry);
       const result = await cwm.prepareHistory("conv-1", history);
 
-      // applySummarization was entered (wasSummarized=true) but no summary was prepended
-      expect(result.wasSummarized).toBe(true);
-      expect(result.messages).toEqual(history); // No summary prepended (no older msgs, no cached summary)
+      // No summary possible (no older messages, no cached summary) → didSummarize = false
+      expect(result.wasSummarized).toBe(false);
+      expect(result.messages).toEqual(history);
       expect(mockComplete).not.toHaveBeenCalled();
     });
 
@@ -254,8 +254,8 @@ describe("ContextWindowManager", () => {
       const cwm = new ContextWindowManager(db, registry);
       await cwm.prepareHistory("conv-1", history);
 
-      // Implementation uses dbFetchLimit as offset for older message fetch
-      expect(mockGetConversationMessages).toHaveBeenCalledWith(db, "conv-1", 50, 50);
+      // When client provides history, offset = recentMessageCount (20), not dbFetchLimit
+      expect(mockGetConversationMessages).toHaveBeenCalledWith(db, "conv-1", 50, 20);
     });
 
     it("uses dbFetchLimit offset when loading from DB (no clientHistory)", async () => {
