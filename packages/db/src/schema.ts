@@ -49,7 +49,7 @@ export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   title: text("title"),
   metadata: jsonb("metadata"),
   parentConversationId: uuid("parent_conversation_id"),
@@ -62,7 +62,7 @@ export const messages = pgTable("messages", {
   id: uuid("id").primaryKey().defaultRandom(),
   conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => conversations.id),
+    .references(() => conversations.id, { onDelete: "cascade" }),
   role: text("role").notNull(), // "user" | "agent" | "system"
   agentRole: agentRoleEnum("agent_role"),
   content: text("content").notNull(),
@@ -77,7 +77,7 @@ export const channelConversations = pgTable("channel_conversations", {
   channelId: text("channel_id").notNull().unique(),
   conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => conversations.id),
+    .references(() => conversations.id, { onDelete: "cascade" }),
   platform: text("platform").notNull().default("discord"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -128,8 +128,7 @@ export const milestoneStatusEnum = pgEnum("milestone_status", [
 export const milestones = pgTable("milestones", {
   id: uuid("id").primaryKey().defaultRandom(),
   conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id),
+    .references(() => conversations.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   status: milestoneStatusEnum("status").notNull().default("planned"),
@@ -137,7 +136,7 @@ export const milestones = pgTable("milestones", {
   dueDate: timestamp("due_date", { withTimezone: true }),
   completedAt: timestamp("completed_at", { withTimezone: true }),
   metadata: jsonb("metadata"),
-  createdBy: uuid("created_by").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -148,15 +147,15 @@ export const goals = pgTable("goals", {
   id: uuid("id").primaryKey().defaultRandom(),
   conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => conversations.id),
-  milestoneId: uuid("milestone_id").references(() => milestones.id),
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  milestoneId: uuid("milestone_id").references(() => milestones.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   description: text("description"),
   status: goalStatusEnum("status").notNull().default("draft"),
   priority: goalPriorityEnum("priority").notNull().default("medium"),
   scope: text("scope"),
   requiresApproval: boolean("requires_approval").notNull().default(false),
-  createdBy: uuid("created_by").references(() => users.id),
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -168,7 +167,7 @@ export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
   goalId: uuid("goal_id")
     .notNull()
-    .references(() => goals.id),
+    .references(() => goals.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   status: taskStatusEnum("status").notNull().default("pending"),
@@ -201,7 +200,7 @@ export const memories = pgTable("memories", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   category: memoryCategoryEnum("category").notNull().default("other"),
   key: text("key").notNull(),
   content: text("content").notNull(),
@@ -234,12 +233,12 @@ export const prompts = pgTable("prompts", {
 export const approvals = pgTable("approvals", {
   id: uuid("id").primaryKey().defaultRandom(),
   taskId: uuid("task_id")
-    .references(() => tasks.id),
+    .references(() => tasks.id, { onDelete: "cascade" }),
   requestedBy: agentRoleEnum("requested_by").notNull(),
   status: approvalStatusEnum("status").notNull().default("pending"),
   reason: text("reason").notNull(),
   decision: text("decision"),
-  decidedBy: uuid("decided_by").references(() => users.id),
+  decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -248,7 +247,7 @@ export const approvals = pgTable("approvals", {
 
 export const codeExecutions = pgTable("code_executions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  taskId: uuid("task_id").references(() => tasks.id),
+  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
   language: text("language").notNull(), // "typescript" | "javascript" | "python" | "bash"
   codeHash: text("code_hash").notNull(),
   stdout: text("stdout").notNull().default(""),
@@ -282,7 +281,7 @@ export const llmUsage = pgTable("llm_usage", {
 
 export const schedules = pgTable("schedules", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").references(() => users.id),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   cronExpression: text("cron_expression").notNull(),
   actionPrompt: text("action_prompt").notNull(),
   description: text("description"),
@@ -311,8 +310,8 @@ export const events = pgTable("events", {
 export const workSessions = pgTable("work_sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
   trigger: text("trigger").notNull(), // "schedule", "event", "manual"
-  scheduleId: uuid("schedule_id").references(() => schedules.id),
-  eventId: uuid("event_id").references(() => events.id),
+  scheduleId: uuid("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+  eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
   goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   context: jsonb("context"),
   tokensUsed: integer("tokens_used").notNull().default(0),
@@ -330,7 +329,7 @@ export const conversationSummaries = pgTable("conversation_summaries", {
   id: uuid("id").primaryKey().defaultRandom(),
   conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => conversations.id),
+    .references(() => conversations.id, { onDelete: "cascade" }),
   summary: text("summary").notNull(),
   messageCount: integer("message_count").notNull().default(0),
   fromMessageCreatedAt: timestamp("from_message_created_at", { withTimezone: true }),

@@ -167,6 +167,15 @@ export async function main() {
 
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
+
+  process.on("unhandledRejection", (reason) => {
+    logger.fatal({ err: reason }, "unhandled rejection — exiting");
+    process.exit(1);
+  });
+  process.on("uncaughtException", (err) => {
+    logger.fatal({ err }, "uncaught exception — exiting");
+    process.exit(1);
+  });
 }
 
 main().catch((err) => {

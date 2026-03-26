@@ -213,6 +213,7 @@ export interface QueueStatus {
   completed: number;
   failed: number;
   delayed: number;
+  oldestWaitingTimestamp?: number;
 }
 
 export async function getAllQueueStatus(): Promise<QueueStatus[]> {
@@ -230,14 +231,16 @@ export async function getAllQueueStatus(): Promise<QueueStatus[]> {
 
   return Promise.all(
     queues.map(async ({ name, queue }) => {
-      const [waiting, active, completed, failed, delayed] = await Promise.all([
+      const [waiting, active, completed, failed, delayed, waitingJobs] = await Promise.all([
         queue.getWaitingCount(),
         queue.getActiveCount(),
         queue.getCompletedCount(),
         queue.getFailedCount(),
         queue.getDelayedCount(),
+        queue.getWaiting(0, 0), // get oldest waiting job (index 0)
       ]);
-      return { name, waiting, active, completed, failed, delayed };
+      const oldestWaitingTimestamp = waitingJobs[0]?.timestamp;
+      return { name, waiting, active, completed, failed, delayed, oldestWaitingTimestamp };
     }),
   );
 }

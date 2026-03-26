@@ -79,6 +79,59 @@ groups:
           summary: "Backup is stale"
           description: "No successful backup recorded in the last 36 hours."
 
+      - alert: RedisDown
+        expr: redis_up{job="agent-server"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been unreachable for more than 2 minutes. Queues, pub/sub, and caching are unavailable."
+
+      - alert: AllLlmProvidersDown
+        expr: |
+          count(
+            sum by (provider) (rate(llm_requests_total{status="error", job="agent-server"}[5m]))
+            / sum by (provider) (rate(llm_requests_total{job="agent-server"}[5m]))
+            > 0.5
+          )
+          == count(
+            count by (provider) (llm_requests_total{job="agent-server"})
+          )
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "All LLM providers are failing"
+          description: "Every LLM provider has an error rate above 50% for the last 5 minutes. Agent operations are severely degraded."
+
+      - alert: QueueJobAgeHigh
+        expr: queue_oldest_waiting_job_age_seconds{job="agent-server"} > 3600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Queue {{ $labels.queue }} has old waiting jobs"
+          description: "Oldest waiting job in {{ $labels.queue }} is {{ $value | humanizeDuration }} old (threshold: 1h)."
+
+      - alert: ConnectionPoolExhaustion
+        expr: pg_stat_activity_count{datname="avion"} > (pg_settings_max_connections * 0.85)
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "PostgreSQL connections ({{ $value }}) are above 85% of max. Risk of connection refusal."
+
+      - alert: N8nDown
+        expr: absent(container_last_seen{name=~".*n8n.*"}) or (time() - container_last_seen{name=~".*n8n.*"}) > 120
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "n8n container is down"
+          description: "n8n container has not been seen for more than 2 minutes. Workflow automation is unavailable."
+
   - name: infrastructure
     rules:
       - alert: HighDiskUsage

@@ -118,6 +118,17 @@ const queueStaleJobs = new client.Gauge({
   labelNames: ["queue"] as const,
 });
 
+const redisUp = new client.Gauge({
+  name: "redis_up",
+  help: "Whether Redis is reachable (1 = up, 0 = down)",
+});
+
+const queueOldestWaitingJobAgeSeconds = new client.Gauge({
+  name: "queue_oldest_waiting_job_age_seconds",
+  help: "Age of the oldest waiting job in seconds per queue",
+  labelNames: ["queue"] as const,
+});
+
 // --- Subagent Metrics ---
 
 const subagentRunsTotal = new client.Counter({
@@ -223,7 +234,10 @@ const prevFailed = new Map<string, number>();
 async function updateQueueMetrics() {
   try {
     const { getAllQueueStatus, getStaleJobCounts } = await import("@ai-cofounder/queue");
+
     const statuses = await getAllQueueStatus();
+    // If we got here, Redis is reachable (BullMQ uses Redis internally)
+    redisUp.set(1);
     let dlqTotal = 0;
     for (const s of statuses) {
       queueDepth.set({ queue: s.name }, s.waiting);
@@ -244,6 +258,14 @@ async function updateQueueMetrics() {
         queueJobsFailedTotal.inc({ queue: s.name }, s.failed - prevF);
       }
       prevFailed.set(s.name, s.failed);
+
+      // Track oldest waiting job age per queue
+      if (s.oldestWaitingTimestamp) {
+        const ageSeconds = (Date.now() - s.oldestWaitingTimestamp) / 1000;
+        queueOldestWaitingJobAgeSeconds.set({ queue: s.name }, ageSeconds);
+      } else {
+        queueOldestWaitingJobAgeSeconds.set({ queue: s.name }, 0);
+      }
     }
     dlqSizeTotal.set(dlqTotal);
 
@@ -259,7 +281,8 @@ async function updateQueueMetrics() {
       queueStaleJobs.set({ queue: s.name }, s.staleCount);
     }
   } catch {
-    // Redis not available — skip silently
+    // Redis not available — mark as down
+    redisUp.set(0);
   }
 }
 

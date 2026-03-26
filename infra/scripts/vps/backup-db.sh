@@ -52,11 +52,32 @@ else
   log_error "n8n backup failed"
 fi
 
+# Backup n8n Docker volume (workflow data, credentials, etc.)
+log "Starting n8n volume backup..."
+N8N_VOLUME=$(docker volume ls --format '{{.Name}}' --filter name=n8n_data 2>/dev/null | head -1)
+N8N_VOLUME_DIR="${N8N_BACKUP_DIR}/volumes"
+mkdir -p "$N8N_VOLUME_DIR"
+
+if [[ -n "$N8N_VOLUME" ]]; then
+  N8N_VOL_FILE="${N8N_VOLUME_DIR}/n8n_volume_${TIMESTAMP}.tar.gz"
+  if docker run --rm -v "${N8N_VOLUME}:/data:ro" alpine tar czf - -C /data . > "$N8N_VOL_FILE" 2>>"${LOG_DIR:-/var/log/automation}/backup-db-stderr.log"; then
+    N8N_VOL_SIZE=$(du -sh "$N8N_VOL_FILE" | cut -f1)
+    log "n8n volume backup complete: ${N8N_VOL_FILE} (${N8N_VOL_SIZE})"
+  else
+    rm -f "$N8N_VOL_FILE"
+    ERRORS+=("n8n volume backup failed")
+    log_error "n8n volume backup failed"
+  fi
+else
+  log "n8n volume not found — skipping volume backup"
+fi
+
 # Prune old backups
 log "Pruning backups older than ${RETENTION_DAYS} days..."
 PRUNED_AVION=$(find "$AVION_BACKUP_DIR" -maxdepth 1 -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete -print | wc -l)
 PRUNED_N8N=$(find "$N8N_BACKUP_DIR" -maxdepth 1 -name "*.sql.gz" -mtime +$RETENTION_DAYS -delete -print | wc -l)
-log "Pruned ${PRUNED_AVION} avion + ${PRUNED_N8N} n8n old backups"
+PRUNED_N8N_VOL=$(find "$N8N_VOLUME_DIR" -maxdepth 1 -name "*.tar.gz" -mtime +$RETENTION_DAYS -delete -print 2>/dev/null | wc -l)
+log "Pruned ${PRUNED_AVION} avion + ${PRUNED_N8N} n8n DB + ${PRUNED_N8N_VOL} n8n volume old backups"
 
 # Alert on failure only
 if [[ ${#ERRORS[@]} -gt 0 ]]; then

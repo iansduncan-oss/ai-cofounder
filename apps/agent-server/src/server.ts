@@ -108,6 +108,7 @@ export function buildServer(registry?: LlmRegistry) {
   const app = Fastify({
     logger: false,
     trustProxy: true, // required behind reverse proxy for correct IP detection
+    forceCloseConnections: "idle", // close idle keep-alive on shutdown, let active requests finish
   });
 
   // Automatic LLM usage recording for every registry.complete() call.

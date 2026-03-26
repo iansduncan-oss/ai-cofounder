@@ -44,15 +44,44 @@ async function main() {
   logger.info({ port, host }, "agent-server started");
 
   // Graceful shutdown (scheduler is started inside buildServer)
-  const shutdown = async () => {
-    logger.info("shutting down...");
-    await app.browserService.close();
-    await shutdownTracing();
-    await app.close();
-    process.exit(0);
+  let isShuttingDown = false;
+  const shutdown = async (signal: string) => {
+    if (isShuttingDown) {
+      logger.warn({ signal }, "duplicate shutdown signal — ignoring");
+      return;
+    }
+    isShuttingDown = true;
+    logger.info({ signal }, "shutdown initiated");
+
+    // Hard timeout: force exit after 30s if graceful shutdown stalls
+    const hardTimeout = setTimeout(() => {
+      logger.fatal("graceful shutdown timed out after 30s — forcing exit");
+      process.exit(1);
+    }, 30_000);
+    hardTimeout.unref();
+
+    try {
+      await app.browserService.close();
+      await shutdownTracing();
+      await app.close();
+      logger.info("shutdown complete");
+      process.exit(0);
+    } catch (err) {
+      logger.fatal({ err }, "error during shutdown");
+      process.exit(1);
+    }
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+
+  process.on("unhandledRejection", (reason) => {
+    logger.fatal({ err: reason }, "unhandled rejection — exiting");
+    process.exit(1);
+  });
+  process.on("uncaughtException", (err) => {
+    logger.fatal({ err }, "uncaught exception — exiting");
+    process.exit(1);
+  });
 }
 
 main().catch((err) => {
