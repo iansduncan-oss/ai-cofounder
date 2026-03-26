@@ -46,9 +46,15 @@ export async function deployWebhookRoute(app: FastifyInstance): Promise<void> {
       error?: string;
     };
 
-    // Validate webhook secret if configured
+    // Validate webhook secret — required in production, optional in dev
     const webhookSecret = optionalEnv("DEPLOY_WEBHOOK_SECRET", "");
-    if (webhookSecret) {
+    if (!webhookSecret) {
+      if (process.env.NODE_ENV === "production") {
+        logger.error("DEPLOY_WEBHOOK_SECRET not configured — rejecting webhook in production");
+        return reply.code(503).send({ error: "Webhook authentication not configured" });
+      }
+      logger.warn("DEPLOY_WEBHOOK_SECRET not set — skipping auth (dev mode)");
+    } else {
       const authHeader = request.headers.authorization;
       if (authHeader !== `Bearer ${webhookSecret}`) {
         return reply.code(401).send({ error: "Unauthorized" });

@@ -56,12 +56,12 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
     // Trust loopback and Docker bridge requests (cron scripts, internal services)
-    // Only loopback + Docker bridge (172.16-31.x) — not 10.x/192.168.x which
-    // can appear via X-Forwarded-For with trustProxy enabled
-    const ip = request.ip;
+    // Use socket.remoteAddress (actual TCP peer) instead of request.ip to prevent
+    // bypass via spoofed X-Forwarded-For headers when trustProxy is enabled
+    const socketIp = request.socket.remoteAddress ?? "";
     if (
-      ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" ||
-      (ip.startsWith("172.") && (() => { const s = parseInt(ip.split(".")[1], 10); return s >= 16 && s <= 31; })())
+      socketIp === "127.0.0.1" || socketIp === "::1" || socketIp === "::ffff:127.0.0.1" ||
+      (socketIp.startsWith("172.") && (() => { const s = parseInt(socketIp.split(".")[1], 10); return s >= 16 && s <= 31; })())
     ) {
       return;
     }

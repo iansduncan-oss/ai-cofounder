@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:v2.51.0
+    image: prom/prometheus:v3.10.0
     container_name: ai-cofounder-prometheus
     restart: unless-stopped
     volumes:
@@ -17,7 +17,7 @@ services:
       - avion_avion_net
 
   alertmanager:
-    image: prom/alertmanager:v0.27.0
+    image: prom/alertmanager:v0.28.1
     container_name: ai-cofounder-alertmanager
     restart: unless-stopped
     environment:
@@ -55,7 +55,7 @@ services:
       - avion_avion_net
 
   node-exporter:
-    image: prom/node-exporter:v1.7.0
+    image: prom/node-exporter:v1.9.1
     container_name: ai-cofounder-node-exporter
     restart: unless-stopped
     pid: host

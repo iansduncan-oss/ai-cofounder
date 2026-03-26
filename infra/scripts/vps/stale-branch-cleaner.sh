@@ -13,9 +13,13 @@ start_timer
 REPO_DIR="/opt/ai-cofounder"
 PROTECTED_BRANCHES="main|develop|staging"
 MAX_AGE_DAYS=14
+DRY_RUN="${1:-}"
 
 cd "$REPO_DIR" || { log_error "Cannot cd to ${REPO_DIR}"; exit 1; }
 
+if [[ "$DRY_RUN" == "--dry-run" ]]; then
+  log "DRY RUN MODE — no branches will be deleted"
+fi
 log "Starting stale branch cleanup..."
 
 # Prune remote tracking refs
@@ -47,11 +51,16 @@ for branch in $MERGED_BRANCHES; do
 
   if [[ "$LAST_COMMIT" -lt "$CUTOFF" ]]; then
     LAST_DATE=$(git log -1 --format='%ci' "origin/${branch}" 2>/dev/null | cut -d' ' -f1)
-    log "Deleting: ${branch} (last commit: ${LAST_DATE})"
-    if git push origin --delete "$branch" 2>/dev/null; then
+    if [[ "$DRY_RUN" == "--dry-run" ]]; then
+      log "Would delete: ${branch} (last commit: ${LAST_DATE})"
       DELETED+=("${branch} (${LAST_DATE})")
     else
-      log_error "Failed to delete branch: ${branch}"
+      log "Deleting: ${branch} (last commit: ${LAST_DATE})"
+      if git push origin --delete "$branch" 2>/dev/null; then
+        DELETED+=("${branch} (${LAST_DATE})")
+      else
+        log_error "Failed to delete branch: ${branch}"
+      fi
     fi
   fi
 done

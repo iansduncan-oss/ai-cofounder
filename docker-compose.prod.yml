@@ -84,7 +84,6 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - workspace_data:/data/workspace
-      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - avion_avion_net
     depends_on:

@@ -26,7 +26,7 @@ ERRORS=()
 # Backup ai_cofounder database
 log "Starting ai_cofounder database backup..."
 AVION_FILE="${AVION_BACKUP_DIR}/avion_${TIMESTAMP}.sql.gz"
-if docker exec "$PG_CONTAINER" pg_dump -U avion ai_cofounder | gzip > "$AVION_FILE" 2>/dev/null; then
+if docker exec "$PG_CONTAINER" pg_dump -U avion ai_cofounder 2>>"${LOG_DIR:-/var/log/automation}/backup-db-stderr.log" | gzip > "$AVION_FILE"; then
   AVION_SIZE=$(du -sh "$AVION_FILE" | cut -f1)
   log "avion backup complete: ${AVION_FILE} (${AVION_SIZE})"
 
@@ -43,7 +43,7 @@ fi
 # Backup n8n database
 log "Starting n8n database backup..."
 N8N_FILE="${N8N_BACKUP_DIR}/n8n_${TIMESTAMP}.sql.gz"
-if docker exec "$PG_CONTAINER" pg_dump -U avion n8n | gzip > "$N8N_FILE" 2>/dev/null; then
+if docker exec "$PG_CONTAINER" pg_dump -U avion n8n 2>>"${LOG_DIR:-/var/log/automation}/backup-db-stderr.log" | gzip > "$N8N_FILE"; then
   N8N_SIZE=$(du -sh "$N8N_FILE" | cut -f1)
   log "n8n backup complete: ${N8N_FILE} (${N8N_SIZE})"
 else

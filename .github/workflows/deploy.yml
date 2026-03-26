@@ -170,7 +170,18 @@ jobs:
                 fi
                 echo "Rollback attempt $i/6..."
               done
-              if [ "$ROLLBACK_OK" != "true" ]; then
+
+              # Write rollback state for notification steps to read
+              if [ "$ROLLBACK_OK" = "true" ]; then
+                cat > /tmp/deploy_state << ROLLBACK_EOF
+ROLLBACK_STATUS=success
+ROLLBACK_SHA=${PREVIOUS_SHA:0:7}
+ROLLBACK_EOF
+                echo "Rollback state written to /tmp/deploy_state"
+              else
+                cat > /tmp/deploy_state << ROLLBACK_EOF
+ROLLBACK_STATUS=failed
+ROLLBACK_EOF
                 echo "Rollback also failed after 6 attempts!"
               fi
             fi

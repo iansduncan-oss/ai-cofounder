@@ -125,13 +125,18 @@ const bannedIps = new Map<string, number>(); // ip -> ban expiry timestamp
 let banEventDb: Db | undefined;
 
 function getClientIp(request: FastifyRequest): string {
-  // Use Fastify's built-in request.ip which respects trustProxy settings
-  // This properly handles X-Forwarded-For based on the trustProxy configuration
+  // Use request.ip for rate limiting (respects trustProxy / X-Forwarded-For)
   return request.ip;
 }
 
+function getSocketIp(request: FastifyRequest): string {
+  // Use socket.remoteAddress for security checks — this is the actual TCP peer,
+  // not spoofable via X-Forwarded-For when trustProxy is enabled
+  return request.socket.remoteAddress ?? "";
+}
+
 function isInternalRequest(request: FastifyRequest): boolean {
-  const ip = getClientIp(request);
+  const ip = getSocketIp(request);
   // Check RFC 1918 private ranges, loopback, and IPv6 equivalents
   if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") return true;
   if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true;
