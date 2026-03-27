@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
-import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, tasks } from "@ai-cofounder/db";
+import { createGoal, getGoal, listGoalsByConversation, countGoalsByConversation, updateGoalStatus, listTasksByGoal, tasks, deleteGoal, cancelGoal } from "@ai-cofounder/db";
 import { getJobStatus } from "@ai-cofounder/queue";
 import { CreateGoalBody, UpdateGoalStatusBody, BulkGoalStatusBody, IdParams, GoalListQuery } from "../schemas.js";
 import { recordActionSafe } from "../services/action-recorder.js";
@@ -186,6 +186,30 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       }
 
       return updated;
+    },
+  );
+
+  /* DELETE /:id — delete a goal (CASCADE handles tasks) */
+  app.delete<{ Params: typeof IdParams.static }>(
+    "/:id",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const row = await deleteGoal(app.db, request.params.id);
+      if (!row) return reply.status(404).send({ error: "Goal not found" });
+      app.wsBroadcast?.("goals");
+      return { deleted: true, id: request.params.id };
+    },
+  );
+
+  /* PATCH /:id/cancel — cancel a goal and all pending/running tasks */
+  app.patch<{ Params: typeof IdParams.static }>(
+    "/:id/cancel",
+    { schema: { tags: ["goals"], params: IdParams } },
+    async (request, reply) => {
+      const goal = await cancelGoal(app.db, request.params.id);
+      if (!goal) return reply.status(404).send({ error: "Goal not found" });
+      app.wsBroadcast?.("goals");
+      return goal;
     },
   );
 

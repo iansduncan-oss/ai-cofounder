@@ -142,6 +142,11 @@ export async function updateConversationTitle(db: Db, id: string, title: string)
   return updated ?? null;
 }
 
+export async function deleteConversation(db: Db, id: string) {
+  const [row] = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+  return row ?? null;
+}
+
 /* ────────────────────── Messages ────────────────────────── */
 
 export async function createMessage(
@@ -244,6 +249,25 @@ export async function updateGoalStatus(
     .where(eq(goals.id, id))
     .returning();
   return updated ?? null;
+}
+
+export async function deleteGoal(db: Db, id: string) {
+  const [row] = await db.delete(goals).where(eq(goals.id, id)).returning();
+  return row ?? null;
+}
+
+export async function cancelGoal(db: Db, id: string) {
+  const [goal] = await db
+    .update(goals)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(goals.id, id))
+    .returning();
+  if (!goal) return null;
+  await db
+    .update(tasks)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(and(eq(tasks.goalId, id), inArray(tasks.status, ["pending", "assigned", "running"])));
+  return goal;
 }
 
 export async function updateGoalMetadata(

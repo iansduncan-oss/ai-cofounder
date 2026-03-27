@@ -297,6 +297,14 @@ export class ApiClient {
     return this.request<Goal>("POST", `/api/goals/${id}/reject`, reason ? { reason } : undefined);
   }
 
+  deleteGoal(id: string) {
+    return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/goals/${id}`);
+  }
+
+  cancelGoal(id: string) {
+    return this.request<Goal>("PATCH", `/api/goals/${id}/cancel`);
+  }
+
   /* ── Tasks ── */
 
   createTask(data: {
@@ -546,6 +554,10 @@ export class ApiClient {
 
   getConversation(id: string) {
     return this.request<Conversation>("GET", `/api/conversations/${id}`);
+  }
+
+  deleteConversation(id: string) {
+    return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/conversations/${id}`);
   }
 
   getConversationMessages(id: string, pagination?: PaginationParams) {

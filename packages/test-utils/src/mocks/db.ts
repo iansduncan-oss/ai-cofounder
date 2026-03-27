@@ -25,6 +25,7 @@ export function mockDbModule() {
     createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
     searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    deleteConversation: vi.fn().mockResolvedValue(null),
     // Channel conversations
     getChannelConversation: vi.fn().mockResolvedValue(null),
     upsertChannelConversation: vi.fn().mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),
@@ -40,6 +41,8 @@ export function mockDbModule() {
     updateGoalStatus: vi.fn().mockResolvedValue({}),
     updateGoalScope: vi.fn().mockResolvedValue({}),
     updateGoalMetadata: vi.fn().mockResolvedValue({}),
+    deleteGoal: vi.fn().mockResolvedValue(null),
+    cancelGoal: vi.fn().mockResolvedValue(null),
     // Tasks
     createTask: vi.fn().mockResolvedValue({ id: "task-1", title: "Test Task" }),
     getTask: vi.fn().mockResolvedValue(null),

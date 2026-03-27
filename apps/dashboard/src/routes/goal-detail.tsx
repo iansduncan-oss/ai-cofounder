@@ -1,7 +1,7 @@
 import { useState, lazy, Suspense } from "react";
-import { useParams, Link } from "react-router";
+import { useParams, Link, useNavigate } from "react-router";
 import { useGoal, useTasks, useCostByGoal } from "@/api/queries";
-import { useUpdateGoalStatus, useApproveGoal, useRejectGoal } from "@/api/mutations";
+import { useUpdateGoalStatus, useApproveGoal, useRejectGoal, useDeleteGoal, useCancelGoal } from "@/api/mutations";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { ExecutionPanel } from "@/components/goals/execution-panel";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatDate } from "@/lib/utils";
-import { ChevronRight, AlertTriangle, XCircle, CheckCircle, ShieldAlert, List, GitBranch, DollarSign } from "lucide-react";
+import { ChevronRight, AlertTriangle, XCircle, CheckCircle, ShieldAlert, List, GitBranch, DollarSign, Trash2 } from "lucide-react";
 import type { GoalStatus } from "@ai-cofounder/api-client";
 
 const TaskDAGView = lazy(() =>
@@ -27,38 +27,51 @@ const TaskDAGView = lazy(() =>
 
 export function GoalDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { data: goal, isLoading: goalLoading, error: goalError } = useGoal(id!);
   const { data: tasksData, isLoading: tasksLoading } = useTasks(id!);
   const tasks = tasksData?.data;
   const updateStatus = useUpdateGoalStatus();
   const approveGoal = useApproveGoal();
   const rejectGoal = useRejectGoal();
+  const deleteGoal = useDeleteGoal();
+  const cancelGoalMutation = useCancelGoal();
 
   const { data: costData } = useCostByGoal(id!);
   const [taskView, setTaskView] = useState<"list" | "dag">("list");
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
-    status: GoalStatus;
+    action: "cancel" | "delete";
     label: string;
-  }>({ open: false, status: "cancelled", label: "" });
+  }>({ open: false, action: "cancel", label: "" });
 
   usePageTitle(goal?.title ?? "Goal");
 
   const handleStatusChange = (status: GoalStatus, label: string) => {
     if (status === "cancelled") {
-      setConfirmDialog({ open: true, status, label });
+      setConfirmDialog({ open: true, action: "cancel", label });
     } else {
       updateStatus.mutate({ id: id!, status });
     }
   };
 
-  const confirmStatusChange = () => {
-    updateStatus.mutate(
-      { id: id!, status: confirmDialog.status },
-      { onSuccess: () => setConfirmDialog((d) => ({ ...d, open: false })) },
-    );
+  const confirmAction = () => {
+    if (confirmDialog.action === "delete") {
+      deleteGoal.mutate(id!, {
+        onSuccess: () => {
+          setConfirmDialog((d) => ({ ...d, open: false }));
+          navigate("/dashboard/goals");
+        },
+      });
+    } else {
+      cancelGoalMutation.mutate(id!, {
+        onSuccess: () => setConfirmDialog((d) => ({ ...d, open: false })),
+      });
+    }
   };
+
+  const isPending = confirmDialog.action === "delete" ? deleteGoal.isPending : cancelGoalMutation.isPending;
 
   if (goalLoading) return <ListSkeleton rows={3} />;
 
@@ -138,12 +151,22 @@ export function GoalDetailPage() {
                 variant="destructive"
                 size="sm"
                 onClick={() => handleStatusChange("cancelled", "Cancel")}
-                disabled={updateStatus.isPending}
+                disabled={cancelGoalMutation.isPending}
               >
                 <XCircle className="mr-1 h-3 w-3" />
                 Cancel Goal
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirmDialog({ open: true, action: "delete", label: "Delete" })}
+              disabled={deleteGoal.isPending}
+            >
+              <Trash2 className="mr-1 h-3 w-3" />
+              Delete
+            </Button>
             <GoalStatusBadge status={goal.status} />
           </div>
         }
@@ -318,9 +341,13 @@ export function GoalDetailPage() {
         onClose={() => setConfirmDialog((d) => ({ ...d, open: false }))}
       >
         <DialogHeader>
-          <DialogTitle>Cancel this goal?</DialogTitle>
+          <DialogTitle>
+            {confirmDialog.action === "delete" ? "Delete this goal?" : "Cancel this goal?"}
+          </DialogTitle>
           <DialogDescription>
-            This will cancel the goal and all pending tasks. This action cannot be undone.
+            {confirmDialog.action === "delete"
+              ? "This will permanently delete the goal and all its tasks. This action cannot be undone."
+              : "This will cancel the goal and all pending tasks. This action cannot be undone."}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -332,10 +359,12 @@ export function GoalDetailPage() {
           </Button>
           <Button
             variant="destructive"
-            onClick={confirmStatusChange}
-            disabled={updateStatus.isPending}
+            onClick={confirmAction}
+            disabled={isPending}
           >
-            {updateStatus.isPending ? "Cancelling..." : "Yes, Cancel Goal"}
+            {isPending
+              ? (confirmDialog.action === "delete" ? "Deleting..." : "Cancelling...")
+              : (confirmDialog.action === "delete" ? "Yes, Delete Goal" : "Yes, Cancel Goal")}
           </Button>
         </DialogFooter>
       </Dialog>

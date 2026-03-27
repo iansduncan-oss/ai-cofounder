@@ -141,6 +141,52 @@ export function useDeleteMemory() {
   });
 }
 
+export function useDeleteGoal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteGoal(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+      toast.success("Goal deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete goal: ${err.message}`);
+    },
+  });
+}
+
+export function useCancelGoal() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.cancelGoal(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.goals.detail(id) });
+      toast.success("Goal cancelled");
+    },
+    onError: (err) => {
+      toast.error(`Failed to cancel goal: ${err.message}`);
+    },
+  });
+}
+
+export function useDeleteConversation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteConversation(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.conversations.all });
+      toast.success("Conversation deleted");
+    },
+    onError: (err) => {
+      toast.error(`Failed to delete conversation: ${err.message}`);
+    },
+  });
+}
+
 export function useCreateGoal() {
   const queryClient = useQueryClient();
 

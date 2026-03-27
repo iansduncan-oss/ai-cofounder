@@ -6,6 +6,7 @@ import {
   getConversation,
   getConversationMessages,
   listGoalsByConversation,
+  deleteConversation,
 } from "@ai-cofounder/db";
 import { IdParams, PaginationQuery } from "../schemas.js";
 
@@ -93,6 +94,18 @@ export const conversationRoutes: FastifyPluginAsync = async (app) => {
         .header("Content-Disposition", `attachment; filename=conversation-${request.params.id}.json`)
         .type("application/json")
         .send(JSON.stringify(exportData, null, 2));
+    },
+  );
+
+  /* DELETE /:id — delete a conversation (CASCADE handles messages, goals, etc.) */
+  app.delete<{ Params: typeof IdParams.static }>(
+    "/:id",
+    { schema: { tags: ["conversations"], params: IdParams } },
+    async (request, reply) => {
+      const row = await deleteConversation(app.db, request.params.id);
+      if (!row) return reply.status(404).send({ error: "Conversation not found" });
+      app.wsBroadcast?.("conversations");
+      return { deleted: true, id: request.params.id };
     },
   );
 

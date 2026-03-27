@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useConversations } from "@/api/queries";
+import { useDeleteConversation } from "@/api/mutations";
 import { formatRelativeTime } from "@/lib/utils";
 import { cn } from "@/lib/utils";
-import { MessageSquare, Plus, PanelLeftClose, PanelLeft, X } from "lucide-react";
+import { MessageSquare, Plus, PanelLeftClose, PanelLeft, X, Trash2 } from "lucide-react";
+import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 interface ConversationSidebarProps {
   userId: string | undefined;
@@ -22,7 +25,9 @@ export function ConversationSidebar({
   onMobileClose,
 }: ConversationSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const { data } = useConversations(userId);
+  const deleteConversation = useDeleteConversation();
 
   if (collapsed) {
     return (
@@ -56,28 +61,42 @@ export function ConversationSidebar({
       ) : (
         <div className="py-1">
           {conversations.map((conv) => (
-            <button
+            <div
               key={conv.id}
-              onClick={() => {
-                onSelect(conv.id);
-                onMobileClose?.();
-              }}
-              aria-current={conv.id === activeConversationId ? "true" : undefined}
               className={cn(
-                "flex w-full items-start gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-accent",
+                "group flex w-full items-start gap-2 px-3 py-2 text-left text-xs transition-colors hover:bg-accent",
                 conv.id === activeConversationId && "bg-accent",
               )}
             >
-              <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">
-                  {conv.title || `Chat ${conv.id.slice(0, 8)}...`}
-                </p>
-                <p className="mt-0.5 text-muted-foreground">
-                  {formatRelativeTime(conv.updatedAt)}
-                </p>
-              </div>
-            </button>
+              <button
+                onClick={() => {
+                  onSelect(conv.id);
+                  onMobileClose?.();
+                }}
+                aria-current={conv.id === activeConversationId ? "true" : undefined}
+                className="flex min-w-0 flex-1 items-start gap-2"
+              >
+                <MessageSquare className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">
+                    {conv.title || `Chat ${conv.id.slice(0, 8)}...`}
+                  </p>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {formatRelativeTime(conv.updatedAt)}
+                  </p>
+                </div>
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeleteTarget(conv.id);
+                }}
+                className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                aria-label={`Delete conversation ${conv.title || conv.id.slice(0, 8)}`}
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -145,6 +164,41 @@ export function ConversationSidebar({
           </div>
         </>
       )}
+
+      {/* Delete conversation confirmation */}
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => setDeleteTarget(null)}
+      >
+        <DialogHeader>
+          <DialogTitle>Delete this conversation?</DialogTitle>
+          <DialogDescription>
+            This will permanently delete the conversation and all its messages. This action cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={deleteConversation.isPending}
+            onClick={() => {
+              if (!deleteTarget) return;
+              deleteConversation.mutate(deleteTarget, {
+                onSuccess: () => {
+                  if (deleteTarget === activeConversationId) {
+                    onNewChat();
+                  }
+                  setDeleteTarget(null);
+                },
+              });
+            }}
+          >
+            {deleteConversation.isPending ? "Deleting..." : "Yes, Delete"}
+          </Button>
+        </DialogFooter>
+      </Dialog>
     </>
   );
 }

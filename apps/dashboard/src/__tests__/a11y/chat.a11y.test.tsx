@@ -30,6 +30,7 @@ vi.mock("@/api/queries", () => ({
 
 vi.mock("@/api/mutations", () => ({
   useAcceptSuggestion: vi.fn().mockReturnValue({ mutateAsync: vi.fn() }),
+  useDeleteConversation: vi.fn().mockReturnValue({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@/hooks/use-speech-recognition", () => ({
