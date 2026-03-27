@@ -135,9 +135,7 @@ function getSocketIp(request: FastifyRequest): string {
   return request.socket.remoteAddress ?? "";
 }
 
-function isInternalRequest(request: FastifyRequest): boolean {
-  const ip = getSocketIp(request);
-  // Check RFC 1918 private ranges, loopback, and IPv6 equivalents
+export function isPrivateIp(ip: string): boolean {
   if (ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1") return true;
   if (ip.startsWith("10.") || ip.startsWith("192.168.")) return true;
   // 172.16.0.0/12 = 172.16.x.x through 172.31.x.x
@@ -146,6 +144,16 @@ function isInternalRequest(request: FastifyRequest): boolean {
     if (second >= 16 && second <= 31) return true;
   }
   return false;
+}
+
+export function isInternalRequest(request: FastifyRequest): boolean {
+  const socketIp = getSocketIp(request);
+  if (!isPrivateIp(socketIp)) return false;
+  // When trustProxy is on and X-Forwarded-For is present, request.ip differs
+  // from socket IP — check the forwarded IP too
+  const clientIp = getClientIp(request);
+  if (clientIp !== socketIp && !isPrivateIp(clientIp)) return false;
+  return true;
 }
 
 function isBannedIp(ip: string): boolean {

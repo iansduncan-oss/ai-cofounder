@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { agentRoutes } from "../routes/agents.js";
 import { goalRoutes } from "../routes/goals.js";
 import { taskRoutes } from "../routes/tasks.js";
@@ -42,6 +42,26 @@ import { followUpRoutes } from "../routes/follow-ups.js";
 import { thinkingRoutes } from "../routes/thinking.js";
 import { searchRoutes } from "../routes/search.js";
 
+/** Check if request is from loopback or Docker bridge (narrower than isInternalRequest) */
+function isLoopbackOrDocker(request: FastifyRequest): boolean {
+  const socketIp = request.socket.remoteAddress ?? "";
+  const isExemptSocket =
+    socketIp === "127.0.0.1" || socketIp === "::1" || socketIp === "::ffff:127.0.0.1" ||
+    (socketIp.startsWith("172.") && (() => { const s = parseInt(socketIp.split(".")[1], 10); return s >= 16 && s <= 31; })());
+  if (!isExemptSocket) return false;
+  // When behind a proxy, also check the forwarded IP
+  const clientIp = request.ip;
+  if (clientIp !== socketIp) {
+    if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1") return true;
+    if (clientIp.startsWith("172.")) {
+      const s = parseInt(clientIp.split(".")[1], 10);
+      if (s >= 16 && s <= 31) return true;
+    }
+    return false;
+  }
+  return true;
+}
+
 /**
  * JWT Guard Plugin — scoped Fastify plugin (NOT wrapped with fp()) so its
  * onRequest hook only applies to routes registered inside this scope.
@@ -56,13 +76,8 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   // Only add JWT verification hook when jwtVerify is available (authPlugin enabled)
   app.addHook("onRequest", async (request, reply) => {
     // Trust loopback and Docker bridge requests (cron scripts, internal services)
-    // Use socket.remoteAddress (actual TCP peer) instead of request.ip to prevent
-    // bypass via spoofed X-Forwarded-For headers when trustProxy is enabled
-    const socketIp = request.socket.remoteAddress ?? "";
-    if (
-      socketIp === "127.0.0.1" || socketIp === "::1" || socketIp === "::ffff:127.0.0.1" ||
-      (socketIp.startsWith("172.") && (() => { const s = parseInt(socketIp.split(".")[1], 10); return s >= 16 && s <= 31; })())
-    ) {
+    // Narrower than isInternalRequest — does NOT exempt 10.x.x.x or 192.168.x.x
+    if (isLoopbackOrDocker(request)) {
       return;
     }
 
