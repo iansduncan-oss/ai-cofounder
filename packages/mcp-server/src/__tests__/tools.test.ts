@@ -17,6 +17,9 @@ function createMockClient(): ApiClient {
     submitGoalPipeline: vi.fn(),
     listMemories: vi.fn(),
     providerHealth: vi.fn(),
+    deleteGoal: vi.fn(),
+    cancelGoal: vi.fn(),
+    deleteConversation: vi.fn(),
   } as unknown as ApiClient;
 }
 
@@ -30,7 +33,7 @@ describe("MCP tools registration", () => {
     registerTools(server, client);
   });
 
-  it("registers 12 tools", () => {
+  it("registers 18 tools", () => {
     // McpServer stores tools internally; we verify by checking the tool method was called
     // Since we can't easily inspect registered tools, we verify the registration didn't throw
     expect(server).toBeDefined();
@@ -164,6 +167,38 @@ describe("MCP tools registration", () => {
     const result = await tools.get("get_provider_health")!.handler({});
     expect(result.content[0].text).toContain("anthropic");
     expect(result.content[0].text).toContain("98.0%");
+  });
+
+  it("delete_goal calls deleteGoal", async () => {
+    (client.deleteGoal as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "g-1" });
+
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("delete_goal")!.handler({ id: "g-1" });
+    expect(client.deleteGoal).toHaveBeenCalledWith("g-1");
+    expect(result.content[0].text).toContain("g-1 deleted");
+  });
+
+  it("cancel_goal calls cancelGoal", async () => {
+    (client.cancelGoal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: "g-1",
+      title: "My Goal",
+      status: "cancelled",
+    });
+
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("cancel_goal")!.handler({ id: "g-1" });
+    expect(client.cancelGoal).toHaveBeenCalledWith("g-1");
+    expect(result.content[0].text).toContain("My Goal");
+    expect(result.content[0].text).toContain("cancelled");
+  });
+
+  it("delete_conversation calls deleteConversation", async () => {
+    (client.deleteConversation as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "conv-1" });
+
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("delete_conversation")!.handler({ id: "conv-1" });
+    expect(client.deleteConversation).toHaveBeenCalledWith("conv-1");
+    expect(result.content[0].text).toContain("conv-1 deleted");
   });
 
   it("handles errors gracefully", async () => {

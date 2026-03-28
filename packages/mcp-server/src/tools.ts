@@ -224,6 +224,59 @@ export function registerTools(server: McpServer, client: ApiClient): void {
   );
 
   server.tool(
+    "delete_goal",
+    "Delete a goal by ID",
+    {
+      id: z.string().describe("The goal ID to delete"),
+    },
+    async ({ id }) => {
+      try {
+        await client.deleteGoal(id);
+        return { content: [{ type: "text" as const, text: `Goal ${id} deleted.` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "cancel_goal",
+    "Cancel a goal by ID (sets status to cancelled)",
+    {
+      id: z.string().describe("The goal ID to cancel"),
+    },
+    async ({ id }) => {
+      try {
+        const goal = await client.cancelGoal(id);
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Goal cancelled: **${goal.title}** [${goal.status}] (${goal.id})`,
+          }],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "delete_conversation",
+    "Delete a conversation by ID",
+    {
+      id: z.string().describe("The conversation ID to delete"),
+    },
+    async ({ id }) => {
+      try {
+        await client.deleteConversation(id);
+        return { content: [{ type: "text" as const, text: `Conversation ${id} deleted.` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "spawn_subagent",
     "Spawn an autonomous subagent to handle a task with its own tool loop",
     {
