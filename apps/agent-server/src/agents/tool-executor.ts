@@ -591,6 +591,16 @@ export async function executeSharedTool(
         timeoutMs,
         dependencies: input.dependencies,
       });
+      // Record sandbox metrics
+      try {
+        const { recordSandboxMetrics } = await import("../plugins/observability.js");
+        recordSandboxMetrics({
+          language: result.language,
+          success: result.exitCode === 0,
+          oomKilled: result.oomKilled,
+          timedOut: result.timedOut,
+        });
+      } catch { /* metrics are best-effort */ }
       if (db) {
         try {
           const { hashCode } = await import("@ai-cofounder/sandbox");
@@ -613,6 +623,7 @@ export async function executeSharedTool(
         exitCode: result.exitCode,
         durationMs: result.durationMs,
         timedOut: result.timedOut,
+        oomKilled: result.oomKilled,
         language: result.language,
       };
     }

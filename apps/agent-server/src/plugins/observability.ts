@@ -149,6 +149,25 @@ const subagentToolRounds = new client.Histogram({
   buckets: [1, 3, 5, 10, 15, 20, 25],
 });
 
+// --- Sandbox Metrics ---
+
+const sandboxExecutionsTotal = new client.Counter({
+  name: "sandbox_executions_total",
+  help: "Total sandbox code executions",
+  labelNames: ["language", "status"] as const,
+});
+
+const sandboxOomKillsTotal = new client.Counter({
+  name: "sandbox_oom_kills_total",
+  help: "Total sandbox OOM kills",
+  labelNames: ["language"] as const,
+});
+
+const sandboxOrphanCleanupsTotal = new client.Counter({
+  name: "sandbox_orphan_cleanups_total",
+  help: "Total orphaned sandbox containers cleaned up",
+});
+
 // --- Backup Metrics ---
 
 export const backupLastSuccessTimestamp = new client.Gauge({
@@ -158,6 +177,25 @@ export const backupLastSuccessTimestamp = new client.Gauge({
 
 export function recordBackupSuccess() {
   backupLastSuccessTimestamp.set(Date.now() / 1000);
+}
+
+export function recordSandboxMetrics(data: {
+  language: string;
+  success: boolean;
+  oomKilled: boolean;
+  timedOut: boolean;
+}) {
+  const status = data.oomKilled ? "oom" : data.timedOut ? "timeout" : data.success ? "success" : "error";
+  sandboxExecutionsTotal.inc({ language: data.language, status });
+  if (data.oomKilled) {
+    sandboxOomKillsTotal.inc({ language: data.language });
+  }
+}
+
+export function recordSandboxOrphanCleanup(count: number) {
+  if (count > 0) {
+    sandboxOrphanCleanupsTotal.inc(count);
+  }
 }
 
 export function recordSubagentMetrics(data: {

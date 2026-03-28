@@ -89,6 +89,16 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "sandbox_orphan_cleanup": {
+          if (app.sandboxService?.available) {
+            const cleaned = await app.sandboxService.cleanupOrphanContainers();
+            if (cleaned > 0) {
+              const { recordSandboxOrphanCleanup } = await import("./observability.js");
+              recordSandboxOrphanCleanup(cleaned);
+            }
+          }
+          break;
+        }
         case "dlq_check": {
           const { listDeadLetterJobs } = await import("@ai-cofounder/queue");
           const dlqJobs = await listDeadLetterJobs(10);

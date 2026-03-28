@@ -198,6 +198,18 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled budget check every 60s");
 
+  // ── Sandbox orphan container cleanup (every 5 minutes) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "sandbox-orphan-cleanup",
+    { every: 5 * 60 * 1000 },
+    {
+      name: "sandbox-orphan-cleanup",
+      data: { check: "sandbox_orphan_cleanup" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled sandbox orphan cleanup every 5 minutes");
+
   // ── Dead-letter queue check (every 5 minutes) ──
 
   await monitoringQueue.upsertJobScheduler(

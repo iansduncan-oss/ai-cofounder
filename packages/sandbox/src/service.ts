@@ -121,6 +121,61 @@ export class SandboxService {
     return this.config.dockerAvailable;
   }
 
+  /**
+   * Finds and removes orphaned sandbox containers that have been running
+   * longer than the default timeout + a buffer. Returns number cleaned.
+   */
+  async cleanupOrphanContainers(): Promise<number> {
+    if (!this.config.dockerAvailable) return 0;
+
+    const maxAgeMs = this.config.defaultTimeoutMs + 30_000; // timeout + 30s buffer
+
+    return new Promise<number>((resolve) => {
+      // List running containers with our managed label, get ID + creation time
+      execFile(
+        "docker",
+        [
+          "ps",
+          "--filter", "label=ai-cofounder.managed=true",
+          "--format", "{{.ID}}\t{{.CreatedAt}}",
+          "--no-trunc",
+        ],
+        { timeout: 10_000, encoding: "utf-8" },
+        async (err, stdout) => {
+          if (err || !stdout.trim()) {
+            resolve(0);
+            return;
+          }
+
+          const lines = stdout.trim().split("\n").filter(Boolean);
+          let cleaned = 0;
+
+          for (const line of lines) {
+            const [id, ...createdParts] = line.split("\t");
+            if (!id || !createdParts.length) continue;
+
+            const createdAt = new Date(createdParts.join("\t")).getTime();
+            if (Number.isNaN(createdAt)) continue;
+
+            const ageMs = Date.now() - createdAt;
+            if (ageMs > maxAgeMs) {
+              await new Promise<void>((res) => {
+                execFile("docker", ["rm", "-f", id], { timeout: 10_000 }, () => res());
+              });
+              logger.warn({ containerId: id, ageMs }, "removed orphaned sandbox container");
+              cleaned++;
+            }
+          }
+
+          if (cleaned > 0) {
+            logger.info({ cleaned }, "orphaned sandbox container cleanup complete");
+          }
+          resolve(cleaned);
+        },
+      );
+    });
+  }
+
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
     if (!this.config.dockerAvailable) {
       return {
@@ -130,6 +185,7 @@ export class SandboxService {
         durationMs: 0,
         language: request.language,
         timedOut: false,
+        oomKilled: false,
       };
     }
 
@@ -145,6 +201,7 @@ export class SandboxService {
         durationMs: cached.durationMs,
         language: request.language,
         timedOut: false,
+        oomKilled: false,
         cached: true,
       };
     }
@@ -161,6 +218,10 @@ export class SandboxService {
       "--rm",
       "--name",
       containerName,
+      // Labels for identification and cleanup
+      "--label", "ai-cofounder.managed=true",
+      "--label", `ai-cofounder.language=${request.language}`,
+      "--label", `ai-cofounder.task-id=${request.taskId ?? ""}`,
       // Allow network only when dependencies need installing
       ...(hasDeps ? [] : ["--network=none"]),
       ...(hasDeps ? [] : ["--read-only"]),
@@ -208,6 +269,9 @@ export class SandboxService {
                 : (error as unknown as { status?: number }).status ?? 1;
           }
 
+          // OOM kill: Docker sends SIGKILL (exit 137) when memory limit exceeded
+          const oomKilled = exitCode === 137 && !timedOut;
+
           if (timedOut) {
             // Kill the container if it timed out (the process may be dead but container lingers)
             execFile("docker", ["kill", containerName], () => {
@@ -221,6 +285,7 @@ export class SandboxService {
               exitCode,
               durationMs,
               timedOut,
+              oomKilled,
               stdoutLen: stdout.length,
               stderrLen: stderr.length,
             },
@@ -229,11 +294,14 @@ export class SandboxService {
 
           const result: ExecutionResult = {
             stdout: truncate(stdout, 10_000),
-            stderr: truncate(stderr, 10_000),
+            stderr: oomKilled
+              ? truncate(`OOM: Container killed — exceeded ${this.config.memoryLimit} memory limit.\n${stderr}`, 10_000)
+              : truncate(stderr, 10_000),
             exitCode,
             durationMs,
             language: request.language,
             timedOut,
+            oomKilled,
             cached: false,
           };
 
@@ -261,6 +329,7 @@ export class SandboxService {
           durationMs: 0,
           language: request.language,
           timedOut: false,
+          oomKilled: false,
         });
       }
     });

@@ -186,6 +186,92 @@ describe("SandboxService", () => {
       ]);
     });
 
+    it("includes Docker labels for identification", async () => {
+      const service = new SandboxService({ dockerAvailable: true });
+
+      mockExecFile.mockImplementation(((
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        cb: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "docker" && args[0] === "run") {
+          // Check labels are present
+          const labelIdx1 = args.indexOf("ai-cofounder.managed=true");
+          expect(labelIdx1).toBeGreaterThan(0);
+          expect(args[labelIdx1 - 1]).toBe("--label");
+
+          const langLabelIdx = args.findIndex((a: string) => a.startsWith("ai-cofounder.language="));
+          expect(langLabelIdx).toBeGreaterThan(0);
+          expect(args[langLabelIdx]).toBe("ai-cofounder.language=python");
+
+          cb(null, "42\n", "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const result = await service.execute({
+        code: "print(42)",
+        language: "python",
+        taskId: "task-abc",
+      });
+
+      expect(result.exitCode).toBe(0);
+    });
+
+    it("detects OOM kill (exit code 137)", async () => {
+      const service = new SandboxService({ dockerAvailable: true });
+
+      mockExecFile.mockImplementation(((
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        cb: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "docker" && args[0] === "run") {
+          const error = new Error("exit 137") as NodeJS.ErrnoException & { status: number };
+          error.status = 137;
+          cb(error, "", "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const result = await service.execute({
+        code: "x = [0] * 10**9",
+        language: "python",
+      });
+
+      expect(result.oomKilled).toBe(true);
+      expect(result.timedOut).toBe(false);
+      expect(result.exitCode).toBe(137);
+      expect(result.stderr).toContain("OOM");
+    });
+
+    it("sets oomKilled=false on normal execution", async () => {
+      const service = new SandboxService({ dockerAvailable: true });
+
+      mockExecFile.mockImplementation(((
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        cb: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "docker" && args[0] === "run") {
+          cb(null, "ok\n", "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const result = await service.execute({
+        code: "echo ok",
+        language: "bash",
+      });
+
+      expect(result.oomKilled).toBe(false);
+      expect(result.timedOut).toBe(false);
+      expect(result.exitCode).toBe(0);
+    });
+
     it("respects custom resource limits", async () => {
       const service = new SandboxService({
         dockerAvailable: true,
@@ -210,6 +296,75 @@ describe("SandboxService", () => {
       }) as typeof execFile);
 
       await service.execute({ code: "echo hi", language: "bash" });
+    });
+  });
+
+  describe("cleanupOrphanContainers()", () => {
+    it("returns 0 when docker is not available", async () => {
+      const service = new SandboxService({ dockerAvailable: false });
+      const cleaned = await service.cleanupOrphanContainers();
+      expect(cleaned).toBe(0);
+    });
+
+    it("removes containers older than timeout + buffer", async () => {
+      const service = new SandboxService({ dockerAvailable: true, defaultTimeoutMs: 5000 });
+      const oldDate = new Date(Date.now() - 120_000).toISOString(); // 2 minutes ago (> 5s + 30s)
+
+      mockExecFile.mockImplementation(((...fnArgs: unknown[]) => {
+        const cmd = fnArgs[0] as string;
+        const args = fnArgs[1] as string[];
+        const cb = (typeof fnArgs[3] === "function" ? fnArgs[3] : fnArgs[2]) as
+          | ((err: Error | null, stdout: string, stderr: string) => void)
+          | undefined;
+        if (cmd === "docker" && args[0] === "ps" && cb) {
+          cb(null, `abc123\t${oldDate}`, "");
+        } else if (cmd === "docker" && args[0] === "rm" && cb) {
+          cb(null, "", "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const cleaned = await service.cleanupOrphanContainers();
+      expect(cleaned).toBe(1);
+    });
+
+    it("skips containers newer than threshold", async () => {
+      const service = new SandboxService({ dockerAvailable: true, defaultTimeoutMs: 30_000 });
+      const recentDate = new Date(Date.now() - 5000).toISOString(); // 5 seconds ago
+
+      mockExecFile.mockImplementation(((
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        cb: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "docker" && args[0] === "ps") {
+          cb(null, `def456\t${recentDate}`, "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const cleaned = await service.cleanupOrphanContainers();
+      expect(cleaned).toBe(0);
+    });
+
+    it("returns 0 when no containers found", async () => {
+      const service = new SandboxService({ dockerAvailable: true });
+
+      mockExecFile.mockImplementation(((
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        cb: (err: Error | null, stdout: string, stderr: string) => void,
+      ) => {
+        if (cmd === "docker" && args[0] === "ps") {
+          cb(null, "", "");
+        }
+        return {} as ReturnType<typeof execFile>;
+      }) as typeof execFile);
+
+      const cleaned = await service.cleanupOrphanContainers();
+      expect(cleaned).toBe(0);
     });
   });
 

@@ -29,6 +29,8 @@ export interface ExecutionResult {
   language: SandboxLanguage;
   /** Whether the execution was killed due to timeout */
   timedOut: boolean;
+  /** Whether the container was killed due to OOM (exit code 137) */
+  oomKilled: boolean;
   /** Whether result was served from cache */
   cached?: boolean;
 }
