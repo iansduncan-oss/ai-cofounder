@@ -302,6 +302,13 @@
       "when": 1772808000000,
       "tag": "0042_add_failure_patterns",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1774660000000,
+      "tag": "0043_add_composite_indexes",
+      "breakpoints": true
     }
   ]
 }
