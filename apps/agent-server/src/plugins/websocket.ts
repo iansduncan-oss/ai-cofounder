@@ -20,6 +20,7 @@ interface WsClient {
   channels: Set<WsChannel>;
   goalIds: Set<string>;
   alive: boolean;
+  lastActivityAt: number;
 }
 
 /** All connected clients */
@@ -53,6 +54,9 @@ function broadcastGoalEvent(goalId: string, data: Record<string, unknown>): void
   }
 }
 
+/** Staleness threshold — 1 hour without activity */
+const STALE_THRESHOLD_MS = 60 * 60 * 1000;
+
 export const websocketPlugin = fp(async (app) => {
   // Register the @fastify/websocket plugin
   await app.register(websocket);
@@ -76,6 +80,30 @@ export const websocketPlugin = fp(async (app) => {
     }
   }, 30_000);
   heartbeatInterval.unref();
+
+  /** Remove all goal listeners and delete client from the set */
+  function cleanupClient(client: WsClient): void {
+    for (const goalId of client.goalIds) {
+      const ch = goalChannel(goalId);
+      const listener = (client as unknown as Record<string, unknown>)[`_goalListener_${goalId}`] as ((...args: unknown[]) => void) | undefined;
+      if (listener) app.agentEvents.off(ch, listener);
+      app.unsubscribeGoal(goalId).catch(() => {});
+    }
+    clients.delete(client);
+  }
+
+  // Staleness reaper: terminate clients with no activity for 1 hour
+  const stalenessInterval = setInterval(() => {
+    const cutoff = Date.now() - STALE_THRESHOLD_MS;
+    for (const client of clients) {
+      if (client.lastActivityAt < cutoff) {
+        logger.warn({ goalIds: [...client.goalIds] }, "cleaning up stale WS client");
+        client.socket.terminate();
+        cleanupClient(client);
+      }
+    }
+  }, STALE_THRESHOLD_MS);
+  stalenessInterval.unref();
 
   // Bridge: listen to app.agentEvents for goal events → forward to WS clients
   app.agentEvents.on("ws:goal_event", (payload: string) => {
@@ -118,6 +146,7 @@ export const websocketPlugin = fp(async (app) => {
       channels: new Set(),
       goalIds: new Set(),
       alive: true,
+      lastActivityAt: Date.now(),
     };
     clients.add(client);
 
@@ -125,10 +154,12 @@ export const websocketPlugin = fp(async (app) => {
 
     socket.on("pong", () => {
       client.alive = true;
+      client.lastActivityAt = Date.now();
     });
 
     socket.on("message", (raw) => {
       client.alive = true;
+      client.lastActivityAt = Date.now();
 
       let msg: WsClientMessage;
       try {
@@ -198,16 +229,7 @@ export const websocketPlugin = fp(async (app) => {
     });
 
     socket.on("close", () => {
-      // Clean up goal subscriptions
-      for (const goalId of client.goalIds) {
-        const ch = goalChannel(goalId);
-        const listener = (client as unknown as Record<string, unknown>)[`_goalListener_${goalId}`] as ((...args: unknown[]) => void) | undefined;
-        if (listener) {
-          app.agentEvents.off(ch, listener);
-        }
-        app.unsubscribeGoal(goalId).catch(() => {});
-      }
-      clients.delete(client);
+      cleanupClient(client);
       logger.info({ clientCount: clients.size }, "WebSocket client disconnected");
     });
 
@@ -219,6 +241,7 @@ export const websocketPlugin = fp(async (app) => {
   // Cleanup on server close
   app.addHook("onClose", async () => {
     clearInterval(heartbeatInterval);
+    clearInterval(stalenessInterval);
     for (const client of clients) {
       client.socket.close(1001, "Server shutting down");
     }
