@@ -31,6 +31,7 @@ import {
   Scale,
   LayoutTemplate,
   Webhook,
+  Clock,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,7 @@ const navSections: NavSection[] = [
       { icon: Boxes, label: "Subagents", path: "/dashboard/subagents", drawer: true },
       { icon: Scale, label: "Decisions", path: "/dashboard/decisions", drawer: true },
       { icon: PlayCircle, label: "Autonomous", path: "/dashboard/autonomous", drawer: true },
+      { icon: Clock, label: "Sessions", path: "/dashboard/work-sessions", drawer: true },
       { icon: Webhook, label: "Events", path: "/dashboard/events", drawer: true },
       { icon: Inbox, label: "DLQ", path: "/dashboard/dlq", drawer: true },
       { icon: Bell, label: "Notifications", path: "/dashboard/notifications", drawer: true },

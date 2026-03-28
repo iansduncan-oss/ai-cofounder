@@ -310,6 +310,14 @@ export function useAutonomousSessions(limit = 20) {
   });
 }
 
+export function useWorkSessions(params?: { limit?: number; offset?: number; goalId?: string }) {
+  return useQuery({
+    queryKey: [...queryKeys.workSessions.list, params] as const,
+    queryFn: () => apiClient.listWorkSessions(params),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useGmailInbox(maxResults?: number) {
   return useQuery({
     queryKey: [...queryKeys.gmail.inbox, maxResults ?? "default"] as const,

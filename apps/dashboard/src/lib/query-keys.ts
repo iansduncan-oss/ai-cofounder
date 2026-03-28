@@ -154,4 +154,9 @@ export const queryKeys = {
     latest: ["deploys", "latest"] as const,
     list: ["deploys", "list"] as const,
   },
+  workSessions: {
+    all: ["work-sessions"] as const,
+    list: ["work-sessions", "list"] as const,
+    detail: (id: string) => ["work-sessions", "detail", id] as const,
+  },
 };

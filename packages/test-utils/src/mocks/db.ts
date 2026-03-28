@@ -279,6 +279,8 @@ export function mockDbModule() {
     getJournalEntry: vi.fn().mockResolvedValue(null),
     listJournalEntries: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     listWorkSessionsFiltered: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    getWorkSession: vi.fn().mockResolvedValue(null),
+    cancelWorkSession: vi.fn().mockResolvedValue(null),
     journalEntries: {},
     // Registered projects
     createRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "test-project", slug: "test-project", workspacePath: "/tmp/test" }),

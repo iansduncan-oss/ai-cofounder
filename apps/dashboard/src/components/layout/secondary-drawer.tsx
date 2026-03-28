@@ -21,6 +21,7 @@ const pageMap: Record<string, { component: React.LazyExoticComponent<React.Compo
   "/dashboard/dlq": { component: lazy(() => import("@/routes/dlq").then((m) => ({ default: m.DlqPage }))), title: "Dead Letter Queue" },
   "/dashboard/notifications": { component: lazy(() => import("@/routes/notifications").then((m) => ({ default: m.NotificationsPage }))), title: "Notifications" },
   "/dashboard/settings": { component: lazy(() => import("@/routes/settings").then((m) => ({ default: m.SettingsPage }))), title: "Settings" },
+  "/dashboard/work-sessions": { component: lazy(() => import("@/routes/work-sessions").then((m) => ({ default: m.WorkSessionsPage }))), title: "Work Sessions" },
 };
 
 interface SecondaryDrawerProps {

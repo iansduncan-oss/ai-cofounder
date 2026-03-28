@@ -933,6 +933,28 @@ export class ApiClient {
     );
   }
 
+  /* ── Work Sessions ── */
+
+  listWorkSessions(params?: { limit?: number; offset?: number; goalId?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.offset != null) qs.set("offset", String(params.offset));
+    if (params?.goalId) qs.set("goalId", params.goalId);
+    const query = qs.toString();
+    return this.request<{ data: WorkSession[]; total: number }>(
+      "GET",
+      `/api/work-sessions${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getWorkSession(id: string) {
+    return this.request<WorkSession>("GET", `/api/work-sessions/${encodeURIComponent(id)}`);
+  }
+
+  cancelWorkSession(id: string) {
+    return this.request<WorkSession>("PATCH", `/api/work-sessions/${encodeURIComponent(id)}/cancel`);
+  }
+
   /* ── Journal ── */
 
   listJournalEntries(params?: {

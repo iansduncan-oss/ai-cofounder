@@ -3445,6 +3445,20 @@ export async function listWorkSessionsFiltered(
   return { data, total: countResult[0]?.count ?? 0 };
 }
 
+export async function getWorkSession(db: Db, id: string) {
+  const rows = await db.select().from(workSessions).where(eq(workSessions.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function cancelWorkSession(db: Db, id: string) {
+  const rows = await db
+    .update(workSessions)
+    .set({ status: "failed", summary: "Cancelled by user", completedAt: new Date() })
+    .where(and(eq(workSessions.id, id), eq(workSessions.status, "running")))
+    .returning();
+  return rows[0] ?? null;
+}
+
 /* ──────────────── Registered Projects ──────────────────── */
 
 export async function createRegisteredProject(

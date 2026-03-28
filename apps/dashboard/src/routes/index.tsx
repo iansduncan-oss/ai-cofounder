@@ -93,6 +93,9 @@ const EventsPage = lazy(() =>
 const PipelineTemplatesPage = lazy(() =>
   import("./pipeline-templates").then((m) => ({ default: m.PipelineTemplatesPage })),
 );
+const WorkSessionsPage = lazy(() =>
+  import("./work-sessions").then((m) => ({ default: m.WorkSessionsPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -135,6 +138,7 @@ export const router = createBrowserRouter([
       { path: "decisions", element: <DecisionsPage /> },
       { path: "pipeline-templates", element: <PipelineTemplatesPage /> },
       { path: "events", element: <EventsPage /> },
+      { path: "work-sessions", element: <WorkSessionsPage /> },
       { path: "settings", element: <SettingsPage /> },
     ],
   },

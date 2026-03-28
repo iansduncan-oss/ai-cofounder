@@ -187,6 +187,21 @@ export function useDeleteConversation() {
   });
 }
 
+export function useCancelWorkSession() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => apiClient.cancelWorkSession(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workSessions.all });
+      toast.success("Work session cancelled");
+    },
+    onError: (err) => {
+      toast.error(`Failed to cancel session: ${err.message}`);
+    },
+  });
+}
+
 export function useCreateGoal() {
   const queryClient = useQueryClient();
 
