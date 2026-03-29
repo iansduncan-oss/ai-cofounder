@@ -69,6 +69,7 @@ function createRateLimitBucket() {
 
 const generalBucket = createRateLimitBucket();
 const expensiveBucket = createRateLimitBucket();
+const inFlightRequests = new Map<string, number>();
 
 /**
  * Extract user ID from JWT payload without verifying signature.
@@ -216,6 +217,7 @@ export function _resetSecurityState(): void {
   bannedIps.clear();
   generalBucket.map.clear();
   expensiveBucket.map.clear();
+  inFlightRequests.clear();
 }
 
 export const securityPlugin = fp(async (app: FastifyInstance) => {
@@ -229,6 +231,7 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   const apiSecret = optionalEnv("API_SECRET", "");
   // When JWT_SECRET is set, JWT auth handles protected routes — API_SECRET only applies to bot routes
   const jwtSecret = optionalEnv("JWT_SECRET", "");
+  const concurrentRequestLimit = parseInt(optionalEnv("CONCURRENT_REQUEST_LIMIT", "3"), 10);
   const rateLimitMax = parseInt(optionalEnv("RATE_LIMIT_MAX", "120"), 10);
   const rateLimitWindowSec = parseInt(optionalEnv("RATE_LIMIT_WINDOW", "60"), 10);
   const rateLimitWindowMs = rateLimitWindowSec * 1000;
@@ -302,7 +305,22 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
       }
     }
 
-    // 6. Bearer token auth on /api/* routes (skip public paths and internal requests)
+    // 6. Per-user concurrent request limit on expensive endpoints
+    if (url.startsWith("/api/") || url === "/voice/chat") {
+      const userId = extractUserIdFromJwt(request);
+      const concurrentKey = userId ? `user:${userId}` : `ip:${ip}`;
+      const current = inFlightRequests.get(concurrentKey) ?? 0;
+      if (current >= concurrentRequestLimit) {
+        logger.debug({ ip, userId, concurrent: current }, "concurrent request limit hit");
+        reply.code(429).send({ error: "Too many concurrent requests", retryAfter: 1 });
+        return;
+      }
+      inFlightRequests.set(concurrentKey, current + 1);
+      // Stash the key on the request for reliable cleanup in onResponse
+      (request as unknown as Record<string, unknown>)._concurrentKey = concurrentKey;
+    }
+
+    // 7. Bearer token auth on /api/* routes (skip public paths and internal requests)
     // When JWT is active (jwtSecret set), API_SECRET only enforced on bot routes
     // (channels + webhooks) so Discord/Slack bots continue to work without JWT.
     // Dashboard requests use JWT (handled by jwtGuardPlugin), not API_SECRET.
@@ -325,8 +343,19 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     }
   });
 
-  // Track 404s for rate-limiting
+  // Track 404s for rate-limiting + decrement in-flight counter
   app.addHook("onResponse", async (request, reply) => {
+    // Decrement in-flight request counter
+    const concurrentKey = (request as unknown as Record<string, unknown>)._concurrentKey as string | undefined;
+    if (concurrentKey) {
+      const count = inFlightRequests.get(concurrentKey) ?? 1;
+      if (count <= 1) {
+        inFlightRequests.delete(concurrentKey);
+      } else {
+        inFlightRequests.set(concurrentKey, count - 1);
+      }
+    }
+
     if (reply.statusCode === 404) {
       const ip = getClientIp(request);
       recordHit(ip);
@@ -344,9 +373,10 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   }, 60_000);
   rateLimitCleanupInterval.unref();
 
-  // Clean up intervals on server close
+  // Clean up intervals and state on server close
   app.addHook("onClose", async () => {
     clearInterval(banCleanupInterval);
     clearInterval(rateLimitCleanupInterval);
+    inFlightRequests.clear();
   });
 });
