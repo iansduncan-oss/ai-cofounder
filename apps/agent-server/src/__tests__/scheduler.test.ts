@@ -25,7 +25,9 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
   countTasksByStatus: (...args: unknown[]) => mockCountTasksByStatus(...args),

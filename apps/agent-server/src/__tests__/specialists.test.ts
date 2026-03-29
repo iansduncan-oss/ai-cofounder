@@ -9,7 +9,9 @@ const mockComplete = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   recallMemories: vi.fn().mockResolvedValue([
     { key: "pref", category: "preferences", content: "likes TypeScript" },
   ]),

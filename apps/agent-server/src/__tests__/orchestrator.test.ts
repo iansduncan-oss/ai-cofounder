@@ -24,7 +24,9 @@ const mockListN8nWorkflows = vi.fn().mockResolvedValue([]);
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   createGoal: (...args: unknown[]) => mockCreateGoal(...args),
   createTask: (...args: unknown[]) => mockCreateTask(...args),
   updateGoalStatus: (...args: unknown[]) => mockUpdateGoalStatus(...args),
@@ -280,7 +282,8 @@ describe("Orchestrator", () => {
 
       const registry = new LlmRegistry();
       const embeddingService = { embed: mockEmbed };
-      const orchestrator = new Orchestrator({ registry, db: {} as any, embeddingService });
+      const mockDb = { execute: vi.fn().mockResolvedValue([]) } as any;
+      const orchestrator = new Orchestrator({ registry, db: mockDb, embeddingService });
       await orchestrator.run("Save this fact", undefined, undefined, "user-1");
 
       expect(mockEmbed).toHaveBeenCalledWith("company: We sell widgets");
@@ -306,7 +309,8 @@ describe("Orchestrator", () => {
 
       const registry = new LlmRegistry();
       const embeddingService = { embed: mockEmbed };
-      const orchestrator = new Orchestrator({ registry, db: {} as any, embeddingService });
+      const mockDb = { execute: vi.fn().mockResolvedValue([]) } as any;
+      const orchestrator = new Orchestrator({ registry, db: mockDb, embeddingService });
       await orchestrator.run("What do I like?", undefined, undefined, "user-1");
 
       expect(mockEmbed).toHaveBeenCalledWith("what do I like");

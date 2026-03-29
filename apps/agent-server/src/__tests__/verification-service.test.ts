@@ -23,7 +23,9 @@ const mockSaveMemory = vi.fn().mockResolvedValue({});
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   updateGoalStatus: (...args: unknown[]) => mockUpdateGoalStatus(...args),
   updateGoalMetadata: (...args: unknown[]) => mockUpdateGoalMetadata(...args),
   saveMemory: (...args: unknown[]) => mockSaveMemory(...args),

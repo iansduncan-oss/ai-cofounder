@@ -14,7 +14,9 @@ const mockCompleteWorkSession = vi.fn().mockResolvedValue({});
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),
   countTasksByStatus: (...args: unknown[]) => mockCountTasksByStatus(...args),

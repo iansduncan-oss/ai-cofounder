@@ -9,7 +9,9 @@ const mockGetActivePrompt = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   getActivePrompt: (...args: unknown[]) => mockGetActivePrompt(...args),
   getActivePersona: vi.fn().mockResolvedValue(null),
 }));

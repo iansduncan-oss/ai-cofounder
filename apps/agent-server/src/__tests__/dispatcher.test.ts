@@ -18,7 +18,9 @@ const mockListPendingApprovalsForTasks = vi.fn().mockResolvedValue([]);
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  createDb: vi.fn().mockReturnValue({}),
+  createDb: vi.fn().mockReturnValue({
+    execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+  }),
   getGoal: mockGetGoal,
   listTasksByGoal: mockListTasksByGoal,
   assignTask: mockAssignTask,

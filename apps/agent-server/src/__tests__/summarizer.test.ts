@@ -124,7 +124,7 @@ describe("orchestrator auto semantic retrieval", () => {
 
     const orchestrator = new Orchestrator({
       registry,
-      db: {} as any,
+      db: { execute: vi.fn().mockResolvedValue([]) } as any,
       embeddingService: { embed: mockEmbed } as any,
     });
 
@@ -156,7 +156,7 @@ describe("orchestrator auto semantic retrieval", () => {
 
     const orchestrator = new Orchestrator({
       registry,
-      db: {} as any,
+      db: { execute: vi.fn().mockResolvedValue([]) } as any,
       embeddingService: { embed: mockEmbed } as any,
     });
 
