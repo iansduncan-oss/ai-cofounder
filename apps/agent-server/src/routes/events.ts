@@ -1,9 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type } from "@sinclair/typebox";
 import { createEvent, listEvents, countEvents, getEventById, resetEventProcessed } from "@ai-cofounder/db";
-import { optionalEnv } from "@ai-cofounder/shared";
+import { optionalEnv, createLogger } from "@ai-cofounder/shared";
 import { processEvent } from "../events.js";
 import { PaginationQuery, IdParams } from "../schemas.js";
+
+const logger = createLogger("event-routes");
 
 const InboundEventBody = Type.Object({
   source: Type.String({ minLength: 1, maxLength: 100 }),
@@ -21,6 +23,11 @@ const EventListQuery = Type.Intersect([
 ]);
 
 export const eventRoutes: FastifyPluginAsync = async (app) => {
+  // Warn at startup if ALLOWED_EVENT_SOURCES is not configured in production
+  if (process.env.NODE_ENV === "production" && !optionalEnv("ALLOWED_EVENT_SOURCES", "")) {
+    logger.warn("ALLOWED_EVENT_SOURCES is not configured — inbound events will be rejected in production");
+  }
+
   /* GET / — list events (paginated, filterable) */
   app.get<{ Querystring: typeof EventListQuery.static }>(
     "/",
@@ -76,12 +83,34 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
   /* POST /inbound — receive an external event */
   app.post<{ Body: typeof InboundEventBody.static }>(
     "/inbound",
-    { schema: { tags: ["events"], body: InboundEventBody } },
+    {
+      schema: { tags: ["events"], body: InboundEventBody },
+      preHandler: async (request, reply) => {
+        // Accept API_SECRET bearer token as an alternative to JWT for webhook callers
+        const apiSecret = optionalEnv("API_SECRET", "");
+        if (apiSecret) {
+          const authHeader = request.headers.authorization;
+          if (authHeader === `Bearer ${apiSecret}`) {
+            return; // Authenticated via API_SECRET
+          }
+        }
+
+        // If JWT already verified (handled by jwt-guard), allow through
+        // jwtVerify would have already run in the parent scope's onRequest hook
+        // Loopback/Docker callers are also already allowed through by jwt-guard
+
+        // No additional auth block here — jwt-guard handles the gate.
+        // This preHandler just adds the API_SECRET alternative path.
+      },
+    },
     async (request, reply) => {
       const { source, type, payload } = request.body;
 
-      // Optional source whitelist
+      // Require ALLOWED_EVENT_SOURCES in production
       const allowedSources = optionalEnv("ALLOWED_EVENT_SOURCES", "").split(",").filter(Boolean);
+      if (process.env.NODE_ENV === "production" && allowedSources.length === 0) {
+        return reply.status(503).send({ error: "Event source whitelist not configured" });
+      }
       if (allowedSources.length > 0 && !allowedSources.includes(source)) {
         return reply.status(403).send({ error: "Source not allowed" });
       }

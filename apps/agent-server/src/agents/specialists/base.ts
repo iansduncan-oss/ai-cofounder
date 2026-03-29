@@ -9,6 +9,7 @@ import type {
   EmbeddingService,
 } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
+import { sanitizeForPrompt } from "../prompts/system.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
@@ -121,7 +122,7 @@ export abstract class SpecialistAgent {
           toolResults.push({
             type: "tool_result",
             tool_use_id: block.id,
-            content: JSON.stringify(result),
+            content: sanitizeForPrompt(JSON.stringify(result)),
           });
         }
       }

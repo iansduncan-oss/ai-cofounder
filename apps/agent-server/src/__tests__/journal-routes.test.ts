@@ -18,8 +18,8 @@ vi.mock("@ai-cofounder/db", () => ({
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({
-    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
-    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fatal: vi.fn() }),
   }),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
   requireEnv: (name: string) => `mock-${name}`,

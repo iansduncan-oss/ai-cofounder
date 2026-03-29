@@ -34,7 +34,7 @@ import {
   saveThinkingTrace,
   recordLlmUsage,
 } from "@ai-cofounder/db";
-import { buildSystemPrompt } from "./prompts/system.js";
+import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
@@ -704,7 +704,7 @@ export class Orchestrator {
             toolResults.push({
               type: "tool_result",
               tool_use_id: block.id,
-              content: JSON.stringify(result),
+              content: sanitizeForPrompt(JSON.stringify(result)),
             });
           }
         }
@@ -953,7 +953,7 @@ export class Orchestrator {
             }
 
             await onEvent({ type: "tool_result", data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) } });
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) });
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeForPrompt(JSON.stringify(result)) });
           }
         }
 

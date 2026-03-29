@@ -8,10 +8,14 @@ const logger = createLogger("autonomy-tier");
 
 export class AutonomyTierService {
   private static readonly DEFAULT_TIERS: Record<string, AutonomyTier> = {
-    git_push: "yellow",
+    // Red: irreversible external actions
+    git_push: "red",
+    // Yellow: destructive or high-impact
     delete_file: "yellow",
     delete_directory: "yellow",
+    write_file: "yellow",
     create_pr: "yellow",
+    git_commit: "yellow",
   };
 
   private tiers: Map<string, { tier: AutonomyTier; timeoutMs: number }> = new Map();
@@ -45,9 +49,13 @@ export class AutonomyTierService {
   }
 
   getAllRed(): string[] {
-    return [...this.tiers.entries()]
+    const dbRed = [...this.tiers.entries()]
       .filter(([, v]) => v.tier === "red")
       .map(([k]) => k);
+    const defaultRed = Object.entries(AutonomyTierService.DEFAULT_TIERS)
+      .filter(([, tier]) => tier === "red")
+      .map(([name]) => name);
+    return [...new Set([...dbRed, ...defaultRed])];
   }
 
   isLoaded(): boolean {

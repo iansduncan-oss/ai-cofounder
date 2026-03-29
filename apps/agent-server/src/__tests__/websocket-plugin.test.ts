@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 import type { WsClientMessage, WsServerMessage } from "@ai-cofounder/shared";
 
@@ -24,6 +24,7 @@ vi.mock("@ai-cofounder/shared", async (importOriginal) => {
       warn: vi.fn(),
       error: vi.fn(),
       debug: vi.fn(),
+      fatal: vi.fn(),
     }),
     optionalEnv: (_name: string, defaultValue: string) => defaultValue,
   };
@@ -77,13 +78,15 @@ vi.mock("@ai-cofounder/sandbox", () => ({
 }));
 
 import WebSocket from "ws";
-import { _wsClients } from "../plugins/websocket.js";
+import { _wsClients, _goalListeners } from "../plugins/websocket.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let app: any;
 
-beforeEach(async () => {
-  _wsClients.clear();
+/** Track all connections opened during a test for guaranteed cleanup */
+const openConnections: WebSocket[] = [];
+
+beforeAll(async () => {
   const { buildServer } = await import("../server.js");
   const server = buildServer();
   app = server.app;
@@ -91,9 +94,20 @@ beforeEach(async () => {
   await app.listen({ port: 0 });
 });
 
-afterEach(async () => {
+afterAll(async () => {
   _wsClients.clear();
   await app?.close();
+});
+
+afterEach(() => {
+  for (const ws of openConnections) {
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close();
+    }
+  }
+  openConnections.length = 0;
+  _wsClients.clear();
+  _goalListeners.clear();
 });
 
 function getWsUrl(): string {
@@ -102,27 +116,41 @@ function getWsUrl(): string {
   return `ws://localhost:${addr.port}/ws`;
 }
 
-function connectWs(): Promise<WebSocket> {
+function connectWs(timeoutMs = 5000): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(getWsUrl());
-    ws.on("open", () => resolve(ws));
-    ws.on("error", reject);
+    openConnections.push(ws);
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error("WebSocket connect timeout"));
+    }, timeoutMs);
+    ws.on("open", () => { clearTimeout(timer); resolve(ws); });
+    ws.on("error", (err) => { clearTimeout(timer); reject(err); });
   });
 }
 
-function waitForMessage(ws: WebSocket): Promise<WsServerMessage> {
-  return new Promise((resolve) => {
+function waitForMessage(ws: WebSocket, timeoutMs = 5000): Promise<WsServerMessage> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error("waitForMessage timeout"));
+    }, timeoutMs);
     ws.once("message", (data) => {
+      clearTimeout(timer);
       resolve(JSON.parse(data.toString()) as WsServerMessage);
     });
   });
+}
+
+/** Send a ping and wait for pong — confirms all prior messages were processed */
+async function flushMessages(ws: WebSocket): Promise<void> {
+  ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+  await waitForMessage(ws); // pong
 }
 
 describe("WebSocket plugin", () => {
   it("accepts a WebSocket connection on /ws", async () => {
     const ws = await connectWs();
     expect(ws.readyState).toBe(WebSocket.OPEN);
-    ws.close();
   });
 
   it("responds to ping with pong", async () => {
@@ -134,7 +162,6 @@ describe("WebSocket plugin", () => {
 
     const response = await msgPromise;
     expect(response.type).toBe("pong");
-    ws.close();
   });
 
   it("returns error for invalid JSON", async () => {
@@ -144,85 +171,92 @@ describe("WebSocket plugin", () => {
     ws.send("not valid json");
 
     const response = await msgPromise;
-    expect(response.type).toBe("error");
-    if (response.type === "error") {
-      expect(response.message).toBe("Invalid JSON");
-    }
-    ws.close();
+    expect(response).toEqual({ type: "error", message: "Invalid JSON" });
+  });
+
+  it("returns error for unknown message type", async () => {
+    const ws = await connectWs();
+    const msgPromise = waitForMessage(ws);
+
+    ws.send(JSON.stringify({ type: "unknown_type" }));
+
+    const response = await msgPromise;
+    expect(response).toEqual({ type: "error", message: "Unknown message type" });
   });
 
   it("subscribes to channels and receives invalidation", async () => {
     const ws = await connectWs();
 
-    // Subscribe to tasks channel
-    const sub: WsClientMessage = { type: "subscribe", channels: ["tasks"] };
-    ws.send(JSON.stringify(sub));
+    ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
+    await flushMessages(ws);
 
-    // Send a ping and wait for pong — confirms subscribe was processed (same message queue)
-    const ping: WsClientMessage = { type: "ping" };
-    ws.send(JSON.stringify(ping));
-    await waitForMessage(ws); // pong
-
-    // Trigger a broadcast from the server
     const msgPromise = waitForMessage(ws);
     app.wsBroadcast("tasks");
 
     const response = await msgPromise;
-    expect(response.type).toBe("invalidate");
-    if (response.type === "invalidate") {
-      expect(response.channel).toBe("tasks");
+    expect(response).toEqual({ type: "invalidate", channel: "tasks" });
+  });
+
+  it("subscribes to multiple channels", async () => {
+    const ws = await connectWs();
+
+    ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks", "goals", "usage"] } satisfies WsClientMessage));
+    await flushMessages(ws);
+
+    // Should receive from all three
+    for (const channel of ["tasks", "goals", "usage"] as const) {
+      const msgPromise = waitForMessage(ws);
+      app.wsBroadcast(channel);
+      const response = await msgPromise;
+      expect(response).toEqual({ type: "invalidate", channel });
     }
-    ws.close();
+  });
+
+  it("ignores invalid channel names", async () => {
+    const ws = await connectWs();
+
+    ws.send(JSON.stringify({ type: "subscribe", channels: ["not_a_real_channel", "tasks"] }));
+    await flushMessages(ws);
+
+    // Should receive tasks but not the invalid channel
+    const msgPromise = waitForMessage(ws);
+    app.wsBroadcast("tasks");
+    const response = await msgPromise;
+    expect(response).toEqual({ type: "invalidate", channel: "tasks" });
   });
 
   it("does not receive events for unsubscribed channels", async () => {
     const ws = await connectWs();
 
-    // Subscribe only to tasks
-    const sub: WsClientMessage = { type: "subscribe", channels: ["tasks"] };
-    ws.send(JSON.stringify(sub));
+    ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
+    await flushMessages(ws);
 
-    // Confirm subscribe processed
-    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
-    await waitForMessage(ws); // pong
-
-    // Broadcast to monitoring (not subscribed)
+    // Broadcast to monitoring (not subscribed) — should be ignored
     app.wsBroadcast("monitoring");
 
-    // Broadcast to tasks (subscribed)
+    // Broadcast to tasks (subscribed) — should arrive
     const msgPromise = waitForMessage(ws);
     app.wsBroadcast("tasks");
 
     const response = await msgPromise;
-    expect(response.type).toBe("invalidate");
-    if (response.type === "invalidate") {
-      expect(response.channel).toBe("tasks");
-    }
-    ws.close();
+    expect(response).toEqual({ type: "invalidate", channel: "tasks" });
   });
 
   it("handles unsubscribe", async () => {
     const ws = await connectWs();
 
-    // Subscribe, then confirm via ping/pong
     ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
-    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
-    await waitForMessage(ws); // pong confirms subscribe processed
+    await flushMessages(ws);
 
-    // Unsubscribe, then confirm via ping/pong
     ws.send(JSON.stringify({ type: "unsubscribe", channels: ["tasks"] } satisfies WsClientMessage));
-    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
-    await waitForMessage(ws); // pong confirms unsubscribe processed
+    await flushMessages(ws);
 
-    // Broadcast to tasks — should not receive
-    let received = false;
-    ws.once("message", () => { received = true; });
-
+    // Broadcast to tasks — should not arrive since we unsubscribed.
+    // Send a ping after broadcast; if we only get pong back, the invalidation was correctly filtered.
     app.wsBroadcast("tasks");
-    await new Promise((r) => setTimeout(r, 100));
-
-    expect(received).toBe(false);
-    ws.close();
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    const response = await waitForMessage(ws);
+    expect(response.type).toBe("pong");
   });
 
   it("handles subscribe_goal and unsubscribe_goal", async () => {
@@ -230,29 +264,143 @@ describe("WebSocket plugin", () => {
 
     const goalId = "test-goal-123";
     ws.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
-    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
-    await waitForMessage(ws); // pong confirms subscribe_goal processed
+    await flushMessages(ws);
 
     ws.send(JSON.stringify({ type: "unsubscribe_goal", goalId } satisfies WsClientMessage));
-    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
-    await waitForMessage(ws); // pong confirms unsubscribe_goal processed
-
-    // Should not crash
-    ws.close();
+    await flushMessages(ws);
   });
 
-  it("handles unknown message type gracefully", async () => {
-    const ws = await connectWs();
-    const msgPromise = waitForMessage(ws);
+  it("broadcasts to multiple connected clients", async () => {
+    const ws1 = await connectWs();
+    const ws2 = await connectWs();
 
-    ws.send(JSON.stringify({ type: "unknown_type" }));
+    ws1.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
+    ws2.send(JSON.stringify({ type: "subscribe", channels: ["tasks"] } satisfies WsClientMessage));
+    await Promise.all([flushMessages(ws1), flushMessages(ws2)]);
+
+    const [msg1, msg2] = await Promise.all([
+      waitForMessage(ws1),
+      (() => { app.wsBroadcast("tasks"); return waitForMessage(ws2); })(),
+    ]);
+
+    expect(msg1).toEqual({ type: "invalidate", channel: "tasks" });
+    expect(msg2).toEqual({ type: "invalidate", channel: "tasks" });
+  });
+
+  it("accepts hyphenated channel names (follow-ups, conversations, work-sessions)", async () => {
+    const ws = await connectWs();
+
+    ws.send(JSON.stringify({ type: "subscribe", channels: ["follow-ups", "conversations", "work-sessions"] } satisfies WsClientMessage));
+    await flushMessages(ws);
+
+    for (const channel of ["follow-ups", "conversations", "work-sessions"] as const) {
+      const msgPromise = waitForMessage(ws);
+      app.wsBroadcast(channel);
+      const response = await msgPromise;
+      expect(response).toEqual({ type: "invalidate", channel });
+    }
+  });
+
+  it("receives goal events after subscribe_goal", async () => {
+    const ws = await connectWs();
+    const goalId = "goal-evt-test";
+
+    ws.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws);
+
+    // Emit a goal event through the agentEvents bridge
+    const msgPromise = waitForMessage(ws);
+    const payload = JSON.stringify({ goalId, data: { status: "running", step: 2 } });
+    app.agentEvents.emit("ws:goal_event", payload);
 
     const response = await msgPromise;
-    expect(response.type).toBe("error");
-    if (response.type === "error") {
-      expect(response.message).toBe("Unknown message type");
-    }
+    expect(response).toEqual({
+      type: "goal_event",
+      goalId,
+      data: { status: "running", step: 2 },
+    });
+  });
+
+  it("stops receiving goal events after unsubscribe_goal", async () => {
+    const ws = await connectWs();
+    const goalId = "goal-unsub-test";
+
+    ws.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws);
+
+    ws.send(JSON.stringify({ type: "unsubscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws);
+
+    // Emit goal event — should not arrive; ping should be next message
+    app.agentEvents.emit("ws:goal_event", JSON.stringify({ goalId, data: { x: 1 } }));
+    ws.send(JSON.stringify({ type: "ping" } satisfies WsClientMessage));
+    const response = await waitForMessage(ws);
+    expect(response.type).toBe("pong");
+  });
+
+  it("removes client from tracking set on disconnect", async () => {
+    const ws = await connectWs();
+    await flushMessages(ws);
+
+    const sizeBefore = _wsClients.size;
+    expect(sizeBefore).toBeGreaterThan(0);
+
+    // Close and wait for server to process the disconnect
     ws.close();
+    await new Promise<void>((resolve) => { ws.on("close", () => resolve()); });
+    // Give the server-side close handler a tick to fire
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(_wsClients.size).toBe(sizeBefore - 1);
+  });
+
+  it("shares a single goal listener across multiple clients (ref-counted)", async () => {
+    const ws1 = await connectWs();
+    const ws2 = await connectWs();
+    const goalId = "shared-goal";
+
+    ws1.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
+    ws2.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
+    await Promise.all([flushMessages(ws1), flushMessages(ws2)]);
+
+    // Only one listener should exist despite two subscribers
+    expect(_goalListeners.size).toBe(1);
+    expect(_goalListeners.get(goalId)?.refCount).toBe(2);
+
+    // Both clients should receive the event
+    const payload = JSON.stringify({ goalId, data: { step: 1 } });
+    const [msg1, msg2] = await Promise.all([
+      waitForMessage(ws1),
+      (() => { app.agentEvents.emit("ws:goal_event", payload); return waitForMessage(ws2); })(),
+    ]);
+    expect(msg1).toEqual({ type: "goal_event", goalId, data: { step: 1 } });
+    expect(msg2).toEqual({ type: "goal_event", goalId, data: { step: 1 } });
+
+    // Unsubscribe one — listener should remain with refCount 1
+    ws1.send(JSON.stringify({ type: "unsubscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws1);
+    expect(_goalListeners.get(goalId)?.refCount).toBe(1);
+
+    // Unsubscribe second — listener should be fully removed
+    ws2.send(JSON.stringify({ type: "unsubscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws2);
+    expect(_goalListeners.has(goalId)).toBe(false);
+  });
+
+  it("cleans up goal listeners when client disconnects", async () => {
+    const ws = await connectWs();
+    const goalId = "disconnect-goal";
+
+    ws.send(JSON.stringify({ type: "subscribe_goal", goalId } satisfies WsClientMessage));
+    await flushMessages(ws);
+    expect(_goalListeners.get(goalId)?.refCount).toBe(1);
+
+    // Disconnect — server-side cleanup should remove the listener
+    ws.close();
+    await new Promise<void>((resolve) => { ws.on("close", () => resolve()); });
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(_goalListeners.has(goalId)).toBe(false);
   });
 
   it("wsBroadcast decorator is available on app", () => {

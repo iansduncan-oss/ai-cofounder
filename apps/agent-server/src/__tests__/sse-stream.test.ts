@@ -17,6 +17,7 @@ vi.mock("@ai-cofounder/shared", () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   optionalEnv: (name: string, defaultValue: string) => {
     // Return REDIS_URL so pubsubPlugin takes the real (mocked) path instead of no-op

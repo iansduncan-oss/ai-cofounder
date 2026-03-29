@@ -8,6 +8,7 @@ vi.mock("@ai-cofounder/shared", () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
@@ -71,13 +72,17 @@ describe("AutonomyTierService", () => {
     expect(service.getTier("unknown_tool")).toBe("green");
   });
 
-  it("returns yellow for destructive tools via static defaults when DB has no config", async () => {
+  it("returns correct default tiers for dangerous tools when DB has no config", async () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
-    expect(service.getTier("git_push")).toBe("yellow");
+    // Red: irreversible external
+    expect(service.getTier("git_push")).toBe("red");
+    // Yellow: destructive or high-impact
     expect(service.getTier("delete_file")).toBe("yellow");
     expect(service.getTier("delete_directory")).toBe("yellow");
+    expect(service.getTier("write_file")).toBe("yellow");
     expect(service.getTier("create_pr")).toBe("yellow");
+    expect(service.getTier("git_commit")).toBe("yellow");
   });
 
   it("DB config overrides static defaults", async () => {
@@ -86,7 +91,7 @@ describe("AutonomyTierService", () => {
     ]);
     const service = new AutonomyTierService(mockDb);
     await service.load();
-    // DB says green, static default says yellow — DB wins
+    // DB says green, static default says red — DB wins
     expect(service.getTier("git_push")).toBe("green");
     // delete_file still uses static default since not in DB
     expect(service.getTier("delete_file")).toBe("yellow");
@@ -120,9 +125,8 @@ describe("AutonomyTierService", () => {
     expect(service.getTimeoutMs("unknown_tool")).toBe(300_000);
   });
 
-  it("getAllRed returns only red-tier tool names", async () => {
+  it("getAllRed includes both DB and hardcoded default red tools", async () => {
     mockListToolTierConfigs.mockResolvedValue([
-      { toolName: "git_push", tier: "yellow", timeoutMs: 60000 },
       { toolName: "delete_file", tier: "red", timeoutMs: 300000 },
       { toolName: "delete_directory", tier: "red", timeoutMs: 300000 },
       { toolName: "save_memory", tier: "green", timeoutMs: 300000 },
@@ -130,11 +134,32 @@ describe("AutonomyTierService", () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
     const redTools = service.getAllRed();
-    expect(redTools).toHaveLength(2);
+    // DB red: delete_file, delete_directory; hardcoded red: git_push
     expect(redTools).toContain("delete_file");
     expect(redTools).toContain("delete_directory");
-    expect(redTools).not.toContain("git_push");
+    expect(redTools).toContain("git_push"); // hardcoded default
     expect(redTools).not.toContain("save_memory");
+    expect(redTools).toHaveLength(3);
+  });
+
+  it("getAllRed deduplicates when tool is red in both DB and defaults", async () => {
+    mockListToolTierConfigs.mockResolvedValue([
+      { toolName: "git_push", tier: "red", timeoutMs: 60000 },
+    ]);
+    const service = new AutonomyTierService(mockDb);
+    await service.load();
+    const redTools = service.getAllRed();
+    // git_push is red in both DB and defaults — should appear once
+    const gitPushCount = redTools.filter((t) => t === "git_push").length;
+    expect(gitPushCount).toBe(1);
+  });
+
+  it("getAllRed returns hardcoded defaults even with empty DB", async () => {
+    const service = new AutonomyTierService(mockDb);
+    await service.load();
+    const redTools = service.getAllRed();
+    expect(redTools).toContain("git_push");
+    expect(redTools).toHaveLength(1);
   });
 
   it("reload refreshes tier data from DB", async () => {

@@ -11,6 +11,7 @@ import {
   real,
   customType,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
@@ -530,7 +531,9 @@ export const userPatterns = pgTable("user_patterns", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("idx_user_patterns_user_type").on(table.userId, table.patternType),
+]);
 
 /* ── Deployments (deploy tracking & self-healing) ── */
 

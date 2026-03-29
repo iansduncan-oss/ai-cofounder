@@ -31,6 +31,7 @@ vi.mock("@ai-cofounder/shared", () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
   requireEnv: (name: string) => `mock-${name}`,

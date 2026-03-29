@@ -1,5 +1,13 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
+
+/** Cleanup function returned by main() — removes process listeners */
+let cleanup: (() => void) | undefined;
+
+afterEach(() => {
+  cleanup?.();
+  cleanup = undefined;
+});
 
 beforeAll(() => {
   process.env.REDIS_URL = "redis://localhost:6379";
@@ -23,6 +31,7 @@ vi.mock("@ai-cofounder/shared", () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   requireEnv: (...args: unknown[]) => mockRequireEnv(...(args as [string])),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
@@ -131,10 +140,14 @@ vi.mock("../services/notifications.js", () => ({
   createNotificationService: (...args: unknown[]) => mockCreateNotificationService(...args),
 }));
 
-// Import the main function for direct testing (main() is also called at module level)
-// We use dynamic import to control timing after mocks are set up.
-// Since main() runs at module load time, we test via the exported `main` function directly.
-const { main } = await import("../worker.js");
+// Dynamic import after mocks are set up. main() no longer auto-runs on import.
+const { main: rawMain } = await import("../worker.js");
+
+/** Wrapper that captures the cleanup function returned by main() */
+async function main() {
+  cleanup?.();
+  cleanup = await rawMain();
+}
 
 describe("Worker — QUEUE-03: agentTask processor registration", () => {
   it("registers ONLY the agentTask processor (not monitoring/notification/briefing/pipeline)", async () => {

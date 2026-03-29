@@ -165,20 +165,36 @@ export async function main() {
     process.exit(0);
   };
 
-  process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT", () => shutdown("SIGINT"));
-
-  process.on("unhandledRejection", (reason) => {
+  const onSigTerm = () => shutdown("SIGTERM");
+  const onSigInt = () => shutdown("SIGINT");
+  const onUnhandledRejection = (reason: unknown) => {
     logger.fatal({ err: reason }, "unhandled rejection — exiting");
     process.exit(1);
-  });
-  process.on("uncaughtException", (err) => {
+  };
+  const onUncaughtException = (err: Error) => {
     logger.fatal({ err }, "uncaught exception — exiting");
+    process.exit(1);
+  };
+
+  process.on("SIGTERM", onSigTerm);
+  process.on("SIGINT", onSigInt);
+  process.on("unhandledRejection", onUnhandledRejection);
+  process.on("uncaughtException", onUncaughtException);
+
+  // Return cleanup function for testing
+  return () => {
+    process.off("SIGTERM", onSigTerm);
+    process.off("SIGINT", onSigInt);
+    process.off("unhandledRejection", onUnhandledRejection);
+    process.off("uncaughtException", onUncaughtException);
+  };
+}
+
+// Only auto-start when run as the entry point (not when imported for testing)
+const isMainModule = process.argv[1]?.endsWith("worker.js") || process.argv[1]?.endsWith("worker.ts");
+if (isMainModule) {
+  main().catch((err) => {
+    logger.error({ err }, "Worker startup failed");
     process.exit(1);
   });
 }
-
-main().catch((err) => {
-  logger.error({ err }, "Worker startup failed");
-  process.exit(1);
-});

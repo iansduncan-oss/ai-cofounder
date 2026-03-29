@@ -12,6 +12,7 @@ const VALID_CHANNELS = new Set<string>([
   "tasks", "approvals", "monitoring", "queue", "health",
   "tools", "pipelines", "briefing", "goals", "deploys",
   "patterns", "context", "journal", "usage",
+  "follow-ups", "conversations", "work-sessions",
 ]);
 
 /** Per-connection state */
@@ -25,6 +26,12 @@ interface WsClient {
 
 /** All connected clients */
 const clients = new Set<WsClient>();
+
+/**
+ * Reference-counted goal listeners. One shared listener per goalId instead of
+ * one per client — broadcastGoalEvent already fans out to all subscribed clients.
+ */
+const goalListeners = new Map<string, { listener: (raw: string) => void; refCount: number }>();
 
 /**
  * Broadcast an invalidation event to all clients subscribed to the given channel.
@@ -61,46 +68,82 @@ export const websocketPlugin = fp(async (app) => {
   // Register the @fastify/websocket plugin
   await app.register(websocket);
 
+  // Each WebSocket connection adds a close listener to the WS server. Under load
+  // (or in tests with many connections) this exceeds the default limit of 10.
+  if (app.websocketServer) {
+    app.websocketServer.setMaxListeners(0);
+  }
+
   // Heartbeat: ping every 30s, drop dead connections after 10s grace
   const heartbeatInterval = setInterval(() => {
+    const toDrop: WsClient[] = [];
     for (const client of clients) {
       if (!client.alive) {
-        logger.debug("dropping unresponsive WebSocket client");
-        client.socket.terminate();
-        clients.delete(client);
+        toDrop.push(client);
         continue;
       }
       client.alive = false;
-      const msg: WsServerMessage = { type: "pong" };
-      // We use the ping frame, but also send a JSON pong for protocol-level keepalive
       client.socket.ping();
-      if (client.socket.readyState === 1) {
-        client.socket.send(JSON.stringify(msg));
-      }
+    }
+    for (const client of toDrop) {
+      logger.debug("dropping unresponsive WebSocket client");
+      client.socket.terminate();
+      cleanupClient(client);
     }
   }, 30_000);
   heartbeatInterval.unref();
 
-  /** Remove all goal listeners and delete client from the set */
+  /** Add a reference-counted goal listener on agentEvents */
+  function addGoalListener(goalId: string): void {
+    const existing = goalListeners.get(goalId);
+    if (existing) {
+      existing.refCount++;
+      return;
+    }
+    const listener = (rawMsg: string): void => {
+      try {
+        const event = JSON.parse(rawMsg) as Record<string, unknown>;
+        broadcastGoalEvent(goalId, event);
+      } catch { /* ignore parse errors */ }
+    };
+    app.agentEvents.on(goalChannel(goalId), listener);
+    goalListeners.set(goalId, { listener, refCount: 1 });
+  }
+
+  /** Remove a reference-counted goal listener; cleans up when refCount hits 0 */
+  function removeGoalListener(goalId: string): void {
+    const entry = goalListeners.get(goalId);
+    if (!entry) return;
+    entry.refCount--;
+    if (entry.refCount <= 0) {
+      app.agentEvents.off(goalChannel(goalId), entry.listener);
+      goalListeners.delete(goalId);
+    }
+  }
+
+  /** Remove all goal listeners for a client and delete it from the set */
   function cleanupClient(client: WsClient): void {
     for (const goalId of client.goalIds) {
-      const ch = goalChannel(goalId);
-      const listener = (client as unknown as Record<string, unknown>)[`_goalListener_${goalId}`] as ((...args: unknown[]) => void) | undefined;
-      if (listener) app.agentEvents.off(ch, listener);
+      removeGoalListener(goalId);
       app.unsubscribeGoal(goalId).catch(() => {});
     }
     clients.delete(client);
   }
 
-  // Staleness reaper: terminate clients with no activity for 1 hour
+  // Staleness reaper: terminate clients with no activity for 1 hour.
+  // Collect first, then clean up — mutating a Set during iteration can skip elements.
   const stalenessInterval = setInterval(() => {
     const cutoff = Date.now() - STALE_THRESHOLD_MS;
+    const stale: WsClient[] = [];
     for (const client of clients) {
       if (client.lastActivityAt < cutoff) {
-        logger.warn({ goalIds: [...client.goalIds] }, "cleaning up stale WS client");
-        client.socket.terminate();
-        cleanupClient(client);
+        stale.push(client);
       }
+    }
+    for (const client of stale) {
+      logger.warn({ goalIds: [...client.goalIds] }, "cleaning up stale WS client");
+      client.socket.terminate();
+      cleanupClient(client);
     }
   }, STALE_THRESHOLD_MS);
   stalenessInterval.unref();
@@ -187,30 +230,14 @@ export const websocketPlugin = fp(async (app) => {
 
         case "subscribe_goal": {
           client.goalIds.add(msg.goalId);
-          // Also subscribe to Redis pubsub for this goal so events flow through
-          const channel = goalChannel(msg.goalId);
-          const onGoalMessage = (rawMsg: string): void => {
-            try {
-              const event = JSON.parse(rawMsg) as Record<string, unknown>;
-              broadcastGoalEvent(msg.goalId, event);
-            } catch { /* ignore parse errors */ }
-          };
-          app.agentEvents.on(channel, onGoalMessage);
+          addGoalListener(msg.goalId);
           app.subscribeGoal(msg.goalId).catch(() => {});
-
-          // Track listener for cleanup
-          (client as unknown as Record<string, unknown>)[`_goalListener_${msg.goalId}`] = onGoalMessage;
           break;
         }
 
         case "unsubscribe_goal": {
           client.goalIds.delete(msg.goalId);
-          const ch = goalChannel(msg.goalId);
-          const listener = (client as unknown as Record<string, unknown>)[`_goalListener_${msg.goalId}`] as ((...args: unknown[]) => void) | undefined;
-          if (listener) {
-            app.agentEvents.off(ch, listener);
-            delete (client as unknown as Record<string, unknown>)[`_goalListener_${msg.goalId}`];
-          }
+          removeGoalListener(msg.goalId);
           app.unsubscribeGoal(msg.goalId).catch(() => {});
           break;
         }
@@ -246,6 +273,7 @@ export const websocketPlugin = fp(async (app) => {
       client.socket.close(1001, "Server shutting down");
     }
     clients.clear();
+    goalListeners.clear();
     logger.info("WebSocket plugin shut down");
   });
 
@@ -253,4 +281,4 @@ export const websocketPlugin = fp(async (app) => {
 });
 
 // Export for testing
-export { clients as _wsClients, broadcastInvalidation, broadcastGoalEvent };
+export { clients as _wsClients, goalListeners as _goalListeners, broadcastInvalidation, broadcastGoalEvent };

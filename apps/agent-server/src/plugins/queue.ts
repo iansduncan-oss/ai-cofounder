@@ -221,13 +221,6 @@ export const queuePlugin = fp(async (app) => {
           logger.info(result, "memory consolidation complete");
           break;
         }
-        case "process_pattern_feedback": {
-          const { PatternFeedbackProcessor } = await import("../services/pattern-feedback.js");
-          const processor = new PatternFeedbackProcessor(app.db);
-          const result = await processor.processConfidenceAdjustments();
-          logger.info(result, "pattern feedback processing complete");
-          break;
-        }
         case "create_episode": {
           if (app.episodicMemoryService && job.data.conversationId) {
             const episode = await app.episodicMemoryService.createEpisode(job.data.conversationId);

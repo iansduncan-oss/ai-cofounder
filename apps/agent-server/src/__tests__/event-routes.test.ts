@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
@@ -245,5 +245,74 @@ describe("Event routes", () => {
     expect(body.total).toBe(0);
     expect(body.limit).toBe(50);
     expect(body.offset).toBe(0);
+  });
+
+  it("POST /api/events/inbound — rejects when production + no ALLOWED_EVENT_SOURCES", async () => {
+    const origNodeEnv = process.env.NODE_ENV;
+    const origAllowed = process.env.ALLOWED_EVENT_SOURCES;
+    const origJwt = process.env.JWT_SECRET;
+    const origCookie = process.env.COOKIE_SECRET;
+    process.env.NODE_ENV = "production";
+    process.env.JWT_SECRET = "test-jwt-secret";
+    process.env.COOKIE_SECRET = "test-cookie-secret";
+    delete process.env.ALLOWED_EVENT_SOURCES;
+
+    try {
+      const { app } = buildServer();
+      const res = await app.inject({
+        method: "POST",
+        url: "/api/events/inbound",
+        payload: {
+          source: "github",
+          type: "push",
+          payload: { ref: "refs/heads/main" },
+        },
+      });
+      await app.close();
+
+      expect(res.statusCode).toBe(503);
+      expect(res.json().error).toContain("whitelist not configured");
+    } finally {
+      process.env.NODE_ENV = origNodeEnv;
+      if (origAllowed !== undefined) process.env.ALLOWED_EVENT_SOURCES = origAllowed;
+      else delete process.env.ALLOWED_EVENT_SOURCES;
+      if (origJwt !== undefined) process.env.JWT_SECRET = origJwt;
+      else delete process.env.JWT_SECRET;
+      if (origCookie !== undefined) process.env.COOKIE_SECRET = origCookie;
+      else delete process.env.COOKIE_SECRET;
+    }
+  });
+
+  it("POST /api/events/inbound — accepts with API_SECRET bearer token", async () => {
+    const origSecret = process.env.API_SECRET;
+    process.env.API_SECRET = "test-secret-123";
+
+    mockCreateEvent.mockResolvedValueOnce({
+      id: "evt-3",
+      source: "n8n",
+      type: "workflow_complete",
+      payload: {},
+      processed: false,
+    });
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/events/inbound",
+      headers: {
+        authorization: "Bearer test-secret-123",
+      },
+      payload: {
+        source: "n8n",
+        type: "workflow_complete",
+      },
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(202);
+    expect(res.json().eventId).toBe("evt-3");
+
+    if (origSecret !== undefined) process.env.API_SECRET = origSecret;
+    else delete process.env.API_SECRET;
   });
 });

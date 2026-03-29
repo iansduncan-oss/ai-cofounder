@@ -330,6 +330,13 @@
       "when": 1774838500000,
       "tag": "0046_add_soft_delete_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1774924800000,
+      "tag": "0047_add_user_pattern_unique",
+      "breakpoints": true
     }
   ]
 }

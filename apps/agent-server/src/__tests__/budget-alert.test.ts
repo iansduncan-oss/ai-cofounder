@@ -10,6 +10,7 @@ vi.mock("@ai-cofounder/shared", () => ({
     warn: vi.fn(),
     error: vi.fn(),
     debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   optionalEnv: (name: string, defaultValue: string) => {
     if (name === "DAILY_BUDGET_USD") return mockDailyBudget;
