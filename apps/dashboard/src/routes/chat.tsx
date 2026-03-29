@@ -182,6 +182,17 @@ export function ChatPage() {
     }
   }, [stream.error]);
 
+  const handleSend = useCallback((text?: string) => {
+    const trimmed = (text ?? input).trim();
+    if (!trimmed || stream.isStreaming) return;
+
+    tts.stop(); // Stop speaking when sending new message
+    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+    if (!text) setInput("");
+
+    stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
+  }, [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop]);
+
   // Send speech transcript when recognition completes (final result)
   const lastTranscript = useRef("");
   useEffect(() => {
@@ -193,7 +204,7 @@ export function ChatPage() {
       lastTranscript.current = speech.transcript;
       handleSend(speech.transcript);
     }
-  }, [speech.isListening, speech.transcript]);
+  }, [speech.isListening, speech.transcript, handleSend]);
 
   // Derive ring state from current activity
   const ringState: RingState = useMemo(() => {
@@ -217,17 +228,6 @@ export function ChatPage() {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowScrollButton(false);
   };
-
-  const handleSend = useCallback((text?: string) => {
-    const trimmed = (text ?? input).trim();
-    if (!trimmed || stream.isStreaming) return;
-
-    tts.stop(); // Stop speaking when sending new message
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
-    if (!text) setInput("");
-
-    stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
-  }, [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop]);
 
   const handleSuggestionSelect = (suggestion: string) => {
     acceptSuggestion.mutate({
