@@ -37,6 +37,8 @@ export function GoalsPage() {
     });
   };
 
+  const [visibleCount, setVisibleCount] = useState(20);
+
   const { data: goalsData, isLoading, error } = useGoals(conversationId);
   const goals = goalsData?.data;
 
@@ -47,6 +49,9 @@ export function GoalsPage() {
       return false;
     return true;
   });
+
+  const visible = filtered?.slice(0, visibleCount);
+  const hasMore = (filtered?.length ?? 0) > visibleCount;
 
   const priorityColors: Record<GoalPriority, "default" | "secondary" | "warning" | "destructive"> = {
     low: "secondary",
@@ -117,9 +122,9 @@ export function GoalsPage() {
         </div>
       ) : isLoading ? (
         <ListSkeleton rows={5} />
-      ) : filtered && filtered.length > 0 ? (
+      ) : visible && visible.length > 0 ? (
         <div className="space-y-2">
-          {filtered.map((goal) => (
+          {visible.map((goal) => (
             <Link
               key={goal.id}
               to={`/dashboard/goals/${goal.id}`}
@@ -147,6 +152,17 @@ export function GoalsPage() {
               </div>
             </Link>
           ))}
+          {hasMore && (
+            <div className="pt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + 20)}
+              >
+                Show more ({filtered!.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

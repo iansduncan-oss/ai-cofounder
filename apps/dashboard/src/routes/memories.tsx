@@ -32,6 +32,7 @@ export function MemoriesPage() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(20);
 
   const { data: memoriesData, isLoading, error } = useMemories(userId);
   const memories = memoriesData?.data;
@@ -52,12 +53,16 @@ export function MemoriesPage() {
     return true;
   });
 
-  const grouped = filtered?.reduce(
+  const totalFiltered = filtered?.length ?? 0;
+  const visible = filtered?.slice(0, visibleCount);
+  const hasMore = totalFiltered > visibleCount;
+
+  const grouped = visible?.reduce(
     (acc, m) => {
       (acc[m.category] ??= []).push(m);
       return acc;
     },
-    {} as Record<string, typeof filtered>,
+    {} as Record<string, typeof visible>,
   );
 
   return (
@@ -158,6 +163,17 @@ export function MemoriesPage() {
                 </div>
               </div>
             ))}
+          {hasMore && (
+            <div className="pt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + 20)}
+              >
+                Show more ({totalFiltered - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

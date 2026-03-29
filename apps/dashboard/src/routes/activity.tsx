@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePendingTasks, usePendingApprovals, useGoals } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
@@ -34,6 +35,7 @@ interface ActivityEvent {
 export function ActivityPage() {
   usePageTitle("Activity");
   const [typeFilter, setTypeFilter] = useState<"all" | "task" | "goal" | "approval">("all");
+  const [visibleCount, setVisibleCount] = useState(20);
   const [conversationId] = useState("default");
 
   const { data: tasks, isLoading: tasksLoading } = usePendingTasks();
@@ -110,10 +112,13 @@ export function ActivityPage() {
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
   );
 
-  const filtered =
+  const allFiltered =
     typeFilter === "all"
       ? events
       : events.filter((e) => e.type === typeFilter);
+
+  const filtered = allFiltered.slice(0, visibleCount);
+  const hasMore = allFiltered.length > visibleCount;
 
   const typeColors: Record<string, "default" | "secondary" | "warning"> = {
     task: "default",
@@ -198,6 +203,17 @@ export function ActivityPage() {
               );
             })}
           </div>
+          {hasMore && (
+            <div className="pt-4 text-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVisibleCount((c) => c + 20)}
+              >
+                Show more ({allFiltered.length - visibleCount} remaining)
+              </Button>
+            </div>
+          )}
         </div>
       ) : (
         <EmptyState

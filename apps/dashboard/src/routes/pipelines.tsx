@@ -61,6 +61,7 @@ export function PipelinesPage() {
   usePageTitle("Pipelines");
   const [searchParams, setSearchParams] = useSearchParams();
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(20);
   const queryClient = useQueryClient();
 
   const stateFilter = searchParams.get("state") ?? "all";
@@ -98,10 +99,13 @@ export function PipelinesPage() {
   const { data, isLoading, error } = useListPipelines();
   const runs = data?.runs ?? [];
 
-  const filtered =
+  const allFiltered =
     stateFilter === "all"
       ? runs
       : runs.filter((r: PipelineRun) => r.state === stateFilter);
+
+  const filtered = allFiltered.slice(0, visibleCount);
+  const hasMore = allFiltered.length > visibleCount;
 
   return (
     <div>
@@ -171,7 +175,7 @@ export function PipelinesPage() {
         </Select>
         {stateFilter !== "all" && (
           <span className="text-xs text-muted-foreground">
-            {filtered.length} result{filtered.length !== 1 ? "s" : ""} filtered
+            {allFiltered.length} result{allFiltered.length !== 1 ? "s" : ""} filtered
           </span>
         )}
       </div>
@@ -207,34 +211,47 @@ export function PipelinesPage() {
             }
           />
         ) : (
-          filtered.map((run: PipelineRun) => (
-            <Link
-              key={run.jobId}
-              to={`/dashboard/pipelines/${run.jobId}`}
-              className="block rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:shadow-md hover:-translate-y-0.5"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">
-                    Pipeline {run.pipelineId.slice(0, 8)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Goal: <GoalTitle goalId={run.goalId} /> &middot; {run.stageCount} stages
-                    {run.createdAt && (
-                      <>
-                        {" "}
-                        &middot; <RelativeTime date={run.createdAt} />
-                      </>
-                    )}
-                    {run.finishedAt && run.createdAt && (
-                      <> &middot; {formatDuration(run.createdAt, run.finishedAt)}</>
-                    )}
-                  </p>
+          <>
+            {filtered.map((run: PipelineRun) => (
+              <Link
+                key={run.jobId}
+                to={`/dashboard/pipelines/${run.jobId}`}
+                className="block rounded-lg border bg-card p-4 transition-all hover:bg-accent hover:shadow-md hover:-translate-y-0.5"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">
+                      Pipeline {run.pipelineId.slice(0, 8)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Goal: <GoalTitle goalId={run.goalId} /> &middot; {run.stageCount} stages
+                      {run.createdAt && (
+                        <>
+                          {" "}
+                          &middot; <RelativeTime date={run.createdAt} />
+                        </>
+                      )}
+                      {run.finishedAt && run.createdAt && (
+                        <> &middot; {formatDuration(run.createdAt, run.finishedAt)}</>
+                      )}
+                    </p>
+                  </div>
+                  <PipelineStateBadge state={run.state} />
                 </div>
-                <PipelineStateBadge state={run.state} />
+              </Link>
+            ))}
+            {hasMore && (
+              <div className="pt-4 text-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setVisibleCount((c) => c + 20)}
+                >
+                  Show more ({allFiltered.length - visibleCount} remaining)
+                </Button>
               </div>
-            </Link>
-          ))
+            )}
+          </>
         )}
       </div>
 

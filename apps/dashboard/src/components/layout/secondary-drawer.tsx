@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Drawer } from "@/components/ui/drawer";
+import { ErrorBoundary } from "@/components/common/error-boundary";
 import { Loader2 } from "lucide-react";
 
 // Map paths to lazy-loaded page components
@@ -41,15 +42,17 @@ export function SecondaryDrawer({ activePath, onClose }: SecondaryDrawerProps) {
   return (
     <Drawer open={!!activePath} onClose={onClose} title={entry?.title}>
       {PageComponent && (
-        <Suspense
-          fallback={
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-            </div>
-          }
-        >
-          <PageComponent />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            }
+          >
+            <PageComponent />
+          </Suspense>
+        </ErrorBoundary>
       )}
     </Drawer>
   );
