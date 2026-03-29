@@ -10,6 +10,7 @@ import {
   boolean,
   real,
   customType,
+  index,
 } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
@@ -69,7 +70,9 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_messages_conversation_created").on(table.conversationId, table.createdAt),
+]);
 
 /* ── Channel ↔ Conversation mapping (Discord bot persistence) ── */
 
@@ -183,7 +186,9 @@ export const tasks = pgTable("tasks", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_tasks_goal_status").on(table.goalId, table.status),
+]);
 
 /* ── Memories (long-term facts about users) ── */
 
@@ -216,7 +221,9 @@ export const memories = pgTable("memories", {
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_memories_user_category").on(table.userId, table.category),
+]);
 
 /* ── Prompts (versioned system prompts for agents) ── */
 
@@ -277,7 +284,9 @@ export const llmUsage = pgTable("llm_usage", {
   conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_llm_usage_created_user").on(table.createdAt, table.userId),
+]);
 
 /* ── Schedules (natural language cron) ── */
 
