@@ -69,7 +69,7 @@ import {
   GIT_PUSH_TOOL,
 } from "./tools/git-tools.js";
 import { RUN_TESTS_TOOL } from "./tools/workspace-tools.js";
-import { CREATE_PR_TOOL, executeCreatePr } from "./tools/github-tools.js";
+import { CREATE_PR_TOOL } from "./tools/github-tools.js";
 import type { CreatePrInput } from "./tools/github-tools.js";
 import type { StreamCallback } from "./stream-events.js";
 import type { N8nService } from "../services/n8n.js";
