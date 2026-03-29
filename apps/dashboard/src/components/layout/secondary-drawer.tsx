@@ -22,6 +22,11 @@ const pageMap: Record<string, { component: React.LazyExoticComponent<React.Compo
   "/dashboard/notifications": { component: lazy(() => import("@/routes/notifications").then((m) => ({ default: m.NotificationsPage }))), title: "Notifications" },
   "/dashboard/settings": { component: lazy(() => import("@/routes/settings").then((m) => ({ default: m.SettingsPage }))), title: "Settings" },
   "/dashboard/work-sessions": { component: lazy(() => import("@/routes/work-sessions").then((m) => ({ default: m.WorkSessionsPage }))), title: "Work Sessions" },
+  "/dashboard/decisions": { component: lazy(() => import("@/routes/decisions").then((m) => ({ default: m.DecisionsPage }))), title: "Decisions" },
+  "/dashboard/follow-ups": { component: lazy(() => import("@/routes/follow-ups").then((m) => ({ default: m.FollowUpsPage }))), title: "Follow-ups" },
+  "/dashboard/pipeline-templates": { component: lazy(() => import("@/routes/pipeline-templates").then((m) => ({ default: m.PipelineTemplatesPage }))), title: "Pipeline Templates" },
+  "/dashboard/events": { component: lazy(() => import("@/routes/events").then((m) => ({ default: m.EventsPage }))), title: "Events" },
+  "/dashboard/subagents": { component: lazy(() => import("@/routes/subagents").then((m) => ({ default: m.SubagentsPage }))), title: "Subagents" },
 };
 
 interface SecondaryDrawerProps {

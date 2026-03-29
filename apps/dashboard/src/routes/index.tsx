@@ -140,6 +140,7 @@ export const router = createBrowserRouter([
       { path: "events", element: <EventsPage /> },
       { path: "work-sessions", element: <WorkSessionsPage /> },
       { path: "settings", element: <SettingsPage /> },
+      { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],
   },
 ]);

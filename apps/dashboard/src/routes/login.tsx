@@ -86,6 +86,8 @@ export function LoginPage() {
                 placeholder="Email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                aria-label="Email"
                 autoFocus
               />
             </div>
@@ -95,6 +97,8 @@ export function LoginPage() {
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                aria-label="Password"
               />
             </div>
             {error && (

@@ -181,7 +181,7 @@ body {
 
 /* Prose styling for chat markdown */
 .prose pre {
-  background: #0d0d14;
+  background: var(--color-surface-1);
   border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   padding: 0.75rem 1rem;
@@ -191,20 +191,20 @@ body {
 
 .prose code:not(pre code) {
   background: rgba(124, 58, 237, 0.15);
-  color: #c4b5fd;
+  color: var(--color-primary);
   padding: 0.15rem 0.35rem;
   border-radius: 0.25rem;
   font-size: 0.85em;
 }
 
 .prose a {
-  color: #818cf8;
+  color: var(--color-primary);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .prose a:hover {
-  color: #a78bfa;
+  color: var(--color-ring);
 }
 
 /* Chat message entrance */

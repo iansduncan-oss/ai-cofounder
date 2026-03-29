@@ -61,7 +61,7 @@ export function GlobalChatBar() {
           </div>
           <div className="flex-1 overflow-y-auto p-3 text-sm">
             {stream.accumulatedText ? (
-              <div className="prose prose-sm prose-invert max-w-none">
+              <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown>{stream.accumulatedText}</ReactMarkdown>
                 {stream.isStreaming && <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground ml-0.5" />}
               </div>
@@ -82,6 +82,7 @@ export function GlobalChatBar() {
         <button
           onClick={() => setOpen(!open)}
           className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+          aria-label={open ? "Close quick chat" : "Open quick chat"}
         >
           <MessageSquare className="h-4 w-4" />
         </button>
@@ -92,12 +93,14 @@ export function GlobalChatBar() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
           placeholder="Ask your cofounder... (⌘K)"
+          aria-label="Quick chat input"
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || stream.isStreaming}
           className="shrink-0 text-muted-foreground hover:text-purple-400 disabled:opacity-30 transition-colors"
+          aria-label="Send message"
         >
           <Send className="h-4 w-4" />
         </button>
