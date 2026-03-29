@@ -2,15 +2,12 @@ import { createLogger } from "@ai-cofounder/shared";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { Db } from "@ai-cofounder/db";
 import {
-  gte,
-  asc,
   insertReflection,
   listReflections,
   getDistinctActionUserIds,
   getUserActionsForAnalysis,
   upsertUserPattern,
   deleteOldUserActions,
-  userActions,
 } from "@ai-cofounder/db";
 
 const logger = createLogger("reflection-service");

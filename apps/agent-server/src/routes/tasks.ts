@@ -12,7 +12,6 @@ import {
 } from "@ai-cofounder/db";
 import {
   CreateTaskBody,
-  GoalIdQuery,
   IdParams,
   AssignTaskBody,
   CompleteTaskBody,

@@ -1,7 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-
-const logger = createLogger("crypto");
+import { optionalEnv } from "@ai-cofounder/shared";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12; // 96 bits for GCM

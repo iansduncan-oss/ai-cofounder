@@ -133,8 +133,8 @@ vi.mock("@ai-cofounder/db", () => ({
 
 // --- Mock @ai-cofounder/queue ---
 const mockGetHistory = vi.fn().mockResolvedValue([]);
-const mockSubscribeGoal = vi.fn().mockResolvedValue(undefined);
-const mockUnsubscribeGoal = vi.fn().mockResolvedValue(undefined);
+const _mockSubscribeGoal = vi.fn().mockResolvedValue(undefined);
+const _mockUnsubscribeGoal = vi.fn().mockResolvedValue(undefined);
 const mockEnqueueAgentTask = vi.fn().mockResolvedValue("job-123");
 const mockSubscriberOn = vi.fn();
 const mockSubscriberSubscribe = vi.fn().mockResolvedValue(undefined);

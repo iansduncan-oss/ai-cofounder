@@ -17,18 +17,10 @@ import {
   createTask,
   updateGoalStatus,
   updateTaskDependencies,
-  saveMemory,
   recallMemories,
   searchMemoriesByVector,
   createApproval,
-  getN8nWorkflowByName,
-  listN8nWorkflows,
-  saveCodeExecution,
-  createSchedule,
-  listSchedules,
-  deleteSchedule,
   createMilestone,
-  touchMemory,
   recordToolExecution,
   getConversation,
   saveThinkingTrace,
@@ -39,45 +31,13 @@ import { SessionContextService } from "../services/session-context.js";
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
-import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
-import { SEARCH_WEB_TOOL } from "./tools/web-search.js";
-import { BROWSE_WEB_TOOL } from "./tools/browse-web.js";
-import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
-import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
-import {
-  CREATE_SCHEDULE_TOOL,
-  LIST_SCHEDULES_TOOL,
-  DELETE_SCHEDULE_TOOL,
-} from "./tools/schedule-tools.js";
-import {
-  READ_FILE_TOOL,
-  WRITE_FILE_TOOL,
-  LIST_DIRECTORY_TOOL,
-  DELETE_FILE_TOOL,
-  DELETE_DIRECTORY_TOOL,
-} from "./tools/filesystem-tools.js";
-import {
-  GIT_CLONE_TOOL,
-  GIT_STATUS_TOOL,
-  GIT_DIFF_TOOL,
-  GIT_ADD_TOOL,
-  GIT_COMMIT_TOOL,
-  GIT_PULL_TOOL,
-  GIT_LOG_TOOL,
-  GIT_BRANCH_TOOL,
-  GIT_CHECKOUT_TOOL,
-  GIT_PUSH_TOOL,
-} from "./tools/git-tools.js";
-import { RUN_TESTS_TOOL } from "./tools/workspace-tools.js";
-import { CREATE_PR_TOOL } from "./tools/github-tools.js";
-import type { CreatePrInput } from "./tools/github-tools.js";
 import type { StreamCallback } from "./stream-events.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { notifyApprovalCreated, notifyGoalProposed } from "../services/notifications.js";
 import { classifyGoalScope, scopeRequiresApproval } from "../services/scope-classifier.js";
-import { buildSharedToolList, executeSharedTool, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
+import { buildSharedToolList, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";

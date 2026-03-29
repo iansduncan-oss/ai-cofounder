@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll } from "vitest";
 
 beforeAll(() => {
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";

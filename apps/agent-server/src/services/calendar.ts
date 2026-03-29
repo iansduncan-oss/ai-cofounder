@@ -1,8 +1,5 @@
-import { createLogger } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { getValidGoogleToken } from "./google-auth.js";
-
-const logger = createLogger("calendar");
 
 const CALENDAR_API = "https://www.googleapis.com/calendar/v3";
 

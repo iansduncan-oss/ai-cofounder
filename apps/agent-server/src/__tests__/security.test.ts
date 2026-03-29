@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
@@ -178,7 +178,7 @@ describe("Security Plugin", () => {
       }
 
       // Now a normal request should also be 403
-      const res = await app.inject({
+      const _res = await app.inject({
         method: "GET",
         url: "/health",
         headers: { "x-forwarded-for": ip },

@@ -455,7 +455,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       // The second call should have the error context injected
       const secondCallArgs = mockComplete.mock.calls[1];
       const messagesArg = secondCallArgs[1];
-      const systemMsg = messagesArg.system ?? messagesArg.messages?.[0]?.content ?? "";
+      const _systemMsg = messagesArg.system ?? messagesArg.messages?.[0]?.content ?? "";
       // We can check that complete was called twice (original + retry)
       expect(mockComplete).toHaveBeenCalledTimes(2);
     });

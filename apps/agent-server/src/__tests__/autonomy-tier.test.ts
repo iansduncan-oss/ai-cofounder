@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
 // 1. Mock @ai-cofounder/shared

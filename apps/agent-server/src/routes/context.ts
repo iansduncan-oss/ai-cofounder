@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { createLogger } from "@ai-cofounder/shared";
-import { getUserTimezone, setUserTimezone, listPendingApprovals, listActiveGoals } from "@ai-cofounder/db";
+import { getUserTimezone, setUserTimezone } from "@ai-cofounder/db";
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { gatherBriefingData } from "../services/briefing.js";
 

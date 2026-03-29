@@ -85,7 +85,7 @@ export const eventRoutes: FastifyPluginAsync = async (app) => {
     "/inbound",
     {
       schema: { tags: ["events"], body: InboundEventBody },
-      preHandler: async (request, reply) => {
+      preHandler: async (request, _reply) => {
         // Accept API_SECRET bearer token as an alternative to JWT for webhook callers
         const apiSecret = optionalEnv("API_SECRET", "");
         if (apiSecret) {

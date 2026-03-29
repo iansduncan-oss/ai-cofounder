@@ -260,7 +260,7 @@ export async function deployRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // POST /api/deploys/:id/remediate — trigger remediation action
-  app.post("/:id/remediate", { schema: { tags: ["deploys"] } }, async (request, reply) => {
+  app.post("/:id/remediate", { schema: { tags: ["deploys"] } }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { action?: "restart_containers" | "clear_cache" } | undefined;
     const action = body?.action ?? "restart_containers";

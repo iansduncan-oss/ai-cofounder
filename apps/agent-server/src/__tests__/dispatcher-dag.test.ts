@@ -89,13 +89,7 @@ describe("TaskDispatcher DAG execution", () => {
     mockListTasksByGoal.mockResolvedValue([t0, t1, t2]);
 
     const executionOrder: string[] = [];
-    const originalComplete = mockComplete.getMockImplementation() ?? (() => textResponse("done"));
-    mockComplete.mockImplementation(async (...args: unknown[]) => {
-      const taskCategory = args[0];
-      // Extract the task context from the messages
-      const opts = args[1] as { messages?: Array<{ content: string | unknown }> };
-      const lastMsg = opts?.messages?.at(-1);
-      const content = typeof lastMsg?.content === "string" ? lastMsg.content : "";
+    mockComplete.mockImplementation(async (..._args: unknown[]) => {
       // Determine which task is running from the call order
       executionOrder.push(`exec-${executionOrder.length}`);
       return textResponse(`output-${executionOrder.length}`);
@@ -220,7 +214,7 @@ describe("TaskDispatcher DAG execution", () => {
     const t2Call = mockComplete.mock.calls[2] ?? mockComplete.mock.calls[mockComplete.mock.calls.length - 1];
     if (t2Call) {
       const opts = t2Call[1] as { messages?: Array<{ role: string; content: string }> };
-      const systemOrUserMsg = opts?.messages?.find((m) => typeof m.content === "string" && m.content.includes("output-"));
+      const _systemOrUserMsg = opts?.messages?.find((m) => typeof m.content === "string" && m.content.includes("output-"));
       // The key insight: t2 receives t0's output in its previousOutputs
       // Since t2 depends on t0, output-1 (t0's output) should be present
       // output-2 (t1's output) should NOT be present in t2's direct dep outputs

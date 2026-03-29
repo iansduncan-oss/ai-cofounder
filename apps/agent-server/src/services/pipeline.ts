@@ -1,7 +1,6 @@
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { createLogger } from "@ai-cofounder/shared";
-import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { updateGoalStatus } from "@ai-cofounder/db";
 import type { PipelineJob, PipelineStage } from "@ai-cofounder/queue";
@@ -200,7 +199,7 @@ export class PipelineExecutor {
     pipelineId: string,
     goalId: string,
     previousOutputs: string[],
-    context: Record<string, unknown>,
+    _context: Record<string, unknown>,
   ): Promise<StageResult> {
     const specialist = this.specialists.get(stage.agent);
     if (!specialist) {

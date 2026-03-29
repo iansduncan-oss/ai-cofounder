@@ -8,10 +8,7 @@ import {
   getActivePersona,
 } from "@ai-cofounder/db";
 import { resolveUserContext } from "../helpers/resolve-user-context.js";
-import { createLogger } from "@ai-cofounder/shared";
 import { recordLlmMetrics } from "../plugins/observability.js";
-
-const logger = createLogger("voice-routes");
 
 const VoiceChatBody = Type.Object({
   message: Type.String({ minLength: 1, maxLength: 8_000 }),

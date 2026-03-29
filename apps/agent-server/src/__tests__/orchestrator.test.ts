@@ -407,7 +407,7 @@ describe("Orchestrator", () => {
 
       const registry = new LlmRegistry();
       const orchestrator = new Orchestrator({ registry });
-      const result = await orchestrator.run("search a lot");
+      const _result = await orchestrator.run("search a lot");
 
       // 1 initial + 10 rounds = 11 calls total
       expect(mockComplete).toHaveBeenCalledTimes(11);

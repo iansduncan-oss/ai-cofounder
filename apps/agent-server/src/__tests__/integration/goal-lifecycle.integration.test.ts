@@ -17,7 +17,7 @@ import {
 describe.skipIf(shouldSkip())("Goal Lifecycle (integration)", () => {
   let app: FastifyInstance;
   let sql: ReturnType<typeof postgres>;
-  let userId: string;
+  let _userId: string;
   let conversationId: string;
 
   beforeAll(async () => {
@@ -33,7 +33,7 @@ describe.skipIf(shouldSkip())("Goal Lifecycle (integration)", () => {
   beforeEach(async () => {
     await truncateAll(sql);
     const seed = await seedUserAndConversation(app);
-    userId = seed.userId;
+    _userId = seed.userId;
     conversationId = seed.conversationId;
   });
 

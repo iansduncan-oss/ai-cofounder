@@ -2,7 +2,6 @@ import { createLogger } from "@ai-cofounder/shared";
 import {
   createJournalEntry,
   listJournalEntries,
-  getJournalEntry,
 } from "@ai-cofounder/db";
 import type { Db } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";

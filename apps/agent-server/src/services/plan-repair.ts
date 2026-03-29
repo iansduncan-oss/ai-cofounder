@@ -9,7 +9,6 @@ import { createLogger } from "@ai-cofounder/shared";
 const logger = createLogger("plan-repair");
 
 const MAX_CORRECTIVE_TASKS = 3;
-const LLM_TIMEOUT = 10000;
 
 export interface TaskInfo {
   id: string;
@@ -53,8 +52,6 @@ export class PlanRepairService {
     remainingTasks: TaskInfo[],
     goalDescription: string,
   ): Promise<CorrectiveTask[] | null> {
-    const goalId = ""; // Will be tracked by caller
-
     const completedSummary = completedTasks
       .map((t) => `- [DONE] ${t.title}${t.output ? `: ${String(t.output).slice(0, 100)}` : ""}`)
       .join("\n");

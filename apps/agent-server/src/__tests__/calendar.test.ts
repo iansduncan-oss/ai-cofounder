@@ -302,7 +302,7 @@ describe("CalendarService", () => {
         { body: { ...evt, attendees: [{ email: "alice@example.com", responseStatus: "declined", self: true }, { email: "bob@example.com", responseStatus: "needsAction" }] } },
       ]);
 
-      const result = await service.respondToEvent("evt-1", "declined");
+      const _result = await service.respondToEvent("evt-1", "declined");
 
       // First call is GET, second is PATCH
       expect(mockFetch).toHaveBeenCalledTimes(2);

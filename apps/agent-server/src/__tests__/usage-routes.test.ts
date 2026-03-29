@@ -117,7 +117,7 @@ describe("GET /api/usage/daily", () => {
     expect(body.days).toHaveLength(30);
 
     // Find the day with actual spend
-    const day = body.days.find((d: { date: string }) => d.date === "2026-03-10");
+    const _day = body.days.find((d: { date: string }) => d.date === "2026-03-10");
     // It may or may not be in the 30-day window depending on test run date.
     // Just check that all days are valid structure with numbers
     for (const d of body.days) {

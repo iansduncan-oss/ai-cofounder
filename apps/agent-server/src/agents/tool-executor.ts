@@ -7,9 +7,6 @@ import type { Db } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 import { retrieve, formatContext } from "@ai-cofounder/rag";
 import {
-  createGoal,
-  createTask,
-  updateGoalStatus,
   saveMemory,
   recallMemories,
   searchMemoriesByVector,
@@ -22,7 +19,6 @@ import {
   createSchedule,
   listSchedules,
   deleteSchedule,
-  createMilestone,
   touchMemory,
   createFollowUp,
   getChunkCount,

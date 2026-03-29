@@ -61,7 +61,7 @@ export class ContextualAwarenessService {
         10,
       );
 
-      const dayOfWeek = parseInt(
+      const _dayOfWeek = parseInt(
         new Intl.DateTimeFormat("en-US", {
           timeZone: this.timezone,
           weekday: "narrow",

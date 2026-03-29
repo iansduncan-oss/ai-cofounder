@@ -2,7 +2,7 @@
  * Shared utilities for integration tests.
  */
 import postgres from "postgres";
-import { testDbUrl } from "./setup.js";
+import { testDbUrl as _testDbUrl } from "./setup.js";
 
 const PG_USER = process.env.POSTGRES_USER ?? "ai_cofounder";
 const PG_PASSWORD = process.env.POSTGRES_PASSWORD ?? "localdev";

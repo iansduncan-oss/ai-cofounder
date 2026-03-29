@@ -60,7 +60,7 @@ export const workspaceRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["workspace"] } },
     async () => {
       const rootDir = app.workspaceService.rootDir;
-      return new Promise<{ path: string; totalBytes: number; totalHuman: string }>((resolve, reject) => {
+      return new Promise<{ path: string; totalBytes: number; totalHuman: string }>((resolve, _reject) => {
         execFile("du", ["-sb", rootDir], { timeout: 10_000 }, (error, stdout) => {
           if (error) {
             // Fallback: return 0 if du fails (e.g. dir doesn't exist yet)

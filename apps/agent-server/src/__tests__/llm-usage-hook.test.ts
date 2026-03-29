@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LlmRegistry } from "@ai-cofounder/llm";
-import type { LlmProvider, LlmCompletionRequest, LlmCompletionResponse } from "@ai-cofounder/llm";
+import type { LlmProvider, LlmCompletionResponse } from "@ai-cofounder/llm";
 
 /** Create a mock LLM provider that returns a canned response */
 function makeMockProvider(name: string): LlmProvider & { complete: ReturnType<typeof vi.fn> } {

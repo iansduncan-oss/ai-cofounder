@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { CalendarService } from "../services/calendar.js";
-import { getMeetingPrep, upsertMeetingPrep } from "@ai-cofounder/db";
+import { getMeetingPrep } from "@ai-cofounder/db";
 import { MeetingPrepService } from "../services/meeting-prep.js";
 
 export async function calendarRoutes(app: FastifyInstance): Promise<void> {

@@ -290,7 +290,7 @@ describe("ContextWindowManager", () => {
       mockGetConversationMessages.mockResolvedValue([...olderMessages].reverse());
 
       const cwm = new ContextWindowManager(db, registry);
-      const result = await cwm.prepareHistory("conv-1", history);
+      const _result = await cwm.prepareHistory("conv-1", history);
 
       // Just past staleSummaryDelta boundary: new summary generated
       expect(mockComplete).toHaveBeenCalledOnce();

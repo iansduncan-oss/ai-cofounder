@@ -103,7 +103,7 @@ vi.mock("../services/gmail.js", () => ({
 }));
 
 // Dynamic imports after mocks
-const { enrichWithGoogle, formatBriefing, gatherBriefingData, sendDailyBriefing } = await import("../services/briefing.js");
+const { enrichWithGoogle, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
 const { buildServer } = await import("../server.js");
 
 const baseBriefingData = {

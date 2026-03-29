@@ -43,7 +43,7 @@ vi.mock("node:child_process", () => ({
 }));
 
 vi.mock("node:util", () => ({
-  promisify: (fn: unknown) => vi.fn().mockRejectedValue(new Error("SSH not available in test")),
+  promisify: (_fn: unknown) => vi.fn().mockRejectedValue(new Error("SSH not available in test")),
 }));
 
 const { DeployHealthService } = await import("../services/deploy-health.js");
