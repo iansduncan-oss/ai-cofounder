@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, ilike, or, sql, lte, isNull, inArray, gt } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, lte, isNull, isNotNull, inArray, gt } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import {
@@ -116,7 +116,7 @@ export async function createConversation(db: Db, data: { userId: string; title?:
 }
 
 export async function getConversation(db: Db, id: string) {
-  const rows = await db.select().from(conversations).where(eq(conversations.id, id)).limit(1);
+  const rows = await db.select().from(conversations).where(and(eq(conversations.id, id), isNull(conversations.deletedAt))).limit(1);
   return rows[0] ?? null;
 }
 
@@ -143,8 +143,18 @@ export async function updateConversationTitle(db: Db, id: string, title: string)
 }
 
 export async function deleteConversation(db: Db, id: string) {
-  const [row] = await db.delete(conversations).where(eq(conversations.id, id)).returning();
+  const [row] = await db.update(conversations).set({ deletedAt: new Date() }).where(and(eq(conversations.id, id), isNull(conversations.deletedAt))).returning();
   return row ?? null;
+}
+
+export async function restoreConversation(db: Db, id: string) {
+  const [row] = await db.update(conversations).set({ deletedAt: null }).where(eq(conversations.id, id)).returning();
+  return row ?? null;
+}
+
+export async function purgeDeletedConversations(db: Db, olderThan: Date) {
+  const rows = await db.delete(conversations).where(and(isNotNull(conversations.deletedAt), lte(conversations.deletedAt, olderThan))).returning();
+  return rows.length;
 }
 
 /* ────────────────────── Messages ────────────────────────── */
@@ -194,7 +204,7 @@ export async function createGoal(
 }
 
 export async function getGoal(db: Db, id: string) {
-  const rows = await db.select().from(goals).where(eq(goals.id, id)).limit(1);
+  const rows = await db.select().from(goals).where(and(eq(goals.id, id), isNull(goals.deletedAt))).limit(1);
   return rows[0] ?? null;
 }
 
@@ -206,7 +216,7 @@ export async function listGoalsByConversation(
   let query = db
     .select()
     .from(goals)
-    .where(eq(goals.conversationId, conversationId))
+    .where(and(eq(goals.conversationId, conversationId), isNull(goals.deletedAt)))
     .orderBy(desc(goals.createdAt))
     .$dynamic();
 
@@ -220,7 +230,7 @@ export async function countGoalsByConversation(db: Db, conversationId: string): 
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(goals)
-    .where(eq(goals.conversationId, conversationId));
+    .where(and(eq(goals.conversationId, conversationId), isNull(goals.deletedAt)));
   return rows[0]?.count ?? 0;
 }
 
@@ -252,8 +262,18 @@ export async function updateGoalStatus(
 }
 
 export async function deleteGoal(db: Db, id: string) {
-  const [row] = await db.delete(goals).where(eq(goals.id, id)).returning();
+  const [row] = await db.update(goals).set({ deletedAt: new Date() }).where(and(eq(goals.id, id), isNull(goals.deletedAt))).returning();
   return row ?? null;
+}
+
+export async function restoreGoal(db: Db, id: string) {
+  const [row] = await db.update(goals).set({ deletedAt: null }).where(eq(goals.id, id)).returning();
+  return row ?? null;
+}
+
+export async function purgeDeletedGoals(db: Db, olderThan: Date) {
+  const rows = await db.delete(goals).where(and(isNotNull(goals.deletedAt), lte(goals.deletedAt, olderThan))).returning();
+  return rows.length;
 }
 
 export async function cancelGoal(db: Db, id: string) {
@@ -747,7 +767,7 @@ export async function listActiveGoals(db: Db): Promise<GoalSummary[]> {
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
-    .where(eq(goals.status, "active"))
+    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)))
     .groupBy(goals.id)
     .orderBy(desc(goals.updatedAt));
 
@@ -765,6 +785,7 @@ export async function listRecentlyCompletedGoals(db: Db, since: Date) {
     .where(
       and(
         eq(goals.status, "completed"),
+        isNull(goals.deletedAt),
         sql`${goals.updatedAt} >= ${since.toISOString()}`,
       ),
     )
@@ -776,7 +797,7 @@ export async function countTasksByStatus(db: Db) {
     .select({ status: tasks.status })
     .from(tasks)
     .innerJoin(goals, eq(tasks.goalId, goals.id))
-    .where(eq(goals.status, "active"));
+    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)));
 
   const counts: Record<string, number> = {};
   for (const row of rows) {
@@ -805,7 +826,7 @@ export async function listGoalBacklog(db: Db, limit = 5) {
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
-    .where(eq(goals.status, "active"))
+    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)))
     .groupBy(goals.id)
     .having(
       and(
@@ -1508,7 +1529,7 @@ export async function getMilestoneProgress(db: Db, milestoneId: string) {
   const milestoneGoals = await db
     .select()
     .from(goals)
-    .where(eq(goals.milestoneId, milestoneId))
+    .where(and(eq(goals.milestoneId, milestoneId), isNull(goals.deletedAt)))
     .orderBy(asc(goals.createdAt));
 
   const total = milestoneGoals.length;
@@ -1606,7 +1627,7 @@ export async function getRecentSessionSummaries(
   const recentConvs = await db
     .select({ id: conversations.id })
     .from(conversations)
-    .where(eq(conversations.userId, userId))
+    .where(and(eq(conversations.userId, userId), isNull(conversations.deletedAt)))
     .orderBy(desc(conversations.updatedAt))
     .limit(10);
 
@@ -1835,14 +1856,14 @@ export async function listConversationsByUser(
     db
       .select()
       .from(conversations)
-      .where(eq(conversations.userId, userId))
+      .where(and(eq(conversations.userId, userId), isNull(conversations.deletedAt)))
       .orderBy(desc(conversations.updatedAt))
       .limit(limit)
       .offset(offset),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(conversations)
-      .where(eq(conversations.userId, userId)),
+      .where(and(eq(conversations.userId, userId), isNull(conversations.deletedAt))),
   ]);
 
   return { data, total: countRows[0]?.count ?? 0 };
@@ -4300,7 +4321,7 @@ export async function globalSearch(
     db
       .select({ id: goals.id, title: goals.title, description: goals.description, status: goals.status, createdAt: goals.createdAt })
       .from(goals)
-      .where(or(ilike(goals.title, pattern), ilike(goals.description, pattern)))
+      .where(and(or(ilike(goals.title, pattern), ilike(goals.description, pattern)), isNull(goals.deletedAt)))
       .orderBy(desc(goals.createdAt))
       .limit(limit),
     db
@@ -4312,7 +4333,7 @@ export async function globalSearch(
     db
       .select({ id: conversations.id, title: conversations.title, createdAt: conversations.createdAt })
       .from(conversations)
-      .where(ilike(conversations.title, pattern))
+      .where(and(ilike(conversations.title, pattern), isNull(conversations.deletedAt)))
       .orderBy(desc(conversations.createdAt))
       .limit(limit),
     db

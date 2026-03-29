@@ -323,6 +323,13 @@
       "when": 1774838400000,
       "tag": "0045_add_cascade_delete_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1774838500000,
+      "tag": "0046_add_soft_delete_columns",
+      "breakpoints": true
     }
   ]
 }

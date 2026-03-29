@@ -54,6 +54,7 @@ export const conversations = pgTable("conversations", {
   metadata: jsonb("metadata"),
   parentConversationId: uuid("parent_conversation_id"),
   branchPointMessageId: uuid("branch_point_message_id"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -157,6 +158,7 @@ export const goals = pgTable("goals", {
   requiresApproval: boolean("requires_approval").notNull().default(false),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   metadata: jsonb("metadata"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

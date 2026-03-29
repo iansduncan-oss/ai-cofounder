@@ -26,6 +26,8 @@ export function mockDbModule() {
     searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     deleteConversation: vi.fn().mockResolvedValue(null),
+    restoreConversation: vi.fn().mockResolvedValue(null),
+    purgeDeletedConversations: vi.fn().mockResolvedValue(0),
     // Channel conversations
     getChannelConversation: vi.fn().mockResolvedValue(null),
     upsertChannelConversation: vi.fn().mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),
@@ -42,6 +44,8 @@ export function mockDbModule() {
     updateGoalScope: vi.fn().mockResolvedValue({}),
     updateGoalMetadata: vi.fn().mockResolvedValue({}),
     deleteGoal: vi.fn().mockResolvedValue(null),
+    restoreGoal: vi.fn().mockResolvedValue(null),
+    purgeDeletedGoals: vi.fn().mockResolvedValue(0),
     cancelGoal: vi.fn().mockResolvedValue(null),
     // Tasks
     createTask: vi.fn().mockResolvedValue({ id: "task-1", title: "Test Task" }),
@@ -375,6 +379,7 @@ export function mockDbModule() {
     lte: vi.fn((...args: unknown[]) => ({ op: "lte", args })),
     gte: vi.fn((...args: unknown[]) => ({ op: "gte", args })),
     isNull: vi.fn((col: unknown) => ({ op: "isNull", col })),
+    isNotNull: vi.fn((col: unknown) => ({ op: "isNotNull", col })),
     inArray: vi.fn((...args: unknown[]) => ({ op: "inArray", args })),
     gt: vi.fn((...args: unknown[]) => ({ op: "gt", args })),
   };
