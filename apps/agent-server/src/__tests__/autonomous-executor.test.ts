@@ -397,7 +397,7 @@ describe("TokenBudgetExceededError", () => {
     });
 
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
         if (cb) {
           await cb({
             goalId: "goal-abc12345",
@@ -462,7 +462,7 @@ describe("TokenBudgetExceededError", () => {
     });
 
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: Function) => {
+      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
         if (cb) {
           await cb({
             goalId: "goal-abc12345",
