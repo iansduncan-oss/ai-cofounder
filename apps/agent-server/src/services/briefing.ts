@@ -63,8 +63,8 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     completedYesterday: completedGoals.map((g) => ({ title: g.title })),
     taskBreakdown: taskCounts,
     costsSinceYesterday: {
-      totalCostUsd: usage.totalCostUsd,
-      requestCount: usage.requestCount,
+      totalCostUsd: usage?.totalCostUsd ?? 0,
+      requestCount: usage?.requestCount ?? 0,
     },
     upcomingSchedules: schedules.slice(0, 5).map((s) => ({
       description: s.description ?? s.actionPrompt.slice(0, 80),

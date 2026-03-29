@@ -11,7 +11,7 @@ beforeAll(() => {
 
 const mockGetAppSetting = vi.fn();
 const mockUpsertAppSetting = vi.fn();
-const mockGetUsageSummary = vi.fn();
+const mockGetUsageSummary = vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} });
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),

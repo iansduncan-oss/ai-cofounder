@@ -22,7 +22,7 @@ vi.mock("@ai-cofounder/shared", () => ({
 // ── Mock @ai-cofounder/db ──
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
-const mockGetUsageSummary = vi.fn();
+const mockGetUsageSummary = vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} });
 const mockGetCostByDay = vi.fn();
 
 vi.mock("@ai-cofounder/db", () => ({
