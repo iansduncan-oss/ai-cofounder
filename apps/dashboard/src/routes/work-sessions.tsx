@@ -104,7 +104,7 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
             {actions.map((action: Record<string, unknown>, i: number) => (
               <div key={i} className="text-xs bg-muted rounded px-2 py-1.5 font-mono">
                 <span className="font-semibold">{String(action.action ?? action.type ?? "action")}</span>
-                {action.result && <span className="text-muted-foreground ml-2">{String(action.result)}</span>}
+                {action.result ? <span className="text-muted-foreground ml-2">{String(action.result)}</span> : null}
               </div>
             ))}
           </div>
