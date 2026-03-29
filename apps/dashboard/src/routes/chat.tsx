@@ -218,7 +218,7 @@ export function ChatPage() {
     setShowScrollButton(false);
   };
 
-  const handleSend = (text?: string) => {
+  const handleSend = useCallback((text?: string) => {
     const trimmed = (text ?? input).trim();
     if (!trimmed || stream.isStreaming) return;
 
@@ -227,7 +227,7 @@ export function ChatPage() {
     if (!text) setInput("");
 
     stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
-  };
+  }, [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop]);
 
   const handleSuggestionSelect = (suggestion: string) => {
     acceptSuggestion.mutate({

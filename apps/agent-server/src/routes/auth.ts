@@ -313,8 +313,8 @@ export async function authRoutes(app: FastifyInstance) {
         maxAge: 7 * 24 * 60 * 60,
       });
 
-      // Redirect to dashboard callback page with token in query
-      return reply.redirect(`/dashboard/auth/callback?token=${encodeURIComponent(accessToken)}`);
+      // Redirect to dashboard callback page — access token delivered via refresh cookie
+      return reply.redirect("/dashboard/auth/callback");
     },
   );
 
