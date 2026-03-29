@@ -19,12 +19,8 @@ export {
   type SubagentProgressEvent,
   type AgentEvent,
   type AgentMessageEvent,
-  agentMsgChannel,
-  agentBroadcastChannel,
   AGENT_MSG_PREFIX,
   AGENT_BROADCAST_PREFIX,
-  AGENT_MSG_HISTORY_PREFIX,
-  AGENT_MSG_HISTORY_TTL,
 } from "./pubsub.js";
 
 // Queues & job types

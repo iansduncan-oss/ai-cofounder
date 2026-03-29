@@ -17,7 +17,6 @@ export {
   handleGmailInbox,
   handleGmailSend,
   truncate,
-  STATUS_ICON,
 } from "./handlers.js";
 
 export { checkCooldown, clearCooldowns } from "./cooldown.js";
