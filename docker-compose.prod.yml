@@ -6,6 +6,7 @@ services:
     volumes:
       - redisdata:/data
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy noeviction --requirepass ${REDIS_PASSWORD}
+    mem_limit: 256m
     healthcheck:
       test: ["CMD-SHELL", "REDISCLI_AUTH=${REDIS_PASSWORD} redis-cli ping"]
       interval: 5s
@@ -50,6 +51,7 @@ services:
       - JWT_SECRET=${JWT_SECRET}
       - COOKIE_SECRET=${COOKIE_SECRET}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    mem_limit: 1g
     volumes:
       - workspace_data:/data/workspace
       - /var/run/docker.sock:/var/run/docker.sock
@@ -82,6 +84,7 @@ services:
       - TAVILY_API_KEY=${TAVILY_API_KEY:-}
       - WORKSPACE_DIR=/data/workspace
       - LOG_LEVEL=${LOG_LEVEL:-info}
+    mem_limit: 512m
     volumes:
       - workspace_data:/data/workspace
     networks:
@@ -89,6 +92,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   discord-bot:
     image: ai-cofounder-discord-bot:latest
@@ -100,6 +108,10 @@ services:
       - AGENT_SERVER_URL=http://agent-server:3100
       - DISCORD_GUILD_ID=${DISCORD_GUILD_ID:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+    mem_limit: 256m
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       agent-server:
         condition: service_healthy
@@ -117,6 +129,10 @@ services:
       - AGENT_SERVER_URL=http://agent-server:3100
       - API_SECRET=${API_SECRET:-}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+    mem_limit: 256m
+    read_only: true
+    tmpfs:
+      - /tmp
     depends_on:
       agent-server:
         condition: service_healthy

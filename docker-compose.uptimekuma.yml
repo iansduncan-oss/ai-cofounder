@@ -5,8 +5,14 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:3001:3001"
+    mem_limit: 256m
     volumes:
       - uptimekuma_data:/app/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3001/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - avion_avion_net
 

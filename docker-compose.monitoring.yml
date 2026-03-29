@@ -11,8 +11,14 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.retention.time=30d"
       - "--web.enable-lifecycle"
+    mem_limit: 512m
     ports:
       - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - avion_avion_net
 
@@ -30,8 +36,14 @@ services:
         sed "s|\$${ALERTMANAGER_DISCORD_WEBHOOK_URL}|$$ALERTMANAGER_DISCORD_WEBHOOK_URL|g" \
           /tmp/alertmanager.yml.tpl > /etc/alertmanager/alertmanager.yml
         exec /bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml
+    mem_limit: 128m
     ports:
       - "127.0.0.1:9093:9093"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - avion_avion_net
 
@@ -47,10 +59,16 @@ services:
       - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./infra/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana_data:/var/lib/grafana
+    mem_limit: 256m
     ports:
       - "127.0.0.1:3200:3000"
     depends_on:
       - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - avion_avion_net
 
@@ -68,6 +86,7 @@ services:
       - "--path.sysfs=/host/sys"
       - "--path.rootfs=/rootfs"
       - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)"
+    mem_limit: 128m
     networks:
       - avion_avion_net
 
@@ -82,6 +101,7 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+    mem_limit: 256m
     networks:
       - avion_avion_net
 
@@ -91,6 +111,7 @@ services:
     restart: unless-stopped
     environment:
       - DATA_SOURCE_NAME=postgresql://avion:${POSTGRES_PASSWORD}@avion-postgres-1:5432/avion?sslmode=disable
+    mem_limit: 128m
     networks:
       - avion_avion_net
 
@@ -100,6 +121,7 @@ services:
     restart: unless-stopped
     environment:
       - DISCORD_WEBHOOK=${ALERTMANAGER_DISCORD_WEBHOOK_URL}
+    mem_limit: 64m
     networks:
       - avion_avion_net
 
