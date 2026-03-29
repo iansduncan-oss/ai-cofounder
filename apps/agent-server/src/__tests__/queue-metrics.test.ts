@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { flushPromises, mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -136,7 +136,7 @@ describe("Queue Prometheus metrics", () => {
 
     // Wait for onReady hook to fire and updateQueueMetrics to resolve
     await app.ready();
-    await new Promise((r) => setTimeout(r, 50));
+    await flushPromises();
 
     const res = await app.inject({
       method: "GET",
@@ -156,7 +156,7 @@ describe("Queue Prometheus metrics", () => {
     const { app } = buildServer();
 
     await app.ready();
-    await new Promise((r) => setTimeout(r, 50));
+    await flushPromises();
 
     const res = await app.inject({
       method: "GET",

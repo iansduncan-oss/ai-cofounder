@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { flushPromises, mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -286,7 +286,7 @@ describe("VerificationService", () => {
       });
 
       // Wait for fire-and-forget
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
 
       expect(mockNotification.notifyGoalCompleted).toHaveBeenCalledWith(
         expect.objectContaining({ goalId: "g-1", status: "verified" }),

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { flushPromises } from "@ai-cofounder/test-utils";
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({
@@ -360,7 +361,7 @@ describe("BrowserService", () => {
       const p1 = service.execute({ action: "navigate", url: "https://example.com" });
       const p2 = service.execute({ action: "navigate", url: "https://example.com" });
       // Small delay to ensure p1 and p2 have incremented activeContexts
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
       const p3 = service.execute({ action: "navigate", url: "https://example.com" });
 
       // p3 should immediately fail due to concurrency limit

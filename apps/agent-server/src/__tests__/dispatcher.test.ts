@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { flushPromises, mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -273,7 +273,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       await dispatcher.runGoal("g-1");
 
       // Wait for fire-and-forget promise to settle
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
 
       expect(ns.notifyGoalCompleted).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -297,7 +297,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       const dispatcher = createDispatcher(ns);
       await dispatcher.runGoal("g-1");
 
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
 
       expect(ns.notifyTaskFailed).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -333,7 +333,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       const dispatcher = createDispatcher(ns);
       await dispatcher.runGoal("g-1");
 
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
 
       // Should have been called twice: started + completed
       expect(ns.notifyGoalProgress).toHaveBeenCalledTimes(2);
@@ -517,7 +517,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       await dispatcher.runGoal("g-1", "user-1");
 
       // Wait for fire-and-forget
-      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
 
       expect(mockVerify).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -540,7 +540,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       const dispatcher = createDispatcherWithVerification(mockVerify);
       await dispatcher.runGoal("g-1", "user-1");
 
-      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
 
       expect(mockVerify).not.toHaveBeenCalled();
     });
@@ -559,7 +559,7 @@ describe("TaskDispatcher", { timeout: 15_000 }, () => {
       mockComplete.mockImplementation(async () => {
         const taskId = `call-${executionOrder.length}`;
         executionOrder.push(`start-${taskId}`);
-        await new Promise((r) => setTimeout(r, 50));
+        await flushPromises();
         executionOrder.push(`end-${taskId}`);
         return {
           content: [{ type: "text", text: "Output" }],

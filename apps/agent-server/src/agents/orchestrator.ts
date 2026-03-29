@@ -40,8 +40,8 @@ import { ContextualAwarenessService } from "../services/contextual-awareness.js"
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
-import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
-import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
+import { SEARCH_WEB_TOOL } from "./tools/web-search.js";
+import { BROWSE_WEB_TOOL } from "./tools/browse-web.js";
 import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
 import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
 import {
@@ -1370,48 +1370,6 @@ export class Orchestrator {
       requiresApproval,
       tasks: createdTasks,
     };
-  }
-
-  /** Validate that task dependencies form a DAG (no cycles) using Kahn's algorithm */
-  private validateDependencyGraph(tasks: CreatePlanInput["tasks"]): void {
-    const n = tasks.length;
-    const inDegree = new Array(n).fill(0);
-    const adjacency: number[][] = Array.from({ length: n }, () => []);
-
-    for (let i = 0; i < n; i++) {
-      const deps = tasks[i].depends_on;
-      if (!deps) continue;
-      for (const dep of deps) {
-        if (dep < 0 || dep >= n) {
-          throw new Error(`Task ${i} depends on invalid index ${dep}`);
-        }
-        if (dep === i) {
-          throw new Error(`Task ${i} depends on itself`);
-        }
-        adjacency[dep].push(i);
-        inDegree[i]++;
-      }
-    }
-
-    // Kahn's algorithm
-    const queue: number[] = [];
-    for (let i = 0; i < n; i++) {
-      if (inDegree[i] === 0) queue.push(i);
-    }
-
-    let processed = 0;
-    while (queue.length > 0) {
-      const node = queue.shift()!;
-      processed++;
-      for (const neighbor of adjacency[node]) {
-        inDegree[neighbor]--;
-        if (inDegree[neighbor] === 0) queue.push(neighbor);
-      }
-    }
-
-    if (processed < n) {
-      throw new Error("Circular dependency detected in task graph");
-    }
   }
 
   private buildPlanSummary(plan: PlanResult): string {

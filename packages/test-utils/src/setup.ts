@@ -38,3 +38,12 @@ export function setupTestEnv(overrides: Record<string, string> = {}) {
 
   return restore;
 }
+
+/**
+ * Flush pending microtasks / fire-and-forget promises.
+ * Use instead of `await new Promise(r => setTimeout(r, N))` in tests
+ * that need to wait for un-awaited async work to settle.
+ */
+export function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

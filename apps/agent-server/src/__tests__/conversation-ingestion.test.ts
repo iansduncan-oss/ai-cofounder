@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { flushPromises, mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -188,7 +188,7 @@ describe("project ingestion", () => {
     expect(result).toMatchObject({ cloned: true, repoUrl: "https://github.com/example/my-repo.git" });
 
     // Give fire-and-forget a microtask tick to execute
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     // RAG ingestion enqueued with ingest_repo action
     expect(mockEnqueueRagIngestion).toHaveBeenCalledOnce();
@@ -216,7 +216,7 @@ describe("project ingestion", () => {
       { conversationId: "conv-1" },
     );
 
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await flushPromises();
 
     expect(mockEnqueueRagIngestion).toHaveBeenCalledOnce();
     expect(mockEnqueueRagIngestion.mock.calls[0][0]).toMatchObject({

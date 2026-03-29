@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { flushPromises, mockDbModule } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
@@ -102,7 +102,7 @@ describe("Reasoning Traces", () => {
       await orchestrator.run("Test", "conv-1", [], "user-1", "req-1");
 
       // Wait for fire-and-forget to settle
-      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
 
       expect(mockSaveThinkingTrace).toHaveBeenCalledWith(
         expect.anything(),
@@ -136,7 +136,7 @@ describe("Reasoning Traces", () => {
 
       const result = await orchestrator.run("Test", "conv-1", [], "user-1");
 
-      await new Promise((r) => setTimeout(r, 50));
+      await flushPromises();
 
       expect(result.response).not.toContain("<thinking>");
       expect(result.response).toContain("Some text");

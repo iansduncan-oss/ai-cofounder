@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { setupTestEnv, mockLlmModule, mockDbModule, textResponse } from "@ai-cofounder/test-utils";
+import { setupTestEnv, mockLlmModule, mockDbModule, textResponse, flushPromises } from "@ai-cofounder/test-utils";
 
 beforeAll(() => {
   setupTestEnv();
@@ -184,7 +184,7 @@ describe("TaskDispatcher DAG execution", () => {
       currentConcurrent++;
       if (currentConcurrent > maxConcurrent) maxConcurrent = currentConcurrent;
       // Small delay to let concurrent tasks overlap
-      await new Promise((r) => setTimeout(r, 10));
+      await flushPromises();
       currentConcurrent--;
       return textResponse("done");
     });
