@@ -467,7 +467,7 @@ export const googleTokens = pgTable("google_tokens", {
 
 export const personas = pgTable("personas", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   voiceId: text("voice_id"),
   corePersonality: text("core_personality").notNull(),
   capabilities: text("capabilities"),

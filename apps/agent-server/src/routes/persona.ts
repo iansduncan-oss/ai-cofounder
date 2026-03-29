@@ -24,9 +24,17 @@ export async function personaRoutes(app: FastifyInstance): Promise<void> {
   app.put<{ Body: typeof UpsertPersonaBody.static }>(
     "/",
     { schema: { tags: ["persona"], body: UpsertPersonaBody } },
-    async (request) => {
-      const persona = await upsertPersona(app.db, request.body);
-      return { persona };
+    async (request, reply) => {
+      try {
+        const persona = await upsertPersona(app.db, request.body);
+        return { persona };
+      } catch (err: unknown) {
+        const dbErr = err as { code?: string };
+        if (dbErr.code === "23505") {
+          return reply.code(409).send({ error: "A persona with that name already exists" });
+        }
+        throw err;
+      }
     },
   );
 
