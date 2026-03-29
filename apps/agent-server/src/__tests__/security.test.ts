@@ -266,6 +266,7 @@ describe("Security Plugin", () => {
       const res = await app.inject({
         method: "POST",
         url: "/api/agents/run",
+        remoteAddress: "203.0.113.1",
         headers: { "x-forwarded-for": uniqueIp() },
         payload: { message: "test" },
       });
@@ -322,6 +323,7 @@ describe("Security Plugin", () => {
       const res = await app.inject({
         method: "GET",
         url: "/metrics",
+        remoteAddress: "203.0.113.1",
         headers: { "x-forwarded-for": uniqueIp() },
       });
       await app.close();

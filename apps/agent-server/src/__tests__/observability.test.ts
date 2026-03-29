@@ -114,6 +114,7 @@ describe("Observability Plugin", () => {
     const res = await app.inject({
       method: "GET",
       url: "/metrics",
+      remoteAddress: "203.0.113.50",
       headers: { "x-forwarded-for": "203.0.113.50" },
     });
     await app.close();

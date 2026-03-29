@@ -459,6 +459,7 @@ describe("AUTH-04: Protected routes require valid JWT", () => {
     const res = await app.inject({
       method: "GET",
       url: "/api/goals?conversationId=00000000-0000-0000-0000-000000000001",
+      remoteAddress: "10.0.0.1",
       headers: { "x-forwarded-for": "10.0.0.1" },
     });
     await app.close();
