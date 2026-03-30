@@ -160,6 +160,7 @@ export function buildServer(registry?: LlmRegistry) {
 
   // Security headers
   app.register(helmet, {
+    hsts: false, // NPM handles HSTS with preload directive
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
