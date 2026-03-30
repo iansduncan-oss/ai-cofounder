@@ -153,7 +153,6 @@ describe("Keyboard Navigation", () => {
     });
 
     it("links are reachable via keyboard", async () => {
-      const user = userEvent.setup();
       renderWithProviders(<OverviewPage />);
 
       // Tab through elements and check we can reach links

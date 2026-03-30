@@ -53,7 +53,7 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
-          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 bash -s -- "${GITHUB_SHA}" "${DRY_RUN}" << 'DEPLOY'
+          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 bash -s -- "${GITHUB_SHA}" "${DRY_RUN}" << 'EOF_DEPLOY_SCRIPT'
           set -e
           cd /opt/ai-cofounder
 
@@ -173,15 +173,10 @@ jobs:
 
               # Write rollback state for notification steps to read
               if [ "$ROLLBACK_OK" = "true" ]; then
-                cat > /tmp/deploy_state << ROLLBACK_EOF
-ROLLBACK_STATUS=success
-ROLLBACK_SHA=${PREVIOUS_SHA:0:7}
-ROLLBACK_EOF
+                printf 'ROLLBACK_STATUS=success\nROLLBACK_SHA=%s\n' "${PREVIOUS_SHA:0:7}" > /tmp/deploy_state
                 echo "Rollback state written to /tmp/deploy_state"
               else
-                cat > /tmp/deploy_state << ROLLBACK_EOF
-ROLLBACK_STATUS=failed
-ROLLBACK_EOF
+                echo "ROLLBACK_STATUS=failed" > /tmp/deploy_state
                 echo "Rollback also failed after 6 attempts!"
               fi
             fi
@@ -194,7 +189,7 @@ ROLLBACK_EOF
           DEPLOY_END=$(date +%s)
           DEPLOY_DURATION=$((DEPLOY_END - DEPLOY_START))
           echo "==> Deploy complete (${SHORT_SHA}) in ${DEPLOY_DURATION}s!"
-          DEPLOY
+          EOF_DEPLOY_SCRIPT
 
       - name: Notify deploy completed
         if: success() && inputs.dry_run != true

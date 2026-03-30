@@ -1,3 +1,4 @@
+name: ai-cofounder-n8n
 services:
   n8n:
     image: n8nio/n8n:1.76.1
@@ -18,9 +19,10 @@ services:
       - N8N_EDITOR_BASE_URL=https://n8n.aviontechs.com/
       - WEBHOOK_URL=https://n8n.aviontechs.com/
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - GENERIC_TIMEZONE=${TZ:-UTC}
+      - GENERIC_TIMEZONE=America/Los_Angeles
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
     mem_limit: 1536m
     extra_hosts:
       - "host.docker.internal:host-gateway"

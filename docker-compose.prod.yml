@@ -1,3 +1,4 @@
+name: ai-cofounder
 services:
   redis:
     image: redis:7-alpine
