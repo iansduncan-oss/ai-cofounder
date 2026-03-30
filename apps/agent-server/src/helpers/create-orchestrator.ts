@@ -36,5 +36,6 @@ export function createOrchestrator(app: FastifyInstance): Orchestrator {
     outboundWebhookService,
     conversationBranchingService,
     discordService: (app as unknown as Record<string, unknown>).discordService as import("../services/discord.js").DiscordService | undefined,
+    vpsCommandService: (app as unknown as Record<string, unknown>).vpsCommandService as import("../services/vps-command.js").VpsCommandService | undefined,
   });
 }

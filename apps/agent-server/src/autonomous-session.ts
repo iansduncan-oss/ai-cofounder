@@ -15,6 +15,7 @@ import type { WorkspaceService } from "./services/workspace.js";
 import type { AgentMessagingService } from "./services/agent-messaging.js";
 import { Orchestrator } from "./agents/orchestrator.js";
 import type { DiscordService } from "./services/discord.js";
+import type { VpsCommandService } from "./services/vps-command.js";
 import type { DistributedLockService} from "./services/distributed-lock.js";
 import { AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
 import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
@@ -38,6 +39,8 @@ export interface SessionOptions {
   webhookUrl?: string;
   /** Discord service for reading channel messages */
   discordService?: DiscordService;
+  /** VPS command service for infrastructure management */
+  vpsCommandService?: VpsCommandService;
 }
 
 export interface SessionResult {
@@ -366,6 +369,7 @@ async function _runSessionBody(
         workspaceService,
         messagingService,
         discordService: options?.discordService,
+        vpsCommandService: options?.vpsCommandService,
         isAutonomous: true,
       });
 

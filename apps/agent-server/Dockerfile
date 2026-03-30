@@ -39,7 +39,7 @@ FROM node:24-alpine
 WORKDIR /app
 
 # Install Docker CLI for sandbox code execution and Chromium for browser automation
-RUN apk add --no-cache docker-cli chromium \
+RUN apk add --no-cache docker-cli chromium openssh-client \
     && addgroup -g 1001 appgroup \
     && adduser -u 1001 -G appgroup -s /bin/sh -D appuser
 

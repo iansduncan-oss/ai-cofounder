@@ -51,6 +51,7 @@ import type { PrReviewService } from "../services/pr-review.js";
 import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
 import type { ConversationBranchingService } from "../services/conversation-branching.js";
 import type { DiscordService } from "../services/discord.js";
+import type { VpsCommandService } from "../services/vps-command.js";
 import { ToolCache } from "../services/tool-cache.js";
 import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
@@ -310,6 +311,7 @@ export interface OrchestratorOptions {
   outboundWebhookService?: OutboundWebhookService;
   conversationBranchingService?: ConversationBranchingService;
   discordService?: DiscordService;
+  vpsCommandService?: VpsCommandService;
   isAutonomous?: boolean;
 }
 
@@ -337,6 +339,7 @@ export class Orchestrator {
   private outboundWebhookService?: OutboundWebhookService;
   private conversationBranchingService?: ConversationBranchingService;
   private discordService?: DiscordService;
+  private vpsCommandService?: VpsCommandService;
   private isAutonomous: boolean;
   private requestId?: string;
 
@@ -361,6 +364,7 @@ export class Orchestrator {
     this.outboundWebhookService = options.outboundWebhookService;
     this.conversationBranchingService = options.conversationBranchingService;
     this.discordService = options.discordService;
+    this.vpsCommandService = options.vpsCommandService;
     this.isAutonomous = options.isAutonomous ?? false;
   }
 
@@ -1213,6 +1217,7 @@ export class Orchestrator {
           outboundWebhookService: this.outboundWebhookService,
           conversationBranchingService: this.conversationBranchingService,
           discordService: this.discordService,
+          vpsCommandService: this.vpsCommandService,
         }, { conversationId, userId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

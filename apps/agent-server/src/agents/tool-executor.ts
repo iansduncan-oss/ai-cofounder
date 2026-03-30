@@ -97,6 +97,8 @@ import {
 import { REVIEW_PR_TOOL } from "./tools/review-tools.js";
 import { REGISTER_WEBHOOK_TOOL, LIST_WEBHOOKS_TOOL } from "./tools/webhook-tools.js";
 import { READ_DISCORD_MESSAGES_TOOL, LIST_DISCORD_CHANNELS_TOOL } from "./tools/discord-tools.js";
+import { EXECUTE_VPS_COMMAND_TOOL, DOCKER_SERVICE_LOGS_TOOL, DOCKER_RESTART_SERVICE_TOOL } from "./tools/vps-command-tools.js";
+import type { VpsCommandService } from "../services/vps-command.js";
 import type { PrReviewService } from "../services/pr-review.js";
 import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
 import type { ConversationBranchingService } from "../services/conversation-branching.js";
@@ -157,6 +159,7 @@ export interface ToolExecutorServices {
   outboundWebhookService?: OutboundWebhookService;
   conversationBranchingService?: ConversationBranchingService;
   discordService?: DiscordService;
+  vpsCommandService?: VpsCommandService;
 }
 
 export interface ToolExecutorContext {
@@ -312,6 +315,13 @@ export function buildSharedToolList(
   if (services.discordService) {
     add(READ_DISCORD_MESSAGES_TOOL);
     add(LIST_DISCORD_CHANNELS_TOOL);
+  }
+
+  // VPS command execution tools
+  if (services.vpsCommandService) {
+    add(EXECUTE_VPS_COMMAND_TOOL);
+    add(DOCKER_SERVICE_LOGS_TOOL);
+    add(DOCKER_RESTART_SERVICE_TOOL);
   }
 
   return tools;
@@ -1386,6 +1396,27 @@ export async function executeSharedTool(
         context.conversationId, context.userId, branch_point_message_id,
       );
       return { branched: true, new_conversation_id: result.id, messages_copied: result.messagesCopied };
+    }
+
+    /* ── VPS command execution ── */
+
+    case "execute_vps_command": {
+      if (!services.vpsCommandService) return { error: "VPS command service not available" };
+      const { command, timeout_seconds } = block.input as { command: string; timeout_seconds?: number };
+      return services.vpsCommandService.execute(command, { timeoutSeconds: timeout_seconds });
+    }
+
+    case "docker_service_logs": {
+      if (!services.vpsCommandService) return { error: "VPS command service not available" };
+      const { service, lines } = block.input as { service: string; lines?: number };
+      const logs = await services.vpsCommandService.getServiceLogs(service, Math.min(lines ?? 50, 200));
+      return { service, logs };
+    }
+
+    case "docker_restart_service": {
+      if (!services.vpsCommandService) return { error: "VPS command service not available" };
+      const { service, compose_file } = block.input as { service: string; compose_file?: string };
+      return services.vpsCommandService.restartService(service, compose_file);
     }
 
     /* ── Discord channel reading ── */
