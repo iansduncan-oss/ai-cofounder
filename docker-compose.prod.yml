@@ -66,14 +66,14 @@ services:
       - SESSION_TIME_BUDGET_MS=${SESSION_TIME_BUDGET_MS:-900000}
       - VPS_HOST=host.docker.internal
       - VPS_USER=ian
-      - SSH_KEY_PATH=/root/.ssh/id_ed25519
+      - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
     mem_limit: 1g
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - workspace_data:/data/workspace
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/ian/.ssh/ai-cofounder-key:/root/.ssh/id_ed25519:ro
+      - /home/ian/.ssh/ai-cofounder-key:/home/appuser/.ssh/id_ed25519:ro
     networks:
       - avion_avion_net
     depends_on:
@@ -121,13 +121,13 @@ services:
       - BRIEFING_TIMEZONE=${BRIEFING_TIMEZONE:-America/Los_Angeles}
       - VPS_HOST=host.docker.internal
       - VPS_USER=ian
-      - SSH_KEY_PATH=/root/.ssh/id_ed25519
+      - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
     mem_limit: 512m
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - workspace_data:/data/workspace
-      - /home/ian/.ssh/ai-cofounder-key:/root/.ssh/id_ed25519:ro
+      - /home/ian/.ssh/ai-cofounder-key:/home/appuser/.ssh/id_ed25519:ro
     networks:
       - avion_avion_net
     depends_on:
