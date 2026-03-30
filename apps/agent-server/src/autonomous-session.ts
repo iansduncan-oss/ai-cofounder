@@ -14,6 +14,7 @@ import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./services/workspace.js";
 import type { AgentMessagingService } from "./services/agent-messaging.js";
 import { Orchestrator } from "./agents/orchestrator.js";
+import type { DiscordService } from "./services/discord.js";
 import type { DistributedLockService} from "./services/distributed-lock.js";
 import { AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
 import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
@@ -35,6 +36,8 @@ export interface SessionOptions {
   prompt?: string;
   /** Discord webhook URL to report progress */
   webhookUrl?: string;
+  /** Discord service for reading channel messages */
+  discordService?: DiscordService;
 }
 
 export interface SessionResult {
@@ -362,6 +365,7 @@ async function _runSessionBody(
         sandboxService,
         workspaceService,
         messagingService,
+        discordService: options?.discordService,
         isAutonomous: true,
       });
 

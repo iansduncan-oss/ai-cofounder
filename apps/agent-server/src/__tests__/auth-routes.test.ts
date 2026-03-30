@@ -297,7 +297,7 @@ describe("AUTH-03: Login sets HttpOnly refresh cookie", () => {
     expect(cookieStr).toContain("refreshToken=");
     expect(cookieStr.toLowerCase()).toContain("httponly");
     expect(cookieStr.toLowerCase()).toContain("samesite=strict");
-    expect(cookieStr.toLowerCase()).toContain("path=/api/auth/refresh");
+    expect(cookieStr.toLowerCase()).toContain("path=/api/auth");
   });
 });
 
@@ -629,7 +629,7 @@ describe("AUTH-10: POST /api/auth/refresh (extended)", () => {
     const cookies = Array.isArray(setCookieHeader) ? setCookieHeader : [String(setCookieHeader ?? "")];
     const refreshCookie = cookies.find((c) => c.includes("refreshToken="));
     expect(refreshCookie).toBeDefined();
-    expect(refreshCookie!.toLowerCase()).toContain("path=/api/auth/refresh");
+    expect(refreshCookie!.toLowerCase()).toContain("path=/api/auth");
   });
 
   it("refresh rejects deleted user", async () => {

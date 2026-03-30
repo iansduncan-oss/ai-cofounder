@@ -37,6 +37,7 @@ import { createMonitoringService, type MonitoringService } from "./services/moni
 import { createTTSService, type TTSService } from "./services/tts.js";
 import { createWorkspaceService, type WorkspaceService } from "./services/workspace.js";
 import { createBrowserService, type BrowserService } from "./services/browser.js";
+import { createDiscordService } from "./services/discord.js";
 import {
   createNotificationService,
   type NotificationService,
@@ -243,6 +244,10 @@ export function buildServer(registry?: LlmRegistry) {
   // Create workspace service for file system and git access
   const workspaceService = createWorkspaceService();
   app.decorate("workspaceService", workspaceService);
+
+  // Create Discord service for reading channel messages
+  const discordService = createDiscordService();
+  if (discordService) app.decorate("discordService", discordService);
 
   // Create browser service for Playwright-based browser automation
   const browserService = createBrowserService();

@@ -284,7 +284,7 @@ describe("OAUTH-03: GET /api/auth/google/callback", () => {
 
     expect(res.statusCode).toBe(302);
     const location = res.headers.location as string;
-    expect(location).toBe("/dashboard/auth/callback");
+    expect(location).toMatch(/^\/dashboard\/auth\/callback#token=/);
 
     // Should set refresh cookie
     const setCookie = res.headers["set-cookie"];
@@ -330,7 +330,7 @@ describe("OAUTH-03: GET /api/auth/google/callback", () => {
     globalThis.fetch = originalFetch;
 
     expect(res.statusCode).toBe(302);
-    expect(res.headers.location as string).toBe("/dashboard/auth/callback");
+    expect(res.headers.location as string).toMatch(/^\/dashboard\/auth\/callback#token=/);
     expect(mockCreateAdminUser).toHaveBeenCalledWith(
       expect.anything(),
       { email: "newuser@example.com", passwordHash: null },

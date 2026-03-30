@@ -23,6 +23,7 @@ import { SubagentRunner } from "./services/subagent.js";
 import { AgentMessagingService } from "./services/agent-messaging.js";
 import { DistributedLockService } from "./services/distributed-lock.js";
 import { PlanRepairService } from "./services/plan-repair.js";
+import { createDiscordService } from "./services/discord.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
 import Redis from "ioredis";
 
@@ -52,6 +53,7 @@ export async function main() {
   const embeddingService = geminiKey ? createEmbeddingService(geminiKey) : undefined;
   const sandboxService = createSandboxService();
   const workspaceService = createWorkspaceService();
+  const discordService = createDiscordService();
   const notificationService = createNotificationService();
 
   const verificationService = new VerificationService(
@@ -146,7 +148,7 @@ export async function main() {
       const result = await runAutonomousSession(
         db, llmRegistry, embeddingService, sandboxService, workspaceService, messagingService,
         lockService,
-        { trigger, tokenBudget, timeBudgetMs, prompt },
+        { trigger, tokenBudget, timeBudgetMs, prompt, discordService },
       );
       logger.info({ jobId: job.id, status: result.status, tokensUsed: result.tokensUsed }, "Autonomous session finished");
     },

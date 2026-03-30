@@ -50,6 +50,7 @@ import type { ProceduralMemoryService } from "../services/procedural-memory.js";
 import type { PrReviewService } from "../services/pr-review.js";
 import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
 import type { ConversationBranchingService } from "../services/conversation-branching.js";
+import type { DiscordService } from "../services/discord.js";
 import { ToolCache } from "../services/tool-cache.js";
 import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
@@ -308,6 +309,7 @@ export interface OrchestratorOptions {
   prReviewService?: PrReviewService;
   outboundWebhookService?: OutboundWebhookService;
   conversationBranchingService?: ConversationBranchingService;
+  discordService?: DiscordService;
   isAutonomous?: boolean;
 }
 
@@ -334,6 +336,7 @@ export class Orchestrator {
   private prReviewService?: PrReviewService;
   private outboundWebhookService?: OutboundWebhookService;
   private conversationBranchingService?: ConversationBranchingService;
+  private discordService?: DiscordService;
   private isAutonomous: boolean;
   private requestId?: string;
 
@@ -357,6 +360,7 @@ export class Orchestrator {
     this.prReviewService = options.prReviewService;
     this.outboundWebhookService = options.outboundWebhookService;
     this.conversationBranchingService = options.conversationBranchingService;
+    this.discordService = options.discordService;
     this.isAutonomous = options.isAutonomous ?? false;
   }
 
@@ -1206,6 +1210,7 @@ export class Orchestrator {
           proceduralMemoryService: this.proceduralMemoryService,
           outboundWebhookService: this.outboundWebhookService,
           conversationBranchingService: this.conversationBranchingService,
+          discordService: this.discordService,
         }, { conversationId, userId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };

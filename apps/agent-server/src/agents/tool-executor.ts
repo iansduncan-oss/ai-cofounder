@@ -96,6 +96,7 @@ import {
 } from "./tools/template-tools.js";
 import { REVIEW_PR_TOOL } from "./tools/review-tools.js";
 import { REGISTER_WEBHOOK_TOOL, LIST_WEBHOOKS_TOOL } from "./tools/webhook-tools.js";
+import { READ_DISCORD_MESSAGES_TOOL, LIST_DISCORD_CHANNELS_TOOL } from "./tools/discord-tools.js";
 import type { PrReviewService } from "../services/pr-review.js";
 import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
 import type { ConversationBranchingService } from "../services/conversation-branching.js";
@@ -132,6 +133,7 @@ import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { BrowserService } from "../services/browser.js";
+import type { DiscordService } from "../services/discord.js";
 import { notifyApprovalCreated } from "../services/notifications.js";
 
 const logger = createLogger("tool-executor");
@@ -154,6 +156,7 @@ export interface ToolExecutorServices {
   prReviewService?: PrReviewService;
   outboundWebhookService?: OutboundWebhookService;
   conversationBranchingService?: ConversationBranchingService;
+  discordService?: DiscordService;
 }
 
 export interface ToolExecutorContext {
@@ -303,6 +306,12 @@ export function buildSharedToolList(
   if (services.outboundWebhookService) {
     add(REGISTER_WEBHOOK_TOOL);
     add(LIST_WEBHOOKS_TOOL);
+  }
+
+  // Discord channel reading tools
+  if (services.discordService) {
+    add(READ_DISCORD_MESSAGES_TOOL);
+    add(LIST_DISCORD_CHANNELS_TOOL);
   }
 
   return tools;
@@ -1375,6 +1384,22 @@ export async function executeSharedTool(
         context.conversationId, context.userId, branch_point_message_id,
       );
       return { branched: true, new_conversation_id: result.id, messages_copied: result.messagesCopied };
+    }
+
+    /* ── Discord channel reading ── */
+
+    case "read_discord_messages": {
+      if (!services.discordService) return { error: "Discord integration not available" };
+      const { channel_id, limit } = block.input as { channel_id: string; limit?: number };
+      const messages = await services.discordService.fetchMessages(channel_id, { limit });
+      return { channel_id, count: messages.length, messages };
+    }
+
+    case "list_discord_channels": {
+      if (!services.discordService) return { error: "Discord integration not available" };
+      const { guild_id } = block.input as { guild_id?: string };
+      const channels = await services.discordService.fetchChannels(guild_id);
+      return { count: channels.length, channels };
     }
 
     default:
