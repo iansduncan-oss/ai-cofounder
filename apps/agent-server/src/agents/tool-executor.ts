@@ -328,8 +328,10 @@ async function executeYellowTierTool(
   const { db, autonomyTierService } = services;
   if (!db) return { error: "Database not available for approval workflow" };
 
-  // Autonomous sessions auto-approve YELLOW tools (human reviews the PR, not the push)
-  if (context.isAutonomous) {
+  // Autonomous sessions auto-approve most YELLOW tools (human reviews the PR, not the push).
+  // Tools that communicate externally on the user's behalf always require approval.
+  const ALWAYS_REQUIRE_APPROVAL = new Set(["send_email", "create_calendar_event", "update_calendar_event", "delete_calendar_event", "respond_to_calendar_event"]);
+  if (context.isAutonomous && !ALWAYS_REQUIRE_APPROVAL.has(block.name)) {
     logger.info({ toolName: block.name }, "yellow-tier tool auto-approved for autonomous session");
     return executeSharedTool(block, services, context);
   }

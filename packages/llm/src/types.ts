@@ -62,6 +62,8 @@ export interface LlmCompletionRequest {
   tools?: LlmTool[];
   max_tokens?: number;
   temperature?: number;
+  /** Enable extended thinking (Anthropic only). Budget is the max thinking tokens. */
+  thinking?: { type: "enabled"; budget_tokens: number };
   /** Optional metadata passed through to onCompletion hook (ignored by LLM providers) */
   metadata?: CompletionMetadata;
 }

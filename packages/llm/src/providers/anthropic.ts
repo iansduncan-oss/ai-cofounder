@@ -44,13 +44,14 @@ export class AnthropicProvider implements LlmProvider {
     const response = await this.client.messages.create(
       {
         model,
-        max_tokens: request.max_tokens ?? 4096,
+        max_tokens: request.thinking ? request.thinking.budget_tokens + 4096 : (request.max_tokens ?? 4096),
         system,
         messages,
         tools,
-        ...(request.temperature != null ? { temperature: request.temperature } : {}),
+        ...(request.temperature != null && !request.thinking ? { temperature: request.temperature } : {}),
+        ...(request.thinking ? { thinking: request.thinking } : {}),
       },
-      { signal: AbortSignal.timeout(120_000) },
+      { signal: AbortSignal.timeout(request.thinking ? 300_000 : 120_000) },
     );
 
     const usage = response.usage as Anthropic.Usage & {
@@ -116,6 +117,10 @@ export class AnthropicProvider implements LlmProvider {
   }
 
   private fromAnthropicBlock(block: Anthropic.ContentBlock): LlmContentBlock {
+    if (block.type === "thinking") {
+      // Extended thinking block — include as text with prefix for downstream parsing
+      return { type: "text", text: `<thinking>${(block as unknown as { thinking: string }).thinking}</thinking>` };
+    }
     if (block.type === "text") {
       return { type: "text", text: block.text };
     }
