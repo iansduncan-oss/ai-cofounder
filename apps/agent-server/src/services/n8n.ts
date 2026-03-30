@@ -22,9 +22,20 @@ export interface N8nExecution {
   retrySuccessId: string | null;
 }
 
+export interface N8nWorkflow {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface N8nService {
   trigger(webhookUrl: string, workflowName: string, payload: Record<string, unknown>): Promise<N8nTriggerResult>;
   listExecutions(opts?: { workflowId?: string; status?: string; limit?: number }): Promise<N8nExecution[]>;
+  listApiWorkflows(): Promise<N8nWorkflow[]>;
+  activateWorkflow(id: string): Promise<boolean>;
+  deactivateWorkflow(id: string): Promise<boolean>;
 }
 
 export function createN8nService(): N8nService {
@@ -112,6 +123,56 @@ export function createN8nService(): N8nService {
       } catch (err) {
         logger.error({ err }, "n8n listExecutions error");
         return [];
+      }
+    },
+
+    async listApiWorkflows() {
+      const baseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
+      const apiKey = optionalEnv("N8N_API_KEY", "");
+      if (!apiKey) return [];
+      try {
+        const res = await fetch(`${baseUrl}/api/v1/workflows`, {
+          headers: { "X-N8N-API-KEY": apiKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        if (!res.ok) return [];
+        const json = (await res.json()) as { data?: N8nWorkflow[] };
+        return json.data ?? [];
+      } catch (err) {
+        logger.error({ err }, "n8n listApiWorkflows error");
+        return [];
+      }
+    },
+
+    async activateWorkflow(id: string) {
+      const baseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
+      const apiKey = optionalEnv("N8N_API_KEY", "");
+      if (!apiKey) return false;
+      try {
+        const res = await fetch(`${baseUrl}/api/v1/workflows/${id}/activate`, {
+          method: "POST",
+          headers: { "X-N8N-API-KEY": apiKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        return res.ok;
+      } catch {
+        return false;
+      }
+    },
+
+    async deactivateWorkflow(id: string) {
+      const baseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
+      const apiKey = optionalEnv("N8N_API_KEY", "");
+      if (!apiKey) return false;
+      try {
+        const res = await fetch(`${baseUrl}/api/v1/workflows/${id}/deactivate`, {
+          method: "POST",
+          headers: { "X-N8N-API-KEY": apiKey },
+          signal: AbortSignal.timeout(10000),
+        });
+        return res.ok;
+      } catch {
+        return false;
       }
     },
   };

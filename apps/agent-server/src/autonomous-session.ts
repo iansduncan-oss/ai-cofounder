@@ -69,7 +69,7 @@ async function sendWebhook(
   }
 }
 
-async function buildContextPrompt(db: Db, overridePrompt?: string, vpsCommandService?: VpsCommandService): Promise<string> {
+async function buildContextPrompt(db: Db, overridePrompt?: string, vpsCommandService?: VpsCommandService, discordService?: DiscordService): Promise<string> {
   const [activeGoals, recentSessions, taskCounts] = await Promise.all([
     listActiveGoals(db),
     listRecentWorkSessions(db, 5),
@@ -138,13 +138,47 @@ async function buildContextPrompt(db: Db, overridePrompt?: string, vpsCommandSer
     }
   }
 
+  // Discord recent activity (check for errors/requests)
+  if (discordService) {
+    try {
+      const channels = await discordService.fetchChannels();
+      const alertChannels = channels.filter((c) =>
+        /alert|error|monitor|deploy|bot|general/i.test(c.name),
+      );
+      if (alertChannels.length > 0) {
+        const recentMessages: string[] = [];
+        for (const ch of alertChannels.slice(0, 3)) {
+          const msgs = await discordService.fetchMessages(ch.id, { limit: 5 });
+          const recent = msgs.filter((m) => {
+            const age = Date.now() - new Date(m.timestamp).getTime();
+            return age < 4 * 60 * 60 * 1000; // last 4 hours
+          });
+          if (recent.length > 0) {
+            recentMessages.push(`#${ch.name}: ${recent.map((m) => `[${m.author}] ${m.content.slice(0, 150)}`).join(" | ")}`);
+          }
+        }
+        if (recentMessages.length > 0) {
+          lines.push("");
+          lines.push("**Recent Discord activity:**");
+          for (const msg of recentMessages) {
+            lines.push(`- ${msg}`);
+          }
+        }
+      }
+    } catch {
+      // Non-fatal — skip Discord context
+    }
+  }
+
   lines.push("");
   lines.push(
-    "Based on this context, either: (1) execute pending tasks on an active goal using create_plan, " +
-      "(2) research and advance a stale goal, (3) if a scheduled directive is given, follow it, " +
-      "(4) check Discord channels for errors or requests to address, or " +
-      "(5) if infrastructure issues are detected, diagnose and fix them. " +
-      "Use docker_service_logs and execute_vps_command to investigate issues. " +
+    "You are the AI Cofounder. Prioritize your work in this order:\n" +
+      "1. **Fix infrastructure issues** — if VPS health shows problems or containers are unhealthy, diagnose and fix them first using docker_service_logs and execute_vps_command.\n" +
+      "2. **Respond to Discord requests** — if someone asked for something or there are error alerts, address them.\n" +
+      "3. **Execute pending tasks** — pick the highest-priority active goal and work on it using create_plan.\n" +
+      "4. **Follow scheduled directives** — if one was provided, execute it.\n" +
+      "5. **Proactive improvement** — if everything is healthy, look for optimizations or advance stale goals.\n" +
+      "After completing work, save lessons learned to procedural memory for future sessions. " +
       "Be focused and produce concrete results.",
   );
 
@@ -379,7 +413,7 @@ async function _runSessionBody(
     }
 
     // Freeform orchestrator fallback — used when no backlog goals exist or backlog path fails
-    const contextPrompt = await buildContextPrompt(db, options?.prompt, options?.vpsCommandService);
+    const contextPrompt = await buildContextPrompt(db, options?.prompt, options?.vpsCommandService, options?.discordService);
 
     // Check time budget
     if (Date.now() - startTime > timeBudgetMs) {

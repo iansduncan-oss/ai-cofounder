@@ -35,24 +35,26 @@ export class AnthropicProvider implements LlmProvider {
     const tools = request.tools?.map((t, i, arr) => this.toAnthropicTool(t, i === arr.length - 1));
 
     // Use structured system content with cache_control for prompt caching.
-    // This caches the system prompt across multi-turn tool loops, reducing
-    // input token costs by up to 90% on subsequent rounds.
     const system: Anthropic.MessageCreateParams["system"] = request.system
       ? [{ type: "text" as const, text: request.system, cache_control: { type: "ephemeral" as const } }]
       : undefined;
 
-    const response = await this.client.messages.create(
-      {
-        model,
-        max_tokens: request.thinking ? request.thinking.budget_tokens + 4096 : (request.max_tokens ?? 4096),
-        system,
-        messages,
-        tools,
-        ...(request.temperature != null && !request.thinking ? { temperature: request.temperature } : {}),
-        ...(request.thinking ? { thinking: request.thinking } : {}),
-      },
-      { signal: AbortSignal.timeout(request.thinking ? 300_000 : 120_000) },
-    );
+    const params: Anthropic.MessageCreateParams = {
+      model,
+      max_tokens: request.thinking ? request.thinking.budget_tokens + 8192 : (request.max_tokens ?? 4096),
+      system,
+      messages,
+      tools,
+      ...(request.temperature != null && !request.thinking ? { temperature: request.temperature } : {}),
+      ...(request.thinking ? { thinking: request.thinking } : {}),
+    };
+
+    // Use streaming to avoid "streaming required for >10min" SDK error.
+    // Collects the full response — callers still get a single response object.
+    const stream = this.client.messages.stream(params, {
+      signal: AbortSignal.timeout(request.thinking ? 300_000 : 120_000),
+    });
+    const response = await stream.finalMessage();
 
     const usage = response.usage as Anthropic.Usage & {
       cache_creation_input_tokens?: number;
@@ -118,7 +120,6 @@ export class AnthropicProvider implements LlmProvider {
 
   private fromAnthropicBlock(block: Anthropic.ContentBlock): LlmContentBlock {
     if (block.type === "thinking") {
-      // Extended thinking block — include as text with prefix for downstream parsing
       return { type: "text", text: `<thinking>${(block as unknown as { thinking: string }).thinking}</thinking>` };
     }
     if (block.type === "text") {

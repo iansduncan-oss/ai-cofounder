@@ -37,7 +37,7 @@ import type { MonitoringService } from "../services/monitoring.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
-import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL } from "./tools/n8n-tools.js";
+import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL, LIST_N8N_API_WORKFLOWS_TOOL, LIST_N8N_EXECUTIONS_TOOL, TOGGLE_N8N_WORKFLOW_TOOL } from "./tools/n8n-tools.js";
 import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
 import {
   CREATE_SCHEDULE_TOOL,
@@ -211,6 +211,9 @@ export function buildSharedToolList(
   if (services.n8nService && services.db) {
     add(TRIGGER_N8N_WORKFLOW_TOOL);
     add(LIST_N8N_WORKFLOWS_TOOL);
+    add(LIST_N8N_API_WORKFLOWS_TOOL);
+    add(LIST_N8N_EXECUTIONS_TOOL);
+    add(TOGGLE_N8N_WORKFLOW_TOOL);
   }
 
   if (services.sandboxService?.available) {
@@ -554,6 +557,28 @@ export async function executeSharedTool(
         description: w.description,
         inputSchema: w.inputSchema,
       }));
+    }
+
+    case "list_n8n_workflows": {
+      if (!n8nService) return { error: "n8n not available" };
+      const workflows = await n8nService.listApiWorkflows();
+      return { count: workflows.length, workflows: workflows.map((w) => ({ id: w.id, name: w.name, active: w.active })) };
+    }
+
+    case "list_n8n_executions": {
+      if (!n8nService) return { error: "n8n not available" };
+      const { status, limit } = block.input as { status?: string; limit?: number };
+      const executions = await n8nService.listExecutions({ status, limit: limit ?? 10 });
+      return { count: executions.length, executions: executions.map((e) => ({ id: e.id, workflowId: e.workflowId, status: e.status, mode: e.mode, startedAt: e.startedAt, stoppedAt: e.stoppedAt })) };
+    }
+
+    case "toggle_n8n_workflow": {
+      if (!n8nService) return { error: "n8n not available" };
+      const { workflow_id, active } = block.input as { workflow_id: string; active: boolean };
+      const success = active
+        ? await n8nService.activateWorkflow(workflow_id)
+        : await n8nService.deactivateWorkflow(workflow_id);
+      return { workflow_id, active, success };
     }
 
     case "create_schedule": {
