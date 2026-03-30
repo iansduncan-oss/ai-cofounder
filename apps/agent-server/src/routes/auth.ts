@@ -70,7 +70,7 @@ export async function authRoutes(app: FastifyInstance) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      path: "/api/auth/refresh",
+      path: "/api/auth",
       maxAge: 7 * 24 * 60 * 60, // 7 days in seconds
     });
 
@@ -92,14 +92,14 @@ export async function authRoutes(app: FastifyInstance) {
       const payload = app.jwt.verify(refreshToken) as Record<string, unknown>;
 
       if (payload.type !== "refresh") {
-        reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+        reply.clearCookie("refreshToken", { path: "/api/auth" });
         return reply.status(401).send({ error: "Invalid refresh token" });
       }
 
       // Verify user still exists (reject deleted users)
       const admin = await findAdminById(app.db, payload.sub as string);
       if (!admin) {
-        reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+        reply.clearCookie("refreshToken", { path: "/api/auth" });
         return reply.status(401).send({ error: "User not found" });
       }
 
@@ -116,13 +116,13 @@ export async function authRoutes(app: FastifyInstance) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
-        path: "/api/auth/refresh",
+        path: "/api/auth",
         maxAge: 7 * 24 * 60 * 60,
       });
 
       return reply.status(200).send({ accessToken });
     } catch {
-      reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+      reply.clearCookie("refreshToken", { path: "/api/auth" });
       return reply.status(401).send({ error: "Invalid or expired refresh token" });
     }
   });
@@ -132,7 +132,7 @@ export async function authRoutes(app: FastifyInstance) {
    * Clears the refresh token cookie.
    */
   app.post("/logout", async (_request, reply) => {
-    reply.clearCookie("refreshToken", { path: "/api/auth/refresh" });
+    reply.clearCookie("refreshToken", { path: "/api/auth" });
     return reply.status(200).send({ success: true });
   });
 
@@ -297,7 +297,7 @@ export async function authRoutes(app: FastifyInstance) {
         }
       }
 
-      // Issue JWT + refresh cookie (same as password login)
+      // Issue JWT + refresh cookie
       const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
 
       const refreshToken = app.jwt.sign(
@@ -309,12 +309,12 @@ export async function authRoutes(app: FastifyInstance) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        path: "/api/auth/refresh",
+        path: "/api/auth",
         maxAge: 7 * 24 * 60 * 60,
       });
 
-      // Redirect to dashboard callback page — access token delivered via refresh cookie
-      return reply.redirect("/dashboard/auth/callback");
+      // Redirect to dashboard callback page with access token as fragment (not in URL query for security)
+      return reply.redirect(`/dashboard/auth/callback#token=${accessToken}`);
     },
   );
 

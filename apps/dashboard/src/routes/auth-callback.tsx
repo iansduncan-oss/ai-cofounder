@@ -6,8 +6,18 @@ export function AuthCallbackPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const baseUrl = import.meta.env.VITE_API_URL || "";
+    // Try token from URL fragment first (OAuth redirect), then fall back to refresh cookie
+    const hash = window.location.hash;
+    const tokenMatch = hash.match(/token=([^&]+)/);
 
+    if (tokenMatch) {
+      setAccessToken(tokenMatch[1]);
+      window.history.replaceState(null, "", window.location.pathname);
+      navigate("/dashboard", { replace: true });
+      return;
+    }
+
+    const baseUrl = import.meta.env.VITE_API_URL || "";
     fetch(`${baseUrl}/api/auth/refresh`, {
       method: "POST",
       credentials: "include",
