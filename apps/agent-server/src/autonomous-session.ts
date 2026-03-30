@@ -69,7 +69,7 @@ async function sendWebhook(
   }
 }
 
-async function buildContextPrompt(db: Db, overridePrompt?: string): Promise<string> {
+async function buildContextPrompt(db: Db, overridePrompt?: string, vpsCommandService?: VpsCommandService): Promise<string> {
   const [activeGoals, recentSessions, taskCounts] = await Promise.all([
     listActiveGoals(db),
     listRecentWorkSessions(db, 5),
@@ -115,10 +115,36 @@ async function buildContextPrompt(db: Db, overridePrompt?: string): Promise<stri
     }
   }
 
+  // Infrastructure health snapshot
+  if (vpsCommandService) {
+    try {
+      const healthResult = await vpsCommandService.execute(
+        "echo DISK=$(df -h / | tail -1 | awk '{print $5}') MEM=$(free | grep Mem | awk '{printf \"%.0f%%\", $3/$2*100}') CPU=$(cat /proc/loadavg | awk '{print $1}')",
+        { timeoutSeconds: 10 },
+      );
+      if (healthResult.exitCode === 0 && healthResult.stdout) {
+        lines.push("");
+        lines.push(`**VPS health:** ${healthResult.stdout}`);
+      }
+      const containerResult = await vpsCommandService.execute(
+        "docker ps --format '{{.Names}} {{.Status}}' | grep -i unhealthy || echo 'All containers healthy'",
+        { timeoutSeconds: 10 },
+      );
+      if (containerResult.exitCode === 0 && containerResult.stdout) {
+        lines.push(`**Containers:** ${containerResult.stdout}`);
+      }
+    } catch {
+      // Non-fatal — skip VPS health in context
+    }
+  }
+
   lines.push("");
   lines.push(
     "Based on this context, either: (1) execute pending tasks on an active goal using create_plan, " +
-      "(2) research and advance a stale goal, or (3) if a scheduled directive is given, follow it. " +
+      "(2) research and advance a stale goal, (3) if a scheduled directive is given, follow it, " +
+      "(4) check Discord channels for errors or requests to address, or " +
+      "(5) if infrastructure issues are detected, diagnose and fix them. " +
+      "Use docker_service_logs and execute_vps_command to investigate issues. " +
       "Be focused and produce concrete results.",
   );
 
@@ -353,7 +379,7 @@ async function _runSessionBody(
     }
 
     // Freeform orchestrator fallback — used when no backlog goals exist or backlog path fails
-    const contextPrompt = await buildContextPrompt(db, options?.prompt);
+    const contextPrompt = await buildContextPrompt(db, options?.prompt, options?.vpsCommandService);
 
     // Check time budget
     if (Date.now() - startTime > timeBudgetMs) {

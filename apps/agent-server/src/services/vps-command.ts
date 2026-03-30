@@ -52,7 +52,9 @@ export class VpsCommandService {
     const sshArgs = [
       "-o", "ConnectTimeout=10",
       "-o", "StrictHostKeyChecking=accept-new",
+      "-o", "UserKnownHostsFile=/dev/null",
       "-o", "BatchMode=yes",
+      "-o", "LogLevel=ERROR",
       ...(this.sshKeyPath ? ["-i", this.sshKeyPath] : []),
       `${this.user}@${this.host}`,
       command,
