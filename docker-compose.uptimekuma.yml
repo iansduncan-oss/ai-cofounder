@@ -19,6 +19,8 @@ services:
 
 volumes:
   uptimekuma_data:
+    external: true
+    name: avion_uptime_kuma_data
 
 networks:
   avion_avion_net:
