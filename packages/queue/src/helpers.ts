@@ -382,3 +382,31 @@ export async function getStaleJobCounts(thresholdMs = 30 * 60 * 1000): Promise<S
 
   return results;
 }
+
+/**
+ * Trim BullMQ event streams to prevent unbounded Redis growth.
+ * Each queue has a `:events` stream that grows indefinitely.
+ */
+export async function trimEventStreams(maxLen = 500): Promise<void> {
+  const queues = [
+    getAgentTaskQueue(),
+    getSubagentTaskQueue(),
+    getMonitoringQueue(),
+    getBriefingQueue(),
+    getNotificationQueue(),
+    getPipelineQueue(),
+    getRagIngestionQueue(),
+    getReflectionQueue(),
+    getAutonomousSessionQueue(),
+    getMeetingPrepQueue(),
+  ];
+
+  for (const queue of queues) {
+    try {
+      const client = await queue.client;
+      await client.xtrim(`bull:${queue.name}:events`, "MAXLEN", "~", maxLen);
+    } catch {
+      // Queue not available — skip
+    }
+  }
+}

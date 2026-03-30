@@ -95,6 +95,7 @@ export {
   retryDeadLetterJob,
   deleteDeadLetterJob,
   getStaleJobCounts,
+  trimEventStreams,
   type QueueStatus,
   type JobStatusResult,
   type DeadLetterEntry,
