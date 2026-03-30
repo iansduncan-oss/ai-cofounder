@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import type { DiscordService } from "../services/discord.js";
+import type { VpsCommandService } from "../services/vps-command.js";
 import { Orchestrator } from "../agents/orchestrator.js";
 import { PrReviewService } from "../services/pr-review.js";
 import { OutboundWebhookService } from "../services/outbound-webhooks.js";
@@ -35,7 +37,7 @@ export function createOrchestrator(app: FastifyInstance): Orchestrator {
     prReviewService,
     outboundWebhookService,
     conversationBranchingService,
-    discordService: (app as unknown as Record<string, unknown>).discordService as import("../services/discord.js").DiscordService | undefined,
-    vpsCommandService: (app as unknown as Record<string, unknown>).vpsCommandService as import("../services/vps-command.js").VpsCommandService | undefined,
+    discordService: (app as unknown as Record<string, unknown>).discordService as DiscordService | undefined,
+    vpsCommandService: (app as unknown as Record<string, unknown>).vpsCommandService as VpsCommandService | undefined,
   });
 }
