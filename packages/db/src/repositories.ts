@@ -1031,7 +1031,7 @@ export async function listCodeExecutionsByTask(db: Db, taskId: string) {
 /** Per-model pricing in microdollars per token ($0.000001 = 1 microdollar) */
 const PRICING: Record<string, { input: number; output: number }> = {
   // Anthropic
-  "claude-opus-4-20250901": { input: 15_000, output: 75_000 }, // $15/$75 per MTok
+  "claude-opus-4-20250514": { input: 15_000, output: 75_000 }, // $15/$75 per MTok
   "claude-sonnet-4-20250514": { input: 3_000, output: 15_000 }, // $3/$15 per MTok
   // Groq (free tier)
   "llama-3.1-8b-instant": { input: 0, output: 0 },

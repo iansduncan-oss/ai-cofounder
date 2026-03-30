@@ -1,14 +1,12 @@
 import { type Interaction, type ChatInputCommandInteraction, EmbedBuilder } from "discord.js";
 import { ApiClient } from "@ai-cofounder/api-client";
 import {
-  handleAsk,
   handleAskStreaming,
   handleStatus,
   handleGoals,
   handleTasks,
   handleMemory,
   handleClear,
-  handleExecute,
   handleExecuteStreaming,
   handleApprove,
   handleHelp,

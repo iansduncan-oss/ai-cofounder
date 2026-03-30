@@ -26,19 +26,19 @@ function createMockProvider(name: string, available = true): LlmProvider {
 
 /**
  * Build custom routes where the "simple" category has two entries:
- *   1. providerA → claude-opus-4-20250901 (expensive: $15/$75 per 1M)
+ *   1. providerA → claude-opus-4-20250514 (expensive: $15/$75 per 1M)
  *   2. providerB → llama-3.1-8b-instant   (cheap: $0.05/$0.08 per 1M)
  * All other categories point to providerA as a placeholder.
  */
 function buildRoutes(): Record<TaskCategory, Array<{ provider: string; model: string }>> {
-  const filler = [{ provider: "providerA", model: "claude-opus-4-20250901" }];
+  const filler = [{ provider: "providerA", model: "claude-opus-4-20250514" }];
   return {
     planning: filler,
     conversation: filler,
     research: filler,
     code: filler,
     simple: [
-      { provider: "providerA", model: "claude-opus-4-20250901" },
+      { provider: "providerA", model: "claude-opus-4-20250514" },
       { provider: "providerB", model: "llama-3.1-8b-instant" },
     ],
   };

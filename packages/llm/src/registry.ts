@@ -29,7 +29,7 @@ interface ModelCost {
 
 const MODEL_COSTS: Record<string, ModelCost> = {
   // Anthropic
-  "claude-opus-4-20250901": { inputPer1M: 15, outputPer1M: 75 },
+  "claude-opus-4-20250514": { inputPer1M: 15, outputPer1M: 75 },
   "claude-sonnet-4-20250514": { inputPer1M: 3, outputPer1M: 15 },
   // Groq (hosted Llama)
   "llama-3.3-70b-versatile": { inputPer1M: 0.59, outputPer1M: 0.79 },
@@ -107,7 +107,7 @@ export interface RoutingOptions {
  */
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   planning: [
-    { provider: "anthropic", model: "claude-opus-4-20250901" },
+    { provider: "anthropic", model: "claude-opus-4-20250514" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "gemini", model: "gemini-2.5-pro" },
   ],

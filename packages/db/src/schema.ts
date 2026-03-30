@@ -424,6 +424,7 @@ export const sourceTypeEnum = pgEnum("source_type", [
   "memory",
   "reflection",
   "markdown",
+  "document",
 ]);
 
 export const documentChunks = pgTable("document_chunks", {

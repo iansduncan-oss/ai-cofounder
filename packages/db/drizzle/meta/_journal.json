@@ -337,6 +337,13 @@
       "when": 1774924800000,
       "tag": "0047_add_user_pattern_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1774925000000,
+      "tag": "0048_add_document_source_type",
+      "breakpoints": true
     }
   ]
 }

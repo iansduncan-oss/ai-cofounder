@@ -1,14 +1,12 @@
 import type { App } from "@slack/bolt";
 import { ApiClient } from "@ai-cofounder/api-client";
 import {
-  handleAsk,
   handleAskStreaming,
   handleStatus,
   handleGoals,
   handleTasks,
   handleMemory,
   handleClear,
-  handleExecute,
   handleExecuteStreaming,
   handleApprove,
   handleReject,
@@ -24,9 +22,7 @@ import {
   type CommandContext,
   type HandlerResult,
 } from "@ai-cofounder/bot-handlers";
-import { createLogger, optionalEnv } from "@ai-cofounder/shared";
-
-const logger = createLogger("slack-commands");
+import { optionalEnv } from "@ai-cofounder/shared";
 
 function createClient(): ApiClient {
   return new ApiClient({
