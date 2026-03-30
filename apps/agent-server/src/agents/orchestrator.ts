@@ -634,13 +634,11 @@ export class Orchestrator {
       let totalOutputTokens = 0;
       let plan: PlanResult | undefined;
       // Agentic tool-use loop
-      const useThinking = this.taskCategory === "planning";
       let response = await this.completeWithRetry(this.taskCategory, {
         system: systemPrompt,
         messages,
         tools,
-        max_tokens: useThinking ? 16384 : 4096,
-        ...(useThinking ? { thinking: { type: "enabled" as const, budget_tokens: 10000 } } : {}),
+        max_tokens: 8192,
         metadata: { agentRole: "orchestrator", conversationId: id, userId },
       });
 
