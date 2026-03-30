@@ -362,6 +362,7 @@ async function _runSessionBody(
         sandboxService,
         workspaceService,
         messagingService,
+        isAutonomous: true,
       });
 
       const result = await Promise.race([

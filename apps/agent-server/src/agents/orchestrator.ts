@@ -308,6 +308,7 @@ export interface OrchestratorOptions {
   prReviewService?: PrReviewService;
   outboundWebhookService?: OutboundWebhookService;
   conversationBranchingService?: ConversationBranchingService;
+  isAutonomous?: boolean;
 }
 
 /* ── Orchestrator class ── */
@@ -333,6 +334,7 @@ export class Orchestrator {
   private prReviewService?: PrReviewService;
   private outboundWebhookService?: OutboundWebhookService;
   private conversationBranchingService?: ConversationBranchingService;
+  private isAutonomous: boolean;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -355,6 +357,7 @@ export class Orchestrator {
     this.prReviewService = options.prReviewService;
     this.outboundWebhookService = options.outboundWebhookService;
     this.conversationBranchingService = options.conversationBranchingService;
+    this.isAutonomous = options.isAutonomous ?? false;
   }
 
   /**
@@ -1203,7 +1206,7 @@ export class Orchestrator {
           proceduralMemoryService: this.proceduralMemoryService,
           outboundWebhookService: this.outboundWebhookService,
           conversationBranchingService: this.conversationBranchingService,
-        }, { conversationId, userId, agentRole: "orchestrator" } as ToolExecutorContext);
+        }, { conversationId, userId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
         return result;

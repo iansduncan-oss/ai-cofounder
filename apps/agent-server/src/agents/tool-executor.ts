@@ -162,6 +162,7 @@ export interface ToolExecutorContext {
   agentRole?: string;
   agentRunId?: string;
   goalId?: string;
+  isAutonomous?: boolean;
 }
 
 /**
@@ -317,6 +318,12 @@ async function executeYellowTierTool(
 ): Promise<unknown> {
   const { db, autonomyTierService } = services;
   if (!db) return { error: "Database not available for approval workflow" };
+
+  // Autonomous sessions auto-approve YELLOW tools (human reviews the PR, not the push)
+  if (context.isAutonomous) {
+    logger.info({ toolName: block.name }, "yellow-tier tool auto-approved for autonomous session");
+    return executeSharedTool(block, services, context);
+  }
 
   const timeoutMs = autonomyTierService?.getTimeoutMs(block.name) ?? 300_000;
   const reason = `Tool "${block.name}" requires approval before execution (yellow tier). Input: ${JSON.stringify(block.input).slice(0, 200)}`;

@@ -75,9 +75,8 @@ describe("AutonomyTierService", () => {
   it("returns correct default tiers for dangerous tools when DB has no config", async () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
-    // Red: irreversible external
-    expect(service.getTier("git_push")).toBe("red");
-    // Yellow: destructive or high-impact
+    // Yellow: destructive or high-impact (git_push promoted from red)
+    expect(service.getTier("git_push")).toBe("yellow");
     expect(service.getTier("delete_file")).toBe("yellow");
     expect(service.getTier("delete_directory")).toBe("yellow");
     expect(service.getTier("write_file")).toBe("yellow");
@@ -134,32 +133,29 @@ describe("AutonomyTierService", () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
     const redTools = service.getAllRed();
-    // DB red: delete_file, delete_directory; hardcoded red: git_push
+    // DB red: delete_file, delete_directory (no hardcoded red tools)
     expect(redTools).toContain("delete_file");
     expect(redTools).toContain("delete_directory");
-    expect(redTools).toContain("git_push"); // hardcoded default
     expect(redTools).not.toContain("save_memory");
-    expect(redTools).toHaveLength(3);
+    expect(redTools).toHaveLength(2);
   });
 
   it("getAllRed deduplicates when tool is red in both DB and defaults", async () => {
     mockListToolTierConfigs.mockResolvedValue([
-      { toolName: "git_push", tier: "red", timeoutMs: 60000 },
+      { toolName: "delete_file", tier: "red", timeoutMs: 60000 },
     ]);
     const service = new AutonomyTierService(mockDb);
     await service.load();
     const redTools = service.getAllRed();
-    // git_push is red in both DB and defaults — should appear once
-    const gitPushCount = redTools.filter((t) => t === "git_push").length;
-    expect(gitPushCount).toBe(1);
+    const deleteFileCount = redTools.filter((t) => t === "delete_file").length;
+    expect(deleteFileCount).toBe(1);
   });
 
-  it("getAllRed returns hardcoded defaults even with empty DB", async () => {
+  it("getAllRed returns empty when no red tools in DB or defaults", async () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
     const redTools = service.getAllRed();
-    expect(redTools).toContain("git_push");
-    expect(redTools).toHaveLength(1);
+    expect(redTools).toHaveLength(0);
   });
 
   it("reload refreshes tier data from DB", async () => {

@@ -248,6 +248,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             workspaceService,
             messagingService,
             autonomyTierService,
+            isAutonomous: true,
           });
 
           // Create a system user + conversation for scheduled tasks

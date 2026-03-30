@@ -8,9 +8,8 @@ const logger = createLogger("autonomy-tier");
 
 export class AutonomyTierService {
   private static readonly DEFAULT_TIERS: Record<string, AutonomyTier> = {
-    // Red: irreversible external actions
-    git_push: "red",
-    // Yellow: destructive or high-impact
+    // Yellow: destructive or high-impact (auto-approved in autonomous sessions)
+    git_push: "yellow",
     delete_file: "yellow",
     delete_directory: "yellow",
     write_file: "yellow",
