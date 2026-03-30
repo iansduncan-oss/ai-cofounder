@@ -120,6 +120,13 @@ export interface GmailSendResult {
   subject: string;
 }
 
+/** Structured result from register command */
+export interface RegisterResult {
+  userId: string;
+  displayName?: string;
+  isNew: boolean;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
@@ -138,6 +145,7 @@ export type HandlerResult =
   | { type: "schedule_create"; data: ScheduleCreateResult }
   | { type: "gmail_inbox"; data: GmailInboxResult }
   | { type: "gmail_send"; data: GmailSendResult }
+  | { type: "register"; data: RegisterResult }
   | { type: "info"; message: string }
   | { type: "error"; message: string };
 

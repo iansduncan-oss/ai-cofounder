@@ -18,6 +18,7 @@ import {
   handleScheduleCreate,
   handleGmailInbox,
   handleGmailSend,
+  handleRegister,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -281,6 +282,19 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       });
       return;
 
+    case "register": {
+      const msg = result.data.isNew
+        ? `\u2705 Welcome, *${result.data.displayName ?? "friend"}*! You're now registered with AI Cofounder.`
+        : `\u2705 You're already registered, *${result.data.displayName ?? "friend"}*!`;
+      await respond({
+        ...base,
+        blocks: [
+          { type: "section", text: { type: "mrkdwn", text: msg } },
+        ],
+      });
+      return;
+    }
+
     case "info":
       await respond({ ...base, text: result.message });
       return;
@@ -466,6 +480,12 @@ export function registerCommands(app: App): void {
       return;
     }
     await sendSlackResponse(respond, await handleListApprovals(client));
+  });
+
+  app.command("/register", async ({ command, ack, respond }) => {
+    await ack();
+    const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
+    await sendSlackResponse(respond, await handleRegister(client, ctx), true);
   });
 
   app.command("/help", async ({ ack, respond }) => {

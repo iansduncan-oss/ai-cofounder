@@ -128,7 +128,7 @@ export async function updateConversationMetadata(
   const [updated] = await db
     .update(conversations)
     .set({ metadata })
-    .where(eq(conversations.id, id))
+    .where(and(eq(conversations.id, id), isNull(conversations.deletedAt)))
     .returning();
   return updated ?? null;
 }
@@ -137,7 +137,7 @@ export async function updateConversationTitle(db: Db, id: string, title: string)
   const [updated] = await db
     .update(conversations)
     .set({ title })
-    .where(eq(conversations.id, id))
+    .where(and(eq(conversations.id, id), isNull(conversations.deletedAt)))
     .returning();
   return updated ?? null;
 }
@@ -243,7 +243,7 @@ export async function updateGoalScope(
   const [updated] = await db
     .update(goals)
     .set({ scope, requiresApproval, updatedAt: new Date() })
-    .where(eq(goals.id, id))
+    .where(and(eq(goals.id, id), isNull(goals.deletedAt)))
     .returning();
   return updated ?? null;
 }
@@ -256,7 +256,7 @@ export async function updateGoalStatus(
   const [updated] = await db
     .update(goals)
     .set({ status, updatedAt: new Date() })
-    .where(eq(goals.id, id))
+    .where(and(eq(goals.id, id), isNull(goals.deletedAt)))
     .returning();
   return updated ?? null;
 }
@@ -280,7 +280,7 @@ export async function cancelGoal(db: Db, id: string) {
   const [goal] = await db
     .update(goals)
     .set({ status: "cancelled", updatedAt: new Date() })
-    .where(eq(goals.id, id))
+    .where(and(eq(goals.id, id), isNull(goals.deletedAt)))
     .returning();
   if (!goal) return null;
   await db
@@ -302,7 +302,7 @@ export async function updateGoalMetadata(
   const [updated] = await db
     .update(goals)
     .set({ metadata: merged, updatedAt: new Date() })
-    .where(eq(goals.id, id))
+    .where(and(eq(goals.id, id), isNull(goals.deletedAt)))
     .returning();
   return updated ?? null;
 }
@@ -1550,14 +1550,14 @@ export async function assignGoalToMilestone(db: Db, goalId: string, milestoneId:
   const [updated] = await db
     .update(goals)
     .set({ milestoneId, updatedAt: new Date() })
-    .where(eq(goals.id, goalId))
+    .where(and(eq(goals.id, goalId), isNull(goals.deletedAt)))
     .returning();
   return updated ?? null;
 }
 
 export async function deleteMilestone(db: Db, id: string) {
-  // Unlink goals first
-  await db.update(goals).set({ milestoneId: null }).where(eq(goals.milestoneId, id));
+  // Unlink non-deleted goals first
+  await db.update(goals).set({ milestoneId: null }).where(and(eq(goals.milestoneId, id), isNull(goals.deletedAt)));
   const [deleted] = await db.delete(milestones).where(eq(milestones.id, id)).returning();
   return deleted ?? null;
 }
@@ -1889,6 +1889,7 @@ export async function getLastUserMessageTimestamp(db: Db, userId: string): Promi
       and(
         eq(conversations.userId, userId),
         eq(messages.role, "user"),
+        isNull(conversations.deletedAt),
       ),
     );
   const val = rows[0]?.latest;

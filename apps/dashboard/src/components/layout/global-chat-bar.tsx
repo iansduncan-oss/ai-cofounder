@@ -14,12 +14,12 @@ export function GlobalChatBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const stream = useStreamChat();
   const { data: dashboardUser } = useDashboardUser();
-  const conversationIdRef = useRef(localStorage.getItem(CONVERSATION_STORAGE_KEY) || undefined);
+  const [conversationId] = useState(
+    () => localStorage.getItem(CONVERSATION_STORAGE_KEY) || undefined,
+  );
 
   // Hide on the full chat page
   if (location.pathname.includes("/chat")) return null;
-
-  const conversationId = conversationIdRef.current;
 
   const handleSend = useCallback(() => {
     const trimmed = input.trim();

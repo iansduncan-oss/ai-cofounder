@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { findUserByPlatform } from "@ai-cofounder/db";
+import { findUserByPlatform, findOrCreateUser } from "@ai-cofounder/db";
 
 export const userRoutes: FastifyPluginAsync = async (app) => {
   app.get<{ Params: { platform: string; externalId: string } }>(
@@ -12,6 +12,15 @@ export const userRoutes: FastifyPluginAsync = async (app) => {
         return reply.status(404).send({ error: "User not found" });
       }
       return user;
+    },
+  );
+
+  app.post<{ Body: { platform: string; externalId: string; displayName?: string } }>(
+    "/register",
+    { schema: { tags: ["users"] } },
+    async (request) => {
+      const { platform, externalId, displayName } = request.body;
+      return findOrCreateUser(app.db, externalId, platform, displayName);
     },
   );
 };

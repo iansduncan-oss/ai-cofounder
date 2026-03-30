@@ -16,6 +16,7 @@ export {
   handleScheduleCreate,
   handleGmailInbox,
   handleGmailSend,
+  handleRegister,
   truncate,
 } from "./handlers.js";
 
@@ -38,5 +39,6 @@ export type {
   ScheduleCreateResult,
   GmailInboxResult,
   GmailSendResult,
+  RegisterResult,
   HandlerResult,
 } from "./types.js";

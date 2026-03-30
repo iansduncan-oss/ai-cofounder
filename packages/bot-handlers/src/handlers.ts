@@ -384,6 +384,7 @@ const COMMAND_LIST = [
   { name: "/execute", description: "Execute a goal by ID" },
   { name: "/approve", description: "Approve a pending approval" },
   { name: "/schedule", description: "List or create scheduled tasks" },
+  { name: "/register", description: "Register yourself with AI Cofounder" },
   { name: "/help", description: "Show this help message" },
 ];
 
@@ -487,6 +488,29 @@ export async function handleGmailSend(
     };
   } catch {
     return { type: "error", message: "Failed to send email. Is your Google account connected?" };
+  }
+}
+
+export async function handleRegister(
+  client: ApiClient,
+  ctx: CommandContext,
+): Promise<HandlerResult> {
+  try {
+    let isNew = true;
+    try {
+      await client.getUserByPlatform(ctx.platform, ctx.userId);
+      isNew = false;
+    } catch {
+      // 404 means new user
+    }
+
+    const user = await client.registerUser(ctx.platform, ctx.userId, ctx.userName);
+    return {
+      type: "register",
+      data: { userId: user.id, displayName: user.displayName, isNew },
+    };
+  } catch {
+    return { type: "error", message: "Failed to register. Please try again later." };
   }
 }
 

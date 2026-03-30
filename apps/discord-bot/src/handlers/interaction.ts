@@ -12,6 +12,7 @@ import {
   handleExecuteStreaming,
   handleApprove,
   handleHelp,
+  handleRegister,
   handleScheduleList,
   handleScheduleCreate,
   handleGmailInbox,
@@ -134,6 +135,11 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
     case "help": {
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, handleHelp());
+      return;
+    }
+    case "register": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleRegister(client, ctx));
       return;
     }
     case "schedule": {
@@ -355,6 +361,17 @@ async function sendDiscordResponse(
         .setColor(0x22c55e)
         .setDescription(`Email sent to **${result.data.to}**: ${result.data.subject}`);
       await interaction.editReply({ embeds: [embed] });
+      return;
+    }
+
+    case "register": {
+      const msg = result.data.isNew
+        ? `Welcome, **${result.data.displayName ?? "friend"}**! You're now registered with AI Cofounder.`
+        : `You're already registered, **${result.data.displayName ?? "friend"}**!`;
+      const regEmbed = new EmbedBuilder()
+        .setColor(0x22c55e)
+        .setDescription(msg);
+      await interaction.editReply({ embeds: [regEmbed] });
       return;
     }
 

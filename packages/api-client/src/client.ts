@@ -483,6 +483,14 @@ export class ApiClient {
     );
   }
 
+  registerUser(platform: string, externalId: string, displayName?: string) {
+    return this.request<{ id: string; externalId: string; platform: string; displayName?: string }>(
+      "POST",
+      "/api/users/register",
+      { platform, externalId, displayName },
+    );
+  }
+
   /* ── Events ── */
 
   listEvents(opts?: PaginationParams & { source?: string; type?: string; processed?: boolean }) {
