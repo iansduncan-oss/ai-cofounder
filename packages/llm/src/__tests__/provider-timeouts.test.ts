@@ -7,17 +7,21 @@ describe("Provider Timeouts", () => {
   });
 
   describe("AnthropicProvider", () => {
-    it("passes timeout signal to client.messages.create", async () => {
-      const mockCreate = vi.fn().mockResolvedValue({
+    it("passes timeout signal to client.messages.stream", async () => {
+      const mockFinalMessage = vi.fn().mockResolvedValue({
         content: [{ type: "text", text: "ok" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
         usage: { input_tokens: 10, output_tokens: 20 },
       });
+      const mockStream = vi.fn(() => ({
+        on: vi.fn().mockReturnThis(),
+        finalMessage: mockFinalMessage,
+      }));
 
       vi.doMock("@anthropic-ai/sdk", () => ({
         default: class {
-          messages = { create: mockCreate };
+          messages = { stream: mockStream };
         },
       }));
 
@@ -28,8 +32,8 @@ describe("Provider Timeouts", () => {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      expect(mockCreate).toHaveBeenCalledTimes(1);
-      const [, options] = mockCreate.mock.calls[0];
+      expect(mockStream).toHaveBeenCalledTimes(1);
+      const [, options] = mockStream.mock.calls[0];
       expect(options).toBeDefined();
       expect(options.signal).toBeInstanceOf(AbortSignal);
     });

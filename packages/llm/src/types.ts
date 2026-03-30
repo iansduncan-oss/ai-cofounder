@@ -66,6 +66,8 @@ export interface LlmCompletionRequest {
   thinking?: { type: "enabled"; budget_tokens: number };
   /** Optional metadata passed through to onCompletion hook (ignored by LLM providers) */
   metadata?: CompletionMetadata;
+  /** Optional callback for real-time text streaming (called with each text chunk as it arrives) */
+  onTextDelta?: (text: string) => void;
 }
 
 export interface LlmCompletionResponse {

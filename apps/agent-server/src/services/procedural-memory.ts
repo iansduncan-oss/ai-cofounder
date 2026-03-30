@@ -113,6 +113,77 @@ Return ONLY valid JSON:
   }
 
   /**
+   * Learn a lesson from a completed autonomous session.
+   * Uses "simple" task category (Groq = free) for the reflection LLM call.
+   */
+  async learnFromSession(
+    summary: string,
+    status: string,
+  ): Promise<{ id: string; triggerPattern: string } | null> {
+    if (!summary || summary.length < 20) {
+      logger.debug("Session summary too short for lesson extraction");
+      return null;
+    }
+
+    try {
+      const result = await this.llmRegistry.complete("simple", {
+        messages: [
+          {
+            role: "user",
+            content: `You just completed an autonomous work session. Review what happened and extract a lesson for future sessions.
+
+Session status: ${status}
+Session summary: ${summary.slice(0, 2000)}
+
+Return ONLY valid JSON:
+{
+  "triggerPattern": "When this lesson applies (1-2 sentences, e.g. 'When deploying services after code changes')",
+  "steps": [{"description": "what to do", "details": "specifics"}],
+  "preconditions": ["when this lesson is relevant"],
+  "tags": ["relevant", "tags"]
+}
+
+Focus on actionable insights: what worked, what to avoid, what to do differently next time.`,
+          },
+        ],
+      });
+
+      const textContent = result.content
+        .filter((b): b is { type: "text"; text: string } => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+      const parsed = JSON.parse(
+        textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}",
+      );
+
+      if (!parsed.triggerPattern || !parsed.steps?.length) {
+        logger.warn("LLM returned incomplete lesson from session");
+        return null;
+      }
+
+      let embedding: number[] | undefined;
+      try {
+        embedding = await this.embed(parsed.triggerPattern);
+      } catch {
+        logger.warn("Failed to embed session lesson trigger pattern");
+      }
+
+      const procedure = await createProceduralMemory(this.db, {
+        triggerPattern: parsed.triggerPattern,
+        steps: parsed.steps,
+        preconditions: parsed.preconditions ?? [],
+        tags: [...(parsed.tags ?? []), "session-lesson"],
+      });
+
+      logger.info({ procedureId: procedure.id }, "Learned lesson from autonomous session");
+      return { id: procedure.id, triggerPattern: parsed.triggerPattern };
+    } catch (err) {
+      logger.error({ err }, "Failed to learn from session");
+      return null;
+    }
+  }
+
+  /**
    * Find procedures matching a task description via vector search.
    */
   async findMatchingProcedures(

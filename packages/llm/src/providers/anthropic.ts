@@ -54,6 +54,13 @@ export class AnthropicProvider implements LlmProvider {
     const stream = this.client.messages.stream(params, {
       signal: AbortSignal.timeout(request.thinking ? 300_000 : 120_000),
     });
+
+    // Pipe real-time text deltas to caller if callback provided
+    if (request.onTextDelta) {
+      const cb = request.onTextDelta;
+      stream.on("text", (text) => cb(text));
+    }
+
     const response = await stream.finalMessage();
 
     const usage = response.usage as Anthropic.Usage & {

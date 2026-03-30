@@ -9,11 +9,13 @@ import type {
  * ────────────────────────────────────────────────────────── */
 
 // ── Anthropic SDK mock ──
-const mockAnthropicCreate = vi.fn();
+const mockAnthropicFinalMessage = vi.fn();
+const mockStreamObj = { on: vi.fn().mockReturnThis(), finalMessage: mockAnthropicFinalMessage };
+const mockAnthropicStream = vi.fn(() => mockStreamObj);
 vi.mock("@anthropic-ai/sdk", () => {
   return {
     default: class MockAnthropic {
-      messages = { create: mockAnthropicCreate };
+      messages = { stream: mockAnthropicStream };
       constructor(_opts: unknown) {}
     },
   };
@@ -160,7 +162,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("sends a basic text completion and maps the response", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "Hi there!" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
@@ -170,7 +172,7 @@ describe("AnthropicProvider", () => {
       const provider = new AnthropicProvider("sk-test");
       const response = await provider.complete(simpleRequest);
 
-      expect(mockAnthropicCreate).toHaveBeenCalledWith(
+      expect(mockAnthropicStream).toHaveBeenCalledWith(
         {
           model: "claude-sonnet-4-20250514",
           max_tokens: 4096,
@@ -190,7 +192,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("uses provided model, max_tokens, temperature, and system prompt", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "ok" }],
         model: "claude-opus-4-20250514",
         stop_reason: "end_turn",
@@ -206,7 +208,7 @@ describe("AnthropicProvider", () => {
         temperature: 0.5,
       });
 
-      expect(mockAnthropicCreate).toHaveBeenCalledWith(
+      expect(mockAnthropicStream).toHaveBeenCalledWith(
         {
           model: "claude-opus-4-20250514",
           max_tokens: 1024,
@@ -220,7 +222,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("maps tool_use response blocks correctly", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [
           { type: "text", text: "Let me search." },
           {
@@ -250,7 +252,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("sends tools in Anthropic format", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "ok" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
@@ -260,7 +262,7 @@ describe("AnthropicProvider", () => {
       const provider = new AnthropicProvider("sk-test");
       await provider.complete(requestWithTools);
 
-      const callArgs = mockAnthropicCreate.mock.calls[0][0];
+      const callArgs = mockAnthropicStream.mock.calls[0][0];
       expect(callArgs.tools).toEqual([
         {
           name: "search",
@@ -278,7 +280,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("converts structured message content blocks", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "Got it" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
@@ -288,7 +290,7 @@ describe("AnthropicProvider", () => {
       const provider = new AnthropicProvider("sk-test");
       await provider.complete(requestWithStructuredMessages);
 
-      const callArgs = mockAnthropicCreate.mock.calls[0][0];
+      const callArgs = mockAnthropicStream.mock.calls[0][0];
       // assistant message with tool_use blocks
       expect(callArgs.messages[0].role).toBe("assistant");
       expect(callArgs.messages[0].content).toEqual([
@@ -307,7 +309,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("maps stop_reason 'max_tokens' correctly", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "truncated" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "max_tokens",
@@ -320,7 +322,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("maps unknown stop_reason to 'unknown'", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "?" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "content_filter",
@@ -333,7 +335,7 @@ describe("AnthropicProvider", () => {
     });
 
     it("maps null stop_reason to 'unknown'", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "text", text: "?" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: null,
@@ -345,8 +347,8 @@ describe("AnthropicProvider", () => {
       expect(response.stop_reason).toBe("unknown");
     });
 
-    it("handles unknown content block types gracefully", async () => {
-      mockAnthropicCreate.mockResolvedValueOnce({
+    it("maps thinking content blocks to wrapped text", async () => {
+      mockAnthropicFinalMessage.mockResolvedValueOnce({
         content: [{ type: "thinking", thinking: "hmm..." }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
@@ -355,12 +357,11 @@ describe("AnthropicProvider", () => {
 
       const provider = new AnthropicProvider("sk-test");
       const response = await provider.complete(simpleRequest);
-      // Unknown block types fall through to the default: empty text block
-      expect(response.content).toEqual([{ type: "text", text: "" }]);
+      expect(response.content).toEqual([{ type: "text", text: "<thinking>hmm...</thinking>" }]);
     });
 
     it("propagates API errors", async () => {
-      mockAnthropicCreate.mockRejectedValueOnce(new Error("Rate limit exceeded"));
+      mockAnthropicFinalMessage.mockRejectedValueOnce(new Error("Rate limit exceeded"));
 
       const provider = new AnthropicProvider("sk-test");
       await expect(provider.complete(simpleRequest)).rejects.toThrow("Rate limit exceeded");

@@ -893,8 +893,15 @@ export class Orchestrator {
 
       await onEvent({ type: "thinking", data: { round: 1, message: "Generating response..." } });
 
+      // Track whether the provider streamed text deltas directly (e.g. Anthropic)
+      let streamedDirectly = false;
+      const streamTextDelta = (text: string) => {
+        streamedDirectly = true;
+        onEvent({ type: "text_delta", data: { text } });
+      };
+
       if (signal?.aborted) throw new Error("Request aborted");
-      let response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
+      let response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id }, onTextDelta: streamTextDelta });
       totalInputTokens += response.usage.inputTokens;
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
@@ -904,6 +911,7 @@ export class Orchestrator {
 
       while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
         round++;
+        streamedDirectly = false; // reset for each round
         const toolResults: LlmToolResultContent[] = [];
 
         for (const block of response.content) {
@@ -935,7 +943,7 @@ export class Orchestrator {
 
         await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
         if (signal?.aborted) throw new Error("Request aborted");
-        response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id } });
+        response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id }, onTextDelta: streamTextDelta });
         totalInputTokens += response.usage.inputTokens;
         totalOutputTokens += response.usage.outputTokens;
       }
@@ -948,10 +956,12 @@ export class Orchestrator {
 
       if (!responseText && plan) responseText = this.buildPlanSummary(plan);
 
-      // Emit text in chunks for progressive rendering
-      const CHUNK_SIZE = 100;
-      for (let i = 0; i < responseText.length; i += CHUNK_SIZE) {
-        await onEvent({ type: "text_delta", data: { text: responseText.slice(i, i + CHUNK_SIZE) } });
+      // If the provider didn't stream text deltas directly, emit chunks for progressive rendering
+      if (!streamedDirectly) {
+        const CHUNK_SIZE = 100;
+        for (let i = 0; i < responseText.length; i += CHUNK_SIZE) {
+          await onEvent({ type: "text_delta", data: { text: responseText.slice(i, i + CHUNK_SIZE) } });
+        }
       }
       await onEvent({ type: "done", data: { response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens } } });
 

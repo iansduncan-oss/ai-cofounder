@@ -19,6 +19,7 @@ import type { VpsCommandService } from "./services/vps-command.js";
 import type { DistributedLockService} from "./services/distributed-lock.js";
 import { AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
 import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
+import { ProceduralMemoryService } from "./services/procedural-memory.js";
 
 const logger = createLogger("autonomous-session");
 
@@ -474,6 +475,22 @@ async function _runSessionBody(
     { sessionId: session.id, status, durationMs, tokensUsed: totalTokens },
     "autonomous session completed",
   );
+
+  // Self-improvement: extract a lesson from the session (best-effort)
+  if (status === "completed" && summary) {
+    try {
+      const embedFn = embeddingService
+        ? (text: string) => embeddingService.embed(text)
+        : async () => [];
+      const proceduralMemory = new ProceduralMemoryService(db, registry, embedFn);
+      const lesson = await proceduralMemory.learnFromSession(summary, status);
+      if (lesson) {
+        logger.info({ procedureId: lesson.id, trigger: lesson.triggerPattern }, "session self-improvement lesson saved");
+      }
+    } catch (err) {
+      logger.warn({ err }, "self-improvement reflection failed (non-fatal)");
+    }
+  }
 
   if (webhookUrl) {
     const color = status === "completed" ? 3066993 : status === "timeout" ? 16098851 : 15158332; // green, amber, red

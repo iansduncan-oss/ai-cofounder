@@ -10,6 +10,8 @@ import {
   usePendingApprovals,
   useErrorSummary,
   useLatestDeployment,
+  useBudgetStatus,
+  useDailyCost,
 } from "@/api/queries";
 import type { TodayBriefingResponse } from "@ai-cofounder/api-client";
 import { apiClient } from "@/api/client";
@@ -19,6 +21,14 @@ import { Badge } from "@/components/ui/badge";
 import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import {
   Activity,
   AlertTriangle,
@@ -248,6 +258,8 @@ export function HudPage() {
   const { data: approvals } = usePendingApprovals();
   const { data: errorSummary } = useErrorSummary();
   const { data: latestDeploy } = useLatestDeployment();
+  const { data: budgetData } = useBudgetStatus();
+  const { data: dailyCostData } = useDailyCost(7);
 
   const isLoading = monitoringLoading || queuesLoading;
   const deploy = latestDeploy?.data;
@@ -389,6 +401,79 @@ export function HudPage() {
                   : "unknown"
               }
             />
+          </div>
+
+          {/* Cost tracking row */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <MetricCard
+              label="Daily Spend"
+              value={budgetData?.daily ? `$${budgetData.daily.spentUsd.toFixed(4)}` : "N/A"}
+              subtext={
+                budgetData?.daily?.limitUsd
+                  ? `of $${budgetData.daily.limitUsd.toFixed(2)} budget`
+                  : "No limit set"
+              }
+              icon={DollarSign}
+              status={
+                budgetData?.daily
+                  ? (budgetData.daily.percentUsed ?? 0) > 100
+                    ? "critical"
+                    : (budgetData.daily.percentUsed ?? 0) > 80
+                      ? "warning"
+                      : "ok"
+                  : "unknown"
+              }
+            />
+            <MetricCard
+              label="Weekly Spend"
+              value={budgetData?.weekly ? `$${budgetData.weekly.spentUsd.toFixed(4)}` : "N/A"}
+              subtext={
+                budgetData?.weekly?.limitUsd
+                  ? `of $${budgetData.weekly.limitUsd.toFixed(2)} budget`
+                  : "No limit set"
+              }
+              icon={DollarSign}
+              status={
+                budgetData?.weekly
+                  ? (budgetData.weekly.percentUsed ?? 0) > 100
+                    ? "critical"
+                    : (budgetData.weekly.percentUsed ?? 0) > 80
+                      ? "warning"
+                      : "ok"
+                  : "unknown"
+              }
+            />
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Cost (7 days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {dailyCostData?.days && dailyCostData.days.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={80}>
+                    <BarChart data={dailyCostData.days}>
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 9 }}
+                        tickFormatter={(v: string) => v.split("-").slice(1).join("/")}
+                      />
+                      <YAxis hide />
+                      <Tooltip
+                        formatter={(value) => [`$${Number(value).toFixed(4)}`, "Cost"]}
+                        contentStyle={{
+                          backgroundColor: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "0.375rem",
+                          fontSize: 11,
+                        }}
+                      />
+                      <Bar dataKey="costUsd" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-xs text-muted-foreground">No cost data</p>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Three-column detail area */}
