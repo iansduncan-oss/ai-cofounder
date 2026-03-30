@@ -28,6 +28,7 @@ import { channelRoutes } from "./routes/channels.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { voiceRoutes } from "./routes/voice.js";
 import { deployWebhookRoute } from "./routes/deploys.js";
+import { recapRoutes } from "./routes/recap.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
 import { websocketPlugin } from "./plugins/websocket.js";
@@ -483,6 +484,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
+  app.register(recapRoutes, { prefix: "/api/recap" }); // Public: token-protected via RECAP_TOKEN
 
   // Project registry plugin — loads registered projects from DB and decorates app.projectRegistry
   app.register(projectRegistryPlugin);
