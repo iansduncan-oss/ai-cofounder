@@ -40,7 +40,7 @@ services:
 volumes:
   n8n_data:
     external: true
-    name: avion_n8n_data
+    name: ai-cofounder-n8n_n8n_data
 
 networks:
   avion_avion_net:
