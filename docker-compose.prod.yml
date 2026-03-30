@@ -1,5 +1,24 @@
 name: ai-cofounder
 services:
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: ai-cofounder-docker-proxy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      CONTAINERS: 1
+      INFO: 1
+      POST: 1
+    mem_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:2375/_ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - avion_avion_net
+
   redis:
     image: redis:7-alpine
     container_name: ai-cofounder-redis
@@ -67,17 +86,19 @@ services:
       - VPS_HOST=host.docker.internal
       - VPS_USER=ian
       - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
+      - DOCKER_HOST=tcp://docker-socket-proxy:2375
     mem_limit: 1g
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - workspace_data:/data/workspace
-      - /var/run/docker.sock:/var/run/docker.sock
       - /home/ian/.ssh/ai-cofounder-key:/home/appuser/.ssh/id_ed25519:ro
     networks:
       - avion_avion_net
     depends_on:
       redis:
+        condition: service_healthy
+      docker-socket-proxy:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3100/health"]
