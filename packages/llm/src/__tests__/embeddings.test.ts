@@ -40,10 +40,10 @@ describe("EmbeddingService", () => {
   });
 
   describe("createEmbeddingService()", () => {
-    it("creates the model with text-embedding-004", () => {
+    it("creates the model with text-embedding-005", () => {
       createEmbeddingService("my-api-key");
       expect(mockGetGenerativeModel).toHaveBeenCalledWith({
-        model: "text-embedding-004",
+        model: "text-embedding-005",
       });
     });
   });

@@ -525,6 +525,16 @@ export function useSchedules() {
 
 /* ── Knowledge / RAG ── */
 
+/* ── Routing Stats ── */
+
+export function useRoutingStats() {
+  return useQuery({
+    queryKey: queryKeys.routing.stats,
+    queryFn: () => apiClient.getRoutingStats(),
+    refetchInterval: 30_000,
+  });
+}
+
 export function useKnowledgeStatus() {
   return useQuery({
     queryKey: queryKeys.knowledge.status,

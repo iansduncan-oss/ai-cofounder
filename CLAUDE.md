@@ -97,7 +97,7 @@ Services available at:
 - **Agent Server**: Fastify + pino logging. Routes in `src/routes/`, agents in `src/agents/`, plugins in `src/plugins/`. `buildServer(registry?)` accepts optional LlmRegistry; creates one via `createLlmRegistry()` if not provided. `app.llmRegistry` Fastify decorator. Use `app.inject()` for testing. Dev mode uses `tsx watch`.
 - **Multi-LLM**: `LlmRegistry` routes by task category (planning→Opus, conversation→Sonnet, simple→Groq, research→Gemini, code→Sonnet) with automatic fallback chains. Providers share an OpenAI-compatible base class.
 - **Database**: Drizzle ORM with PostgreSQL + pgvector. Auto-migrations run at startup via `runMigrations()`. Use `db:push` for dev, `db:generate`/`db:migrate` for production.
-- **Semantic Memory**: Memories stored with 768-dim vector embeddings (Gemini `text-embedding-004`). Recall uses cosine similarity with ILIKE fallback.
+- **Semantic Memory**: Memories stored with 768-dim vector embeddings (Gemini `text-embedding-005`). Recall uses cosine similarity with ILIKE fallback.
 - **Shared Package**: Import as `@ai-cofounder/shared`. Logger: `createLogger("service-name")`. Config: `requireEnv()` / `optionalEnv()` (note: `optionalEnv` requires 2 args — name + defaultValue).
 
 ## Agent System

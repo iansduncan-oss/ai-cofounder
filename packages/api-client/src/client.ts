@@ -1054,6 +1054,35 @@ export class ApiClient {
     return this.request<{ action: string; result: string; timestamp: string }>("POST", `/api/deploys/${id}/remediate`, { action });
   }
 
+  /* ── Routing ── */
+
+  getRoutingStats() {
+    return this.request<{
+      agentPerformance: Array<{
+        agent: string;
+        totalTasks: number;
+        completedTasks: number;
+        failedTasks: number;
+        avgDurationMs: number | null;
+        overallSuccessRate: number;
+        recentSuccessRate: number | null;
+        score: number;
+        hasSufficientData: boolean;
+      }>;
+      recentDecisions: Array<{
+        taskId: string;
+        originalAgent: string;
+        recommendedAgent: string;
+        confidence: number;
+        overridden: boolean;
+        timestamp: string;
+      }>;
+      overrideRate: number;
+      totalDecisions: number;
+      totalOverrides: number;
+    }>("GET", "/api/routing/stats");
+  }
+
   /* ── Context ── */
 
   getCurrentContext(userId?: string) {

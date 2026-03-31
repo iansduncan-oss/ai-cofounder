@@ -6,7 +6,7 @@ export interface EmbeddingService {
 
 export function createEmbeddingService(apiKey: string): EmbeddingService {
   const client = new GoogleGenerativeAI(apiKey);
-  const model = client.getGenerativeModel({ model: "text-embedding-004" });
+  const model = client.getGenerativeModel({ model: "text-embedding-005" });
 
   return {
     async embed(text: string): Promise<number[]> {

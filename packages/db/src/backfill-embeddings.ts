@@ -26,7 +26,7 @@ if (!GEMINI_API_KEY) {
 
 const db = createDb(DATABASE_URL);
 const genai = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genai.getGenerativeModel({ model: "text-embedding-004" });
+const model = genai.getGenerativeModel({ model: "text-embedding-005" });
 
 async function main() {
   const rows = await db.select().from(memories).where(isNull(memories.embedding));

@@ -178,6 +178,9 @@ export const queryKeys = {
     all: ["schedules"] as const,
     list: ["schedules", "list"] as const,
   },
+  routing: {
+    stats: ["routing", "stats"] as const,
+  },
   knowledge: {
     all: ["knowledge"] as const,
     status: ["knowledge", "status"] as const,
