@@ -24,7 +24,25 @@ export type WsClientMessage =
   | { type: "unsubscribe"; channels: WsChannel[] }
   | { type: "subscribe_goal"; goalId: string }
   | { type: "unsubscribe_goal"; goalId: string }
+  | { type: "ping" }
+  | WsChatClientMessage;
+
+/** Client → Server chat messages (sent on /ws/chat/:conversationId) */
+export type WsChatClientMessage =
+  | { type: "user_message"; content: string; userId?: string; platform?: string }
   | { type: "ping" };
+
+/** Server → Client chat messages (sent on /ws/chat/:conversationId) */
+export type WsChatServerMessage =
+  | { type: "agent_chunk"; content: string; toolName?: string }
+  | { type: "agent_complete"; conversationId?: string; response: string; model?: string; provider?: string; usage?: Record<string, unknown>; plan?: Record<string, unknown> }
+  | { type: "tool_start"; id: string; toolName: string; input?: Record<string, unknown> }
+  | { type: "tool_result"; id: string; toolName: string; result: string }
+  | { type: "thinking"; message: string }
+  | { type: "suggestions"; suggestions: string[] }
+  | { type: "rich_card"; cardType: string; data: Record<string, unknown> }
+  | { type: "error"; message: string }
+  | { type: "pong" };
 
 /** Server → Client messages */
 export type WsServerMessage =

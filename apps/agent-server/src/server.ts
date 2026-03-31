@@ -33,6 +33,7 @@ import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
 import { websocketPlugin } from "./plugins/websocket.js";
 import { wsEmitterPlugin } from "./plugins/ws-emitter.js";
+import { wsChatPlugin } from "./plugins/ws-chat.js";
 import { createN8nService, type N8nService } from "./services/n8n.js";
 import { createMonitoringService, type MonitoringService } from "./services/monitoring.js";
 import { createTTSService, type TTSService } from "./services/tts.js";
@@ -57,6 +58,7 @@ import { AutonomyTierService } from "./services/autonomy-tier.js";
 import { DeployCircuitBreakerService } from "./services/deploy-circuit-breaker.js";
 import { SessionEngagementService } from "./services/session-engagement.js";
 import { CiSelfHealService } from "./services/ci-self-heal.js";
+import { SelfHealingService } from "./services/self-healing.js";
 import { projectRegistryPlugin } from "./plugins/project-registry.js";
 import Redis from "ioredis";
 
@@ -313,6 +315,13 @@ export function buildServer(registry?: LlmRegistry) {
   app.decorate("memoryLifecycleService", undefined as unknown as MemoryLifecycleService);
   app.decorate("failurePatternsService", undefined as unknown as FailurePatternService);
 
+  // Self-healing service (in-memory, opt-in via ENABLE_SELF_HEALING, default true)
+  const selfHealingEnabled = optionalEnv("ENABLE_SELF_HEALING", "true") === "true";
+  const selfHealingService = selfHealingEnabled ? new SelfHealingService() : undefined;
+  app.decorate("selfHealingService", selfHealingService);
+  if (selfHealingEnabled) {
+    logger.info("self-healing service initialized");
+  }
 
   // Seed LLM provider health from DB on startup, flush periodically
   let healthFlushInterval: ReturnType<typeof setInterval> | undefined;
@@ -511,6 +520,9 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(websocketPlugin);
   app.register(wsEmitterPlugin);
 
+  // WebSocket bidirectional chat (replaces SSE as primary transport)
+  app.register(wsChatPlugin);
+
   // Serve voice UI static files at /voice/
   // Try multiple paths: relative to cwd (monorepo root), or relative to this file's dir
   const candidates = [
@@ -584,6 +596,7 @@ declare module "fastify" {
     proceduralMemoryService?: ProceduralMemoryService;
     memoryLifecycleService?: MemoryLifecycleService;
     failurePatternsService?: FailurePatternService;
+    selfHealingService?: SelfHealingService;
     adaptiveRoutingService?: AdaptiveRoutingService;
     wsBroadcast: (channel: WsChannel) => void;
   }

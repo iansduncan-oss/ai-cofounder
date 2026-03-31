@@ -1,7 +1,9 @@
 export {
   ApiClient,
   ApiError,
+  ChatWebSocket,
   type ClientOptions,
+  type ChatWebSocketEvents,
   type PipelineTemplate,
   type N8nExecution,
   type TriggerTemplateResponse,

@@ -1475,6 +1475,241 @@ export class ApiClient {
       truncated: boolean;
     }>("GET", `/api/database/query?${params}`);
   }
+
+  /* ── WebSocket Chat ── */
+
+  /**
+   * Get the WebSocket URL for chat, converting http(s) to ws(s).
+   */
+  getChatWebSocketUrl(conversationId: string): string {
+    const url = new URL(this.baseUrl);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    url.pathname = `/ws/chat/${conversationId}`;
+    const token = this.getToken?.();
+    if (token) {
+      url.searchParams.set("token", token);
+    }
+    return url.toString();
+  }
+
+  /**
+   * Connect a WebSocket for bidirectional chat streaming.
+   * Returns a ChatWebSocket wrapper with typed events, reconnection,
+   * and heartbeat management.
+   */
+  connectChatWebSocket(conversationId: string): ChatWebSocket {
+    const url = this.getChatWebSocketUrl(conversationId);
+    return new ChatWebSocket(url, () => this.getChatWebSocketUrl(conversationId));
+  }
+}
+
+/** Events emitted by ChatWebSocket */
+export interface ChatWebSocketEvents {
+  agent_chunk: (content: string, toolName?: string) => void;
+  agent_complete: (data: {
+    conversationId?: string;
+    response: string;
+    model?: string;
+    provider?: string;
+    usage?: Record<string, unknown>;
+    plan?: Record<string, unknown>;
+  }) => void;
+  tool_start: (data: { id: string; toolName: string; input?: Record<string, unknown> }) => void;
+  tool_result: (data: { id: string; toolName: string; result: string }) => void;
+  thinking: (message: string) => void;
+  suggestions: (suggestions: string[]) => void;
+  rich_card: (cardType: string, data: Record<string, unknown>) => void;
+  error: (message: string) => void;
+  open: () => void;
+  close: () => void;
+  reconnecting: (attempt: number) => void;
+}
+
+type ChatWsEventHandler<K extends keyof ChatWebSocketEvents> = ChatWebSocketEvents[K];
+
+/**
+ * Typed WebSocket wrapper for bidirectional chat.
+ * Handles reconnection with exponential backoff and ping/pong heartbeat.
+ */
+export class ChatWebSocket {
+  private ws: WebSocket | null = null;
+  private url: string;
+  private getUrl: () => string;
+  private handlers = new Map<string, Set<(...args: unknown[]) => void>>();
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private closed = false;
+
+  constructor(url: string, getUrl: () => string) {
+    this.url = url;
+    this.getUrl = getUrl;
+    this.connect();
+  }
+
+  private connect(): void {
+    if (this.closed) return;
+
+    try {
+      this.ws = new WebSocket(this.url);
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
+
+    this.ws.onopen = () => {
+      this.reconnectAttempts = 0;
+      this.startPing();
+      this.emit("open");
+    };
+
+    this.ws.onmessage = (event) => {
+      let msg: Record<string, unknown>;
+      try {
+        msg = JSON.parse(event.data as string) as Record<string, unknown>;
+      } catch {
+        return;
+      }
+
+      switch (msg.type) {
+        case "agent_chunk":
+          this.emit("agent_chunk", msg.content as string, msg.toolName as string | undefined);
+          break;
+        case "agent_complete":
+          this.emit("agent_complete", {
+            conversationId: msg.conversationId as string | undefined,
+            response: msg.response as string,
+            model: msg.model as string | undefined,
+            provider: msg.provider as string | undefined,
+            usage: msg.usage as Record<string, unknown> | undefined,
+            plan: msg.plan as Record<string, unknown> | undefined,
+          });
+          break;
+        case "tool_start":
+          this.emit("tool_start", {
+            id: msg.id as string,
+            toolName: msg.toolName as string,
+            input: msg.input as Record<string, unknown> | undefined,
+          });
+          break;
+        case "tool_result":
+          this.emit("tool_result", {
+            id: msg.id as string,
+            toolName: msg.toolName as string,
+            result: msg.result as string,
+          });
+          break;
+        case "thinking":
+          this.emit("thinking", msg.message as string);
+          break;
+        case "suggestions":
+          this.emit("suggestions", msg.suggestions as string[]);
+          break;
+        case "rich_card":
+          this.emit("rich_card", msg.cardType as string, msg.data as Record<string, unknown>);
+          break;
+        case "error":
+          this.emit("error", msg.message as string);
+          break;
+        case "pong":
+          // Heartbeat response
+          break;
+      }
+    };
+
+    this.ws.onclose = () => {
+      this.stopPing();
+      this.emit("close");
+      if (!this.closed) {
+        this.scheduleReconnect();
+      }
+    };
+
+    this.ws.onerror = () => {
+      // onclose will fire after this
+    };
+  }
+
+  private scheduleReconnect(): void {
+    if (this.closed || this.reconnectAttempts >= this.maxReconnectAttempts) return;
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30_000);
+    this.emit("reconnecting", this.reconnectAttempts);
+    this.reconnectTimeout = setTimeout(() => {
+      this.url = this.getUrl(); // refresh URL (token may have changed)
+      this.connect();
+    }, delay);
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    this.pingInterval = setInterval(() => {
+      this.send({ type: "ping" });
+    }, 25_000);
+  }
+
+  private stopPing(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval);
+      this.pingInterval = null;
+    }
+  }
+
+  /** Send a typed message over the WebSocket */
+  send(msg: { type: string; [key: string]: unknown }): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg));
+    }
+  }
+
+  /** Send a user message */
+  sendMessage(content: string, userId?: string, platform?: string): void {
+    this.send({ type: "user_message", content, userId, platform });
+  }
+
+  /** Subscribe to an event */
+  on<K extends keyof ChatWebSocketEvents>(event: K, handler: ChatWsEventHandler<K>): void {
+    if (!this.handlers.has(event)) {
+      this.handlers.set(event, new Set());
+    }
+    this.handlers.get(event)!.add(handler as (...args: unknown[]) => void);
+  }
+
+  /** Unsubscribe from an event */
+  off<K extends keyof ChatWebSocketEvents>(event: K, handler: ChatWsEventHandler<K>): void {
+    this.handlers.get(event)?.delete(handler as (...args: unknown[]) => void);
+  }
+
+  /** Emit an event to all handlers */
+  private emit(event: string, ...args: unknown[]): void {
+    const handlers = this.handlers.get(event);
+    if (handlers) {
+      for (const handler of handlers) {
+        handler(...args);
+      }
+    }
+  }
+
+  /** Check if WebSocket is connected */
+  get isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  /** Close the WebSocket connection permanently (no reconnect) */
+  close(): void {
+    this.closed = true;
+    this.stopPing();
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+  }
 }
 
 export class ApiError extends Error {
