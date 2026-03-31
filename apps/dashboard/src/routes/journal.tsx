@@ -174,7 +174,7 @@ export function JournalPage() {
     return { groups: Array.from(groups.entries()), ungrouped };
   }, [filteredEntries, groupBy]);
 
-  const { data: standup } = useQuery({
+  const { data: standup, isLoading: standupLoading } = useQuery({
     queryKey: queryKeys.journal.standup(),
     queryFn: () => apiClient.getStandup(),
     staleTime: 5 * 60 * 1000,
@@ -184,6 +184,12 @@ export function JournalPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Work Journal</h1>
 
+      {standupLoading && (
+        <div className="bg-card rounded-lg border border-border p-4 animate-pulse">
+          <div className="h-4 w-32 bg-muted rounded mb-2" />
+          <div className="h-3 w-full bg-muted rounded" />
+        </div>
+      )}
       {standup && (
         <div className="bg-card rounded-lg border border-border p-4">
           <h2 className="text-sm font-semibold mb-2">Today's Standup</h2>

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import ReactMarkdown from "react-markdown";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useStreamChat } from "@/hooks/use-stream-chat";
+import { useWsChat } from "@/hooks/use-ws-chat";
 import { useDashboardUser, useConversationMessages, useQuickActions } from "@/api/queries";
 import { useAcceptSuggestion } from "@/api/mutations";
 import { StreamingMessage } from "@/components/chat/streaming-message";
@@ -41,6 +41,8 @@ import {
   Rocket,
   DollarSign,
   Calendar,
+  Wifi,
+  WifiOff,
   type LucideIcon,
 } from "lucide-react";
 
@@ -98,7 +100,7 @@ export function ChatPage() {
   const { data: dashboardUser } = useDashboardUser();
   const { data: quickActionsData } = useQuickActions();
   const quickActions = quickActionsData?.data ?? FALLBACK_QUICK_ACTIONS;
-  const stream = useStreamChat();
+  const stream = useWsChat(conversationId);
   const acceptSuggestion = useAcceptSuggestion();
   const speech = useSpeechRecognition();
   const tts = useTextToSpeech();
@@ -379,6 +381,27 @@ export function ChatPage() {
           }
           actions={
             <div className="flex items-center gap-2">
+              {stream.transport !== "none" && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    stream.isConnected
+                      ? "bg-green-500/10 text-green-500"
+                      : "bg-yellow-500/10 text-yellow-500"
+                  }`}
+                  title={
+                    stream.isConnected
+                      ? `Connected via ${stream.transport.toUpperCase()}`
+                      : "Disconnected"
+                  }
+                >
+                  {stream.isConnected ? (
+                    <Wifi className="h-3 w-3" />
+                  ) : (
+                    <WifiOff className="h-3 w-3" />
+                  )}
+                  {stream.transport === "websocket" ? "WS" : "SSE"}
+                </span>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
