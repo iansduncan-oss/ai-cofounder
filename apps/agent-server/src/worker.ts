@@ -71,7 +71,9 @@ export async function main() {
   const embedFn = embeddingService ? (text: string) => embeddingService.embed(text) : undefined;
   const proceduralMemoryService = embedFn ? new ProceduralMemoryService(db, llmRegistry, embedFn) : undefined;
 
-  const adaptiveRoutingService = new AdaptiveRoutingService(db);
+  const adaptiveRoutingService = optionalEnv("ENABLE_ADAPTIVE_ROUTING", "false") === "true"
+    ? new AdaptiveRoutingService(db)
+    : undefined;
   const dispatcher = new TaskDispatcher(
     llmRegistry,
     db,

@@ -1,9 +1,6 @@
 import type { Db } from "@ai-cofounder/db";
 import { getAgentPerformanceStats } from "@ai-cofounder/db";
 import type { AgentRole } from "@ai-cofounder/shared";
-import { createLogger } from "@ai-cofounder/shared";
-
-const logger = createLogger("adaptive-routing");
 
 const MIN_SAMPLES = 10;
 const W_SUCCESS_RATE = 0.7;

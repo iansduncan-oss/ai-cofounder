@@ -12,3 +12,16 @@ export const routingRoutes: FastifyPluginAsync = async (app) => {
     },
   );
 };
+
+export const routingStatsRoutes: FastifyPluginAsync = async (app) => {
+  app.get(
+    "/stats",
+    { schema: { tags: ["routing"] } },
+    async () => {
+      if (!app.adaptiveRoutingService) {
+        return { error: "Adaptive routing not enabled. Set ENABLE_ADAPTIVE_ROUTING=true", stats: null };
+      }
+      return app.adaptiveRoutingService.getRoutingStats();
+    },
+  );
+};

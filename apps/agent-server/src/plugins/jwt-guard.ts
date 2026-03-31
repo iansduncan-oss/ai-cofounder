@@ -42,7 +42,7 @@ import { followUpRoutes } from "../routes/follow-ups.js";
 import { thinkingRoutes } from "../routes/thinking.js";
 import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
-import { routingRoutes } from "../routes/routing.js";
+import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
 
 /** Check if request is from loopback or Docker bridge (narrower than isInternalRequest) */
 function isLoopbackOrDocker(request: FastifyRequest): boolean {
@@ -143,4 +143,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(searchRoutes, { prefix: "/api/search" });
   app.register(workSessionRoutes, { prefix: "/api/work-sessions" });
   app.register(routingRoutes, { prefix: "/api/analytics/routing" });
+  app.register(routingStatsRoutes, { prefix: "/api/routing" });
 }

@@ -348,8 +348,13 @@ export function buildServer(registry?: LlmRegistry) {
     }
     app.memoryLifecycleService = new MemoryLifecycleService(app.db);
     app.failurePatternsService = new FailurePatternService(app.db);
-    app.adaptiveRoutingService = new AdaptiveRoutingService(app.db);
-    logger.info("memory lifecycle + failure patterns + adaptive routing services initialized");
+    if (optionalEnv("ENABLE_ADAPTIVE_ROUTING", "false") === "true") {
+      app.adaptiveRoutingService = new AdaptiveRoutingService(app.db);
+      logger.info("adaptive routing service initialized");
+    } else {
+      logger.debug("adaptive routing service disabled (ENABLE_ADAPTIVE_ROUTING not set)");
+    }
+    logger.info("memory lifecycle + failure patterns services initialized");
 
     // Wire autonomy tier service and seed default tool tiers on first start
     const tierService = new AutonomyTierService(app.db);

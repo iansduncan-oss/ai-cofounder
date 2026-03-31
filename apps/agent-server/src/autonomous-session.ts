@@ -311,7 +311,11 @@ async function _runSessionBody(
       const { TaskDispatcher } = await import("./agents/dispatcher.js");
 
       const { AdaptiveRoutingService } = await import("./services/adaptive-routing.js");
-      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService, undefined, undefined, undefined, new AdaptiveRoutingService(db));
+      const { optionalEnv } = await import("@ai-cofounder/shared");
+      const adaptiveRouting = optionalEnv("ENABLE_ADAPTIVE_ROUTING", "false") === "true"
+        ? new AdaptiveRoutingService(db)
+        : undefined;
+      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService, undefined, undefined, undefined, adaptiveRouting);
       const executor = new AutonomousExecutorService(dispatcher, workspaceService, db, registry);
 
       try {

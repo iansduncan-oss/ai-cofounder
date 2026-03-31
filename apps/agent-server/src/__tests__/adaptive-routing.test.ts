@@ -20,6 +20,7 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 const { AdaptiveRoutingService } = await import("../services/adaptive-routing.js");
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fakeDb = {} as any;
 
 describe("AdaptiveRoutingService", () => {
@@ -89,7 +90,7 @@ describe("AdaptiveRoutingService", () => {
       const result = await service.suggestAgent("Build feature", "coder");
 
       // Orchestrator should not appear in stats
-      expect(result.stats.find((s: any) => s.agent === "orchestrator")).toBeUndefined();
+      expect(result.stats.find((s: { agent: string }) => s.agent === "orchestrator")).toBeUndefined();
     });
 
     it("speed component rewards faster agents", async () => {
@@ -101,8 +102,8 @@ describe("AdaptiveRoutingService", () => {
       const result = await service.suggestAgent("Do something", "coder");
 
       // Same success rate, but researcher is 5x faster — should score higher
-      const coderStats = result.stats.find((s: any) => s.agent === "coder");
-      const researcherStats = result.stats.find((s: any) => s.agent === "researcher");
+      const coderStats = result.stats.find((s: { agent: string }) => s.agent === "coder");
+      const researcherStats = result.stats.find((s: { agent: string }) => s.agent === "researcher");
       expect(researcherStats.score).toBeGreaterThan(coderStats.score);
     });
   });
@@ -120,7 +121,7 @@ describe("AdaptiveRoutingService", () => {
 
       // Access via getRoutingStats
       mockGetAgentPerformanceStats.mockResolvedValue([]);
-      return service.getRoutingStats().then((stats: any) => {
+      return service.getRoutingStats().then((stats: Awaited<ReturnType<typeof service.getRoutingStats>>) => {
         expect(stats.totalDecisions).toBe(2);
         expect(stats.totalOverrides).toBe(1);
         expect(stats.overrideRate).toBe(0.5);
