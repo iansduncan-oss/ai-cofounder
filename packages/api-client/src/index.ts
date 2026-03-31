@@ -106,4 +106,9 @@ export type {
   RagStatusResponse,
   RagSearchResult,
   GoalAnalytics,
+  CircuitBreakerState,
+  AgentHealthScore,
+  FailurePattern,
+  SelfHealingStatus,
+  SelfHealingReport,
 } from "./types.js";

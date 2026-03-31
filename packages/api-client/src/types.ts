@@ -1080,6 +1080,50 @@ export interface GoalAnalytics {
   tasksByAgent: Array<{ agent: string; total: number; completed: number; failed: number }>;
 }
 
+/* ── Self-Healing ── */
+
+export interface CircuitBreakerState {
+  status: "closed" | "open" | "half-open";
+  failureCount: number;
+  lastFailureAt: string | null;
+  openedAt: string | null;
+  successCount: number;
+}
+
+export interface AgentHealthScore {
+  agentRole: AgentRole;
+  score: number;
+  recentSuccesses: number;
+  recentFailures: number;
+  circuitBreaker: CircuitBreakerState;
+}
+
+export interface FailurePattern {
+  key: string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  samples: string[];
+}
+
+export interface SelfHealingStatus {
+  enabled: boolean;
+  healthScores: AgentHealthScore[];
+  circuitBreakers: Record<string, CircuitBreakerState>;
+  recentFailurePatterns: FailurePattern[];
+  recommendations: string[];
+  totalFailuresTracked: number;
+  oldestRecord: string | null;
+}
+
+export interface SelfHealingReport {
+  healthScores: AgentHealthScore[];
+  activeCircuitBreakers: Array<{ agentRole: AgentRole; state: CircuitBreakerState }>;
+  systematicFailures: FailurePattern[];
+  recommendations: string[];
+  generatedAt: string;
+}
+
 /* ── Global Search ── */
 
 export interface GlobalSearchResults {

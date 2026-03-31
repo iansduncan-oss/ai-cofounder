@@ -17,6 +17,22 @@ export function useProviderHealth() {
   });
 }
 
+export function useSelfHealingStatus() {
+  return useQuery({
+    queryKey: queryKeys.selfHealing.status,
+    queryFn: () => apiClient.selfHealingStatus(),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useSelfHealingReport() {
+  return useQuery({
+    queryKey: queryKeys.selfHealing.report,
+    queryFn: () => apiClient.selfHealingReport(),
+    refetchInterval: 60_000,
+  });
+}
+
 export function useGoals(conversationId: string) {
   return useQuery({
     queryKey: queryKeys.goals.list(conversationId),

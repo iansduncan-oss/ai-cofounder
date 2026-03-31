@@ -86,6 +86,8 @@ import type {
   Reflection,
   ReflectionStats,
   GoalAnalytics,
+  SelfHealingStatus,
+  SelfHealingReport,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -234,6 +236,16 @@ export class ApiClient {
       "GET",
       "/health/providers",
     );
+  }
+
+  /* ── Self-Healing ── */
+
+  selfHealingStatus() {
+    return this.request<SelfHealingStatus>("GET", "/api/self-healing/status");
+  }
+
+  selfHealingReport() {
+    return this.request<SelfHealingReport>("GET", "/api/self-healing/report");
   }
 
   /* ── Agent ── */

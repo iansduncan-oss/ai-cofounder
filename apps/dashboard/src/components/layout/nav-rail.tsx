@@ -39,6 +39,7 @@ import {
   Route,
   Search,
   Mic,
+  HeartPulse,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,7 @@ const navSections: NavSection[] = [
       { icon: BookOpen, label: "Reflections", path: "/dashboard/reflections", drawer: true },
       { icon: Network, label: "Agents", path: "/dashboard/agents", drawer: true },
       { icon: Route, label: "Routing", path: "/dashboard/routing", drawer: true },
+      { icon: HeartPulse, label: "Self-Healing", path: "/dashboard/self-healing", drawer: true },
       { icon: Webhook, label: "Events", path: "/dashboard/events", drawer: true },
       { icon: Inbox, label: "DLQ", path: "/dashboard/dlq", drawer: true },
       { icon: Bell, label: "Notifications", path: "/dashboard/notifications", drawer: true },

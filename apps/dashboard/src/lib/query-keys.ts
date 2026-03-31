@@ -51,6 +51,10 @@ export const queryKeys = {
   monitoring: {
     status: ["monitoring", "status"] as const,
   },
+  selfHealing: {
+    status: ["self-healing", "status"] as const,
+    report: ["self-healing", "report"] as const,
+  },
   queue: {
     status: ["queue", "status"] as const,
   },

@@ -120,6 +120,9 @@ const VoicePage = lazy(() =>
 const RoutingPage = lazy(() =>
   import("./routing").then((m) => ({ default: m.RoutingPage })),
 );
+const SelfHealingPage = lazy(() =>
+  import("./self-healing").then((m) => ({ default: m.SelfHealingPage })),
+);
 const RegisterPage = lazy(() =>
   import("./register").then((m) => ({ default: m.RegisterPage })),
 );
@@ -178,6 +181,7 @@ export const router = createBrowserRouter([
       { path: "search", element: <SearchPage /> },
       { path: "voice", element: <VoicePage /> },
       { path: "routing", element: <RoutingPage /> },
+      { path: "self-healing", element: <SelfHealingPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],
