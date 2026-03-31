@@ -132,9 +132,16 @@ vi.mock("@ai-cofounder/llm", () => {
 
 const { buildServer } = await import("../server.js");
 
+const TEST_WEBHOOK_SECRET = "test-webhook-secret";
+
+function signPayload(payload: unknown): string {
+  const body = JSON.stringify(payload);
+  return "sha256=" + crypto.createHmac("sha256", TEST_WEBHOOK_SECRET).update(body).digest("hex");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  delete process.env.GITHUB_WEBHOOK_SECRET;
+  process.env.GITHUB_WEBHOOK_SECRET = TEST_WEBHOOK_SECRET;
 });
 
 describe("GitHub webhook routes", () => {
@@ -146,6 +153,11 @@ describe("GitHub webhook routes", () => {
       payload: {},
     });
 
+    const payload = {
+      ref: "refs/heads/main",
+      commits: [{ id: "abc123", message: "fix bug" }],
+      repository: { full_name: "user/repo" },
+    };
     const { app } = buildServer();
     const res = await app.inject({
       method: "POST",
@@ -153,12 +165,9 @@ describe("GitHub webhook routes", () => {
       headers: {
         "x-github-event": "push",
         "x-github-delivery": "delivery-123",
+        "x-hub-signature-256": signPayload(payload),
       },
-      payload: {
-        ref: "refs/heads/main",
-        commits: [{ id: "abc123", message: "fix bug" }],
-        repository: { full_name: "user/repo" },
-      },
+      payload,
     });
     await app.close();
 
@@ -181,6 +190,11 @@ describe("GitHub webhook routes", () => {
       payload: {},
     });
 
+    const payload = {
+      action: "opened",
+      pull_request: { title: "Add feature X", number: 42 },
+      repository: { full_name: "user/repo" },
+    };
     const { app } = buildServer();
     const res = await app.inject({
       method: "POST",
@@ -188,12 +202,9 @@ describe("GitHub webhook routes", () => {
       headers: {
         "x-github-event": "pull_request",
         "x-github-delivery": "delivery-456",
+        "x-hub-signature-256": signPayload(payload),
       },
-      payload: {
-        action: "opened",
-        pull_request: { title: "Add feature X", number: 42 },
-        repository: { full_name: "user/repo" },
-      },
+      payload,
     });
     await app.close();
 
@@ -210,18 +221,20 @@ describe("GitHub webhook routes", () => {
       payload: {},
     });
 
+    const payload = {
+      action: "opened",
+      issue: { title: "Bug report", number: 10 },
+      repository: { full_name: "user/repo" },
+    };
     const { app } = buildServer();
     const res = await app.inject({
       method: "POST",
       url: "/api/webhooks/github",
       headers: {
         "x-github-event": "issues",
+        "x-hub-signature-256": signPayload(payload),
       },
-      payload: {
-        action: "opened",
-        issue: { title: "Bug report", number: 10 },
-        repository: { full_name: "user/repo" },
-      },
+      payload,
     });
     await app.close();
 
