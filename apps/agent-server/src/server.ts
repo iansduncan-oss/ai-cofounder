@@ -85,6 +85,7 @@ import { EpisodicMemoryService } from "./services/episodic-memory.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
 import { MemoryLifecycleService } from "./services/memory-lifecycle.js";
 import { FailurePatternService } from "./services/failure-patterns.js";
+import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
 /** Create and configure the LLM registry with all available providers */
@@ -347,7 +348,8 @@ export function buildServer(registry?: LlmRegistry) {
     }
     app.memoryLifecycleService = new MemoryLifecycleService(app.db);
     app.failurePatternsService = new FailurePatternService(app.db);
-    logger.info("memory lifecycle + failure patterns services initialized");
+    app.adaptiveRoutingService = new AdaptiveRoutingService(app.db);
+    logger.info("memory lifecycle + failure patterns + adaptive routing services initialized");
 
     // Wire autonomy tier service and seed default tool tiers on first start
     const tierService = new AutonomyTierService(app.db);
@@ -577,6 +579,7 @@ declare module "fastify" {
     proceduralMemoryService?: ProceduralMemoryService;
     memoryLifecycleService?: MemoryLifecycleService;
     failurePatternsService?: FailurePatternService;
+    adaptiveRoutingService?: AdaptiveRoutingService;
     wsBroadcast: (channel: WsChannel) => void;
   }
 }

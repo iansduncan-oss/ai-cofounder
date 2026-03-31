@@ -26,6 +26,7 @@ import { PlanRepairService } from "./services/plan-repair.js";
 import { createDiscordService } from "./services/discord.js";
 import { createVpsCommandService } from "./services/vps-command.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
+import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
 import Redis from "ioredis";
 
 const logger = createLogger("worker");
@@ -70,6 +71,7 @@ export async function main() {
   const embedFn = embeddingService ? (text: string) => embeddingService.embed(text) : undefined;
   const proceduralMemoryService = embedFn ? new ProceduralMemoryService(db, llmRegistry, embedFn) : undefined;
 
+  const adaptiveRoutingService = new AdaptiveRoutingService(db);
   const dispatcher = new TaskDispatcher(
     llmRegistry,
     db,
@@ -80,6 +82,7 @@ export async function main() {
     verificationService,
     planRepairService,
     proceduralMemoryService,
+    adaptiveRoutingService,
   );
 
   // Agent messaging service

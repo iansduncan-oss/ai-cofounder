@@ -310,7 +310,8 @@ async function _runSessionBody(
       const { AutonomousExecutorService } = await import("./services/autonomous-executor.js");
       const { TaskDispatcher } = await import("./agents/dispatcher.js");
 
-      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService);
+      const { AdaptiveRoutingService } = await import("./services/adaptive-routing.js");
+      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService, undefined, undefined, undefined, new AdaptiveRoutingService(db));
       const executor = new AutonomousExecutorService(dispatcher, workspaceService, db, registry);
 
       try {

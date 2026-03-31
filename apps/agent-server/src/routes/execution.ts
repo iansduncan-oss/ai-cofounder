@@ -29,6 +29,7 @@ export const executionRoutes: FastifyPluginAsync = async (app) => {
     verificationService,
     planRepairService,
     app.proceduralMemoryService,
+    app.adaptiveRoutingService,
   );
 
   // Execute all tasks for a goal — non-blocking: enqueues to BullMQ and returns 202

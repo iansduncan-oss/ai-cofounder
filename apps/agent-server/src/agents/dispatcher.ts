@@ -29,6 +29,7 @@ import type { VerificationService } from "../services/verification.js";
 import { enqueueReflection } from "@ai-cofounder/queue";
 import type { PlanRepairService } from "../services/plan-repair.js";
 import type { ProceduralMemoryService } from "../services/procedural-memory.js";
+import type { AdaptiveRoutingService } from "../services/adaptive-routing.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -75,6 +76,7 @@ export class TaskDispatcher {
     private verificationService?: VerificationService,
     private planRepairService?: PlanRepairService,
     private proceduralMemoryService?: ProceduralMemoryService,
+    private adaptiveRoutingService?: AdaptiveRoutingService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -518,7 +520,41 @@ export class TaskDispatcher {
     onProgress?: TaskProgressCallback,
     retryCounts?: Map<string, number>,
   ): Promise<{ taskResult: DispatcherProgress["tasks"][0]; output?: string }> {
-    const agentRole = (task.assignedAgent ?? "researcher") as AgentRole;
+    let agentRole = (task.assignedAgent ?? "researcher") as AgentRole;
+
+    // Adaptive routing: suggest a potentially better agent
+    if (this.adaptiveRoutingService) {
+      try {
+        const suggestion = await this.adaptiveRoutingService.suggestAgent(
+          task.description ?? task.title,
+          agentRole,
+        );
+        const shouldOverride =
+          suggestion.confidence >= 0.7 &&
+          suggestion.recommended !== agentRole &&
+          this.specialists.has(suggestion.recommended);
+
+        this.adaptiveRoutingService.recordDecision({
+          taskId: task.id,
+          originalAgent: agentRole,
+          recommendedAgent: suggestion.recommended,
+          confidence: suggestion.confidence,
+          overridden: shouldOverride,
+          timestamp: new Date(),
+        });
+
+        if (shouldOverride) {
+          this.logger.info(
+            { taskId: task.id, original: agentRole, recommended: suggestion.recommended, confidence: suggestion.confidence },
+            "adaptive routing override",
+          );
+          agentRole = suggestion.recommended;
+        }
+      } catch (err) {
+        this.logger.warn({ err, taskId: task.id }, "adaptive routing failed, using original assignment");
+      }
+    }
+
     const specialist = this.specialists.get(agentRole);
 
     if (!specialist) {

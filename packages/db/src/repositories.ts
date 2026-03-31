@@ -405,6 +405,54 @@ export async function getGoalAnalytics(db: Db) {
   };
 }
 
+/* ────────────────────── Agent Performance ───────────────────── */
+
+export async function getAgentPerformanceStats(db: Db) {
+  const rows = await db.execute(sql`
+    select
+      assigned_agent as agent,
+      count(*)::int as total_tasks,
+      count(case when status = 'completed' then 1 end)::int as completed_tasks,
+      count(case when status = 'failed' then 1 end)::int as failed_tasks,
+      round(avg(case when status in ('completed', 'failed')
+        then extract(epoch from (updated_at - created_at)) * 1000 end))::int as avg_duration_ms,
+      case when count(case when status in ('completed', 'failed') then 1 end) > 0
+        then round(count(case when status = 'completed' then 1 end)::numeric /
+             count(case when status in ('completed', 'failed') then 1 end)::numeric, 3)::float
+        else 0 end as overall_success_rate,
+      count(case when status = 'completed' and created_at > now() - interval '7 days' then 1 end)::int as recent_completed,
+      count(case when status = 'failed' and created_at > now() - interval '7 days' then 1 end)::int as recent_failed
+    from tasks
+    where assigned_agent is not null
+    group by assigned_agent
+    order by total_tasks desc
+  `);
+
+  return (rows as unknown as Array<{
+    agent: string;
+    total_tasks: number;
+    completed_tasks: number;
+    failed_tasks: number;
+    avg_duration_ms: number | null;
+    overall_success_rate: number;
+    recent_completed: number;
+    recent_failed: number;
+  }>).map((r) => {
+    const recentTotal = r.recent_completed + r.recent_failed;
+    return {
+      agent: r.agent,
+      totalTasks: r.total_tasks,
+      completedTasks: r.completed_tasks,
+      failedTasks: r.failed_tasks,
+      avgDurationMs: r.avg_duration_ms,
+      overallSuccessRate: r.overall_success_rate,
+      recentSuccessRate: recentTotal > 0 ? r.recent_completed / recentTotal : null,
+      recentCompletedTasks: r.recent_completed,
+      recentFailedTasks: r.recent_failed,
+    };
+  });
+}
+
 /* ────────────────────────── Tasks ────────────────────────── */
 
 export async function createTask(
