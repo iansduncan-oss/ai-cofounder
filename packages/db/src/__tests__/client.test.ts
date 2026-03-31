@@ -31,7 +31,7 @@ describe("client", () => {
     it("creates a drizzle instance with the connection string", () => {
       const db = createDb("postgresql://test:test@localhost:5432/test");
       expect(db).toBeDefined();
-      expect(mockPostgres).toHaveBeenCalledWith("postgresql://test:test@localhost:5432/test");
+      expect(mockPostgres).toHaveBeenCalledWith("postgresql://test:test@localhost:5432/test", { max: 20 });
     });
   });
 

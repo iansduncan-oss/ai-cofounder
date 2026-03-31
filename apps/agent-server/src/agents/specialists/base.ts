@@ -75,16 +75,17 @@ export abstract class SpecialistAgent {
       "specialist execution started",
     );
 
-    const systemPrompt = this.getSystemPrompt(context);
+    const safeContext = { ...context, goalTitle: sanitizeForPrompt(context.goalTitle) };
+    const systemPrompt = this.getSystemPrompt(safeContext);
     const tools = this.getTools();
 
-    // Build the user message with context
-    let userMessage = `## Task: ${context.taskTitle}\n\n${context.taskDescription}`;
+    // Build the user message with context (sanitized against prompt injection)
+    let userMessage = `## Task: ${sanitizeForPrompt(context.taskTitle)}\n\n${sanitizeForPrompt(context.taskDescription)}`;
 
     if (context.previousOutputs?.length) {
       userMessage += "\n\n## Previous Task Outputs\n";
       context.previousOutputs.forEach((output, i) => {
-        userMessage += `\n### Step ${i + 1}\n${output}\n`;
+        userMessage += `\n### Step ${i + 1}\n${sanitizeForPrompt(output)}\n`;
       });
     }
 

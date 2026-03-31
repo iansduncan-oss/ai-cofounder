@@ -28,6 +28,9 @@ import {
 } from "@ai-cofounder/db";
 import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
+
+/** Tools that require explicit user confirmation before execution */
+const CONFIRMATION_REQUIRED_TOOLS = new Set(["delete_file", "delete_directory", "git_push"]);
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
@@ -502,12 +505,12 @@ export class Orchestrator {
       const parts: string[] = [];
       if (relevantMemories.length > 0) {
         parts.push("Relevant to this conversation:");
-        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
       }
       if (generalMemories.length > 0) {
         if (parts.length > 0) parts.push("");
         parts.push("General knowledge:");
-        parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+        parts.push(...generalMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
       }
 
       // Proactive decision surfacing (SESS-02): highlight decisions separately
@@ -515,7 +518,7 @@ export class Orchestrator {
         const decisionMemories = relevantMemories.filter((m) => m.category === "decisions");
         if (decisionMemories.length > 0) {
           const decisionBlock = decisionMemories
-            .map((m) => `- ${m.key}: ${m.content}`)
+            .map((m) => `- ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`)
             .join("\n");
           parts.push("");
           parts.push("Past decisions relevant to this topic (reference these naturally when applicable):");
@@ -573,7 +576,8 @@ export class Orchestrator {
     // RAG retrieval: find relevant document chunks (scoped to active project if set)
     const ragContext = await this.retrieveRagContext(message, activeProjectSlug);
     if (ragContext) {
-      memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
+      const wrappedRag = `<user-data>\n${sanitizeForPrompt(ragContext)}\n</user-data>`;
+      memoryContext = memoryContext ? `${memoryContext}\n\n${wrappedRag}` : wrappedRag;
     }
 
     // Tool efficacy hints
@@ -658,6 +662,16 @@ export class Orchestrator {
         for (const block of response.content) {
           if (block.type === "tool_use") {
             this.logger.info({ tool: block.name, conversationId: id }, "executing tool");
+
+            // Block destructive tools without explicit confirmation
+            if (CONFIRMATION_REQUIRED_TOOLS.has(block.name)) {
+              toolResults.push({
+                type: "tool_result",
+                tool_use_id: block.id,
+                content: sanitizeForPrompt(JSON.stringify({ blocked: true, tool: block.name, message: `Tool "${block.name}" requires user confirmation. Ask the user to confirm this action before retrying.` })),
+              });
+              continue;
+            }
 
             // Check tool cache before executing
             const cached = toolCache.get(block.name, block.input as Record<string, unknown>);
@@ -791,12 +805,12 @@ export class Orchestrator {
       const parts: string[] = [];
       if (relevantMemories.length > 0) {
         parts.push("Relevant to this conversation:");
-        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
       }
       if (generalMemories.length > 0) {
         if (parts.length > 0) parts.push("");
         parts.push("General knowledge:");
-        parts.push(...generalMemories.map((m) => `- [${m.category}] ${m.key}: ${m.content}`));
+        parts.push(...generalMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
       }
       if (parts.length > 0) memoryContext = parts.join("\n");
 
@@ -842,7 +856,8 @@ export class Orchestrator {
     // RAG retrieval: find relevant document chunks (scoped to active project if set)
     const ragContext = await this.retrieveRagContext(message, activeProjectSlugStream);
     if (ragContext) {
-      memoryContext = memoryContext ? `${memoryContext}\n\n${ragContext}` : ragContext;
+      const wrappedRag = `<user-data>\n${sanitizeForPrompt(ragContext)}\n</user-data>`;
+      memoryContext = memoryContext ? `${memoryContext}\n\n${wrappedRag}` : wrappedRag;
     }
 
     // Tool efficacy hints (stream path)
@@ -918,6 +933,14 @@ export class Orchestrator {
           if (block.type === "tool_use") {
             const toolInput = block.input as Record<string, unknown>;
             await onEvent({ type: "tool_call", data: { tool: block.name, input: this.sanitizeToolInput(toolInput) } });
+
+            // Block destructive tools without explicit confirmation
+            if (CONFIRMATION_REQUIRED_TOOLS.has(block.name)) {
+              const blocked = { blocked: true, tool: block.name, message: `Tool "${block.name}" requires user confirmation. Ask the user to confirm this action before retrying.` };
+              await onEvent({ type: "tool_result", data: { tool: block.name, summary: `Blocked: ${block.name} requires confirmation`, needs_confirmation: true } });
+              toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeForPrompt(JSON.stringify(blocked)) });
+              continue;
+            }
 
             // Check tool cache before executing
             const cached = toolCache.get(block.name, toolInput);

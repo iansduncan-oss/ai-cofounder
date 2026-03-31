@@ -303,7 +303,9 @@ export const schedules = pgTable("schedules", {
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("idx_schedules_enabled_next_run").on(table.enabled, table.nextRunAt),
+]);
 
 /* ── Events (inbound triggers) ── */
 

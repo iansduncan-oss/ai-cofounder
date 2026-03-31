@@ -4,7 +4,7 @@ import postgres from "postgres";
 import * as schema from "./schema.js";
 
 export function createDb(connectionString: string) {
-  const sql = postgres(connectionString);
+  const sql = postgres(connectionString, { max: 20 });
   return drizzle(sql, { schema });
 }
 
