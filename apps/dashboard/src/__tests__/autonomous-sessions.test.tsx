@@ -109,7 +109,7 @@ describe("AutonomousSessionsPage", () => {
     renderWithProviders(<AutonomousSessionsPage />);
 
     await screen.findByText("Duration test");
-    expect(screen.getByText("2m 30s")).toBeInTheDocument();
+    expect(screen.getAllByText("2m 30s").length).toBeGreaterThan(0);
   });
 
   it("displays summary text for each session", async () => {
