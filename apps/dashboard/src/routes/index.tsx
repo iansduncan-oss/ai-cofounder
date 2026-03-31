@@ -114,6 +114,9 @@ const KnowledgePage = lazy(() =>
 const SearchPage = lazy(() =>
   import("./search").then((m) => ({ default: m.SearchPage })),
 );
+const VoicePage = lazy(() =>
+  import("./voice").then((m) => ({ default: m.VoicePage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -163,6 +166,7 @@ export const router = createBrowserRouter([
       { path: "schedules", element: <SchedulesPage /> },
       { path: "knowledge", element: <KnowledgePage /> },
       { path: "search", element: <SearchPage /> },
+      { path: "voice", element: <VoicePage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

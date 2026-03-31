@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import type { AgentMessage } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { createOrchestrator } from "../helpers/create-orchestrator.js";
 import {
   getConversationMessages,
@@ -10,6 +11,8 @@ import {
 import { resolveUserContext } from "../helpers/resolve-user-context.js";
 import { recordLlmMetrics } from "../plugins/observability.js";
 
+const logger = createLogger("voice-routes");
+
 const VoiceChatBody = Type.Object({
   message: Type.String({ minLength: 1, maxLength: 8_000 }),
   conversationId: Type.Optional(Type.String()),
@@ -17,7 +20,28 @@ const VoiceChatBody = Type.Object({
 });
 type VoiceChatBody = Static<typeof VoiceChatBody>;
 
+const SpeakBody = Type.Object({
+  text: Type.String({ minLength: 1, maxLength: 5_000 }),
+  voiceId: Type.Optional(Type.String()),
+});
+
 export const voiceRoutes: FastifyPluginAsync = async (app) => {
+  // Register content-type parser for audio blobs (used by /transcribe)
+  const audioTypes = [
+    "audio/webm",
+    "audio/ogg",
+    "audio/wav",
+    "audio/mp4",
+    "audio/mpeg",
+    "audio/webm;codecs=opus",
+    "application/octet-stream",
+  ];
+  for (const mimeType of audioTypes) {
+    app.addContentTypeParser(mimeType, { parseAs: "buffer" }, (_req, body, done) => {
+      done(null, body);
+    });
+  }
+
   const orchestrator = createOrchestrator(app);
 
   // ── Original non-streaming chat endpoint ──
@@ -191,6 +215,112 @@ export const voiceRoutes: FastifyPluginAsync = async (app) => {
       reply.header("Content-Type", "audio/mpeg");
       reply.header("Content-Length", audio.length);
       return reply.send(audio);
+    },
+  );
+
+  // ── Speak endpoint — cleaner API for voice UI ──
+  app.post<{ Body: Static<typeof SpeakBody> }>(
+    "/speak",
+    { schema: { body: SpeakBody } },
+    async (request, reply) => {
+      const ttsService = app.ttsService;
+      if (!ttsService?.isConfigured()) {
+        return reply.status(503).send({ error: "TTS service not configured" });
+      }
+
+      const persona = await getActivePersona(app.db);
+      const voiceId = request.body.voiceId || persona?.voiceId || undefined;
+
+      const audio = await ttsService.synthesize(request.body.text, voiceId);
+      if (!audio) {
+        return reply.status(500).send({ error: "Speech generation failed" });
+      }
+
+      reply.header("Content-Type", "audio/mpeg");
+      reply.header("Content-Length", audio.length);
+      return reply.send(audio);
+    },
+  );
+
+  // ── Transcribe endpoint — accepts raw audio, returns text via Whisper API ──
+  app.post(
+    "/transcribe",
+    async (request, reply) => {
+      const openaiKey = optionalEnv("OPENAI_API_KEY", "");
+      if (!openaiKey) {
+        return reply.status(501).send({
+          error: "Transcription not available",
+          message: "OPENAI_API_KEY is not configured. Use text input or browser speech recognition instead.",
+        });
+      }
+
+      // Accept raw audio body (WebM/Opus from MediaRecorder)
+      const audioData = request.body as Buffer;
+      if (!audioData || !Buffer.isBuffer(audioData)) {
+        return reply.status(400).send({ error: "No audio data received" });
+      }
+
+      if (audioData.length < 100) {
+        return reply.status(400).send({ error: "Audio data too small" });
+      }
+
+      // Determine content type from request header
+      const contentType = (request.headers["content-type"] || "audio/webm").split(";")[0].trim();
+      const ext = contentType.includes("wav") ? "wav"
+        : contentType.includes("mp4") || contentType.includes("m4a") ? "m4a"
+        : contentType.includes("ogg") ? "ogg"
+        : "webm";
+
+      try {
+        // Build multipart form data for Whisper API
+        const boundary = "----VoiceTranscribe" + Date.now();
+        const formParts: Buffer[] = [];
+
+        // File field
+        formParts.push(Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="audio.${ext}"\r\nContent-Type: ${contentType}\r\n\r\n`,
+        ));
+        formParts.push(audioData);
+        formParts.push(Buffer.from("\r\n"));
+
+        // Model field
+        formParts.push(Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="model"\r\n\r\nwhisper-1\r\n`,
+        ));
+
+        // Language field (optional, helps accuracy)
+        formParts.push(Buffer.from(
+          `--${boundary}\r\nContent-Disposition: form-data; name="language"\r\n\r\nen\r\n`,
+        ));
+
+        formParts.push(Buffer.from(`--${boundary}--\r\n`));
+
+        const formBody = Buffer.concat(formParts);
+
+        const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${openaiKey}`,
+            "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          },
+          body: formBody,
+        });
+
+        if (!whisperRes.ok) {
+          const errorText = await whisperRes.text();
+          logger.error({ status: whisperRes.status, error: errorText }, "Whisper API error");
+          return reply.status(whisperRes.status).send({
+            error: "Transcription failed",
+            message: whisperRes.status === 401 ? "Invalid API key" : "Whisper API error",
+          });
+        }
+
+        const result = await whisperRes.json() as { text: string };
+        return { text: result.text };
+      } catch (err) {
+        logger.error({ err }, "Transcription failed");
+        return reply.status(500).send({ error: "Transcription failed" });
+      }
     },
   );
 };

@@ -37,6 +37,7 @@ import {
   Library,
   Network,
   Search,
+  Mic,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -67,6 +68,7 @@ const navSections: NavSection[] = [
     items: [
       { icon: Monitor, label: "Command Center", path: null },
       { icon: Search, label: "Search", path: "/dashboard/search" },
+      { icon: Mic, label: "Voice", path: "/dashboard/voice" },
       { icon: Target, label: "Goals", path: "/dashboard/goals" },
       { icon: ShieldCheck, label: "Approvals", path: "/dashboard/approvals", drawer: true },
       { icon: ListChecks, label: "Follow-Ups", path: "/dashboard/follow-ups", drawer: true },
