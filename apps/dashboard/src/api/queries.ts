@@ -468,3 +468,66 @@ export function useDeployments(limit = 20) {
     queryFn: () => apiClient.listDeployments(limit),
   });
 }
+
+/* ── Thinking Traces ── */
+
+export function useThinkingTraces(conversationId: string) {
+  return useQuery({
+    queryKey: queryKeys.thinking.traces(conversationId),
+    queryFn: () => apiClient.getThinkingTraces(conversationId),
+    enabled: !!conversationId,
+  });
+}
+
+/* ── Reflections ── */
+
+export function useReflections(type?: string) {
+  return useQuery({
+    queryKey: queryKeys.reflections.list(type),
+    queryFn: () => apiClient.listReflections({ type, limit: 50 }),
+  });
+}
+
+export function useReflectionStats() {
+  return useQuery({
+    queryKey: queryKeys.reflections.stats,
+    queryFn: () => apiClient.getReflectionStats(),
+  });
+}
+
+/* ── Agent Info ── */
+
+export function useAgentCapabilities() {
+  return useQuery({
+    queryKey: queryKeys.agents.capabilities,
+    queryFn: () => apiClient.getAgentCapabilities(),
+    staleTime: 5 * 60_000, // static data, cache 5 min
+  });
+}
+
+/* ── Schedules ── */
+
+export function useSchedules() {
+  return useQuery({
+    queryKey: queryKeys.schedules.list,
+    queryFn: () => apiClient.listSchedules(),
+  });
+}
+
+/* ── Knowledge / RAG ── */
+
+export function useKnowledgeStatus() {
+  return useQuery({
+    queryKey: queryKeys.knowledge.status,
+    queryFn: () => apiClient.ragStatus(),
+  });
+}
+
+export function useKnowledgeSearch(query: string) {
+  return useQuery({
+    queryKey: queryKeys.knowledge.search(query),
+    queryFn: () => apiClient.ragSearch(query),
+    enabled: query.length >= 2,
+    placeholderData: keepPreviousData,
+  });
+}

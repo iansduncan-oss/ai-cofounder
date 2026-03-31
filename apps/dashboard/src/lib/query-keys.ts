@@ -159,4 +159,27 @@ export const queryKeys = {
     list: ["work-sessions", "list"] as const,
     detail: (id: string) => ["work-sessions", "detail", id] as const,
   },
+  thinking: {
+    all: ["thinking"] as const,
+    traces: (conversationId: string) => ["thinking", "traces", conversationId] as const,
+  },
+  reflections: {
+    all: ["reflections"] as const,
+    list: (type?: string) => ["reflections", "list", type ?? "all"] as const,
+    stats: ["reflections", "stats"] as const,
+  },
+  agents: {
+    all: ["agents"] as const,
+    roles: ["agents", "roles"] as const,
+    capabilities: ["agents", "capabilities"] as const,
+  },
+  schedules: {
+    all: ["schedules"] as const,
+    list: ["schedules", "list"] as const,
+  },
+  knowledge: {
+    all: ["knowledge"] as const,
+    status: ["knowledge", "status"] as const,
+    search: (q: string) => ["knowledge", "search", q] as const,
+  },
 };

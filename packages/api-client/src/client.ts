@@ -82,6 +82,9 @@ import type {
   UpdateFollowUpInput,
   GlobalSearchResults,
   DeployCircuitBreakerStatus,
+  ThinkingTrace,
+  Reflection,
+  ReflectionStats,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1363,6 +1366,44 @@ export class ApiClient {
 
   getQuickActions() {
     return this.request<{ data: Array<{ label: string; icon: string }> }>("GET", "/api/context/quick-actions");
+  }
+
+  /* ── Thinking Traces ── */
+
+  getThinkingTraces(conversationId: string, requestId?: string) {
+    const qs = requestId ? `?requestId=${encodeURIComponent(requestId)}` : "";
+    return this.request<{ traces: ThinkingTrace[] }>(
+      "GET",
+      `/api/thinking/${encodeURIComponent(conversationId)}${qs}`,
+    );
+  }
+
+  /* ── Reflections ── */
+
+  listReflections(params?: { type?: string; limit?: number; offset?: number }) {
+    const qs = new URLSearchParams();
+    if (params?.type) qs.set("type", params.type);
+    if (params?.limit != null) qs.set("limit", String(params.limit));
+    if (params?.offset != null) qs.set("offset", String(params.offset));
+    const query = qs.toString();
+    return this.request<{ data: Reflection[]; total: number }>(
+      "GET",
+      `/api/reflections${query ? `?${query}` : ""}`,
+    );
+  }
+
+  getReflectionStats() {
+    return this.request<{ stats: ReflectionStats }>("GET", "/api/reflections/stats");
+  }
+
+  /* ── Agent Info ── */
+
+  getAgentRoles() {
+    return this.request<{ roles: AgentRoleInfo[] }>("GET", "/api/agent-info/roles");
+  }
+
+  getAgentCapabilities() {
+    return this.request<{ agents: AgentCapability[] }>("GET", "/api/agent-info/capabilities");
   }
 
   /* ── Database ── */

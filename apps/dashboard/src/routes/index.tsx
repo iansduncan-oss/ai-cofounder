@@ -96,6 +96,21 @@ const PipelineTemplatesPage = lazy(() =>
 const WorkSessionsPage = lazy(() =>
   import("./work-sessions").then((m) => ({ default: m.WorkSessionsPage })),
 );
+const ThinkingPage = lazy(() =>
+  import("./thinking").then((m) => ({ default: m.ThinkingPage })),
+);
+const ReflectionsPage = lazy(() =>
+  import("./reflections").then((m) => ({ default: m.ReflectionsPage })),
+);
+const AgentsPage = lazy(() =>
+  import("./agents").then((m) => ({ default: m.AgentsPage })),
+);
+const SchedulesPage = lazy(() =>
+  import("./schedules").then((m) => ({ default: m.SchedulesPage })),
+);
+const KnowledgePage = lazy(() =>
+  import("./knowledge").then((m) => ({ default: m.KnowledgePage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -139,6 +154,11 @@ export const router = createBrowserRouter([
       { path: "pipeline-templates", element: <PipelineTemplatesPage /> },
       { path: "events", element: <EventsPage /> },
       { path: "work-sessions", element: <WorkSessionsPage /> },
+      { path: "thinking", element: <ThinkingPage /> },
+      { path: "reflections", element: <ReflectionsPage /> },
+      { path: "agents", element: <AgentsPage /> },
+      { path: "schedules", element: <SchedulesPage /> },
+      { path: "knowledge", element: <KnowledgePage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

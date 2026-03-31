@@ -32,6 +32,10 @@ import {
   LayoutTemplate,
   Webhook,
   Clock,
+  BrainCircuit,
+  CalendarClock,
+  Library,
+  Network,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -65,6 +69,7 @@ const navSections: NavSection[] = [
       { icon: ShieldCheck, label: "Approvals", path: "/dashboard/approvals", drawer: true },
       { icon: ListChecks, label: "Follow-Ups", path: "/dashboard/follow-ups", drawer: true },
       { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
+      { icon: Library, label: "Knowledge", path: "/dashboard/knowledge", drawer: true },
     ],
   },
   {
@@ -91,6 +96,10 @@ const navSections: NavSection[] = [
       { icon: Scale, label: "Decisions", path: "/dashboard/decisions", drawer: true },
       { icon: PlayCircle, label: "Autonomous", path: "/dashboard/autonomous", drawer: true },
       { icon: Clock, label: "Sessions", path: "/dashboard/work-sessions", drawer: true },
+      { icon: CalendarClock, label: "Schedules", path: "/dashboard/schedules", drawer: true },
+      { icon: BrainCircuit, label: "Thinking", path: "/dashboard/thinking", drawer: true },
+      { icon: BookOpen, label: "Reflections", path: "/dashboard/reflections", drawer: true },
+      { icon: Network, label: "Agents", path: "/dashboard/agents", drawer: true },
       { icon: Webhook, label: "Events", path: "/dashboard/events", drawer: true },
       { icon: Inbox, label: "DLQ", path: "/dashboard/dlq", drawer: true },
       { icon: Bell, label: "Notifications", path: "/dashboard/notifications", drawer: true },

@@ -652,3 +652,71 @@ export function useTriggerPipelineTemplate() {
     onError: (err) => { toast.error(`Failed to trigger template: ${err.message}`); },
   });
 }
+
+/* ── Schedules ── */
+
+export function useCreateSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { cronExpression: string; actionPrompt: string; description?: string }) =>
+      apiClient.createSchedule(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
+      toast.success("Schedule created");
+    },
+    onError: (err) => { toast.error(`Failed to create schedule: ${err.message}`); },
+  });
+}
+
+export function useToggleSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
+      apiClient.toggleSchedule(id, enabled),
+    onSuccess: (_, { enabled }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
+      toast.success(enabled ? "Schedule enabled" : "Schedule paused");
+    },
+    onError: (err) => { toast.error(`Failed to toggle schedule: ${err.message}`); },
+  });
+}
+
+export function useDeleteSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deleteSchedule(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
+      toast.success("Schedule deleted");
+    },
+    onError: (err) => { toast.error(`Failed to delete schedule: ${err.message}`); },
+  });
+}
+
+/* ── Knowledge / RAG ── */
+
+export function useRagIngest() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ action, sourceId }: { action: string; sourceId: string }) =>
+      apiClient.ragIngest(action, sourceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all });
+      toast.success("Ingestion started");
+    },
+    onError: (err) => { toast.error(`Failed to start ingestion: ${err.message}`); },
+  });
+}
+
+export function useRagDeleteSource() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sourceType, sourceId }: { sourceType: string; sourceId: string }) =>
+      apiClient.ragDeleteSource(sourceType, sourceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all });
+      toast.success("Source deleted");
+    },
+    onError: (err) => { toast.error(`Failed to delete source: ${err.message}`); },
+  });
+}

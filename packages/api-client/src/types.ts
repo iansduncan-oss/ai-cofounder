@@ -1001,6 +1001,71 @@ export interface UpdateBudgetInput {
   weeklyUsd: number;
 }
 
+/* ── Thinking Traces ── */
+
+export interface ThinkingTrace {
+  id: string;
+  conversationId: string;
+  requestId: string | null;
+  round: number;
+  content: string;
+  tokenCount: number;
+  createdAt: string;
+}
+
+/* ── Reflections ── */
+
+export type ReflectionType = "goal_completion" | "failure_analysis" | "pattern_extraction" | "weekly_summary";
+
+export interface ReflectionLesson {
+  lesson: string;
+  category: string;
+  confidence: number;
+}
+
+export interface Reflection {
+  id: string;
+  goalId: string | null;
+  reflectionType: ReflectionType;
+  content: string;
+  lessons: ReflectionLesson[] | null;
+  agentPerformance: Record<string, { success: number; fail: number; insights: string[] }> | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReflectionStats {
+  totalReflections: number;
+  byType: Record<string, number>;
+  totalLessons: number;
+  avgLessonsPerReflection: number;
+}
+
+/* ── RAG Knowledge ── */
+
+export interface RagSource {
+  type: string;
+  id: string;
+  lastIngested: string | null;
+  chunkCount: number;
+  cursor: string | null;
+}
+
+export interface RagStatusResponse {
+  totalChunks: number;
+  sources: RagSource[];
+}
+
+export interface RagSearchResult {
+  chunkId: string;
+  content: string;
+  sourceType: string;
+  sourceId: string;
+  score: number;
+  metadata: Record<string, unknown> | null;
+}
+
 /* ── Global Search ── */
 
 export interface GlobalSearchResults {
