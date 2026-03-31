@@ -11,14 +11,33 @@ export function setAccessToken(token: string | null): void {
   _accessToken = token;
 }
 
+export type AdminRole = "admin" | "editor" | "viewer";
+
 /** Decode JWT payload without verification (client-side only) */
-function decodeJwtExp(token: string): number | null {
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return typeof payload.exp === "number" ? payload.exp : null;
+    return JSON.parse(atob(token.split(".")[1]));
   } catch {
     return null;
   }
+}
+
+function decodeJwtExp(token: string): number | null {
+  const payload = decodeJwtPayload(token);
+  return typeof payload?.exp === "number" ? payload.exp : null;
+}
+
+function decodeJwtRole(token: string): AdminRole {
+  const payload = decodeJwtPayload(token);
+  const role = payload?.role;
+  if (role === "admin" || role === "editor" || role === "viewer") return role;
+  return "viewer";
+}
+
+export function getCurrentRole(): AdminRole {
+  const token = getAccessToken();
+  if (!token) return "viewer";
+  return decodeJwtRole(token);
 }
 
 /**
@@ -89,7 +108,9 @@ export function useAuth() {
     }
   }, [baseUrl]);
 
-  return { isAuthenticated, login, logout, refresh };
+  const role = _accessToken ? decodeJwtRole(_accessToken) : "viewer" as AdminRole;
+
+  return { isAuthenticated, login, logout, refresh, role };
 }
 
 /**

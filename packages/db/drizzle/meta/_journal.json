@@ -351,6 +351,13 @@
       "when": 1774926000000,
       "tag": "0049_fix_admin_password_nullable",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1774927000000,
+      "tag": "0050_add_admin_role",
+      "breakpoints": true
     }
   ]
 }

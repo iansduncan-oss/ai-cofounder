@@ -57,7 +57,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     // Sign access token (15min expiry configured in auth plugin)
-    const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
+    const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email, role: admin.role });
 
     // Sign refresh token (7d expiry)
     const refreshToken = app.jwt.sign(
@@ -104,7 +104,7 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       // Sign access token with email claim
-      const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
+      const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email, role: admin.role });
 
       // Rotate refresh token — issue new one on each refresh
       const newRefreshToken = app.jwt.sign(
@@ -298,7 +298,7 @@ export async function authRoutes(app: FastifyInstance) {
       }
 
       // Issue JWT + refresh cookie
-      const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email });
+      const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email, role: admin.role });
 
       const refreshToken = app.jwt.sign(
         { sub: admin.id, type: "refresh" },

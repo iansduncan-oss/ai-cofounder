@@ -2357,7 +2357,7 @@ export async function findAdminById(db: Db, id: string) {
 
 export async function createAdminUser(
   db: Db,
-  data: { email: string; passwordHash: string | null },
+  data: { email: string; passwordHash: string | null; role?: "admin" | "editor" | "viewer" },
 ) {
   const [created] = await db.insert(adminUsers).values(data).returning();
   return created;
@@ -2368,6 +2368,22 @@ export async function countAdminUsers(db: Db): Promise<number> {
     .select({ count: sql<number>`count(*)::int` })
     .from(adminUsers);
   return rows[0]?.count ?? 0;
+}
+
+export async function listAdminUsers(db: Db) {
+  return db
+    .select({ id: adminUsers.id, email: adminUsers.email, role: adminUsers.role, createdAt: adminUsers.createdAt })
+    .from(adminUsers)
+    .orderBy(adminUsers.createdAt);
+}
+
+export async function updateAdminRole(db: Db, id: string, role: "admin" | "editor" | "viewer") {
+  const [updated] = await db
+    .update(adminUsers)
+    .set({ role })
+    .where(eq(adminUsers.id, id))
+    .returning();
+  return updated ?? null;
 }
 
 /* ────────────────────── Google OAuth Tokens ─────────────────────── */

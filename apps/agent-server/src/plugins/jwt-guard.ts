@@ -43,6 +43,7 @@ import { thinkingRoutes } from "../routes/thinking.js";
 import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
 import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
+import type { AdminRole } from "../plugins/rbac.js";
 
 /** Check if request is from loopback or Docker bridge (narrower than isInternalRequest) */
 function isLoopbackOrDocker(request: FastifyRequest): boolean {
@@ -95,6 +96,40 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
       await request.jwtVerify();
     } catch {
       reply.code(401).send({ error: "Unauthorized" });
+    }
+  });
+
+  // ── RBAC: enforce role-based access after JWT verification ──
+  // Read-only methods (GET, HEAD, OPTIONS) are allowed for all authenticated users.
+  // Write methods (POST, PUT, PATCH, DELETE) require editor or admin.
+  // Admin-only paths are checked explicitly.
+  const ADMIN_ONLY_PREFIXES = ["/api/settings", "/api/database", "/api/autonomy/tiers"];
+  const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+  app.addHook("onRequest", async (request, reply) => {
+    // Skip for loopback/Docker (already bypassed JWT)
+    if (isLoopbackOrDocker(request)) return;
+
+    const user = request.user as { sub?: string; role?: string } | undefined;
+    // If no user (dev mode, JWT disabled), skip
+    if (!user?.sub) return;
+
+    const role = (user.role ?? "viewer") as AdminRole;
+
+    // Admin-only paths
+    if (ADMIN_ONLY_PREFIXES.some((p) => request.url.startsWith(p))) {
+      if (role !== "admin") {
+        reply.code(403).send({ error: "Forbidden: admin access required" });
+        return;
+      }
+    }
+
+    // Write operations require editor or admin
+    if (!READ_METHODS.has(request.method)) {
+      if (role === "viewer") {
+        reply.code(403).send({ error: "Forbidden: viewer role has read-only access" });
+        return;
+      }
     }
   });
 

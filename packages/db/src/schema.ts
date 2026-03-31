@@ -455,10 +455,13 @@ export const ingestionState = pgTable("ingestion_state", {
 
 /* ── Admin Users (dashboard auth) ── */
 
+export const adminRoleEnum = pgEnum("admin_role", ["admin", "editor", "viewer"]);
+
 export const adminUsers = pgTable("admin_users", {
   id: uuid("id").primaryKey().defaultRandom(),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
+  role: adminRoleEnum("role").notNull().default("admin"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
