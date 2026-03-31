@@ -5,6 +5,7 @@ import {
   listGoalBacklog,
   listRecentWorkSessions,
   countTasksByStatus,
+  createConversation,
   createWorkSession,
   completeWorkSession,
   getTodayTokenTotal,
@@ -421,6 +422,13 @@ async function _runSessionBody(
     // Freeform orchestrator fallback — used when no backlog goals exist or backlog path fails
     const contextPrompt = await buildContextPrompt(db, options?.prompt, options?.vpsCommandService, options?.discordService);
 
+    // Ensure a conversation record exists so goals can reference it via FK
+    await createConversation(db, { userId: "system-autonomous", title: `Autonomous session ${session.id}` })
+      .then((conv) => {
+        // Use the conversation ID for the orchestrator instead of session ID
+        (session as { conversationId?: string }).conversationId = conv.id;
+      });
+
     // Check time budget
     if (Date.now() - startTime > timeBudgetMs) {
       status = "timeout";
@@ -439,8 +447,9 @@ async function _runSessionBody(
         isAutonomous: true,
       });
 
+      const conversationId = (session as { conversationId?: string }).conversationId ?? session.id;
       const result = await Promise.race([
-        orchestrator.run(contextPrompt, session.id),
+        orchestrator.run(contextPrompt, conversationId),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), timeBudgetMs - (Date.now() - startTime))),
       ]);
 

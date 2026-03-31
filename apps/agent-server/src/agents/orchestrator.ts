@@ -1335,7 +1335,7 @@ export class Orchestrator {
       description: input.goal_description,
       priority: input.goal_priority,
       createdBy: userId,
-      milestoneId: input.milestone_id,
+      milestoneId: input.milestone_id || undefined,
       scope,
       requiresApproval,
     });
