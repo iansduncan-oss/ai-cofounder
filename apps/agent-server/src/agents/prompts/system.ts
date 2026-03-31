@@ -1,9 +1,11 @@
 import type { Db } from "@ai-cofounder/db";
 import { getActivePrompt, getActivePersona } from "@ai-cofounder/db";
 
-/** Strip XML-like tags that could be interpreted as prompt structure */
+/** Strip XML-like tags and markdown headings that could be interpreted as prompt structure */
 export function sanitizeForPrompt(text: string): string {
-  return text.replace(/<\/?(?:system|assistant|user|human|tool_use|tool_result)(?=[\s>\/])(?:\s[^>]*)?\/?>/gi, "[STRIPPED]");
+  return text
+    .replace(/<\/?(?:system|assistant|user|human|tool_use|tool_result|user-data)(?=[\s>\/])(?:\s[^>]*)?\/?>/gi, "[STRIPPED]")
+    .replace(/^#{1,3}\s+(?:System|Instructions|Prompt|Override|Ignore\s+previous)/gim, "[STRIPPED]");
 }
 
 /** Build system prompt, loading from active persona or DB prompts, falling back to hardcoded defaults */

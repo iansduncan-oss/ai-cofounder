@@ -71,25 +71,6 @@ const generalBucket = createRateLimitBucket();
 const expensiveBucket = createRateLimitBucket();
 const inFlightRequests = new Map<string, number>();
 
-/**
- * Extract user ID from JWT payload without verifying signature.
- * JWT verification is handled by the jwtGuardPlugin — this only reads the `sub` claim
- * for rate-limit bucketing so unauthenticated requests fall back to IP-based limiting.
- */
-function extractUserIdFromJwt(request: FastifyRequest): string | undefined {
-  const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return undefined;
-  const token = authHeader.slice(7);
-  const parts = token.split(".");
-  if (parts.length !== 3) return undefined;
-  try {
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString());
-    return typeof payload.sub === "string" ? payload.sub : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 const HONEYPOT_PATHS = [
   "/.env",
   "/.git",
@@ -286,32 +267,29 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     }
 
     // 5. Rate limiting on /api/* and /voice/chat routes (tighter for expensive endpoints)
-    //    Uses user ID from JWT when available, falls back to IP-based limiting.
+    //    Uses IP-based bucketing to prevent bypass via forged JWT sub claims.
     if (url.startsWith("/api/") || url === "/voice/chat") {
       const isExpensive = EXPENSIVE_PATHS.some((p) => url.startsWith(p)) || url === "/voice/chat";
       const bucket = isExpensive ? expensiveBucket : generalBucket;
       const limit = isExpensive ? expensiveLimitMax : rateLimitMax;
-      // Prefer user-ID bucketing for authenticated requests (fairer across shared IPs)
-      const userId = extractUserIdFromJwt(request);
-      const bucketKey = userId ? `user:${userId}` : `ip:${ip}`;
+      const bucketKey = `ip:${ip}`;
       const { limited, remaining, resetMs } = bucket.check(bucketKey, limit, rateLimitWindowMs);
       reply.header("X-RateLimit-Limit", limit);
       reply.header("X-RateLimit-Remaining", remaining);
       reply.header("X-RateLimit-Reset", Math.ceil(resetMs / 1000));
       if (limited) {
-        logger.debug({ ip, userId, expensive: isExpensive }, "rate limited");
+        logger.debug({ ip, expensive: isExpensive }, "rate limited");
         reply.code(429).send({ error: "Too many requests", retryAfter: Math.ceil(resetMs / 1000) });
         return;
       }
     }
 
-    // 6. Per-user concurrent request limit on expensive endpoints
+    // 6. Per-IP concurrent request limit on expensive endpoints
     if (url.startsWith("/api/") || url === "/voice/chat") {
-      const userId = extractUserIdFromJwt(request);
-      const concurrentKey = userId ? `user:${userId}` : `ip:${ip}`;
+      const concurrentKey = `ip:${ip}`;
       const current = inFlightRequests.get(concurrentKey) ?? 0;
       if (current >= concurrentRequestLimit) {
-        logger.debug({ ip, userId, concurrent: current }, "concurrent request limit hit");
+        logger.debug({ ip, concurrent: current }, "concurrent request limit hit");
         reply.code(429).send({ error: "Too many concurrent requests", retryAfter: 1 });
         return;
       }

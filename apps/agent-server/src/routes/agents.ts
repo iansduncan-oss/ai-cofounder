@@ -31,14 +31,11 @@ const RunBody = Type.Object({
   platform: Type.Optional(Type.String({ maxLength: 50 })),
   history: Type.Optional(
     Type.Array(
-      Type.Object(
-        {
-          role: Type.Union([Type.Literal("user"), Type.Literal("agent")]),
-          content: Type.String({ maxLength: 10_000 }),
-        },
-        { additionalProperties: true },
-      ),
-      { maxItems: 100 },
+      Type.Object({
+        role: Type.Union([Type.Literal("user"), Type.Literal("agent")]),
+        content: Type.String({ minLength: 1, maxLength: 10_000 }),
+      }),
+      { maxItems: 50 },
     ),
   ),
 });

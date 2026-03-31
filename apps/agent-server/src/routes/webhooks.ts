@@ -84,12 +84,8 @@ export const webhookRoutes: FastifyPluginAsync = async (app) => {
       preHandler: async (request, reply) => {
         const secret = optionalEnv("GITHUB_WEBHOOK_SECRET", "");
         if (!secret) {
-          if (process.env.NODE_ENV === "production") {
-            logger.error("GITHUB_WEBHOOK_SECRET not configured — rejecting webhook in production");
-            return reply.status(503).send({ error: "Webhook verification not configured" });
-          }
-          logger.warn("GITHUB_WEBHOOK_SECRET not set — skipping signature verification (dev mode)");
-          return;
+          logger.error("GITHUB_WEBHOOK_SECRET not configured — rejecting webhook");
+          return reply.status(503).send({ error: "Webhook verification not configured" });
         }
 
         const signature = request.headers["x-hub-signature-256"] as string | undefined;
