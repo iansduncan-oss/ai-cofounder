@@ -12,6 +12,7 @@ import {
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
+import { sanitizeMemoryContent } from "../agents/prompts/system.js";
 
 const logger = createLogger("episodic-memory");
 
@@ -91,11 +92,11 @@ ${transcript.slice(0, 3000)}`,
 
       const episode = await createEpisodicMemory(this.db, {
         conversationId,
-        summary: parsed.summary,
-        keyDecisions: parsed.keyDecisions ?? [],
+        summary: sanitizeMemoryContent(parsed.summary),
+        keyDecisions: (parsed.keyDecisions ?? []).map((d: string) => sanitizeMemoryContent(d)),
         toolsUsed: parsed.toolsUsed ?? [],
-        goalsWorkedOn: parsed.goalsWorkedOn ?? [],
-        emotionalContext: parsed.emotionalContext ?? null,
+        goalsWorkedOn: (parsed.goalsWorkedOn ?? []).map((g: string) => sanitizeMemoryContent(g)),
+        emotionalContext: parsed.emotionalContext ? sanitizeMemoryContent(parsed.emotionalContext) : undefined,
         importance: typeof parsed.importance === "number" ? parsed.importance : 0.5,
         embedding,
       });

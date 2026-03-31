@@ -328,6 +328,9 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
   // Collect registered route patterns after server is ready
   const registeredRoutes = new Set<string>();
 
+  // Track intervals for cleanup on server close
+  const intervals: ReturnType<typeof setInterval>[] = [];
+
   app.addHook("onReady", async () => {
     // Fastify exposes all registered routes via printRoutes or iterating
     // We build the set from the routing tree by printing routes
@@ -344,13 +347,14 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
     }
 
     // Fallback: also parse via the routerPath on actual requests below
-    startProcessMetrics();
+    intervals.push(startProcessMetrics());
 
     // Start queue metrics collection if Redis is configured
     if (process.env.REDIS_URL) {
       updateQueueMetrics(); // initial collection
       const queueInterval = setInterval(updateQueueMetrics, 30_000);
       queueInterval.unref();
+      intervals.push(queueInterval);
     }
   });
 
@@ -408,5 +412,12 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
   app.get("/metrics", async (_request, reply) => {
     const metrics = await client.register.metrics();
     reply.type(client.register.contentType).send(metrics);
+  });
+
+  // Clean up intervals on server close
+  app.addHook("onClose", async () => {
+    for (const interval of intervals) {
+      clearInterval(interval);
+    }
   });
 });

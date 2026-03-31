@@ -14,6 +14,7 @@ import {
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
+import { sanitizeMemoryContent } from "../agents/prompts/system.js";
 
 const logger = createLogger("procedural-memory");
 
@@ -95,10 +96,18 @@ Return ONLY valid JSON:
         logger.warn("Failed to embed trigger pattern");
       }
 
+      const sanitizedSteps = (parsed.steps as Array<{ description: string; agent?: string; details?: string }>).map(
+        (s) => ({
+          ...s,
+          description: sanitizeMemoryContent(s.description),
+          details: s.details ? sanitizeMemoryContent(s.details) : s.details,
+        }),
+      );
+
       const procedure = await createProceduralMemory(this.db, {
-        triggerPattern: parsed.triggerPattern,
-        steps: parsed.steps,
-        preconditions: parsed.preconditions ?? [],
+        triggerPattern: sanitizeMemoryContent(parsed.triggerPattern),
+        steps: sanitizedSteps,
+        preconditions: (parsed.preconditions ?? []).map((p: string) => sanitizeMemoryContent(p)),
         createdFromGoalId: goalId,
         tags: parsed.tags ?? [],
         embedding,
@@ -168,10 +177,18 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
         logger.warn("Failed to embed session lesson trigger pattern");
       }
 
+      const sanitizedSessionSteps = (parsed.steps as Array<{ description: string; details?: string }>).map(
+        (s) => ({
+          ...s,
+          description: sanitizeMemoryContent(s.description),
+          details: s.details ? sanitizeMemoryContent(s.details) : s.details,
+        }),
+      );
+
       const procedure = await createProceduralMemory(this.db, {
-        triggerPattern: parsed.triggerPattern,
-        steps: parsed.steps,
-        preconditions: parsed.preconditions ?? [],
+        triggerPattern: sanitizeMemoryContent(parsed.triggerPattern),
+        steps: sanitizedSessionSteps,
+        preconditions: (parsed.preconditions ?? []).map((p: string) => sanitizeMemoryContent(p)),
         tags: [...(parsed.tags ?? []), "session-lesson"],
       });
 

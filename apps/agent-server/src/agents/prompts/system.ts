@@ -8,6 +8,24 @@ export function sanitizeForPrompt(text: string): string {
     .replace(/^#{1,3}\s+(?:System|Instructions|Prompt|Override|Ignore\s+previous)/gim, "[STRIPPED]");
 }
 
+/**
+ * Sanitize content extracted from conversations before storing as memories.
+ * Guards against prompt injection via episodic/procedural memory replay.
+ */
+export function sanitizeMemoryContent(text: string): string {
+  return text
+    // Strip XML-like tags that mimic prompt structure
+    .replace(/<\/?(?:system|assistant|user|human|tool_use|tool_result|user-data|instructions|context|memory)(?=[\s>\/])(?:\s[^>]*)?\/?>/gi, "[STRIPPED]")
+    // Strip markdown headings that attempt prompt/instruction override
+    .replace(/^#{1,3}\s+(?:System|Instructions|Prompt|Override|Ignore\s+previous|New\s+instructions|IMPORTANT)/gim, "[STRIPPED]")
+    // Strip common prompt injection phrases
+    .replace(/(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above|earlier)\s+(?:instructions|context|rules|prompts)/gi, "[STRIPPED]")
+    // Strip base64-encoded payloads (64+ chars of base64 alphabet)
+    .replace(/(?:[A-Za-z0-9+/]{64,}={0,2})/g, "[ENCODED_PAYLOAD_STRIPPED]")
+    // Strip HTML script/style tags
+    .replace(/<\/?(?:script|style|iframe|object|embed|form|input)(?:\s[^>]*)?\/?>/gi, "[STRIPPED]");
+}
+
 /** Build system prompt, loading from active persona or DB prompts, falling back to hardcoded defaults */
 export async function buildSystemPrompt(memoryContext?: string, db?: Db): Promise<string> {
   let core = CORE_PERSONALITY;
