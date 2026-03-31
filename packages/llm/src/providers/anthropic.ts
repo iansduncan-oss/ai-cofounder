@@ -5,6 +5,7 @@ import type {
   LlmCompletionResponse,
   LlmContentBlock,
   LlmMessage,
+  LlmThinkingContent,
   LlmTool,
   LlmToolResultContent,
 } from "../types.js";
@@ -88,6 +89,14 @@ export class AnthropicProvider implements LlmProvider {
 
     const blocks: Array<Anthropic.ContentBlockParam | Anthropic.ToolResultBlockParam> =
       msg.content.map((block) => {
+        if (block.type === "thinking") {
+          const tb = block as LlmThinkingContent;
+          return {
+            type: "thinking" as const,
+            thinking: tb.thinking,
+            signature: tb.signature ?? "",
+          };
+        }
         if (block.type === "text") {
           return { type: "text" as const, text: block.text };
         }
@@ -127,7 +136,8 @@ export class AnthropicProvider implements LlmProvider {
 
   private fromAnthropicBlock(block: Anthropic.ContentBlock): LlmContentBlock {
     if (block.type === "thinking") {
-      return { type: "text", text: `<thinking>${(block as unknown as { thinking: string }).thinking}</thinking>` };
+      const tb = block as Anthropic.ThinkingBlock;
+      return { type: "thinking", thinking: tb.thinking, signature: tb.signature };
     }
     if (block.type === "text") {
       return { type: "text", text: block.text };

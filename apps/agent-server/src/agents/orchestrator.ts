@@ -5,6 +5,7 @@ import type {
   LlmToolUseContent,
   LlmToolResultContent,
   LlmTextContent,
+  LlmThinkingContent,
   TaskCategory,
   EmbeddingService,
 } from "@ai-cofounder/llm";
@@ -409,34 +410,59 @@ export class Orchestrator {
   }
 
   /**
-   * Parse <thinking> blocks from response text, store as traces, and strip from output.
+   * Extract native thinking content blocks, store as traces, and return only non-thinking blocks.
+   * Also parses legacy <thinking> tags from text blocks for backward compatibility.
    */
-  private parseAndStoreThinking(
-    text: string,
+  private extractAndStoreThinking(
+    contentBlocks: (LlmTextContent | LlmThinkingContent | LlmToolUseContent | LlmToolResultContent)[],
     conversationId: string,
     round: number,
-  ): string {
-    const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
-    let match: RegExpExecArray | null;
-    const blocks: string[] = [];
+  ): (LlmTextContent | LlmToolUseContent | LlmToolResultContent)[] {
+    const result: (LlmTextContent | LlmToolUseContent | LlmToolResultContent)[] = [];
 
-    while ((match = thinkingRegex.exec(text)) !== null) {
-      blocks.push(match[1].trim());
-    }
-
-    if (blocks.length > 0 && this.db) {
-      for (const block of blocks) {
-        saveThinkingTrace(this.db, {
-          conversationId,
-          requestId: this.requestId,
-          round,
-          content: block,
-        }).catch(() => {}); // fire-and-forget
+    for (const block of contentBlocks) {
+      if (block.type === "thinking") {
+        // Native thinking block from extended thinking
+        if (this.db && block.thinking) {
+          saveThinkingTrace(this.db, {
+            conversationId,
+            requestId: this.requestId,
+            round,
+            content: block.thinking,
+          }).catch(() => {}); // fire-and-forget
+        }
+        continue; // Filter out thinking blocks
       }
+
+      if (block.type === "text") {
+        // Legacy: parse <thinking> tags from text content
+        const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
+        let match: RegExpExecArray | null;
+        const thinkingBlocks: string[] = [];
+        while ((match = thinkingRegex.exec(block.text)) !== null) {
+          thinkingBlocks.push(match[1].trim());
+        }
+        if (thinkingBlocks.length > 0 && this.db) {
+          for (const tb of thinkingBlocks) {
+            saveThinkingTrace(this.db, {
+              conversationId,
+              requestId: this.requestId,
+              round,
+              content: tb,
+            }).catch(() => {});
+          }
+        }
+        const stripped = block.text.replace(thinkingRegex, "").trim();
+        if (stripped) {
+          result.push({ type: "text", text: stripped });
+        }
+        continue;
+      }
+
+      result.push(block);
     }
 
-    // Strip thinking tags from output
-    return text.replace(thinkingRegex, "").trim();
+    return result;
   }
 
   /**
@@ -712,15 +738,15 @@ export class Orchestrator {
         totalOutputTokens += response.usage.outputTokens;
       }
 
+      // Extract thinking traces and filter to non-thinking content
+      const finalContent = this.extractAndStoreThinking(response.content, id, round);
+
       // Extract final text response
-      const textBlocks = response.content
+      const textBlocks = finalContent
         .filter((block): block is LlmTextContent => block.type === "text")
         .map((block) => block.text);
 
       let responseText = textBlocks.join("\n");
-
-      // Parse and store thinking traces, strip from user-facing response
-      responseText = this.parseAndStoreThinking(responseText, id, round);
 
       if (!responseText && plan) {
         responseText = this.buildPlanSummary(plan);
@@ -971,11 +997,10 @@ export class Orchestrator {
         totalOutputTokens += response.usage.outputTokens;
       }
 
-      const textBlocks = response.content.filter((b): b is LlmTextContent => b.type === "text").map((b) => b.text);
+      // Extract thinking traces and filter to non-thinking content
+      const finalContent = this.extractAndStoreThinking(response.content, id, round);
+      const textBlocks = finalContent.filter((b): b is LlmTextContent => b.type === "text").map((b) => b.text);
       let responseText = textBlocks.join("\n");
-
-      // Parse and store thinking traces, strip from user-facing response
-      responseText = this.parseAndStoreThinking(responseText, id, round);
 
       if (!responseText && plan) responseText = this.buildPlanSummary(plan);
 

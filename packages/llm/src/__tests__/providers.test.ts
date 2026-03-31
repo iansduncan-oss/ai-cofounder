@@ -347,9 +347,9 @@ describe("AnthropicProvider", () => {
       expect(response.stop_reason).toBe("unknown");
     });
 
-    it("maps thinking content blocks to wrapped text", async () => {
+    it("maps thinking content blocks to native thinking type", async () => {
       mockAnthropicFinalMessage.mockResolvedValueOnce({
-        content: [{ type: "thinking", thinking: "hmm..." }],
+        content: [{ type: "thinking", thinking: "hmm...", signature: "sig-123" }],
         model: "claude-sonnet-4-20250514",
         stop_reason: "end_turn",
         usage: { input_tokens: 5, output_tokens: 3 },
@@ -357,7 +357,7 @@ describe("AnthropicProvider", () => {
 
       const provider = new AnthropicProvider("sk-test");
       const response = await provider.complete(simpleRequest);
-      expect(response.content).toEqual([{ type: "text", text: "<thinking>hmm...</thinking>" }]);
+      expect(response.content).toEqual([{ type: "thinking", thinking: "hmm...", signature: "sig-123" }]);
     });
 
     it("propagates API errors", async () => {

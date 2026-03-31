@@ -3,6 +3,7 @@ export type {
   LlmToolUseContent,
   LlmToolResultContent,
   LlmContentBlock,
+  LlmThinkingContent,
   LlmMessage,
   LlmToolParameter,
   LlmTool,

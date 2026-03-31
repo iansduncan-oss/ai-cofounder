@@ -144,6 +144,47 @@ describe("Reasoning Traces", () => {
       expect(mockSaveThinkingTrace).toHaveBeenCalledTimes(2);
     });
 
+    it("should handle native thinking content blocks", async () => {
+      const { Orchestrator } = await import("../agents/orchestrator.js");
+      const { LlmRegistry } = await import("@ai-cofounder/llm");
+
+      mockSaveThinkingTrace.mockClear();
+
+      const registry = new LlmRegistry();
+      (registry.complete as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        content: [
+          { type: "thinking", thinking: "native extended thinking content", signature: "sig-abc" },
+          { type: "text", text: "Here is the response." },
+        ],
+        model: "test",
+        stop_reason: "end_turn",
+        usage: { inputTokens: 100, outputTokens: 50 },
+        provider: "test",
+      });
+
+      const orchestrator = new Orchestrator({
+        registry,
+        db: {} as never,
+      });
+
+      const result = await orchestrator.run("Test", "conv-1", [], "user-1", "req-1");
+
+      await flushPromises();
+
+      // Thinking should be stored
+      expect(mockSaveThinkingTrace).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          conversationId: "conv-1",
+          content: "native extended thinking content",
+          round: 0,
+        }),
+      );
+
+      // Response should not contain thinking
+      expect(result.response).toBe("Here is the response.");
+    });
+
     it("should handle text with no thinking blocks", async () => {
       const { Orchestrator } = await import("../agents/orchestrator.js");
       const { LlmRegistry } = await import("@ai-cofounder/llm");

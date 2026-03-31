@@ -18,7 +18,14 @@ export interface LlmToolResultContent {
   content: string;
 }
 
-export type LlmContentBlock = LlmTextContent | LlmToolUseContent | LlmToolResultContent;
+export interface LlmThinkingContent {
+  type: "thinking";
+  thinking: string;
+  /** Anthropic signature needed to round-trip thinking blocks in multi-turn conversations */
+  signature?: string;
+}
+
+export type LlmContentBlock = LlmTextContent | LlmToolUseContent | LlmToolResultContent | LlmThinkingContent;
 
 export interface LlmMessage {
   role: "user" | "assistant";
