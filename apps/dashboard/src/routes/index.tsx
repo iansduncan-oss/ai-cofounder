@@ -111,6 +111,9 @@ const SchedulesPage = lazy(() =>
 const KnowledgePage = lazy(() =>
   import("./knowledge").then((m) => ({ default: m.KnowledgePage })),
 );
+const SearchPage = lazy(() =>
+  import("./search").then((m) => ({ default: m.SearchPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -159,6 +162,7 @@ export const router = createBrowserRouter([
       { path: "agents", element: <AgentsPage /> },
       { path: "schedules", element: <SchedulesPage /> },
       { path: "knowledge", element: <KnowledgePage /> },
+      { path: "search", element: <SearchPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

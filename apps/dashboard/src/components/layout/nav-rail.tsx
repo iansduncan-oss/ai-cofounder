@@ -36,6 +36,7 @@ import {
   CalendarClock,
   Library,
   Network,
+  Search,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ const navSections: NavSection[] = [
     label: "Core",
     items: [
       { icon: Monitor, label: "Command Center", path: null },
+      { icon: Search, label: "Search", path: "/dashboard/search" },
       { icon: Target, label: "Goals", path: "/dashboard/goals" },
       { icon: ShieldCheck, label: "Approvals", path: "/dashboard/approvals", drawer: true },
       { icon: ListChecks, label: "Follow-Ups", path: "/dashboard/follow-ups", drawer: true },
