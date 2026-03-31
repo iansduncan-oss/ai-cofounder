@@ -13,7 +13,7 @@ export const memoryRoutes: FastifyPluginAsync = async (app) => {
       const limit = Math.min(Number(request.query.limit) || 50, 200);
       const offset = Number(request.query.offset) || 0;
       const [data, total] = await Promise.all([
-        listMemoriesByUser(app.db, userId, { limit, offset }),
+        listMemoriesByUser(app.db, userId, { limit, offset, workspaceId: request.workspaceId }),
         countMemoriesByUser(app.db, userId),
       ]);
       return { data, total, limit, offset };

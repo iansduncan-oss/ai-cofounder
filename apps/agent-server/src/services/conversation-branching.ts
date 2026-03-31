@@ -1,6 +1,6 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
-import { createConversation, getConversationMessages, createMessage, conversations } from "@ai-cofounder/db";
+import { createConversation, getConversation, getConversationMessages, createMessage, conversations } from "@ai-cofounder/db";
 import { eq } from "drizzle-orm";
 
 const logger = createLogger("conversation-branching");
@@ -13,11 +13,15 @@ export class ConversationBranchingService {
     userId: string,
     branchPointMessageId?: string,
   ): Promise<{ id: string; messagesCopied: number }> {
+    // Look up original conversation's workspaceId
+    const original = await getConversation(this.db, conversationId);
+    const workspaceId = original?.workspaceId ?? "";
+
     // Create new conversation with branch metadata
     const conv = await createConversation(this.db, {
       userId,
       title: undefined,
-      workspaceId: "",
+      workspaceId,
     });
 
     // Update with branch info

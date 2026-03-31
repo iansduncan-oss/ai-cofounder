@@ -12,7 +12,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
   app.get(
     "/analytics",
     { schema: { tags: ["goals"] } },
-    async () => getGoalAnalytics(app.db),
+    async (request) => getGoalAnalytics(app.db, request.workspaceId),
   );
 
   /* POST / — create a goal */
@@ -37,7 +37,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     "/:id",
     { schema: { tags: ["goals"], params: IdParams } },
     async (request, reply) => {
-      const goal = await getGoal(app.db, request.params.id);
+      const goal = await getGoal(app.db, request.params.id, request.workspaceId);
       if (!goal) return reply.status(404).send({ error: "Goal not found" });
       return goal;
     },
@@ -51,7 +51,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       const limit = Math.min(request.query.limit ?? 50, 200);
       const offset = request.query.offset ?? 0;
       const [data, total] = await Promise.all([
-        listGoalsByConversation(app.db, request.query.conversationId, { limit, offset }),
+        listGoalsByConversation(app.db, request.query.conversationId, { limit, offset, workspaceId: request.workspaceId }),
         countGoalsByConversation(app.db, request.query.conversationId),
       ]);
       return { data, total, limit, offset };

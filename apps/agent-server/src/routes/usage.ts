@@ -30,7 +30,7 @@ export const usageRoutes: FastifyPluginAsync = async (app) => {
         since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     }
 
-    const summary = await getUsageSummary(app.db, since ? { since } : undefined);
+    const summary = await getUsageSummary(app.db, since ? { since, workspaceId: request.workspaceId } : { workspaceId: request.workspaceId });
     return { period, ...summary };
   });
 
@@ -40,7 +40,7 @@ export const usageRoutes: FastifyPluginAsync = async (app) => {
     const days = Math.min(isNaN(rawDays) || rawDays < 1 ? 30 : rawDays, 90);
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const dbRows = await getCostByDay(app.db, since);
+    const dbRows = await getCostByDay(app.db, since, undefined, request.workspaceId);
 
     // Build a map from date string → row for O(1) lookup
     const byDate = new Map<string, { date: string; costUsd: number; inputTokens: number; outputTokens: number; requests: number }>();

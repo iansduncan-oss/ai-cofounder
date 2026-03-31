@@ -141,6 +141,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
     }
 
+    orchestrator.setWorkspaceId(request.workspaceId);
     const llmStart = Date.now();
     const result = await orchestrator.run(
       message,
@@ -285,6 +286,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       send(event.type, event.data);
     };
 
+    orchestrator.setWorkspaceId(request.workspaceId);
     const streamLlmStart = Date.now();
     try {
       const result = await orchestrator.runStream(

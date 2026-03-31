@@ -9,6 +9,7 @@ import {
   searchEpisodicMemoriesByVector,
   touchEpisodicMemory,
   getConversationMessages,
+  getConversation,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import { createLogger } from "@ai-cofounder/shared";
@@ -90,6 +91,9 @@ ${transcript.slice(0, 3000)}`,
         logger.warn("Failed to embed episode summary");
       }
 
+      // Look up the conversation's workspaceId
+      const conv = await getConversation(this.db, conversationId);
+
       const episode = await createEpisodicMemory(this.db, {
         conversationId,
         summary: sanitizeMemoryContent(parsed.summary),
@@ -99,7 +103,7 @@ ${transcript.slice(0, 3000)}`,
         emotionalContext: parsed.emotionalContext ? sanitizeMemoryContent(parsed.emotionalContext) : undefined,
         importance: typeof parsed.importance === "number" ? parsed.importance : 0.5,
         embedding,
-        workspaceId: "",
+        workspaceId: conv?.workspaceId ?? "",
       });
 
       logger.info({ conversationId, episodeId: episode.id }, "Created episodic memory");

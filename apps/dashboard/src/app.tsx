@@ -7,6 +7,7 @@ import { ErrorBoundary } from "@/components/common/error-boundary";
 import { CommandPalette } from "@/components/common/command-palette";
 import { GlobalChatBar } from "@/components/layout/global-chat-bar";
 import { AuthGuard } from "@/components/auth/auth-guard";
+import { WorkspaceProvider } from "@/hooks/use-workspace";
 import { CommandCenterProvider } from "@/providers/command-center-provider";
 import { RealtimeProvider } from "@/providers/realtime-provider";
 
@@ -19,6 +20,7 @@ export function App() {
 
   return (
     <AuthGuard>
+      <WorkspaceProvider>
       <RealtimeProvider>
         <CommandCenterProvider>
           <div className="flex h-screen overflow-hidden bg-surface-0">
@@ -45,6 +47,7 @@ export function App() {
           </div>
         </CommandCenterProvider>
       </RealtimeProvider>
+      </WorkspaceProvider>
     </AuthGuard>
   );
 }

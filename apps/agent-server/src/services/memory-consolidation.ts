@@ -28,6 +28,7 @@ interface MemoryRow {
   key: string;
   content: string;
   metadata: Record<string, unknown> | null;
+  workspaceId?: string | null;
 }
 
 export class MemoryConsolidationService {
@@ -216,6 +217,11 @@ Rules:
           }
         }
 
+        // Use workspaceId from constituent memories
+        const memberWorkspaceId = validMembers
+          .map((id) => memoryById.get(id)?.workspaceId)
+          .find((ws) => ws) ?? "";
+
         // Save composite memory (userId is unambiguous from per-user iteration)
         const composite = await saveMemory(this.db, {
           userId,
@@ -227,7 +233,7 @@ Rules:
             consolidated_at: new Date().toISOString(),
           },
           embedding,
-          workspaceId: "",
+          workspaceId: memberWorkspaceId,
         });
 
         created++;

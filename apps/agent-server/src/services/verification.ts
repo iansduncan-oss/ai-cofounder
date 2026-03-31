@@ -20,6 +20,7 @@ export interface VerificationInput {
     output?: string;
   }>;
   userId?: string;
+  workspaceId?: string;
 }
 
 export interface VerificationResult {
@@ -46,7 +47,7 @@ export class VerificationService {
   ) {}
 
   async verify(input: VerificationInput): Promise<VerificationResult | null> {
-    const { goalId, goalTitle, taskResults, userId } = input;
+    const { goalId, goalTitle, taskResults, userId, workspaceId } = input;
 
     // Skip if no code-related tasks completed
     const hadCodeTasks = taskResults.some(
@@ -120,7 +121,7 @@ export class VerificationService {
           content: `Goal "${goalTitle}" verification: ${verdict.verdict} (confidence: ${verdict.confidence}). ${verdict.summary}`,
           source: `goal-verification:${goalId}`,
           metadata: { goalId, verdict: verdict.verdict, confidence: verdict.confidence },
-          workspaceId: "",
+          workspaceId: workspaceId ?? "",
         }).catch(() => { /* non-fatal */ });
       }
 

@@ -55,6 +55,10 @@ export const queryKeys = {
     status: ["self-healing", "status"] as const,
     report: ["self-healing", "report"] as const,
   },
+  workspaces: {
+    list: ["workspaces", "list"] as const,
+    detail: (id: string) => ["workspaces", "detail", id] as const,
+  },
   queue: {
     status: ["queue", "status"] as const,
   },

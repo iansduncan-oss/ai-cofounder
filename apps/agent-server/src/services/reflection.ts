@@ -332,6 +332,7 @@ LESSONS:
       dayOfWeek: number;
       hourOfDay: number;
       createdAt: Date;
+      workspaceId?: string | null;
     }>,
   ) {
     // Build summary stats
@@ -428,6 +429,9 @@ Return ONLY the JSON array, no other text. Return an empty array [] if no clear 
 
     if (!Array.isArray(parsed)) return [];
 
+    // Use the most common workspaceId from the user's actions
+    const actionWorkspaceId = actions.find((a) => a.workspaceId)?.workspaceId ?? "";
+
     const results = [];
     for (const p of parsed) {
       try {
@@ -438,7 +442,7 @@ Return ONLY the JSON array, no other text. Return an empty array [] if no clear 
           triggerCondition: p.triggerCondition,
           suggestedAction: p.suggestedAction,
           confidence: Math.min(100, Math.max(0, p.confidence)),
-          workspaceId: "",
+          workspaceId: actionWorkspaceId,
         });
         results.push(result);
       } catch (err) {

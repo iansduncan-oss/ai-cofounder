@@ -115,8 +115,10 @@ export async function createConversation(db: Db, data: { userId: string; workspa
   return conv;
 }
 
-export async function getConversation(db: Db, id: string) {
-  const rows = await db.select().from(conversations).where(and(eq(conversations.id, id), isNull(conversations.deletedAt))).limit(1);
+export async function getConversation(db: Db, id: string, workspaceId?: string) {
+  const conditions = [eq(conversations.id, id), isNull(conversations.deletedAt)];
+  if (workspaceId) conditions.push(eq(conversations.workspaceId, workspaceId));
+  const rows = await db.select().from(conversations).where(and(...conditions)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -204,20 +206,25 @@ export async function createGoal(
   return goal;
 }
 
-export async function getGoal(db: Db, id: string) {
-  const rows = await db.select().from(goals).where(and(eq(goals.id, id), isNull(goals.deletedAt))).limit(1);
+export async function getGoal(db: Db, id: string, workspaceId?: string) {
+  const conditions = [eq(goals.id, id), isNull(goals.deletedAt)];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+  const rows = await db.select().from(goals).where(and(...conditions)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function listGoalsByConversation(
   db: Db,
   conversationId: string,
-  options?: { limit?: number; offset?: number },
+  options?: { limit?: number; offset?: number; workspaceId?: string },
 ) {
+  const conditions = [eq(goals.conversationId, conversationId), isNull(goals.deletedAt)];
+  if (options?.workspaceId) conditions.push(eq(goals.workspaceId, options.workspaceId));
+
   let query = db
     .select()
     .from(goals)
-    .where(and(eq(goals.conversationId, conversationId), isNull(goals.deletedAt)))
+    .where(and(...conditions))
     .orderBy(desc(goals.createdAt))
     .$dynamic();
 
@@ -227,11 +234,13 @@ export async function listGoalsByConversation(
   return query;
 }
 
-export async function countGoalsByConversation(db: Db, conversationId: string): Promise<number> {
+export async function countGoalsByConversation(db: Db, conversationId: string, workspaceId?: string): Promise<number> {
+  const conditions = [eq(goals.conversationId, conversationId), isNull(goals.deletedAt)];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(goals)
-    .where(and(eq(goals.conversationId, conversationId), isNull(goals.deletedAt)));
+    .where(and(...conditions));
   return rows[0]?.count ?? 0;
 }
 
@@ -310,8 +319,15 @@ export async function updateGoalMetadata(
 
 /* ────────────────────────── Goal Analytics ────────────────────────── */
 
-export async function getGoalAnalytics(db: Db) {
-  const notDeleted = isNull(goals.deletedAt);
+export async function getGoalAnalytics(db: Db, workspaceId?: string) {
+  const baseConditions = [isNull(goals.deletedAt)];
+  if (workspaceId) baseConditions.push(eq(goals.workspaceId, workspaceId));
+  const notDeleted = and(...baseConditions)!;
+
+  const taskConditions = [isNotNull(tasks.assignedAgent)];
+  if (workspaceId) taskConditions.push(eq(tasks.workspaceId, workspaceId));
+
+  const wsClause = workspaceId ? sql` and workspace_id = ${workspaceId}` : sql``;
 
   const [byStatusRows, byPriorityRows, completionMetrics, trendRows, taskAgentRows] = await Promise.all([
     // Count by status
@@ -345,8 +361,8 @@ export async function getGoalAnalytics(db: Db) {
       )
       select
         d::text as date,
-        coalesce((select count(*)::int from goals where deleted_at is null and created_at::date = d), 0) as created,
-        coalesce((select count(*)::int from goals where deleted_at is null and status = 'completed' and updated_at::date = d), 0) as completed
+        coalesce((select count(*)::int from goals where deleted_at is null${wsClause} and created_at::date = d), 0) as created,
+        coalesce((select count(*)::int from goals where deleted_at is null${wsClause} and status = 'completed' and updated_at::date = d), 0) as completed
       from days
       order by d
     `),
@@ -357,7 +373,7 @@ export async function getGoalAnalytics(db: Db) {
       total: sql<number>`count(*)::int`,
       completed: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`,
       failed: sql<number>`count(case when ${tasks.status} = 'failed' then 1 end)::int`,
-    }).from(tasks).where(isNotNull(tasks.assignedAgent)).groupBy(tasks.assignedAgent),
+    }).from(tasks).where(and(...taskConditions)).groupBy(tasks.assignedAgent),
   ]);
 
   const byStatus: Record<string, number> = {};
@@ -475,20 +491,25 @@ export async function createTask(
   return task;
 }
 
-export async function getTask(db: Db, id: string) {
-  const rows = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
+export async function getTask(db: Db, id: string, workspaceId?: string) {
+  const conditions = [eq(tasks.id, id)];
+  if (workspaceId) conditions.push(eq(tasks.workspaceId, workspaceId));
+  const rows = await db.select().from(tasks).where(and(...conditions)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function listTasksByGoal(
   db: Db,
   goalId: string,
-  options?: { limit?: number; offset?: number },
+  options?: { limit?: number; offset?: number; workspaceId?: string },
 ) {
+  const conditions = [eq(tasks.goalId, goalId)];
+  if (options?.workspaceId) conditions.push(eq(tasks.workspaceId, options.workspaceId));
+
   let query = db
     .select()
     .from(tasks)
-    .where(eq(tasks.goalId, goalId))
+    .where(and(...conditions))
     .orderBy(asc(tasks.orderIndex))
     .$dynamic();
 
@@ -506,11 +527,14 @@ export async function countTasksByGoal(db: Db, goalId: string): Promise<number> 
   return rows[0]?.count ?? 0;
 }
 
-export async function listPendingTasks(db: Db, limit = 50) {
+export async function listPendingTasks(db: Db, limit = 50, workspaceId?: string) {
+  const conditions = [eq(tasks.status, "pending")];
+  if (workspaceId) conditions.push(eq(tasks.workspaceId, workspaceId));
+
   return db
     .select()
     .from(tasks)
-    .where(eq(tasks.status, "pending"))
+    .where(and(...conditions))
     .orderBy(asc(tasks.createdAt))
     .limit(limit);
 }
@@ -784,12 +808,15 @@ export async function searchMemoriesByVector(
 export async function listMemoriesByUser(
   db: Db,
   userId: string,
-  options?: { limit?: number; offset?: number },
+  options?: { limit?: number; offset?: number; workspaceId?: string },
 ) {
+  const conditions = [eq(memories.userId, userId)];
+  if (options?.workspaceId) conditions.push(eq(memories.workspaceId, options.workspaceId));
+
   let query = db
     .select()
     .from(memories)
-    .where(eq(memories.userId, userId))
+    .where(and(...conditions))
     .orderBy(desc(memories.updatedAt))
     .$dynamic();
 
@@ -799,11 +826,13 @@ export async function listMemoriesByUser(
   return query;
 }
 
-export async function countMemoriesByUser(db: Db, userId: string): Promise<number> {
+export async function countMemoriesByUser(db: Db, userId: string, workspaceId?: string): Promise<number> {
+  const conditions = [eq(memories.userId, userId)];
+  if (workspaceId) conditions.push(eq(memories.workspaceId, workspaceId));
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(memories)
-    .where(eq(memories.userId, userId));
+    .where(and(...conditions));
   return rows[0]?.count ?? 0;
 }
 
@@ -902,7 +931,10 @@ export interface GoalSummary {
   completedTaskCount: number;
 }
 
-export async function listActiveGoals(db: Db): Promise<GoalSummary[]> {
+export async function listActiveGoals(db: Db, workspaceId?: string): Promise<GoalSummary[]> {
+  const conditions = [eq(goals.status, "active"), isNull(goals.deletedAt)];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+
   const rows = await db
     .select({
       id: goals.id,
@@ -916,14 +948,21 @@ export async function listActiveGoals(db: Db): Promise<GoalSummary[]> {
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
-    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)))
+    .where(and(...conditions))
     .groupBy(goals.id)
     .orderBy(desc(goals.updatedAt));
 
   return rows;
 }
 
-export async function listRecentlyCompletedGoals(db: Db, since: Date) {
+export async function listRecentlyCompletedGoals(db: Db, since: Date, workspaceId?: string) {
+  const conditions = [
+    eq(goals.status, "completed"),
+    isNull(goals.deletedAt),
+    sql`${goals.updatedAt} >= ${since.toISOString()}`,
+  ];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+
   return db
     .select({
       id: goals.id,
@@ -931,22 +970,19 @@ export async function listRecentlyCompletedGoals(db: Db, since: Date) {
       updatedAt: goals.updatedAt,
     })
     .from(goals)
-    .where(
-      and(
-        eq(goals.status, "completed"),
-        isNull(goals.deletedAt),
-        sql`${goals.updatedAt} >= ${since.toISOString()}`,
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(goals.updatedAt));
 }
 
-export async function countTasksByStatus(db: Db) {
+export async function countTasksByStatus(db: Db, workspaceId?: string) {
+  const conditions = [eq(goals.status, "active"), isNull(goals.deletedAt)];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+
   const rows = await db
     .select({ status: tasks.status })
     .from(tasks)
     .innerJoin(goals, eq(tasks.goalId, goals.id))
-    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)));
+    .where(and(...conditions));
 
   const counts: Record<string, number> = {};
   for (const row of rows) {
@@ -960,7 +996,10 @@ export async function countTasksByStatus(db: Db) {
  * ordered by priority (critical > high > medium > low) then staleness (oldest first).
  * Used by the autonomous executor to deterministically pick the next goal to work on.
  */
-export async function listGoalBacklog(db: Db, limit = 5) {
+export async function listGoalBacklog(db: Db, limit = 5, workspaceId?: string) {
+  const conditions = [eq(goals.status, "active"), isNull(goals.deletedAt)];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+
   return db
     .select({
       id: goals.id,
@@ -975,7 +1014,7 @@ export async function listGoalBacklog(db: Db, limit = 5) {
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
-    .where(and(eq(goals.status, "active"), isNull(goals.deletedAt)))
+    .where(and(...conditions))
     .groupBy(goals.id)
     .having(
       and(
@@ -1319,10 +1358,14 @@ export async function getCostByDay(
   db: Db,
   since: Date,
   until?: Date,
+  workspaceId?: string,
 ): Promise<Array<{ date: string; costUsd: number; inputTokens: number; outputTokens: number; requests: number }>> {
   const conditions = [sql`${llmUsage.createdAt} >= ${since.toISOString()}`];
   if (until) {
     conditions.push(sql`${llmUsage.createdAt} <= ${until.toISOString()}`);
+  }
+  if (workspaceId) {
+    conditions.push(eq(llmUsage.workspaceId, workspaceId));
   }
 
   const rows = await db
@@ -1372,7 +1415,7 @@ export async function getTodayTokenTotal(db: Db): Promise<number> {
 
 export async function getUsageSummary(
   db: Db,
-  options?: { since?: Date; until?: Date },
+  options?: { since?: Date; until?: Date; workspaceId?: string },
 ): Promise<UsageSummary> {
   const conditions = [];
   if (options?.since) {
@@ -1380,6 +1423,9 @@ export async function getUsageSummary(
   }
   if (options?.until) {
     conditions.push(sql`${llmUsage.createdAt} < ${options.until.toISOString()}`);
+  }
+  if (options?.workspaceId) {
+    conditions.push(eq(llmUsage.workspaceId, options.workspaceId));
   }
 
   const rows = await db
@@ -1454,19 +1500,27 @@ export async function createSchedule(
   return schedule;
 }
 
-export async function listSchedules(db: Db, userId?: string) {
-  if (userId) {
-    return db.select().from(schedules).where(eq(schedules.userId, userId)).orderBy(asc(schedules.createdAt));
-  }
-  return db.select().from(schedules).orderBy(asc(schedules.createdAt));
+export async function listSchedules(db: Db, userId?: string, workspaceId?: string) {
+  const conditions = [];
+  if (userId) conditions.push(eq(schedules.userId, userId));
+  if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
+
+  return db.select().from(schedules)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(asc(schedules.createdAt));
 }
 
-export async function listEnabledSchedules(db: Db) {
-  return db.select().from(schedules).where(eq(schedules.enabled, true)).orderBy(asc(schedules.nextRunAt));
+export async function listEnabledSchedules(db: Db, workspaceId?: string) {
+  const conditions = [eq(schedules.enabled, true)];
+  if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
+
+  return db.select().from(schedules).where(and(...conditions)).orderBy(asc(schedules.nextRunAt));
 }
 
-export async function getSchedule(db: Db, id: string) {
-  const rows = await db.select().from(schedules).where(eq(schedules.id, id)).limit(1);
+export async function getSchedule(db: Db, id: string, workspaceId?: string) {
+  const conditions = [eq(schedules.id, id)];
+  if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
+  const rows = await db.select().from(schedules).where(and(...conditions)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -1998,23 +2052,27 @@ export async function searchMessages(
 export async function listConversationsByUser(
   db: Db,
   userId: string,
-  options?: { limit?: number; offset?: number },
+  options?: { limit?: number; offset?: number; workspaceId?: string },
 ) {
   const limit = options?.limit ?? 50;
   const offset = options?.offset ?? 0;
+
+  const conditions = [eq(conversations.userId, userId), isNull(conversations.deletedAt)];
+  if (options?.workspaceId) conditions.push(eq(conversations.workspaceId, options.workspaceId));
+  const where = and(...conditions);
 
   const [data, countRows] = await Promise.all([
     db
       .select()
       .from(conversations)
-      .where(and(eq(conversations.userId, userId), isNull(conversations.deletedAt)))
+      .where(where)
       .orderBy(desc(conversations.updatedAt))
       .limit(limit)
       .offset(offset),
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(conversations)
-      .where(and(eq(conversations.userId, userId), isNull(conversations.deletedAt))),
+      .where(where),
   ]);
 
   return { data, total: countRows[0]?.count ?? 0 };
@@ -2831,19 +2889,20 @@ export async function getUserActionsSince(db: Db, userId: string, since: Date) {
     .orderBy(desc(userActions.createdAt));
 }
 
-export async function getRecentUserActionSummary(db: Db, userId: string, since: Date) {
+export async function getRecentUserActionSummary(db: Db, userId: string, since: Date, workspaceId?: string) {
+  const conditions = [
+    eq(userActions.userId, userId),
+    sql`${userActions.createdAt} >= ${since.toISOString()}`,
+  ];
+  if (workspaceId) conditions.push(eq(userActions.workspaceId, workspaceId));
+
   return db
     .select({
       actionType: userActions.actionType,
       count: sql<number>`count(*)::int`,
     })
     .from(userActions)
-    .where(
-      and(
-        eq(userActions.userId, userId),
-        sql`${userActions.createdAt} >= ${since.toISOString()}`,
-      ),
-    )
+    .where(and(...conditions))
     .groupBy(userActions.actionType)
     .orderBy(sql`count(*) desc`);
 }
@@ -2962,20 +3021,21 @@ export async function upsertUserPattern(
   return created;
 }
 
-export async function getActiveUserPatterns(db: Db, userId: string) {
+export async function getActiveUserPatterns(db: Db, userId: string, workspaceId?: string) {
+  const conditions = [
+    or(eq(userPatterns.userId, userId), isNull(userPatterns.userId)),
+    eq(userPatterns.isActive, true),
+    or(
+      isNull(userPatterns.expiresAt),
+      sql`${userPatterns.expiresAt} > now()`,
+    ),
+  ];
+  if (workspaceId) conditions.push(eq(userPatterns.workspaceId, workspaceId));
+
   return db
     .select()
     .from(userPatterns)
-    .where(
-      and(
-        or(eq(userPatterns.userId, userId), isNull(userPatterns.userId)),
-        eq(userPatterns.isActive, true),
-        or(
-          isNull(userPatterns.expiresAt),
-          sql`${userPatterns.expiresAt} > now()`,
-        ),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(desc(userPatterns.confidence));
 }
 
@@ -3035,7 +3095,7 @@ export async function incrementPatternHitCount(db: Db, patternId: string) {
 
 export async function listPatterns(
   db: Db,
-  opts?: { userId?: string; includeInactive?: boolean; limit?: number; offset?: number },
+  opts?: { userId?: string; includeInactive?: boolean; limit?: number; offset?: number; workspaceId?: string },
 ) {
   const { limit = 50, offset = 0 } = opts ?? {};
   const conditions = [];
@@ -3044,6 +3104,9 @@ export async function listPatterns(
   }
   if (!opts?.includeInactive) {
     conditions.push(eq(userPatterns.isActive, true));
+  }
+  if (opts?.workspaceId) {
+    conditions.push(eq(userPatterns.workspaceId, opts.workspaceId));
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -3144,9 +3207,10 @@ export async function adjustPatternConfidence(db: Db, patternId: string, delta: 
   return updated;
 }
 
-export async function getPatternAnalytics(db: Db, userId?: string) {
+export async function getPatternAnalytics(db: Db, userId?: string, workspaceId?: string) {
   const conditions = [];
   if (userId) conditions.push(eq(userPatterns.userId, userId));
+  if (workspaceId) conditions.push(eq(userPatterns.workspaceId, workspaceId));
 
   const patterns = await db
     .select()
@@ -3961,21 +4025,24 @@ export async function createFollowUp(
   return row;
 }
 
-export async function getFollowUp(db: Db, id: string) {
+export async function getFollowUp(db: Db, id: string, workspaceId?: string) {
+  const conditions = [eq(followUps.id, id)];
+  if (workspaceId) conditions.push(eq(followUps.workspaceId, workspaceId));
   const rows = await db
     .select()
     .from(followUps)
-    .where(eq(followUps.id, id))
+    .where(and(...conditions))
     .limit(1);
   return rows[0] ?? null;
 }
 
 export async function listFollowUps(
   db: Db,
-  opts?: { status?: "pending" | "done" | "dismissed"; limit?: number; offset?: number },
+  opts?: { status?: "pending" | "done" | "dismissed"; limit?: number; offset?: number; workspaceId?: string },
 ) {
   const { status, limit = 50, offset = 0 } = opts ?? {};
   const conditions = status ? [eq(followUps.status, status)] : [];
+  if (opts?.workspaceId) conditions.push(eq(followUps.workspaceId, opts.workspaceId));
 
   const rows = await db
     .select()
@@ -4224,10 +4291,14 @@ export async function createEpisodicMemory(
   return rows[0];
 }
 
-export async function listEpisodicMemories(db: Db, limit = 20, offset = 0) {
+export async function listEpisodicMemories(db: Db, limit = 20, offset = 0, workspaceId?: string) {
+  const conditions = [];
+  if (workspaceId) conditions.push(eq(episodicMemories.workspaceId, workspaceId));
+
   return db
     .select()
     .from(episodicMemories)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(episodicMemories.createdAt))
     .limit(limit)
     .offset(offset);

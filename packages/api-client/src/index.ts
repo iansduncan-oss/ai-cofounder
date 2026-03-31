@@ -111,4 +111,5 @@ export type {
   FailurePattern,
   SelfHealingStatus,
   SelfHealingReport,
+  Workspace,
 } from "./types.js";

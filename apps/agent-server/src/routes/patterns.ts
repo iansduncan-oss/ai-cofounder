@@ -27,6 +27,7 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
         includeInactive: request.query.includeInactive,
         limit: request.query.limit,
         offset: request.query.offset,
+        workspaceId: request.workspaceId,
       });
     },
   );
@@ -38,7 +39,7 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
     async (request) => {
       const userId = request.query.userId;
       const [analytics, heatmap] = await Promise.all([
-        getPatternAnalytics(app.db, userId),
+        getPatternAnalytics(app.db, userId, request.workspaceId),
         getActionHeatmap(app.db, userId),
       ]);
       return { ...analytics, heatmap };

@@ -40,6 +40,7 @@ import {
   Search,
   Mic,
   HeartPulse,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,7 @@ import { queryKeys } from "@/lib/query-keys";
 import { useState, useEffect, useRef } from "react";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/hooks/use-auth";
+import { useWorkspace } from "@/hooks/use-workspace";
 import { Button } from "@/components/ui/button";
 
 interface NavItem {
@@ -91,6 +93,7 @@ const navSections: NavSection[] = [
   {
     label: "System",
     items: [
+      { icon: Layers, label: "Workspaces", path: "/dashboard/workspaces" },
       { icon: Brain, label: "Memories", path: "/dashboard/memories", drawer: true },
       { icon: Milestone, label: "Milestones", path: "/dashboard/milestones", drawer: true },
       { icon: Activity, label: "Activity", path: "/dashboard/activity", drawer: true },
@@ -128,6 +131,9 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { isAuthenticated, logout } = useAuth();
+  const { currentWorkspaceId, workspaces, switchWorkspace } = useWorkspace();
+  const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
+  const currentWs = workspaces.find((w) => w.id === currentWorkspaceId);
 
   const { data: health } = useQuery({
     queryKey: queryKeys.health.status,
@@ -186,6 +192,45 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
           AI
         </div>
       </div>
+
+      {/* Workspace switcher */}
+      {workspaces.length > 1 && (
+        <div className="relative px-1.5 py-1.5 border-b shrink-0">
+          <button
+            onClick={() => setWsDropdownOpen((o) => !o)}
+            className={cn(
+              "flex items-center gap-2 rounded-md transition-all w-full",
+              mobileOpen ? "px-3 py-1.5 text-xs" : "justify-center p-1.5",
+              "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+            )}
+            title={currentWs?.name ?? "Workspace"}
+          >
+            <div className="h-5 w-5 rounded bg-primary/20 text-[8px] font-bold flex items-center justify-center shrink-0">
+              {(currentWs?.name ?? "W")[0].toUpperCase()}
+            </div>
+            {mobileOpen && <span className="truncate">{currentWs?.name ?? "Workspace"}</span>}
+          </button>
+          {wsDropdownOpen && (
+            <div className="absolute left-full top-0 z-50 ml-1 w-48 rounded-md border bg-popover p-1 shadow-md">
+              {workspaces.map((ws) => (
+                <button
+                  key={ws.id}
+                  onClick={() => { switchWorkspace(ws.id); setWsDropdownOpen(false); }}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs transition-colors",
+                    ws.id === currentWorkspaceId
+                      ? "bg-accent text-accent-foreground"
+                      : "hover:bg-accent/50",
+                  )}
+                >
+                  <span className="truncate">{ws.name}</span>
+                  {ws.isDefault && <span className="ml-auto text-[10px] text-muted-foreground">default</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Nav sections */}
       <nav className="flex-1 overflow-y-auto py-2 space-y-3" aria-label="Main navigation">

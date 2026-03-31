@@ -8,7 +8,7 @@ import {
 
 export const dashboardRoutes: FastifyPluginAsync = async (app) => {
   /* GET /summary — aggregated dashboard data */
-  app.get("/summary", { schema: { tags: ["dashboard"] } }, async () => {
+  app.get("/summary", { schema: { tags: ["dashboard"] } }, async (request) => {
     const now = new Date();
 
     const todayStart = new Date(now);
@@ -28,12 +28,12 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
       costWeek,
       costMonth,
     ] = await Promise.all([
-      listActiveGoals(app.db),
-      countTasksByStatus(app.db),
+      listActiveGoals(app.db, request.workspaceId),
+      countTasksByStatus(app.db, request.workspaceId),
       listEvents(app.db, { limit: 10 }),
-      getUsageSummary(app.db, { since: todayStart }),
-      getUsageSummary(app.db, { since: weekStart }),
-      getUsageSummary(app.db, { since: monthStart }),
+      getUsageSummary(app.db, { since: todayStart, workspaceId: request.workspaceId }),
+      getUsageSummary(app.db, { since: weekStart, workspaceId: request.workspaceId }),
+      getUsageSummary(app.db, { since: monthStart, workspaceId: request.workspaceId }),
     ]);
 
     const providerHealth = app.llmRegistry.getProviderHealth();

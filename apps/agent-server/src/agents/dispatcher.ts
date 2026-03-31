@@ -171,7 +171,7 @@ export class TaskDispatcher {
 
     // Post-completion verification: check if deliverables are sound
     if (allCompleted) {
-      this.verifyGoalCompletion(goalId, goal.title, taskResults, userId).catch((err) => {
+      this.verifyGoalCompletion(goalId, goal.title, taskResults, userId, goal.workspaceId ?? undefined).catch((err) => {
         this.logger.warn({ err, goalId }, "goal verification failed (non-fatal)");
       });
 
@@ -213,7 +213,7 @@ export class TaskDispatcher {
       this.logger.warn({ err, goalId }, "failed to enqueue reflection (non-fatal)");
       // Fallback to in-process analysis when queue is unavailable
       if (userId) {
-        this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId).catch((e) => {
+        this.analyzeExecution(goalId, goal.title, goalStatus, taskResults, userId, goal.workspaceId ?? undefined).catch((e) => {
           this.logger.warn({ err: e, goalId }, "fallback analysis also failed (non-fatal)");
         });
       }
@@ -896,6 +896,7 @@ export class TaskDispatcher {
     status: string,
     taskResults: DispatcherProgress["tasks"],
     userId: string,
+    workspaceId?: string,
   ): Promise<void> {
     const failed = taskResults.filter((t) => t.status === "failed");
     const succeeded = taskResults.filter((t) => t.status === "completed");
@@ -939,7 +940,7 @@ export class TaskDispatcher {
       key,
       content,
       source: `goal-execution:${goalId}`,
-      workspaceId: "",
+      workspaceId: workspaceId ?? "",
     });
 
     this.logger.info({ goalId, key }, "execution analysis saved as memory");
@@ -951,9 +952,10 @@ export class TaskDispatcher {
     goalTitle: string,
     taskResults: DispatcherProgress["tasks"],
     userId?: string,
+    workspaceId?: string,
   ): Promise<void> {
     if (this.verificationService) {
-      await this.verificationService.verify({ goalId, goalTitle, taskResults, userId });
+      await this.verificationService.verify({ goalId, goalTitle, taskResults, userId, workspaceId });
       return;
     }
 

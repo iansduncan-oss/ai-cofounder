@@ -10,7 +10,7 @@ import { ConversationBranchingService } from "../services/conversation-branching
  * Create an Orchestrator wired to all services available on the Fastify app.
  * Eliminates the 12+ property copy-paste across routes.
  */
-export function createOrchestrator(app: FastifyInstance): Orchestrator {
+export function createOrchestrator(app: FastifyInstance, options?: { workspaceId?: string }): Orchestrator {
   // Create PrReviewService if workspace is available
   const prReviewService = app.workspaceService
     ? new PrReviewService(app.llmRegistry, app.workspaceService)
@@ -39,5 +39,6 @@ export function createOrchestrator(app: FastifyInstance): Orchestrator {
     conversationBranchingService,
     discordService: (app as unknown as Record<string, unknown>).discordService as DiscordService | undefined,
     vpsCommandService: (app as unknown as Record<string, unknown>).vpsCommandService as VpsCommandService | undefined,
+    workspaceId: options?.workspaceId,
   });
 }

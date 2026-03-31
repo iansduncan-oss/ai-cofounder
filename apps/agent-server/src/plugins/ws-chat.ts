@@ -304,6 +304,7 @@ export const wsChatPlugin = fp(async (app) => {
     };
 
     const isNewConversation = conversationId === "new";
+    if (workspaceId) orchestrator.setWorkspaceId(workspaceId);
     const llmStart = Date.now();
 
     try {

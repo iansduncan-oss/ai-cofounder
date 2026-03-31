@@ -63,7 +63,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     "/",
     { schema: { tags: ["schedules"] } },
     async (request) => {
-      return listSchedules(app.db, request.query.userId);
+      return listSchedules(app.db, request.query.userId, request.workspaceId);
     },
   );
 
@@ -72,7 +72,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
     "/:id",
     { schema: { tags: ["schedules"], params: IdParams } },
     async (request, reply) => {
-      const schedule = await getSchedule(app.db, request.params.id);
+      const schedule = await getSchedule(app.db, request.params.id, request.workspaceId);
       if (!schedule) return reply.status(404).send({ error: "Schedule not found" });
       return schedule;
     },

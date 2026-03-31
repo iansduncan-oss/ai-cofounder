@@ -61,7 +61,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
       convId = conv.id;
     }
 
-    const orchestrator = createOrchestrator(app);
+    const orchestrator = createOrchestrator(app, { workspaceId: request.workspaceId });
 
     const contextMessage = event_type
       ? `[n8n event: ${event_type}] ${message}`

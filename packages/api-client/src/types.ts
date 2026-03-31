@@ -1080,6 +1080,19 @@ export interface GoalAnalytics {
   tasksByAgent: Array<{ agent: string; total: number; completed: number; failed: number }>;
 }
 
+/* ── Workspaces ── */
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  ownerId: string;
+  isDefault: boolean;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /* ── Self-Healing ── */
 
 export interface CircuitBreakerState {

@@ -38,6 +38,7 @@ export async function followUpRoutes(app: FastifyInstance): Promise<void> {
       status,
       limit: limit ? Number(limit) : undefined,
       offset: offset ? Number(offset) : undefined,
+      workspaceId: request.workspaceId,
     });
   });
 

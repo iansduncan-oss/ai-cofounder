@@ -376,6 +376,11 @@ export class Orchestrator {
     this.workspaceId = options.workspaceId;
   }
 
+  /** Set workspace context for the next run (allows reusing singleton orchestrator). */
+  setWorkspaceId(id: string) {
+    this.workspaceId = id;
+  }
+
   /**
    * Call registry.complete with retry on transient failures (429/503).
    * Exponential backoff: 2s, 4s. Max 2 retries.
@@ -1291,7 +1296,7 @@ export class Orchestrator {
           conversationBranchingService: this.conversationBranchingService,
           discordService: this.discordService,
           vpsCommandService: this.vpsCommandService,
-        }, { conversationId, userId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
+        }, { conversationId, userId, workspaceId: this.workspaceId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
         return result;

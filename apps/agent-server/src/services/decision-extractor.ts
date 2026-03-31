@@ -1,7 +1,7 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { Db } from "@ai-cofounder/db";
-import { saveMemory } from "@ai-cofounder/db";
+import { saveMemory, getConversation } from "@ai-cofounder/db";
 
 const logger = createLogger("decision-extractor");
 
@@ -84,6 +84,9 @@ export class DecisionExtractorService {
         }
       }
 
+      // Look up the conversation's workspaceId
+      const conv = conversationId ? await getConversation(this.db, conversationId) : null;
+
       await saveMemory(this.db, {
         userId,
         category: "decisions",
@@ -96,7 +99,7 @@ export class DecisionExtractorService {
           extractedAt: new Date().toISOString(),
         },
         embedding,
-        workspaceId: "",
+        workspaceId: conv?.workspaceId ?? "",
       });
 
       logger.info({ title: parsed.title, conversationId }, "decision auto-extracted");

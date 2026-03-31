@@ -56,6 +56,7 @@ export const conversationRoutes: FastifyPluginAsync = async (app) => {
       const { data, total } = await listConversationsByUser(app.db, request.query.userId, {
         limit,
         offset,
+        workspaceId: request.workspaceId,
       });
       return { data, total, limit, offset };
     },
@@ -66,7 +67,7 @@ export const conversationRoutes: FastifyPluginAsync = async (app) => {
     "/:id",
     { schema: { tags: ["conversations"], params: IdParams } },
     async (request, reply) => {
-      const conv = await getConversation(app.db, request.params.id);
+      const conv = await getConversation(app.db, request.params.id, request.workspaceId);
       if (!conv) return reply.status(404).send({ error: "Conversation not found" });
       return conv;
     },

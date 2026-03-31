@@ -123,6 +123,9 @@ const RoutingPage = lazy(() =>
 const SelfHealingPage = lazy(() =>
   import("./self-healing").then((m) => ({ default: m.SelfHealingPage })),
 );
+const WorkspacesPage = lazy(() =>
+  import("./workspaces").then((m) => ({ default: m.WorkspacesPage })),
+);
 const RegisterPage = lazy(() =>
   import("./register").then((m) => ({ default: m.RegisterPage })),
 );
@@ -182,6 +185,7 @@ export const router = createBrowserRouter([
       { path: "voice", element: <VoicePage /> },
       { path: "routing", element: <RoutingPage /> },
       { path: "self-healing", element: <SelfHealingPage /> },
+      { path: "workspaces", element: <WorkspacesPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

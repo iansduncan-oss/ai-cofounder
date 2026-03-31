@@ -88,6 +88,7 @@ import type {
   GoalAnalytics,
   SelfHealingStatus,
   SelfHealingReport,
+  Workspace,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -124,6 +125,10 @@ export interface ClientOptions {
   getToken?: () => string | null;
   /** Called on 401 response — attempt silent token refresh. Return new token or null. */
   onUnauthorized?: () => Promise<string | null>;
+  /** Dynamic workspace ID getter — injected as X-Workspace-Id header on every request. */
+  getWorkspaceId?: () => string | null;
+  /** Static workspace ID for bot clients. */
+  workspaceId?: string;
 }
 
 export class ApiClient {
@@ -131,6 +136,8 @@ export class ApiClient {
   private headers: Record<string, string>;
   private getToken?: () => string | null;
   private onUnauthorized?: () => Promise<string | null>;
+  private getWorkspaceId?: () => string | null;
+  private staticWorkspaceId?: string;
 
   constructor(options: ClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, "");
@@ -140,6 +147,13 @@ export class ApiClient {
     }
     this.getToken = options.getToken;
     this.onUnauthorized = options.onUnauthorized;
+    this.getWorkspaceId = options.getWorkspaceId;
+    this.staticWorkspaceId = options.workspaceId;
+  }
+
+  private resolveWorkspaceHeader(headers: Record<string, string>) {
+    const wsId = this.getWorkspaceId?.() ?? this.staticWorkspaceId;
+    if (wsId) headers["X-Workspace-Id"] = wsId;
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -149,6 +163,7 @@ export class ApiClient {
     if (dynamicToken) {
       requestHeaders["Authorization"] = `Bearer ${dynamicToken}`;
     }
+    this.resolveWorkspaceHeader(requestHeaders);
 
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
@@ -163,6 +178,7 @@ export class ApiClient {
       if (newToken) {
         const retryHeaders: Record<string, string> = { ...this.headers };
         retryHeaders["Authorization"] = `Bearer ${newToken}`;
+        this.resolveWorkspaceHeader(retryHeaders);
         const retryRes = await fetch(`${this.baseUrl}${path}`, {
           method,
           headers: retryHeaders,
@@ -192,6 +208,7 @@ export class ApiClient {
     if (dynamicToken) {
       requestHeaders["Authorization"] = `Bearer ${dynamicToken}`;
     }
+    this.resolveWorkspaceHeader(requestHeaders);
 
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,
@@ -246,6 +263,28 @@ export class ApiClient {
 
   selfHealingReport() {
     return this.request<SelfHealingReport>("GET", "/api/self-healing/report");
+  }
+
+  /* ── Workspaces ── */
+
+  listWorkspaces() {
+    return this.request<{ workspaces: Workspace[] }>("GET", "/api/workspaces");
+  }
+
+  createWorkspace(data: { name: string; slug: string }) {
+    return this.request<Workspace>("POST", "/api/workspaces", data);
+  }
+
+  getWorkspace(id: string) {
+    return this.request<Workspace>("GET", `/api/workspaces/${id}`);
+  }
+
+  updateWorkspace(id: string, data: { name?: string; slug?: string }) {
+    return this.request<Workspace>("PATCH", `/api/workspaces/${id}`, data);
+  }
+
+  deleteWorkspace(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/workspaces/${id}`);
   }
 
   /* ── Agent ── */

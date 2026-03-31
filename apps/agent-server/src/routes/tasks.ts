@@ -38,7 +38,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["tasks"], querystring: ListPendingQuery } },
     async (request) => {
       const limit = request.query.limit ?? 50;
-      return listPendingTasks(app.db, limit);
+      return listPendingTasks(app.db, limit, request.workspaceId);
     },
   );
 
