@@ -9,6 +9,7 @@ export const queryKeys = {
       ["goals", "list", conversationId] as const,
     detail: (id: string) => ["goals", "detail", id] as const,
     progress: (id: string) => ["goals", "progress", id] as const,
+    analytics: ["goals", "analytics"] as const,
   },
   tasks: {
     all: ["tasks"] as const,

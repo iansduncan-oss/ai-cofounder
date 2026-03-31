@@ -9,6 +9,7 @@ const mockUseDailyCost = vi.fn();
 const mockUseBudgetStatus = vi.fn();
 const mockUseTopExpensiveGoals = vi.fn();
 const mockUseToolStats = vi.fn();
+const mockUseGoalAnalytics = vi.fn();
 
 vi.mock("@/api/queries", () => ({
   useUsage: (...args: unknown[]) => mockUseUsage(...args),
@@ -17,6 +18,7 @@ vi.mock("@/api/queries", () => ({
   useBudgetStatus: () => mockUseBudgetStatus(),
   useTopExpensiveGoals: () => mockUseTopExpensiveGoals(),
   useToolStats: () => mockUseToolStats(),
+  useGoalAnalytics: () => mockUseGoalAnalytics(),
 }));
 
 // Mock recharts to avoid SVG rendering issues in jsdom
@@ -80,6 +82,7 @@ function setupDefaultMocks() {
   });
   mockUseTopExpensiveGoals.mockReturnValue({ data: [] });
   mockUseToolStats.mockReturnValue({ data: toolStatsData });
+  mockUseGoalAnalytics.mockReturnValue({ data: null });
 }
 
 async function renderAnalytics() {
@@ -99,9 +102,10 @@ describe("AnalyticsPage", () => {
     expect(screen.getByText("Cost, usage, and tool performance insights")).toBeInTheDocument();
   });
 
-  it("renders 3 tab buttons", async () => {
+  it("renders 4 tab buttons", async () => {
     await renderAnalytics();
     expect(screen.getByText("Overview")).toBeInTheDocument();
+    expect(screen.getByText("Goals")).toBeInTheDocument();
     expect(screen.getByText("Costs")).toBeInTheDocument();
     expect(screen.getByText("Tools")).toBeInTheDocument();
   });

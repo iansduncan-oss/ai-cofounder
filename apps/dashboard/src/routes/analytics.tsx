@@ -7,6 +7,7 @@ import {
   useBudgetStatus,
   useTopExpensiveGoals,
   useToolStats,
+  useGoalAnalytics,
 } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Select } from "@/components/ui/select";
@@ -25,6 +26,8 @@ import {
   CheckCircle,
   Timer,
   RefreshCw,
+  Clock,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,10 +58,11 @@ const COLORS = [
 ];
 
 type Period = "today" | "week" | "month" | "all";
-type Tab = "overview" | "costs" | "tools";
+type Tab = "overview" | "costs" | "tools" | "goals";
 
 const TABS: { label: string; value: Tab }[] = [
   { label: "Overview", value: "overview" },
+  { label: "Goals", value: "goals" },
   { label: "Costs", value: "costs" },
   { label: "Tools", value: "tools" },
 ];
@@ -89,6 +93,7 @@ export function AnalyticsPage() {
   const { data: budgetData } = useBudgetStatus();
   const { data: topGoals } = useTopExpensiveGoals(10);
   const { data: toolStatsData } = useToolStats();
+  const { data: goalAnalytics } = useGoalAnalytics();
 
   const byProviderData = usage
     ? Object.entries(usage.byProvider).map(([name, data]) => ({
@@ -575,6 +580,151 @@ export function AnalyticsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Goals Tab */}
+      {activeTab === "goals" && goalAnalytics && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-6">
+            <StatCard icon={Target} label="Total Goals" value={String(goalAnalytics.totalGoals)} />
+            <StatCard
+              icon={CheckCircle}
+              label="Completion Rate"
+              value={`${goalAnalytics.completionRate}%`}
+              sub={`of terminal goals`}
+            />
+            <StatCard
+              icon={Clock}
+              label="Avg Completion"
+              value={goalAnalytics.avgCompletionHours != null ? `${goalAnalytics.avgCompletionHours}h` : "N/A"}
+              sub="hours to complete"
+            />
+            <StatCard
+              icon={Users}
+              label="Task Success"
+              value={`${goalAnalytics.taskSuccessRate}%`}
+              sub={`${goalAnalytics.totalTasks} total tasks`}
+            />
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-2 mb-6">
+            {/* Goal Status Pie */}
+            {Object.keys(goalAnalytics.byStatus).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Goals by Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(goalAnalytics.byStatus).map(([name, value]) => ({ name, value }))}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label={({ name, value }) => `${name}: ${value}`}
+                        labelLine={false}
+                      >
+                        {Object.keys(goalAnalytics.byStatus).map((_, i) => (
+                          <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Priority Bar */}
+            {Object.keys(goalAnalytics.byPriority).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Goals by Priority</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart
+                      data={["low", "medium", "high", "critical"]
+                        .filter((p) => goalAnalytics.byPriority[p])
+                        .map((p) => ({ name: p, count: goalAnalytics.byPriority[p] }))}
+                    >
+                      <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                      <Tooltip contentStyle={tooltipStyle} />
+                      <Bar dataKey="count" name="Goals" fill="#8b5cf6" radius={[2, 2, 0, 0]}>
+                        {["low", "medium", "high", "critical"].map((_, i) => (
+                          <Cell key={i} fill={["#3b82f6", "#f59e0b", "#f97316", "#ef4444"][i]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* 14-day Trend */}
+          {goalAnalytics.trend.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-sm">Goal Activity (14 Days)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart data={goalAnalytics.trend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v: string) => {
+                        const parts = v.split("-");
+                        return `${parts[1]}/${parts[2]}`;
+                      }}
+                    />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line type="monotone" dataKey="created" name="Created" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="completed" name="Completed" stroke="#10b981" strokeWidth={2} dot={false} />
+                    <Legend />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Agent Workload */}
+          {goalAnalytics.tasksByAgent.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Task Breakdown by Agent</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={goalAnalytics.tasksByAgent}>
+                    <XAxis dataKey="agent" tick={{ fontSize: 10 }} />
+                    <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Bar dataKey="completed" name="Completed" fill="#10b981" stackId="a" />
+                    <Bar dataKey="failed" name="Failed" fill="#ef4444" stackId="a" radius={[2, 2, 0, 0]} />
+                    <Legend />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {activeTab === "goals" && !goalAnalytics && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
       )}
     </div>
   );

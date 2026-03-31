@@ -7,6 +7,7 @@ const mockUseDailyCost = vi.fn();
 const mockUseBudgetStatus = vi.fn();
 const mockUseTopExpensiveGoals = vi.fn();
 const mockUseToolStats = vi.fn();
+const mockUseGoalAnalytics = vi.fn();
 
 vi.mock("@/api/queries", () => ({
   useUsage: (...args: unknown[]) => mockUseUsage(...args),
@@ -15,6 +16,7 @@ vi.mock("@/api/queries", () => ({
   useBudgetStatus: () => mockUseBudgetStatus(),
   useTopExpensiveGoals: () => mockUseTopExpensiveGoals(),
   useToolStats: () => mockUseToolStats(),
+  useGoalAnalytics: () => mockUseGoalAnalytics(),
 }));
 
 vi.mock("recharts", () => ({
@@ -59,6 +61,7 @@ describe("AnalyticsPage — Goal Costs Section", () => {
       },
     });
     mockUseToolStats.mockReturnValue({ data: { timestamp: "", tools: [] } });
+    mockUseGoalAnalytics.mockReturnValue({ data: null });
   });
 
   async function renderCostsTab() {

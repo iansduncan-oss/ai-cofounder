@@ -1066,6 +1066,20 @@ export interface RagSearchResult {
   metadata: Record<string, unknown> | null;
 }
 
+/* ── Goal Analytics ── */
+
+export interface GoalAnalytics {
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
+  completionRate: number;
+  avgCompletionHours: number | null;
+  totalGoals: number;
+  trend: Array<{ date: string; created: number; completed: number }>;
+  taskSuccessRate: number;
+  totalTasks: number;
+  tasksByAgent: Array<{ agent: string; total: number; completed: number; failed: number }>;
+}
+
 /* ── Global Search ── */
 
 export interface GlobalSearchResults {

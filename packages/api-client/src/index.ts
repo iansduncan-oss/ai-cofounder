@@ -103,4 +103,5 @@ export type {
   RagSource,
   RagStatusResponse,
   RagSearchResult,
+  GoalAnalytics,
 } from "./types.js";

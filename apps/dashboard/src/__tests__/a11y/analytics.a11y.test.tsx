@@ -9,6 +9,7 @@ vi.mock("@/api/queries", () => ({
   useBudgetStatus: vi.fn(),
   useTopExpensiveGoals: vi.fn(),
   useToolStats: vi.fn(),
+  useGoalAnalytics: vi.fn(),
 }));
 
 import {
@@ -18,6 +19,7 @@ import {
   useBudgetStatus,
   useTopExpensiveGoals,
   useToolStats,
+  useGoalAnalytics,
 } from "@/api/queries";
 
 const mockUseUsage = vi.mocked(useUsage);
@@ -26,6 +28,7 @@ const mockUseDailyCost = vi.mocked(useDailyCost);
 const mockUseBudgetStatus = vi.mocked(useBudgetStatus);
 const mockUseTopExpensiveGoals = vi.mocked(useTopExpensiveGoals);
 const mockUseToolStats = vi.mocked(useToolStats);
+const mockUseGoalAnalytics = vi.mocked(useGoalAnalytics);
 
 function mockLoaded() {
   mockUseUsage.mockReturnValue({
@@ -75,6 +78,11 @@ function mockLoaded() {
     isLoading: false,
     error: null,
   } as unknown as ReturnType<typeof useToolStats>);
+  mockUseGoalAnalytics.mockReturnValue({
+    data: null,
+    isLoading: false,
+    error: null,
+  } as unknown as ReturnType<typeof useGoalAnalytics>);
 }
 
 function mockLoading() {
@@ -84,6 +92,7 @@ function mockLoading() {
   mockUseBudgetStatus.mockReturnValue({ data: undefined, isLoading: true, error: null } as unknown as ReturnType<typeof useBudgetStatus>);
   mockUseTopExpensiveGoals.mockReturnValue({ data: undefined, isLoading: true, error: null } as unknown as ReturnType<typeof useTopExpensiveGoals>);
   mockUseToolStats.mockReturnValue({ data: undefined, isLoading: true, error: null } as unknown as ReturnType<typeof useToolStats>);
+  mockUseGoalAnalytics.mockReturnValue({ data: undefined, isLoading: true, error: null } as unknown as ReturnType<typeof useGoalAnalytics>);
 }
 
 describe("AnalyticsPage a11y", () => {

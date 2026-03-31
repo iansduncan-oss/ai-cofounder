@@ -85,6 +85,7 @@ import type {
   ThinkingTrace,
   Reflection,
   ReflectionStats,
+  GoalAnalytics,
 } from "./types.js";
 
 export interface PipelineTemplate {
@@ -1366,6 +1367,12 @@ export class ApiClient {
 
   getQuickActions() {
     return this.request<{ data: Array<{ label: string; icon: string }> }>("GET", "/api/context/quick-actions");
+  }
+
+  /* ── Goal Analytics ── */
+
+  getGoalAnalytics() {
+    return this.request<GoalAnalytics>("GET", "/api/goals/analytics");
   }
 
   /* ── Thinking Traces ── */

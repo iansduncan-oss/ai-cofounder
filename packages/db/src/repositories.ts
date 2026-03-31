@@ -307,6 +307,104 @@ export async function updateGoalMetadata(
   return updated ?? null;
 }
 
+/* ────────────────────────── Goal Analytics ────────────────────────── */
+
+export async function getGoalAnalytics(db: Db) {
+  const notDeleted = isNull(goals.deletedAt);
+
+  const [byStatusRows, byPriorityRows, completionMetrics, trendRows, taskAgentRows] = await Promise.all([
+    // Count by status
+    db.select({
+      status: goals.status,
+      count: sql<number>`count(*)::int`,
+    }).from(goals).where(notDeleted).groupBy(goals.status),
+
+    // Count by priority
+    db.select({
+      priority: goals.priority,
+      count: sql<number>`count(*)::int`,
+    }).from(goals).where(notDeleted).groupBy(goals.priority),
+
+    // Completion metrics
+    db.select({
+      total: sql<number>`count(*)::int`,
+      completed: sql<number>`count(case when ${goals.status} = 'completed' then 1 end)::int`,
+      cancelled: sql<number>`count(case when ${goals.status} = 'cancelled' then 1 end)::int`,
+      avgHours: sql<number>`round(extract(epoch from avg(case when ${goals.status} = 'completed' then ${goals.updatedAt} - ${goals.createdAt} end)) / 3600, 1)`,
+    }).from(goals).where(notDeleted),
+
+    // 14-day trend (created vs completed per day)
+    db.execute(sql`
+      with days as (
+        select generate_series(
+          current_date - interval '13 days',
+          current_date,
+          interval '1 day'
+        )::date as d
+      )
+      select
+        d::text as date,
+        coalesce((select count(*)::int from goals where deleted_at is null and created_at::date = d), 0) as created,
+        coalesce((select count(*)::int from goals where deleted_at is null and status = 'completed' and updated_at::date = d), 0) as completed
+      from days
+      order by d
+    `),
+
+    // Tasks by agent (success/fail breakdown)
+    db.select({
+      agent: tasks.assignedAgent,
+      total: sql<number>`count(*)::int`,
+      completed: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`,
+      failed: sql<number>`count(case when ${tasks.status} = 'failed' then 1 end)::int`,
+    }).from(tasks).where(isNotNull(tasks.assignedAgent)).groupBy(tasks.assignedAgent),
+  ]);
+
+  const byStatus: Record<string, number> = {};
+  for (const r of byStatusRows) byStatus[r.status] = r.count;
+
+  const byPriority: Record<string, number> = {};
+  for (const r of byPriorityRows) byPriority[r.priority] = r.count;
+
+  const metrics = completionMetrics[0];
+  const totalGoals = metrics?.total ?? 0;
+  const completedGoals = metrics?.completed ?? 0;
+  const terminal = completedGoals + (metrics?.cancelled ?? 0);
+  const completionRate = terminal > 0 ? Math.round((completedGoals / terminal) * 100) : 0;
+
+  // Task-level success rate
+  const taskTotals = taskAgentRows.reduce(
+    (acc, r) => ({ total: acc.total + r.total, completed: acc.completed + r.completed }),
+    { total: 0, completed: 0 },
+  );
+  const taskSuccessRate = taskTotals.total > 0
+    ? Math.round((taskTotals.completed / taskTotals.total) * 100)
+    : 0;
+
+  return {
+    byStatus,
+    byPriority,
+    completionRate,
+    avgCompletionHours: metrics?.avgHours ?? null,
+    totalGoals,
+    trend: (trendRows as unknown as Array<{ date: string; created: number; completed: number }>).map((r) => ({
+      date: r.date,
+      created: Number(r.created),
+      completed: Number(r.completed),
+    })),
+    taskSuccessRate,
+    totalTasks: taskTotals.total,
+    tasksByAgent: taskAgentRows
+      .filter((r) => r.agent)
+      .map((r) => ({
+        agent: r.agent as string,
+        total: r.total,
+        completed: r.completed,
+        failed: r.failed,
+      }))
+      .sort((a, b) => b.total - a.total),
+  };
+}
+
 /* ────────────────────────── Tasks ────────────────────────── */
 
 export async function createTask(

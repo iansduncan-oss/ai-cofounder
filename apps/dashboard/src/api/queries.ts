@@ -469,6 +469,15 @@ export function useDeployments(limit = 20) {
   });
 }
 
+/* ── Goal Analytics ── */
+
+export function useGoalAnalytics() {
+  return useQuery({
+    queryKey: queryKeys.goals.analytics,
+    queryFn: () => apiClient.getGoalAnalytics(),
+  });
+}
+
 /* ── Thinking Traces ── */
 
 export function useThinkingTraces(conversationId: string) {
