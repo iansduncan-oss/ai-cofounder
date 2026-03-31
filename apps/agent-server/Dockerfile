@@ -45,24 +45,24 @@ RUN apk add --no-cache docker-cli chromium openssh-client \
 
 ENV BROWSER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-COPY --from=base /app/package.json /app/package-lock.json /app/turbo.json ./
-COPY --from=base /app/packages/shared/package.json packages/shared/
-COPY --from=base /app/packages/shared/dist/ packages/shared/dist/
-COPY --from=base /app/packages/db/package.json packages/db/
-COPY --from=base /app/packages/db/dist/ packages/db/dist/
-COPY --from=base /app/packages/db/drizzle/ packages/db/drizzle/
-COPY --from=base /app/packages/llm/package.json packages/llm/
-COPY --from=base /app/packages/llm/dist/ packages/llm/dist/
-COPY --from=base /app/packages/sandbox/package.json packages/sandbox/
-COPY --from=base /app/packages/sandbox/dist/ packages/sandbox/dist/
-COPY --from=base /app/packages/queue/package.json packages/queue/
-COPY --from=base /app/packages/queue/dist/ packages/queue/dist/
-COPY --from=base /app/packages/rag/package.json packages/rag/
-COPY --from=base /app/packages/rag/dist/ packages/rag/dist/
-COPY --from=base /app/apps/agent-server/package.json apps/agent-server/
-COPY --from=base /app/apps/agent-server/dist/ apps/agent-server/dist/
-COPY apps/voice-ui/public/ apps/voice-ui/public/
-COPY --from=base /app/apps/dashboard/dist/ apps/dashboard/dist/
+COPY --from=base --chown=appuser:appgroup /app/package.json /app/package-lock.json /app/turbo.json ./
+COPY --from=base --chown=appuser:appgroup /app/packages/shared/package.json packages/shared/
+COPY --from=base --chown=appuser:appgroup /app/packages/shared/dist/ packages/shared/dist/
+COPY --from=base --chown=appuser:appgroup /app/packages/db/package.json packages/db/
+COPY --from=base --chown=appuser:appgroup /app/packages/db/dist/ packages/db/dist/
+COPY --from=base --chown=appuser:appgroup /app/packages/db/drizzle/ packages/db/drizzle/
+COPY --from=base --chown=appuser:appgroup /app/packages/llm/package.json packages/llm/
+COPY --from=base --chown=appuser:appgroup /app/packages/llm/dist/ packages/llm/dist/
+COPY --from=base --chown=appuser:appgroup /app/packages/sandbox/package.json packages/sandbox/
+COPY --from=base --chown=appuser:appgroup /app/packages/sandbox/dist/ packages/sandbox/dist/
+COPY --from=base --chown=appuser:appgroup /app/packages/queue/package.json packages/queue/
+COPY --from=base --chown=appuser:appgroup /app/packages/queue/dist/ packages/queue/dist/
+COPY --from=base --chown=appuser:appgroup /app/packages/rag/package.json packages/rag/
+COPY --from=base --chown=appuser:appgroup /app/packages/rag/dist/ packages/rag/dist/
+COPY --from=base --chown=appuser:appgroup /app/apps/agent-server/package.json apps/agent-server/
+COPY --from=base --chown=appuser:appgroup /app/apps/agent-server/dist/ apps/agent-server/dist/
+COPY --chown=appuser:appgroup apps/voice-ui/public/ apps/voice-ui/public/
+COPY --from=base --chown=appuser:appgroup /app/apps/dashboard/dist/ apps/dashboard/dist/
 
 RUN npm ci --omit=dev --ignore-scripts --force
 
