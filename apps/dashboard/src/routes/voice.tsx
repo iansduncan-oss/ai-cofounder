@@ -6,7 +6,7 @@ import { useTextToSpeech } from "@/hooks/use-text-to-speech";
 import { useStreamChat } from "@/hooks/use-stream-chat";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useConversationMessages, useListPersonas, useActivePersona } from "@/api/queries";
-import { Bot, User, Mic, MicOff, Volume2, VolumeX, Plus, ChevronDown } from "lucide-react";
+import { Bot, User, Mic, Volume2, VolumeX, Plus, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ReactMarkdown from "react-markdown";
 
@@ -53,7 +53,7 @@ export function VoicePage() {
 
   // Auto-scroll on new messages or streaming text
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    scrollRef.current?.scrollTo?.({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages.length, stream.accumulatedText]);
 
   // Compute ring state
