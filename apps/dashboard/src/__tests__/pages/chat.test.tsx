@@ -8,8 +8,8 @@ const mockSendMessage = vi.fn();
 const mockCancel = vi.fn();
 const mockReset = vi.fn();
 
-vi.mock("@/hooks/use-stream-chat", () => ({
-  useStreamChat: () => ({
+vi.mock("@/hooks/use-ws-chat", () => ({
+  useWsChat: () => ({
     isStreaming: false,
     accumulatedText: "",
     toolCalls: [],
@@ -21,6 +21,7 @@ vi.mock("@/hooks/use-stream-chat", () => ({
     plan: undefined,
     richCards: [],
     suggestions: [],
+    connected: true,
     sendMessage: mockSendMessage,
     cancel: mockCancel,
     reset: mockReset,
