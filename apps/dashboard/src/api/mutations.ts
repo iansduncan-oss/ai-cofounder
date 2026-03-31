@@ -653,6 +653,33 @@ export function useTriggerPipelineTemplate() {
   });
 }
 
+/* ── Pipeline Templates ── */
+
+export function useCreatePipelineTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string; stages: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }> }) =>
+      apiClient.createPipelineTemplate(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelineTemplates.all });
+      toast.success("Template created");
+    },
+    onError: (err) => { toast.error(`Failed to create template: ${err.message}`); },
+  });
+}
+
+export function useDeletePipelineTemplate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiClient.deletePipelineTemplate(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.pipelineTemplates.all });
+      toast.success("Template deleted");
+    },
+    onError: (err) => { toast.error(`Failed to delete template: ${err.message}`); },
+  });
+}
+
 /* ── Schedules ── */
 
 export function useCreateSchedule() {

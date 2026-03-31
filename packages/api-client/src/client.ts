@@ -713,6 +713,29 @@ export class ApiClient {
     return this.request<PipelineTemplate>("GET", `/api/pipeline-templates/${id}`);
   }
 
+  createPipelineTemplate(data: {
+    name: string;
+    description?: string;
+    stages: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>;
+    defaultContext?: Record<string, unknown>;
+  }) {
+    return this.request<PipelineTemplate>("POST", "/api/pipeline-templates", data);
+  }
+
+  updatePipelineTemplate(id: string, data: {
+    name?: string;
+    description?: string;
+    stages?: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>;
+    defaultContext?: Record<string, unknown>;
+    isActive?: boolean;
+  }) {
+    return this.request<PipelineTemplate>("PATCH", `/api/pipeline-templates/${id}`, data);
+  }
+
+  deletePipelineTemplate(id: string) {
+    return this.request<{ deleted: boolean }>("DELETE", `/api/pipeline-templates/${id}`);
+  }
+
   triggerPipelineTemplate(name: string, opts?: { goalId?: string; context?: Record<string, unknown> }) {
     return this.request<TriggerTemplateResponse>("POST", `/api/pipeline-templates/${encodeURIComponent(name)}/trigger`, opts);
   }
