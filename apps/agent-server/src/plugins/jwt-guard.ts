@@ -43,6 +43,7 @@ import { thinkingRoutes } from "../routes/thinking.js";
 import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
 import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
+import { selfHealingRoutes } from "../routes/self-healing.js";
 import type { AdminRole } from "../plugins/rbac.js";
 
 /** Check if request is from loopback or Docker bridge (narrower than isInternalRequest) */
@@ -179,4 +180,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(workSessionRoutes, { prefix: "/api/work-sessions" });
   app.register(routingRoutes, { prefix: "/api/analytics/routing" });
   app.register(routingStatsRoutes, { prefix: "/api/routing" });
+  app.register(selfHealingRoutes, { prefix: "/api/self-healing" });
 }

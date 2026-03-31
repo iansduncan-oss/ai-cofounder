@@ -27,6 +27,7 @@ import { createDiscordService } from "./services/discord.js";
 import { createVpsCommandService } from "./services/vps-command.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
 import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
+import { SelfHealingService } from "./services/self-healing.js";
 import Redis from "ioredis";
 
 const logger = createLogger("worker");
@@ -74,6 +75,9 @@ export async function main() {
   const adaptiveRoutingService = optionalEnv("ENABLE_ADAPTIVE_ROUTING", "false") === "true"
     ? new AdaptiveRoutingService(db)
     : undefined;
+  const selfHealingService = optionalEnv("ENABLE_SELF_HEALING", "true") === "true"
+    ? new SelfHealingService()
+    : undefined;
   const dispatcher = new TaskDispatcher(
     llmRegistry,
     db,
@@ -85,6 +89,7 @@ export async function main() {
     planRepairService,
     proceduralMemoryService,
     adaptiveRoutingService,
+    selfHealingService,
   );
 
   // Agent messaging service
@@ -155,7 +160,7 @@ export async function main() {
       const result = await runAutonomousSession(
         db, llmRegistry, embeddingService, sandboxService, workspaceService, messagingService,
         lockService,
-        { trigger, tokenBudget, timeBudgetMs, prompt, discordService, vpsCommandService },
+        { trigger, tokenBudget, timeBudgetMs, prompt, discordService, vpsCommandService, selfHealingService },
       );
       logger.info({ jobId: job.id, status: result.status, tokensUsed: result.tokensUsed }, "Autonomous session finished");
     },

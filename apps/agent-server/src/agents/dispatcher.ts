@@ -30,6 +30,7 @@ import { enqueueReflection } from "@ai-cofounder/queue";
 import type { PlanRepairService } from "../services/plan-repair.js";
 import type { ProceduralMemoryService } from "../services/procedural-memory.js";
 import type { AdaptiveRoutingService } from "../services/adaptive-routing.js";
+import type { SelfHealingService } from "../services/self-healing.js";
 
 export interface DispatcherProgress {
   goalId: string;
@@ -77,6 +78,7 @@ export class TaskDispatcher {
     private planRepairService?: PlanRepairService,
     private proceduralMemoryService?: ProceduralMemoryService,
     private adaptiveRoutingService?: AdaptiveRoutingService,
+    private selfHealingService?: SelfHealingService,
   ) {
     this.specialists = new Map<AgentRole, SpecialistAgent>([
       ["researcher", new ResearcherAgent(registry, db, embeddingService)],
@@ -555,6 +557,28 @@ export class TaskDispatcher {
       }
     }
 
+    // Self-healing: check for known failure patterns before executing
+    if (this.selfHealingService) {
+      const recommendation = this.selfHealingService.checkBeforeExecution(agentRole);
+      if (recommendation.action === "skip") {
+        this.logger.warn({ taskId: task.id, agent: agentRole, reason: recommendation.reason }, "self-healing: skipping task");
+        await failTask(this.db, task.id, `Skipped by self-healing: ${recommendation.reason}`);
+        return {
+          taskResult: {
+            id: task.id,
+            title: task.title,
+            agent: agentRole,
+            status: "failed",
+            output: `Skipped by self-healing: ${recommendation.reason}`,
+          },
+        };
+      }
+      if (recommendation.action === "escalate") {
+        this.logger.info({ taskId: task.id, agent: agentRole, reason: recommendation.reason }, "self-healing: escalation recommended");
+        // Log but don't block — the existing retry/routing mechanisms handle escalation
+      }
+    }
+
     const specialist = this.specialists.get(agentRole);
 
     if (!specialist) {
@@ -675,6 +699,9 @@ export class TaskDispatcher {
             /* notification failures are non-fatal */
           });
       }
+
+      // Self-healing: record success
+      this.selfHealingService?.recordSuccess(agentRole);
 
       return {
         taskResult: {
@@ -805,6 +832,17 @@ export class TaskDispatcher {
       }).catch((err2) => this.logger.warn({ err: err2 }, "journal write failed"));
 
       this.logger.error({ taskId: task.id, err }, "task failed");
+
+      // Self-healing: record failure
+      if (this.selfHealingService) {
+        const { SelfHealingService: SHS } = await import("../services/self-healing.js");
+        this.selfHealingService.recordFailure({
+          agentRole,
+          errorCategory: SHS.categorizeError(errorMsg),
+          errorMessage: errorMsg.slice(0, 500),
+          timestamp: new Date(),
+        });
+      }
 
       if (this.notificationService) {
         this.notificationService

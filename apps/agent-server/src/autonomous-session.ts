@@ -21,6 +21,7 @@ import type { DistributedLockService} from "./services/distributed-lock.js";
 import { AUTONOMOUS_SESSION_LOCK } from "./services/distributed-lock.js";
 import { TokenBudgetExceededError } from "./services/autonomous-executor.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
+import type { SelfHealingService } from "./services/self-healing.js";
 
 const logger = createLogger("autonomous-session");
 
@@ -43,6 +44,8 @@ export interface SessionOptions {
   discordService?: DiscordService;
   /** VPS command service for infrastructure management */
   vpsCommandService?: VpsCommandService;
+  /** Self-healing service for failure tracking and circuit breakers */
+  selfHealingService?: SelfHealingService;
 }
 
 export interface SessionResult {
@@ -316,7 +319,7 @@ async function _runSessionBody(
       const adaptiveRouting = optionalEnv("ENABLE_ADAPTIVE_ROUTING", "false") === "true"
         ? new AdaptiveRoutingService(db)
         : undefined;
-      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService, undefined, undefined, undefined, adaptiveRouting);
+      const dispatcher = new TaskDispatcher(registry, db, embeddingService, sandboxService, undefined, workspaceService, undefined, undefined, undefined, adaptiveRouting, options?.selfHealingService);
       const executor = new AutonomousExecutorService(dispatcher, workspaceService, db, registry);
 
       try {
@@ -489,6 +492,21 @@ async function _runSessionBody(
     { sessionId: session.id, status, durationMs, tokensUsed: totalTokens },
     "autonomous session completed",
   );
+
+  // Self-healing: generate end-of-session report (best-effort)
+  if (options?.selfHealingService) {
+    try {
+      const report = options.selfHealingService.generateReport();
+      if (report.recommendations.length > 0) {
+        logger.info(
+          { recommendations: report.recommendations, activeBreakers: report.activeCircuitBreakers.length },
+          "self-healing session report",
+        );
+      }
+    } catch (err) {
+      logger.warn({ err }, "self-healing report generation failed (non-fatal)");
+    }
+  }
 
   // Self-improvement: extract a lesson from the session (best-effort)
   if (status === "completed" && summary) {

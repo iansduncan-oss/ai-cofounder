@@ -134,6 +134,29 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "self_healing_check": {
+          if (app.selfHealingService) {
+            const report = app.selfHealingService.generateReport();
+            const unhealthyAgents = report.healthScores.filter((h) => h.score < 50 && (h.recentSuccesses + h.recentFailures) >= 5);
+            const openBreakers = report.activeCircuitBreakers;
+
+            if (unhealthyAgents.length > 0 || openBreakers.length > 0) {
+              const lines = ["**Self-Healing Alert**"];
+              for (const agent of unhealthyAgents) {
+                lines.push(`- Agent "${agent.agentRole}" health: ${agent.score}% (${agent.recentFailures} failures / ${agent.recentSuccesses + agent.recentFailures} recent)`);
+              }
+              for (const cb of openBreakers) {
+                lines.push(`- Circuit breaker ${cb.state.status.toUpperCase()} for "${cb.agentRole}" (${cb.state.failureCount} failures)`);
+              }
+              if (report.systematicFailures.length > 0) {
+                lines.push(`- ${report.systematicFailures.length} systematic failure pattern(s) detected`);
+              }
+              await app.notificationService.sendBriefing(lines.join("\n"));
+              logger.warn({ unhealthy: unhealthyAgents.length, openBreakers: openBreakers.length }, "self-healing alert sent");
+            }
+          }
+          break;
+        }
         default:
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();

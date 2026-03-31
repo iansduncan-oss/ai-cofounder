@@ -267,6 +267,18 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled meeting prep notifications (every 5 min)");
 
+  // ── Self-healing check (every 15 minutes) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "self-healing-check",
+    { every: 15 * 60 * 1000 },
+    {
+      name: "self-healing-check",
+      data: { check: "self_healing_check" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled self-healing check every 15 minutes");
+
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 
   const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes
