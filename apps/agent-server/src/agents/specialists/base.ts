@@ -13,6 +13,7 @@ import { sanitizeForPrompt } from "../prompts/system.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { trace, SpanStatusCode } from "@opentelemetry/api";
+import { ComplexityEstimator } from "../../services/complexity-estimator.js";
 
 export interface SpecialistContext {
   taskId: string;
@@ -96,7 +97,14 @@ export abstract class SpecialistAgent {
     let model = "";
     let provider = "";
 
-    // Agentic tool-use loop (max 3 rounds for specialists)
+    // Estimate complexity for dynamic round budget
+    const estimator = new ComplexityEstimator();
+    const complexity = estimator.estimate({
+      description: context.taskDescription,
+      toolCount: tools.length,
+    });
+
+    // Agentic tool-use loop with dynamic budget
     let response = await this.completeWithRetry(this.taskCategory, {
       system: systemPrompt,
       messages,
@@ -109,7 +117,7 @@ export abstract class SpecialistAgent {
     model = response.model;
     provider = response.provider;
 
-    const MAX_TOOL_ROUNDS = 3;
+    const MAX_TOOL_ROUNDS = Math.min(complexity.roundBudget, 5); // cap specialists at 5
     let round = 0;
 
     while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {

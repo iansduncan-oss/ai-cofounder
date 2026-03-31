@@ -57,6 +57,7 @@ import type { ConversationBranchingService } from "../services/conversation-bran
 import type { DiscordService } from "../services/discord.js";
 import type { VpsCommandService } from "../services/vps-command.js";
 import { ToolCache } from "../services/tool-cache.js";
+import { ComplexityEstimator } from "../services/complexity-estimator.js";
 import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
@@ -663,14 +664,23 @@ export class Orchestrator {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
       let plan: PlanResult | undefined;
-      // Agentic tool-use loop
-      const useThinking = this.taskCategory === "planning";
+      // Estimate task complexity for dynamic budgets
+      const estimator = new ComplexityEstimator();
+      const complexity = estimator.estimate({
+        description: message,
+        toolCount: tools.length,
+        goalPriority: this.isAutonomous ? "high" : "medium",
+      });
+      this.logger.info({ complexity: complexity.level, score: complexity.score, roundBudget: complexity.roundBudget, thinkingBudget: complexity.thinkingTokenBudget }, "task complexity estimated");
+
+      // Agentic tool-use loop with dynamic budgets
+      const useThinking = complexity.thinkingTokenBudget > 0;
       let response = await this.completeWithRetry(this.taskCategory, {
         system: systemPrompt,
         messages,
         tools,
-        max_tokens: useThinking ? 16384 : 8192,
-        ...(useThinking ? { thinking: { type: "enabled" as const, budget_tokens: 10000 } } : {}),
+        max_tokens: useThinking ? complexity.thinkingTokenBudget + 8192 : 8192,
+        ...(useThinking ? { thinking: { type: "enabled" as const, budget_tokens: complexity.thinkingTokenBudget } } : {}),
         metadata: { agentRole: "orchestrator", conversationId: id, userId },
       });
 
@@ -678,7 +688,7 @@ export class Orchestrator {
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
 
-      const MAX_TOOL_ROUNDS = 10;
+      const MAX_TOOL_ROUNDS = complexity.roundBudget;
       let round = 0;
 
       while (response.stop_reason === "tool_use" && round < MAX_TOOL_ROUNDS) {
