@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { Type, type Static } from "@sinclair/typebox";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { findAdminByEmail, findAdminById, createAdminUser, upsertGoogleToken, upsertAppSetting } from "@ai-cofounder/db";
+import { findAdminByEmail, findAdminById, createAdminUser, listAdminUsers, updateAdminRole, upsertGoogleToken, upsertAppSetting } from "@ai-cofounder/db";
 import { optionalEnv, createLogger } from "@ai-cofounder/shared";
 import { encryptToken, isEncryptionConfigured } from "../services/crypto.js";
 import { getGoogleConnectionStatus, disconnectGoogle } from "../services/google-auth.js";
@@ -346,5 +346,157 @@ export async function authRoutes(app: FastifyInstance) {
     const { sub } = request.user as { sub: string };
     await disconnectGoogle(app.db, sub);
     return reply.send({ success: true });
+  });
+
+  // ── Invite Flow ──
+
+  const InviteBody = Type.Object({
+    email: Type.String({ format: "email", maxLength: 255 }),
+    role: Type.Union([Type.Literal("editor"), Type.Literal("viewer")]),
+  });
+  type InviteBody = Static<typeof InviteBody>;
+
+  /**
+   * POST /api/auth/invite
+   * Admin creates an invite link for a new user.
+   */
+  app.post<{ Body: InviteBody }>("/invite", { schema: { tags: ["auth"], body: InviteBody } }, async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = request.user as { sub: string; role?: string };
+    if (user.role !== "admin") {
+      return reply.status(403).send({ error: "Only admins can create invites" });
+    }
+
+    const { email, role } = request.body;
+
+    // Check if email already registered
+    const existing = await findAdminByEmail(app.db, email);
+    if (existing) {
+      return reply.status(409).send({ error: "User with this email already exists" });
+    }
+
+    // Sign invite JWT (7-day expiry)
+    const token = app.jwt.sign({ email, role, type: "invite" }, { expiresIn: "7d" });
+    const baseUrl = optionalEnv("APP_BASE_URL", "https://app.aviontechs.com");
+    const link = `${baseUrl}/dashboard/register?token=${encodeURIComponent(token)}`;
+
+    logger.info({ email, role, invitedBy: user.sub }, "invite created");
+    return reply.status(201).send({ token, link });
+  });
+
+  const RegisterBody = Type.Object({
+    token: Type.String({ minLength: 1 }),
+    password: Type.String({ minLength: 8, maxLength: 256 }),
+  });
+  type RegisterBody = Static<typeof RegisterBody>;
+
+  /**
+   * POST /api/auth/register
+   * Accept an invite and create a new admin user with password.
+   */
+  app.post<{ Body: RegisterBody }>("/register", { schema: { tags: ["auth"], body: RegisterBody } }, async (request, reply) => {
+    const { token, password } = request.body;
+
+    // Verify invite token
+    let payload: { email?: string; role?: string; type?: string };
+    try {
+      payload = app.jwt.verify(token) as typeof payload;
+    } catch {
+      return reply.status(400).send({ error: "Invalid or expired invite token" });
+    }
+
+    if (payload.type !== "invite" || !payload.email || !payload.role) {
+      return reply.status(400).send({ error: "Invalid invite token" });
+    }
+
+    // Check email not already registered
+    const existing = await findAdminByEmail(app.db, payload.email);
+    if (existing) {
+      return reply.status(409).send({ error: "User with this email already exists" });
+    }
+
+    // Create user
+    const passwordHash = await bcrypt.hash(password, 12);
+    const admin = await createAdminUser(app.db, {
+      email: payload.email,
+      passwordHash,
+      role: payload.role as "editor" | "viewer",
+    });
+
+    // Auto-login: issue access + refresh tokens
+    const accessToken = await reply.jwtSign({ sub: admin.id, email: admin.email, role: admin.role });
+    const refreshToken = app.jwt.sign({ sub: admin.id, type: "refresh" }, { expiresIn: "7d" });
+
+    reply.setCookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/api/auth",
+      maxAge: 7 * 24 * 60 * 60,
+    });
+
+    logger.info({ email: admin.email, role: admin.role }, "user registered via invite");
+    return reply.status(201).send({ accessToken });
+  });
+
+  // ── User Management ──
+
+  /**
+   * GET /api/auth/users
+   * List all admin users (admin-only).
+   */
+  app.get("/users", async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = request.user as { sub: string; role?: string };
+    if (user.role !== "admin") {
+      return reply.status(403).send({ error: "Only admins can list users" });
+    }
+    const users = await listAdminUsers(app.db);
+    return reply.send({ users });
+  });
+
+  const UpdateRoleBody = Type.Object({
+    role: Type.Union([Type.Literal("admin"), Type.Literal("editor"), Type.Literal("viewer")]),
+  });
+  type UpdateRoleBody = Static<typeof UpdateRoleBody>;
+
+  /**
+   * PATCH /api/auth/users/:id/role
+   * Update a user's role (admin-only, cannot demote self).
+   */
+  app.patch<{ Params: { id: string }; Body: UpdateRoleBody }>("/users/:id/role", { schema: { tags: ["auth"], body: UpdateRoleBody } }, async (request, reply) => {
+    try {
+      await request.jwtVerify();
+    } catch {
+      return reply.status(401).send({ error: "Unauthorized" });
+    }
+    const user = request.user as { sub: string; role?: string };
+    if (user.role !== "admin") {
+      return reply.status(403).send({ error: "Only admins can change roles" });
+    }
+
+    const { id } = request.params;
+    const { role } = request.body;
+
+    // Prevent self-demotion
+    if (id === user.sub && role !== "admin") {
+      return reply.status(400).send({ error: "Cannot demote yourself" });
+    }
+
+    const updated = await updateAdminRole(app.db, id, role);
+    if (!updated) {
+      return reply.status(404).send({ error: "User not found" });
+    }
+
+    logger.info({ targetUserId: id, newRole: role, changedBy: user.sub }, "user role updated");
+    return reply.send({ user: { id: updated.id, email: updated.email, role: updated.role } });
   });
 }

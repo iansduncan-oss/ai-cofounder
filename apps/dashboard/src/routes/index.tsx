@@ -117,11 +117,18 @@ const SearchPage = lazy(() =>
 const VoicePage = lazy(() =>
   import("./voice").then((m) => ({ default: m.VoicePage })),
 );
+const RegisterPage = lazy(() =>
+  import("./register").then((m) => ({ default: m.RegisterPage })),
+);
 
 export const router = createBrowserRouter([
   {
     path: "/dashboard/login",
     element: <LoginPage />,
+  },
+  {
+    path: "/dashboard/register",
+    element: <RegisterPage />,
   },
   {
     path: "/dashboard/auth/callback",
