@@ -44,6 +44,8 @@ vi.mock("@/api/queries", () => ({
     },
     isLoading: false,
   }),
+  useProviderHealth: vi.fn().mockReturnValue({ data: { providers: [] } }),
+  useGoalAnalytics: vi.fn().mockReturnValue({ data: null }),
   useDashboardUser: vi.fn().mockReturnValue({ data: { id: "user-uuid-1" } }),
   useConversationMessages: vi.fn().mockReturnValue({ data: null }),
   useConversations: vi.fn().mockReturnValue({ data: null }),

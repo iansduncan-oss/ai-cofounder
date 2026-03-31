@@ -55,6 +55,7 @@ import {
   CheckSquare,
   DollarSign,
   RefreshCw,
+  TrendingUp,
 } from "lucide-react";
 
 function StatusDot({ status }: { status: "ok" | "warning" | "critical" | "unknown" }) {
@@ -68,6 +69,50 @@ function StatusDot({ status }: { status: "ok" | "warning" | "critical" | "unknow
         status === "unknown" && "bg-gray-400",
       )}
     />
+  );
+}
+
+function CostForecastCard({ spent, limit, percentUsed }: { spent: number; limit: number; percentUsed: number }) {
+  const now = new Date();
+  const hoursSinceMidnight = now.getHours() + now.getMinutes() / 60;
+  const ratePerHour = hoursSinceMidnight > 0 ? spent / hoursSinceMidnight : 0;
+  const projectedDaily = ratePerHour * 24;
+  const remaining = limit - spent;
+  const hoursUntilLimit = ratePerHour > 0 ? remaining / ratePerHour : Infinity;
+  const willExceed = projectedDaily > limit;
+
+  return (
+    <Card className={cn("mt-4", willExceed && "border-amber-500/50")}>
+      <CardContent className="pt-4">
+        <div className="flex items-center gap-3">
+          <TrendingUp className={cn("h-5 w-5", willExceed ? "text-amber-500" : "text-muted-foreground")} />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {willExceed
+                ? `Projected $${projectedDaily.toFixed(4)} today — exceeds $${limit.toFixed(2)} limit`
+                : `On track — projected $${projectedDaily.toFixed(4)} of $${limit.toFixed(2)}`}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              ${ratePerHour.toFixed(4)}/hr
+              {hoursUntilLimit < 24 && hoursUntilLimit > 0
+                ? ` · limit in ~${hoursUntilLimit.toFixed(1)}h`
+                : " · within budget"}
+            </p>
+          </div>
+          <div className="h-8 w-8">
+            <svg viewBox="0 0 36 36" className="h-8 w-8 -rotate-90">
+              <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-muted" />
+              <circle
+                cx="18" cy="18" r="16" fill="none" strokeWidth="3"
+                strokeDasharray={`${Math.min(percentUsed, 100)} 100`}
+                strokeLinecap="round"
+                className={cn(percentUsed > 100 ? "text-red-500" : percentUsed > 80 ? "text-amber-500" : "text-blue-500")}
+              />
+            </svg>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -475,6 +520,15 @@ export function HudPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Cost forecast */}
+          {budgetData?.daily && budgetData.daily.limitUsd > 0 && budgetData.daily.spentUsd > 0 && (
+            <CostForecastCard
+              spent={budgetData.daily.spentUsd}
+              limit={budgetData.daily.limitUsd}
+              percentUsed={budgetData.daily.percentUsed ?? 0}
+            />
+          )}
 
           {/* Three-column detail area */}
           <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">

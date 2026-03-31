@@ -7,14 +7,18 @@ vi.mock("@/api/queries", () => ({
   usePendingApprovals: vi.fn(),
   usePendingTasks: vi.fn(),
   useUsage: vi.fn(),
+  useProviderHealth: vi.fn(),
+  useGoalAnalytics: vi.fn(),
 }));
 
-import { useHealth, usePendingApprovals, usePendingTasks, useUsage } from "@/api/queries";
+import { useHealth, usePendingApprovals, usePendingTasks, useUsage, useProviderHealth, useGoalAnalytics } from "@/api/queries";
 
 const mockUseHealth = vi.mocked(useHealth);
 const mockUsePendingApprovals = vi.mocked(usePendingApprovals);
 const mockUsePendingTasks = vi.mocked(usePendingTasks);
 const mockUseUsage = vi.mocked(useUsage);
+const mockUseProviderHealth = vi.mocked(useProviderHealth);
+const mockUseGoalAnalytics = vi.mocked(useGoalAnalytics);
 
 describe("OverviewPage", () => {
   beforeEach(() => {
@@ -35,6 +39,12 @@ describe("OverviewPage", () => {
       data: { totalInputTokens: 50000, totalOutputTokens: 30000, totalCostUsd: 1.23, requestCount: 10, period: "today", byProvider: {}, byModel: {}, byAgent: {} },
       isLoading: false,
     } as unknown as ReturnType<typeof useUsage>);
+    mockUseProviderHealth.mockReturnValue({
+      data: { providers: [] },
+    } as unknown as ReturnType<typeof useProviderHealth>);
+    mockUseGoalAnalytics.mockReturnValue({
+      data: null,
+    } as unknown as ReturnType<typeof useGoalAnalytics>);
   });
 
   it("renders the overview title", () => {

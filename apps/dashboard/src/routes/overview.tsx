@@ -1,11 +1,12 @@
-import { useHealth, usePendingApprovals, usePendingTasks, useUsage } from "@/api/queries";
+import { useHealth, usePendingApprovals, usePendingTasks, useUsage, useProviderHealth, useGoalAnalytics } from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { TaskStatusBadge } from "@/components/common/status-badge";
 import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Target, ShieldCheck, Zap, Activity, AlertTriangle } from "lucide-react";
+import { Target, ShieldCheck, Zap, Activity, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Link } from "react-router";
 
 export function OverviewPage() {
@@ -15,6 +16,8 @@ export function OverviewPage() {
   const { data: approvals, isLoading: approvalsLoading, error: approvalsError } = usePendingApprovals();
   const { data: pendingTasks, isLoading: tasksLoading, error: tasksError } = usePendingTasks();
   const { data: usage, isLoading: usageLoading } = useUsage("today");
+  const { data: providerHealthData } = useProviderHealth();
+  const { data: goalAnalytics } = useGoalAnalytics();
 
   const isLoading = approvalsLoading || tasksLoading || usageLoading;
   const hasError = approvalsError || tasksError;
@@ -152,6 +155,79 @@ export function OverviewPage() {
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No pending tasks</p>
+        )}
+      </div>
+
+      {/* Goal Performance + Provider Health */}
+      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        {/* Goal Performance */}
+        {goalAnalytics && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <Target className="h-4 w-4" />
+                Goal Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-3 mb-3">
+                <div className="text-center">
+                  <p className="text-lg font-bold">{goalAnalytics.totalGoals}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold">{goalAnalytics.completionRate}%</p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-lg font-bold">{goalAnalytics.taskSuccessRate}%</p>
+                  <p className="text-xs text-muted-foreground">Task Success</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {Object.entries(goalAnalytics.byStatus).map(([status, count]) => (
+                  <Badge key={status} variant="outline" className="text-xs">
+                    {status}: {count}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Provider Health */}
+        {providerHealthData?.providers && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <Activity className="h-4 w-4" />
+                Provider Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {providerHealthData.providers.map((p) => (
+                  <div key={p.provider} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      {p.available ? (
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />
+                      ) : (
+                        <XCircle className="h-3.5 w-3.5 text-destructive" />
+                      )}
+                      <span className="font-medium">{p.provider}</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span>{p.totalRequests} req</span>
+                      <span>{p.avgLatencyMs.toFixed(0)}ms</span>
+                      {p.errorCount > 0 && (
+                        <span className="text-destructive">{p.errorCount} err</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
