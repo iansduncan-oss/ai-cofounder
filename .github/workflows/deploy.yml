@@ -18,12 +18,133 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # ── Dry-run validation: build, lint, test, docker build, secrets check ──
+  validate:
+    name: Validate (dry-run)
+    if: inputs.dry_run == true
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ai_cofounder_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U ci"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ai_cofounder_test
+      ANTHROPIC_API_KEY: test-key-not-real
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build (includes typecheck)
+        run: npm run build
+
+      - name: Push schema to test DB
+        run: npm run db:push
+
+      - name: Test
+        run: npm run test
+
+      - name: Build Docker images (no push)
+        run: |
+          docker build -f apps/agent-server/Dockerfile -t ai-cofounder-agent-server:dry-run .
+          docker build -f apps/discord-bot/Dockerfile -t ai-cofounder-discord-bot:dry-run .
+          docker build -f apps/slack-bot/Dockerfile -t ai-cofounder-slack-bot:dry-run .
+
+  check-secrets:
+    name: Check Required Secrets
+    if: inputs.dry_run == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        env:
+          HAS_TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY != '' }}
+          HAS_DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL != '' }}
+          HAS_DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET != '' }}
+          HAS_DISCORD_DEPLOY_WEBHOOK_URL: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL != '' }}
+        run: |
+          echo "## Required Secrets Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          MISSING=0
+          check() {
+            if [ "$2" = "true" ]; then
+              echo "- :white_check_mark: \`$1\`" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- :x: \`$1\` **MISSING**" >> "$GITHUB_STEP_SUMMARY"
+              MISSING=$((MISSING + 1))
+            fi
+          }
+
+          check "TAILSCALE_AUTHKEY" "$HAS_TAILSCALE_AUTHKEY"
+          check "DEPLOY_WEBHOOK_URL" "$HAS_DEPLOY_WEBHOOK_URL"
+          check "DEPLOY_WEBHOOK_SECRET" "$HAS_DEPLOY_WEBHOOK_SECRET"
+          check "DISCORD_DEPLOY_WEBHOOK_URL" "$HAS_DISCORD_DEPLOY_WEBHOOK_URL"
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$MISSING" -gt 0 ]; then
+            echo ":warning: **$MISSING secret(s) missing** — deploy would fail" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          else
+            echo ":white_check_mark: All deploy secrets configured" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  dry-run-summary:
+    name: Dry Run Summary
+    if: inputs.dry_run == true
+    needs: [validate, check-secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate deploy readiness summary
+        run: |
+          echo "## Deploy Dry Run Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Commit:** \`$(git rev-parse --short HEAD)\` — $(git log -1 --pretty=%s)" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Branch:** \`$(git rev-parse --abbrev-ref HEAD)\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Services" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Service | Image | Dockerfile |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|-------|------------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| agent-server | \`ai-cofounder-agent-server:latest\` | \`apps/agent-server/Dockerfile\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| discord-bot | \`ai-cofounder-discord-bot:latest\` | \`apps/discord-bot/Dockerfile\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| slack-bot | \`ai-cofounder-slack-bot:latest\` | \`apps/slack-bot/Dockerfile\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Validation" >> "$GITHUB_STEP_SUMMARY"
+          echo "- :white_check_mark: Lint passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- :white_check_mark: Build/typecheck passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- :white_check_mark: Tests passed" >> "$GITHUB_STEP_SUMMARY"
+          echo "- :white_check_mark: Docker images built" >> "$GITHUB_STEP_SUMMARY"
+          echo "- :white_check_mark: Deploy secrets configured" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "> **Ready to deploy.** Run without \`dry_run\` or push to \`main\` to deploy." >> "$GITHUB_STEP_SUMMARY"
+
+  # ── Actual deploy (skipped during dry-run) ──
   deploy:
     name: Deploy to Hetzner VPS
     runs-on: ubuntu-latest
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_dispatch' && inputs.dry_run != true) ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       - name: Connect to Tailscale
@@ -32,7 +153,6 @@ jobs:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
 
       - name: Notify deploy started
-        if: inputs.dry_run != true
         env:
           DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
           DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
@@ -51,21 +171,13 @@ jobs:
         id: deploy
         env:
           GITHUB_SHA: ${{ github.sha }}
-          DRY_RUN: ${{ inputs.dry_run || 'false' }}
         run: |
-          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 bash -s -- "${GITHUB_SHA}" "${DRY_RUN}" << 'EOF_DEPLOY_SCRIPT'
+          ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=30 ian@avion-stack-01 bash -s -- "${GITHUB_SHA}" << 'EOF_DEPLOY_SCRIPT'
           set -e
           cd /opt/ai-cofounder
 
           SHA="$1"
-          DRY_RUN="$2"
           SHORT_SHA="${SHA:0:7}"
-
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "=========================================="
-            echo "  DRY RUN MODE — validate only, no deploy"
-            echo "=========================================="
-          fi
 
           echo "==> Saving previous image SHA for rollback..."
           PREVIOUS_SHA=$(sudo docker inspect --format='{{index .Config.Labels "git.sha"}}' ai-cofounder-agent-server:latest 2>/dev/null || echo "")
@@ -91,34 +203,6 @@ jobs:
           sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-agent-server:${SHA} -t ai-cofounder-agent-server:latest -f apps/agent-server/Dockerfile .
           sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-discord-bot:${SHA} -t ai-cofounder-discord-bot:latest -f apps/discord-bot/Dockerfile .
           sudo docker build --label "git.sha=${SHA}" -t ai-cofounder-slack-bot:${SHA} -t ai-cofounder-slack-bot:latest -f apps/slack-bot/Dockerfile .
-
-          if [ "$DRY_RUN" = "true" ]; then
-            echo ""
-            echo "=========================================="
-            echo "  DRY RUN SUMMARY"
-            echo "=========================================="
-            echo "  Commit:    ${SHORT_SHA} (${SHA})"
-            echo "  Previous:  ${PREVIOUS_SHA:0:7}"
-            echo "  Images built:"
-            echo "    - ai-cofounder-agent-server:${SHA}"
-            echo "    - ai-cofounder-discord-bot:${SHA}"
-            echo "    - ai-cofounder-slack-bot:${SHA}"
-            echo "  Services that would restart:"
-            echo "    - agent-server, discord-bot, slack-bot (docker-compose.prod.yml)"
-            echo "    - n8n (docker-compose.n8n.yml)"
-            echo "    - uptime-kuma (docker-compose.uptimekuma.yml)"
-            echo "    - monitoring stack (docker-compose.monitoring.yml)"
-            echo "=========================================="
-            echo "  Validation PASSED — images built successfully"
-            echo "=========================================="
-            # Restore previous image tags since we're not deploying
-            if [ -n "$PREVIOUS_SHA" ]; then
-              sudo docker tag ai-cofounder-agent-server:${PREVIOUS_SHA} ai-cofounder-agent-server:latest
-              sudo docker tag ai-cofounder-discord-bot:${PREVIOUS_SHA} ai-cofounder-discord-bot:latest
-              sudo docker tag ai-cofounder-slack-bot:${PREVIOUS_SHA} ai-cofounder-slack-bot:latest
-            fi
-            exit 0
-          fi
 
           echo "==> Restarting services..."
           sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
@@ -192,7 +276,7 @@ jobs:
           EOF_DEPLOY_SCRIPT
 
       - name: Notify deploy completed
-        if: success() && inputs.dry_run != true
+        if: success()
         env:
           DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
           DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
@@ -205,7 +289,7 @@ jobs:
             || echo "::warning::Deploy webhook notification failed (deploy_completed)"
 
       - name: Notify deploy failed
-        if: failure() && inputs.dry_run != true
+        if: failure()
         env:
           DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
           DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
@@ -218,7 +302,7 @@ jobs:
             || echo "::warning::Deploy webhook notification failed (deploy_failed)"
 
       - name: Notify deploy rolled back
-        if: failure() && inputs.dry_run != true
+        if: failure()
         env:
           DEPLOY_WEBHOOK_URL: ${{ secrets.DEPLOY_WEBHOOK_URL }}
           DEPLOY_WEBHOOK_SECRET: ${{ secrets.DEPLOY_WEBHOOK_SECRET }}
@@ -236,7 +320,7 @@ jobs:
           ssh ian@avion-stack-01 "rm -f /tmp/deploy_state" 2>/dev/null || true
 
       - name: Notify Discord — Success
-        if: success() && inputs.dry_run != true
+        if: success()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
           COMMIT_SHA: ${{ github.sha }}
@@ -249,7 +333,7 @@ jobs:
             "$DISCORD_WEBHOOK"
 
       - name: Notify Discord — Failure
-        if: failure() && inputs.dry_run != true
+        if: failure()
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_DEPLOY_WEBHOOK_URL }}
           COMMIT_SHA: ${{ github.sha }}
