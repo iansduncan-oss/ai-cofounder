@@ -87,6 +87,10 @@ services:
       - VPS_USER=ian
       - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
       - DOCKER_HOST=tcp://docker-socket-proxy:2375
+      - ENABLE_ADAPTIVE_ROUTING=${ENABLE_ADAPTIVE_ROUTING:-false}
+      - APP_BASE_URL=${APP_BASE_URL:-https://app.aviontechs.com}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     mem_limit: 1g
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -143,6 +147,7 @@ services:
       - VPS_HOST=host.docker.internal
       - VPS_USER=ian
       - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
+      - ENABLE_ADAPTIVE_ROUTING=${ENABLE_ADAPTIVE_ROUTING:-false}
     mem_limit: 512m
     extra_hosts:
       - "host.docker.internal:host-gateway"
