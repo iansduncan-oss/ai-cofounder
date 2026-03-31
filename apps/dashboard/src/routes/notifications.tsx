@@ -115,6 +115,34 @@ export function NotificationsPage() {
         description="All system notifications in one place"
       />
 
+      {/* Summary cards */}
+      {notifications.length > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-lg font-semibold">{notifications.length}</p>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground">Approvals</p>
+            <p className="text-lg font-semibold text-amber-600">
+              {notifications.filter((n) => n.type === "approval").length}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground">Alerts</p>
+            <p className="text-lg font-semibold text-red-600">
+              {notifications.filter((n) => n.type === "alert").length}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card p-3">
+            <p className="text-xs text-muted-foreground">Critical</p>
+            <p className="text-lg font-semibold text-destructive">
+              {notifications.filter((n) => n.severity === "critical").length}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Filter tabs */}
       <div className="mb-4 flex gap-2 flex-wrap">
         {tabs.map(({ key, label }) => (
