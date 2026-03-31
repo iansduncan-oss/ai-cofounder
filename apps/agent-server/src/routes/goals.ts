@@ -20,9 +20,10 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
     "/",
     { schema: { tags: ["goals"], body: CreateGoalBody } },
     async (request, reply) => {
-      const goal = await createGoal(app.db, request.body);
+      const goal = await createGoal(app.db, { ...request.body, workspaceId: request.workspaceId });
       app.wsBroadcast?.("goals");
       recordActionSafe(app.db, {
+        workspaceId: request.workspaceId,
         userId: request.body.createdBy,
         actionType: "goal_created",
         actionDetail: request.body.title.slice(0, 200),
@@ -125,6 +126,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       if (!original) return reply.status(404).send({ error: "Goal not found" });
 
       const cloned = await createGoal(app.db, {
+        workspaceId: request.workspaceId,
         conversationId: original.conversationId,
         title: `${original.title} (copy)`,
         description: original.description ?? undefined,
@@ -137,6 +139,7 @@ export const goalRoutes: FastifyPluginAsync = async (app) => {
       if (originalTasks.length > 0) {
         await app.db.insert(tasks).values(
           originalTasks.map((task) => ({
+            workspaceId: request.workspaceId,
             goalId: cloned.id,
             title: task.title,
             description: task.description,

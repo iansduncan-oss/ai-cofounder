@@ -17,6 +17,7 @@ export class ConversationBranchingService {
     const conv = await createConversation(this.db, {
       userId,
       title: undefined,
+      workspaceId: "",
     });
 
     // Update with branch info

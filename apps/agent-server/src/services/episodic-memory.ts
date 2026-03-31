@@ -99,6 +99,7 @@ ${transcript.slice(0, 3000)}`,
         emotionalContext: parsed.emotionalContext ? sanitizeMemoryContent(parsed.emotionalContext) : undefined,
         importance: typeof parsed.importance === "number" ? parsed.importance : 0.5,
         embedding,
+        workspaceId: "",
       });
 
       logger.info({ conversationId, episodeId: episode.id }, "Created episodic memory");

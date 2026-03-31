@@ -426,7 +426,7 @@ async function _runSessionBody(
     const contextPrompt = await buildContextPrompt(db, options?.prompt, options?.vpsCommandService, options?.discordService);
 
     // Ensure a conversation record exists so goals can reference it via FK
-    await createConversation(db, { userId: "system-autonomous", title: `Autonomous session ${session.id}` })
+    await createConversation(db, { userId: "system-autonomous", title: `Autonomous session ${session.id}`, workspaceId: "" })
       .then((conv) => {
         // Use the conversation ID for the orchestrator instead of session ID
         (session as { conversationId?: string }).conversationId = conv.id;

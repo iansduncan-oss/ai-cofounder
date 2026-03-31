@@ -169,6 +169,7 @@ export interface ToolExecutorContext {
   agentRunId?: string;
   goalId?: string;
   isAutonomous?: boolean;
+  workspaceId?: string;
 }
 
 /**
@@ -464,6 +465,7 @@ export async function executeSharedTool(
         source: context.conversationId,
         agentRole: context.agentRole,
         embedding,
+        workspaceId: context.workspaceId ?? "",
       });
       return { saved: true, key: mem.key, category: mem.category };
     }
@@ -595,6 +597,7 @@ export async function executeSharedTool(
           userId: context.userId,
           enabled: true,
           nextRunAt,
+          workspaceId: context.workspaceId ?? "",
         });
         return {
           scheduleId: schedule.id,
@@ -1061,6 +1064,7 @@ export async function executeSharedTool(
         description: input.description,
         dueDate: input.due_date ? new Date(input.due_date) : undefined,
         source: input.source,
+        workspaceId: context.workspaceId ?? "",
       });
       return { created: true, followUpId: followUp.id, title: followUp.title };
     }

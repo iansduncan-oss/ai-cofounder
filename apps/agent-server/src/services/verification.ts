@@ -120,6 +120,7 @@ export class VerificationService {
           content: `Goal "${goalTitle}" verification: ${verdict.verdict} (confidence: ${verdict.confidence}). ${verdict.summary}`,
           source: `goal-verification:${goalId}`,
           metadata: { goalId, verdict: verdict.verdict, confidence: verdict.confidence },
+          workspaceId: "",
         }).catch(() => { /* non-fatal */ });
       }
 

@@ -253,7 +253,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
 
           // Create a system user + conversation for scheduled tasks
           const user = await findOrCreateUser(db, "system-scheduler", "system");
-          const conv = await createConversation(db, { userId: user.id, title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 50)}` });
+          const conv = await createConversation(db, { userId: user.id, title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 50)}`, workspaceId: "" });
 
           // Run the orchestrator
           const result = await orchestrator.run(

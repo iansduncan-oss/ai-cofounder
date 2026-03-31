@@ -227,6 +227,7 @@ Rules:
             consolidated_at: new Date().toISOString(),
           },
           embedding,
+          workspaceId: "",
         });
 
         created++;

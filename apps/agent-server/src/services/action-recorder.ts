@@ -5,6 +5,7 @@ import { recordUserAction } from "@ai-cofounder/db";
 export function recordActionSafe(
   db: Db,
   action: {
+    workspaceId?: string;
     userId?: string;
     actionType: string;
     actionDetail?: string;

@@ -96,6 +96,7 @@ export class DecisionExtractorService {
           extractedAt: new Date().toISOString(),
         },
         embedding,
+        workspaceId: "",
       });
 
       logger.info({ title: parsed.title, conversationId }, "decision auto-extracted");

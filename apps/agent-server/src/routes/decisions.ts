@@ -46,6 +46,7 @@ export const decisionRoutes: FastifyPluginAsync = async (app) => {
       const { userId, title, decision, context, alternatives, rationale, source } = request.body;
 
       const memory = await saveMemory(app.db, {
+        workspaceId: request.workspaceId,
         userId,
         category: "decisions",
         key: title,

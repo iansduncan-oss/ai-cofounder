@@ -36,6 +36,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
         const nextRunAt = interval.next().toDate();
 
         const schedule = await createSchedule(app.db, {
+          workspaceId: request.workspaceId,
           cronExpression,
           actionPrompt,
           description,
@@ -44,6 +45,7 @@ export const scheduleRoutes: FastifyPluginAsync = async (app) => {
           nextRunAt,
         });
         recordActionSafe(app.db, {
+          workspaceId: request.workspaceId,
           userId,
           actionType: "schedule_created",
           actionDetail: `${cronExpression}: ${actionPrompt.slice(0, 150)}`,

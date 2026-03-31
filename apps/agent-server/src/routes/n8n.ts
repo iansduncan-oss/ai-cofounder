@@ -57,7 +57,7 @@ export const n8nRoutes: FastifyPluginAsync = async (app) => {
     if (userId) {
       const user = await findOrCreateUser(app.db, userId, platform ?? "n8n");
       dbUserId = user.id;
-      const conv = await createConversation(app.db, { userId: user.id });
+      const conv = await createConversation(app.db, { userId: user.id, workspaceId: request.workspaceId });
       convId = conv.id;
     }
 

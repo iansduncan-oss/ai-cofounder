@@ -318,6 +318,7 @@ export interface OrchestratorOptions {
   discordService?: DiscordService;
   vpsCommandService?: VpsCommandService;
   isAutonomous?: boolean;
+  workspaceId?: string;
 }
 
 /* ── Orchestrator class ── */
@@ -346,6 +347,7 @@ export class Orchestrator {
   private discordService?: DiscordService;
   private vpsCommandService?: VpsCommandService;
   private isAutonomous: boolean;
+  private workspaceId?: string;
   private requestId?: string;
 
   constructor(options: OrchestratorOptions) {
@@ -371,6 +373,7 @@ export class Orchestrator {
     this.discordService = options.discordService;
     this.vpsCommandService = options.vpsCommandService;
     this.isAutonomous = options.isAutonomous ?? false;
+    this.workspaceId = options.workspaceId;
   }
 
   /**
@@ -786,6 +789,7 @@ export class Orchestrator {
             inputTokens: totalInputTokens,
             outputTokens: totalOutputTokens,
             conversationId: id,
+            workspaceId: this.workspaceId ?? "",
           });
         } catch (usageErr) {
           this.logger.warn({ err: usageErr }, "failed to record orchestrator LLM usage");
@@ -1034,6 +1038,7 @@ export class Orchestrator {
             inputTokens: totalInputTokens,
             outputTokens: totalOutputTokens,
             conversationId: id,
+            workspaceId: this.workspaceId ?? "",
           });
         } catch (usageErr) {
           this.logger.warn({ err: usageErr }, "failed to record orchestrator LLM usage");
@@ -1348,6 +1353,7 @@ export class Orchestrator {
       milestoneId: input.milestone_id || undefined,
       scope,
       requiresApproval,
+      workspaceId: this.workspaceId ?? "",
     });
 
     // If approval required → "proposed"; otherwise → "active"
@@ -1368,6 +1374,7 @@ export class Orchestrator {
         orderIndex: i,
         parallelGroup: t.parallel_group,
         input: t.description,
+        workspaceId: this.workspaceId ?? "",
       });
 
       createdTasks.push({

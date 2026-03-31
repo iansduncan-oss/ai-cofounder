@@ -51,6 +51,7 @@ export const patternRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["patterns"], body: CreatePatternBody } },
     async (request, reply) => {
       const pattern = await createPattern(app.db, {
+        workspaceId: request.workspaceId,
         userId: request.body.userId,
         patternType: request.body.patternType,
         description: request.body.description,

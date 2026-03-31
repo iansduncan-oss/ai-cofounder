@@ -49,6 +49,8 @@ export const users = pgTable("users", {
 
 export const conversations = pgTable("conversations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -150,6 +152,8 @@ export const milestones = pgTable("milestones", {
 
 export const goals = pgTable("goals", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   conversationId: uuid("conversation_id")
     .notNull()
     .references(() => conversations.id, { onDelete: "cascade" }),
@@ -171,6 +175,8 @@ export const goals = pgTable("goals", {
 
 export const tasks = pgTable("tasks", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   goalId: uuid("goal_id")
     .notNull()
     .references(() => goals.id, { onDelete: "cascade" }),
@@ -206,6 +212,8 @@ export const memoryCategoryEnum = pgEnum("memory_category", [
 
 export const memories = pgTable("memories", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -272,6 +280,8 @@ export const codeExecutions = pgTable("code_executions", {
 
 export const llmUsage = pgTable("llm_usage", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   provider: text("provider").notNull(),
   model: text("model").notNull(),
   taskCategory: text("task_category").notNull(), // planning, conversation, simple, research, code
@@ -293,6 +303,8 @@ export const llmUsage = pgTable("llm_usage", {
 
 export const schedules = pgTable("schedules", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
   cronExpression: text("cron_expression").notNull(),
   actionPrompt: text("action_prompt").notNull(),
@@ -465,6 +477,21 @@ export const adminUsers = pgTable("admin_users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Workspaces ── */
+
+export const workspaces = pgTable("workspaces", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  ownerId: uuid("owner_id")
+    .notNull()
+    .references(() => adminUsers.id, { onDelete: "cascade" }),
+  isDefault: boolean("is_default").notNull().default(false),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /* ── Google OAuth Tokens ── */
 
 export const googleTokens = pgTable("google_tokens", {
@@ -512,6 +539,8 @@ export const userActionTypeEnum = pgEnum("user_action_type", [
 
 export const userActions = pgTable("user_actions", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   actionType: userActionTypeEnum("action_type").notNull(),
   actionDetail: text("action_detail"),
@@ -525,6 +554,8 @@ export const userActions = pgTable("user_actions", {
 
 export const userPatterns = pgTable("user_patterns", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   patternType: text("pattern_type").notNull(), // "time_preference", "sequence", "recurring_action"
   description: text("description").notNull(), // human-readable: "deploys on Fridays around 3 PM"
@@ -538,7 +569,7 @@ export const userPatterns = pgTable("user_patterns", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
-  uniqueIndex("idx_user_patterns_user_type").on(table.userId, table.patternType),
+  uniqueIndex("idx_user_patterns_user_workspace_type").on(table.userId, table.workspaceId, table.patternType),
 ]);
 
 /* ── Deployments (deploy tracking & self-healing) ── */
@@ -791,6 +822,8 @@ export const followUpStatusEnum = pgEnum("follow_up_status", ["pending", "done",
 
 export const followUps = pgTable("follow_ups", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   status: followUpStatusEnum("status").notNull().default("pending"),
@@ -849,6 +882,8 @@ export const outboundWebhooks = pgTable("outbound_webhooks", {
 
 export const episodicMemories = pgTable("episodic_memories", {
   id: uuid("id").primaryKey().defaultRandom(),
+  workspaceId: uuid("workspace_id")
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   conversationId: uuid("conversation_id")
     .notNull()
     .references(() => conversations.id, { onDelete: "cascade" }),

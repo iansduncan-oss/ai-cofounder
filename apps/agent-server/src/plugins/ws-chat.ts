@@ -174,7 +174,7 @@ export const wsChatPlugin = fp(async (app) => {
               return;
             }
             isProcessing = true;
-            handleUserMessage(socket, conversationId, msg).finally(() => {
+            handleUserMessage(socket, conversationId, msg, request.workspaceId).finally(() => {
               isProcessing = false;
             });
             break;
@@ -208,6 +208,7 @@ export const wsChatPlugin = fp(async (app) => {
     socket: WebSocket,
     conversationId: string,
     msg: WsChatClientMessage & { type: "user_message" },
+    workspaceId: string,
   ): Promise<void> {
     const { content: message, userId, platform } = msg;
 
@@ -235,7 +236,7 @@ export const wsChatPlugin = fp(async (app) => {
 
       // If conversationId is "new", create one
       if (convId === "new") {
-        const conv = await createConversation(app.db, { userId: user.id });
+        const conv = await createConversation(app.db, { userId: user.id, workspaceId });
         convId = conv.id;
       }
     }
@@ -369,6 +370,7 @@ export const wsChatPlugin = fp(async (app) => {
       // Record user action
       if (dbUserId) {
         recordActionSafe(app.db, {
+          workspaceId,
           userId: dbUserId,
           actionType: "chat_message",
           actionDetail: message.slice(0, 200),

@@ -110,7 +110,7 @@ export async function deleteChannelConversation(db: Db, channelId: string) {
 
 /* ──────────────── Conversations ──────────────────────────── */
 
-export async function createConversation(db: Db, data: { userId: string; title?: string }) {
+export async function createConversation(db: Db, data: { userId: string; workspaceId?: string; title?: string }) {
   const [conv] = await db.insert(conversations).values(data).returning();
   return conv;
 }
@@ -189,6 +189,7 @@ export async function createGoal(
   db: Db,
   data: {
     conversationId: string;
+    workspaceId?: string;
     title: string;
     description?: string;
     priority?: "low" | "medium" | "high" | "critical";
@@ -459,6 +460,7 @@ export async function createTask(
   db: Db,
   data: {
     goalId: string;
+    workspaceId?: string;
     title: string;
     description?: string;
     assignedAgent?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier";
@@ -656,6 +658,7 @@ export async function saveMemory(
   db: Db,
   data: {
     userId: string;
+    workspaceId?: string;
     category: MemoryCategory;
     key: string;
     content: string;
@@ -1205,6 +1208,7 @@ export async function recordLlmUsage(
     agentRole?: AgentRole;
     inputTokens: number;
     outputTokens: number;
+    workspaceId?: string;
     userId?: string;
     goalId?: string;
     taskId?: string;
@@ -1435,6 +1439,7 @@ export async function createSchedule(
   db: Db,
   data: {
     userId?: string;
+    workspaceId?: string;
     cronExpression: string;
     actionPrompt: string;
     description?: string;
@@ -2791,6 +2796,7 @@ export async function recordUserAction(
   db: Db,
   data: {
     userId?: string;
+    workspaceId?: string;
     actionType: UserActionType;
     actionDetail?: string;
     metadata?: Record<string, unknown>;
@@ -2801,6 +2807,7 @@ export async function recordUserAction(
     .insert(userActions)
     .values({
       userId: data.userId,
+      workspaceId: data.workspaceId,
       actionType: data.actionType,
       actionDetail: data.actionDetail,
       dayOfWeek: now.getDay(),
@@ -2904,6 +2911,7 @@ export async function upsertUserPattern(
   db: Db,
   data: {
     userId?: string;
+    workspaceId?: string;
     patternType: string;
     description: string;
     triggerCondition: Record<string, unknown>;
@@ -2943,6 +2951,7 @@ export async function upsertUserPattern(
     .insert(userPatterns)
     .values({
       userId: data.userId,
+      workspaceId: data.workspaceId,
       patternType: data.patternType,
       description: data.description,
       triggerCondition: data.triggerCondition,
@@ -3074,6 +3083,7 @@ export async function createPattern(
   db: Db,
   data: {
     userId?: string;
+    workspaceId?: string;
     patternType: string;
     description: string;
     suggestedAction: string;
@@ -3085,6 +3095,7 @@ export async function createPattern(
     .insert(userPatterns)
     .values({
       userId: data.userId,
+      workspaceId: data.workspaceId,
       patternType: data.patternType,
       description: data.description,
       suggestedAction: data.suggestedAction,
@@ -3931,6 +3942,7 @@ export async function createFollowUp(
   db: Db,
   data: {
     title: string;
+    workspaceId?: string;
     description?: string;
     dueDate?: Date;
     source?: string;
@@ -3940,6 +3952,7 @@ export async function createFollowUp(
     .insert(followUps)
     .values({
       title: data.title,
+      workspaceId: data.workspaceId,
       description: data.description,
       dueDate: data.dueDate,
       source: data.source,
@@ -4197,6 +4210,7 @@ export async function createEpisodicMemory(
   db: Db,
   data: {
     conversationId: string;
+    workspaceId?: string;
     summary: string;
     keyDecisions?: unknown[];
     toolsUsed?: string[];

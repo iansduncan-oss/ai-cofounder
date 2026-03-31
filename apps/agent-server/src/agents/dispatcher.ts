@@ -939,6 +939,7 @@ export class TaskDispatcher {
       key,
       content,
       source: `goal-execution:${goalId}`,
+      workspaceId: "",
     });
 
     this.logger.info({ goalId, key }, "execution analysis saved as memory");

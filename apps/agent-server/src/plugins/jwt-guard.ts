@@ -44,6 +44,8 @@ import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
 import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
 import { selfHealingRoutes } from "../routes/self-healing.js";
+import { workspaceTenantRoutes } from "../routes/workspaces.js";
+import { workspaceContextPlugin } from "../plugins/workspace-context.js";
 import type { AdminRole } from "../plugins/rbac.js";
 
 /** Check if request is from loopback or Docker bridge (narrower than isInternalRequest) */
@@ -134,7 +136,11 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
     }
   });
 
+  // Workspace context — resolves request.workspaceId from header or default
+  app.register(workspaceContextPlugin);
+
   // All protected API routes go inside this scoped plugin
+  app.register(workspaceTenantRoutes, { prefix: "/api/workspaces" });
   app.register(agentRoutes, { prefix: "/api/agents" });
   app.register(goalRoutes, { prefix: "/api/goals" });
   app.register(taskRoutes, { prefix: "/api/tasks" });

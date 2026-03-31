@@ -26,7 +26,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
     "/",
     { schema: { tags: ["tasks"], body: CreateTaskBody } },
     async (request, reply) => {
-      const task = await createTask(app.db, request.body);
+      const task = await createTask(app.db, { ...request.body, workspaceId: request.workspaceId });
       app.wsBroadcast?.("tasks");
       return reply.status(201).send(task);
     },

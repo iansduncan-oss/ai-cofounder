@@ -438,6 +438,7 @@ Return ONLY the JSON array, no other text. Return an empty array [] if no clear 
           triggerCondition: p.triggerCondition,
           suggestedAction: p.suggestedAction,
           confidence: Math.min(100, Math.max(0, p.confidence)),
+          workspaceId: "",
         });
         results.push(result);
       } catch (err) {

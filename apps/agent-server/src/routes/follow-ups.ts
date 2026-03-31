@@ -17,6 +17,7 @@ export async function followUpRoutes(app: FastifyInstance): Promise<void> {
       source?: string;
     };
     const row = await createFollowUp(app.db, {
+      workspaceId: request.workspaceId,
       title,
       description,
       dueDate: dueDate ? new Date(dueDate) : undefined,

@@ -119,7 +119,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       dbUserId = user.id;
 
       if (!convId) {
-        const conv = await createConversation(app.db, { userId: user.id });
+        const conv = await createConversation(app.db, { userId: user.id, workspaceId: request.workspaceId });
         convId = conv.id;
       }
     }
@@ -191,6 +191,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     // Record user action (fire-and-forget)
     if (dbUserId) {
       recordActionSafe(app.db, {
+        workspaceId: request.workspaceId,
         userId: dbUserId,
         actionType: "chat_message",
         actionDetail: message.slice(0, 200),
@@ -247,7 +248,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       dbUserId = user.id;
 
       if (!convId) {
-        const conv = await createConversation(app.db, { userId: user.id });
+        const conv = await createConversation(app.db, { userId: user.id, workspaceId: request.workspaceId });
         convId = conv.id;
       }
     }
@@ -333,6 +334,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       // Record user action (fire-and-forget)
       if (dbUserId) {
         recordActionSafe(app.db, {
+          workspaceId: request.workspaceId,
           userId: dbUserId,
           actionType: "chat_message",
           actionDetail: message.slice(0, 200),
@@ -389,6 +391,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       const { suggestion, userId, patternId } = request.body;
 
       recordActionSafe(app.db, {
+        workspaceId: request.workspaceId,
         userId,
         actionType: "suggestion_accepted",
         actionDetail: suggestion.slice(0, 200),
