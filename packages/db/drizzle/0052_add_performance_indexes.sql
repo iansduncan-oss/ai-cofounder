@@ -17,9 +17,6 @@ CREATE INDEX IF NOT EXISTS idx_memories_user_workspace ON memories(user_id, work
 -- User actions: pattern learning queries filter (user_id, created_at)
 CREATE INDEX IF NOT EXISTS idx_user_actions_user_created ON user_actions(user_id, created_at DESC);
 
--- Deployments: health checks filter (status, created_at)
-CREATE INDEX IF NOT EXISTS idx_deployments_status_created ON deployments(status, created_at DESC);
-
 -- Agent messages: queue processing filter (status, created_at)
 CREATE INDEX IF NOT EXISTS idx_agent_messages_status ON agent_messages(status, created_at);
 
