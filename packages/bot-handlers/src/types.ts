@@ -127,6 +127,51 @@ export interface RegisterResult {
   isNew: boolean;
 }
 
+/** Structured result from budget command */
+export interface BudgetResult {
+  daily: { spentUsd: number; limitUsd: number; percentUsed: number | null };
+  weekly: { spentUsd: number; limitUsd: number; percentUsed: number | null };
+  suggestions: string[];
+}
+
+/** Structured result from errors command */
+export interface ErrorsResult {
+  hours: number;
+  totalErrors: number;
+  errors: Array<{ toolName: string; errorMessage: string | null; count: number }>;
+}
+
+/** Structured result from standup command */
+export interface StandupResult {
+  date: string;
+  narrative: string;
+  totalEntries: number;
+  costUsd: number;
+}
+
+/** Structured result from follow-ups command */
+export interface FollowUpsResult {
+  followUps: Array<{ id: string; title: string; status: string; dueDate?: string | null }>;
+  totalCount: number;
+}
+
+/** Structured result from search command */
+export interface SearchResult {
+  goals: Array<{ id: string; title: string; status: string }>;
+  tasks: Array<{ id: string; title: string; status: string }>;
+  conversations: Array<{ id: string; title: string | null }>;
+  memories: Array<{ key: string; content: string; category: string }>;
+}
+
+/** Structured result from analytics command */
+export interface AnalyticsResult {
+  totalGoals: number;
+  completionRate: number;
+  taskSuccessRate: number;
+  totalTasks: number;
+  byStatus: Record<string, number>;
+}
+
 /** All possible handler results */
 export type HandlerResult =
   | { type: "ask"; data: AskResult }
@@ -146,6 +191,12 @@ export type HandlerResult =
   | { type: "gmail_inbox"; data: GmailInboxResult }
   | { type: "gmail_send"; data: GmailSendResult }
   | { type: "register"; data: RegisterResult }
+  | { type: "budget"; data: BudgetResult }
+  | { type: "errors"; data: ErrorsResult }
+  | { type: "standup"; data: StandupResult }
+  | { type: "follow_ups"; data: FollowUpsResult }
+  | { type: "search"; data: SearchResult }
+  | { type: "analytics"; data: AnalyticsResult }
   | { type: "info"; message: string }
   | { type: "error"; message: string };
 

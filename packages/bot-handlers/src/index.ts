@@ -17,6 +17,12 @@ export {
   handleGmailInbox,
   handleGmailSend,
   handleRegister,
+  handleBudget,
+  handleErrors,
+  handleStandup,
+  handleFollowUps,
+  handleSearch,
+  handleAnalytics,
   truncate,
 } from "./handlers.js";
 
@@ -40,5 +46,11 @@ export type {
   GmailInboxResult,
   GmailSendResult,
   RegisterResult,
+  BudgetResult,
+  ErrorsResult,
+  StandupResult,
+  FollowUpsResult,
+  SearchResult,
+  AnalyticsResult,
   HandlerResult,
 } from "./types.js";

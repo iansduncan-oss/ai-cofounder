@@ -9,12 +9,20 @@ import {
   handleClear,
   handleExecuteStreaming,
   handleApprove,
+  handleReject,
+  handleListApprovals,
   handleHelp,
   handleRegister,
   handleScheduleList,
   handleScheduleCreate,
   handleGmailInbox,
   handleGmailSend,
+  handleBudget,
+  handleErrors,
+  handleStandup,
+  handleFollowUps,
+  handleSearch,
+  handleAnalytics,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -130,6 +138,48 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       await sendDiscordResponse(interaction, await handleApprove(client, ctx, approvalId));
       return;
     }
+    case "reject": {
+      const rejectId = interaction.options.getString("approval_id", true);
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleReject(client, ctx, rejectId));
+      return;
+    }
+    case "approvals":
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleListApprovals(client));
+      return;
+    case "budget":
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleBudget(client));
+      return;
+    case "errors": {
+      const hours = interaction.options.getInteger("hours") ?? 24;
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleErrors(client, hours));
+      return;
+    }
+    case "standup": {
+      const date = interaction.options.getString("date") ?? undefined;
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleStandup(client, date));
+      return;
+    }
+    case "followups": {
+      const fStatus = interaction.options.getString("status") ?? undefined;
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleFollowUps(client, fStatus));
+      return;
+    }
+    case "search": {
+      const query = interaction.options.getString("query", true);
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleSearch(client, query));
+      return;
+    }
+    case "analytics":
+      await interaction.deferReply();
+      await sendDiscordResponse(interaction, await handleAnalytics(client));
+      return;
     case "help": {
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, handleHelp());
@@ -370,6 +420,123 @@ async function sendDiscordResponse(
         .setColor(0x22c55e)
         .setDescription(msg);
       await interaction.editReply({ embeds: [regEmbed] });
+      return;
+    }
+
+    case "reject": {
+      const rejectEmbed = new EmbedBuilder()
+        .setColor(0xef4444)
+        .setDescription(`Approval \`${result.data.approvalId}\` rejected.`);
+      await interaction.editReply({ embeds: [rejectEmbed] });
+      return;
+    }
+
+    case "approvals": {
+      const approvalLines = result.data.approvals.map(
+        (a) => `\u2022 \`${a.id}\` — **${a.reason}**\n  Task: ${a.taskId} | By: ${a.requestedBy}`,
+      );
+      const approvalsEmbed = new EmbedBuilder()
+        .setColor(0xf59e0b)
+        .setTitle("Pending Approvals")
+        .setDescription(approvalLines.join("\n\n"))
+        .setFooter({ text: `${result.data.totalCount} pending` });
+      await interaction.editReply({ embeds: [approvalsEmbed] });
+      return;
+    }
+
+    case "budget": {
+      const d = result.data.daily;
+      const w = result.data.weekly;
+      const color = (d.percentUsed ?? 0) > 80 || (w.percentUsed ?? 0) > 80 ? 0xef4444 : 0x22c55e;
+      const budgetEmbed = new EmbedBuilder()
+        .setColor(color)
+        .setTitle("Budget Status")
+        .addFields(
+          { name: "Daily", value: `$${d.spentUsd.toFixed(4)} / $${d.limitUsd.toFixed(2)} (${d.percentUsed?.toFixed(1) ?? "N/A"}%)`, inline: true },
+          { name: "Weekly", value: `$${w.spentUsd.toFixed(4)} / $${w.limitUsd.toFixed(2)} (${w.percentUsed?.toFixed(1) ?? "N/A"}%)`, inline: true },
+        );
+      if (result.data.suggestions.length > 0) {
+        budgetEmbed.addFields({ name: "Suggestions", value: result.data.suggestions.join("\n") });
+      }
+      await interaction.editReply({ embeds: [budgetEmbed] });
+      return;
+    }
+
+    case "errors": {
+      const errorLines = result.data.errors.map(
+        (e) => `\u2022 **${e.toolName}** (x${e.count}) — ${e.errorMessage ?? "unknown"}`,
+      );
+      const errorsEmbed = new EmbedBuilder()
+        .setColor(0xef4444)
+        .setTitle(`Errors (${result.data.totalErrors} in past ${result.data.hours}h)`)
+        .setDescription(errorLines.join("\n"));
+      await interaction.editReply({ embeds: [errorsEmbed] });
+      return;
+    }
+
+    case "standup": {
+      const standupEmbed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle(`Standup \u2014 ${result.data.date}`)
+        .setDescription(truncate(result.data.narrative, 4096))
+        .setFooter({ text: `${result.data.totalEntries} entries \u00b7 $${result.data.costUsd.toFixed(4)}` });
+      await interaction.editReply({ embeds: [standupEmbed] });
+      return;
+    }
+
+    case "follow_ups": {
+      const fuStatusIcon: Record<string, string> = { pending: "\u23f3", done: "\u2705", dismissed: "\u274c" };
+      const fuLines = result.data.followUps.map((f) => {
+        const due = f.dueDate ? ` \u2014 due ${f.dueDate}` : "";
+        return `${fuStatusIcon[f.status] ?? "\u2022"} **${f.title}**${due}`;
+      });
+      const fuEmbed = new EmbedBuilder()
+        .setColor(0xf59e0b)
+        .setTitle("Follow-Ups")
+        .setDescription(fuLines.join("\n"))
+        .setFooter({ text: `${result.data.totalCount} total` });
+      await interaction.editReply({ embeds: [fuEmbed] });
+      return;
+    }
+
+    case "search": {
+      const sections: string[] = [];
+      if (result.data.goals.length > 0) {
+        sections.push(`**Goals**\n${result.data.goals.map((g) => `\u2022 ${g.title} [${g.status}]`).join("\n")}`);
+      }
+      if (result.data.tasks.length > 0) {
+        sections.push(`**Tasks**\n${result.data.tasks.map((t) => `\u2022 ${t.title} [${t.status}]`).join("\n")}`);
+      }
+      if (result.data.conversations.length > 0) {
+        sections.push(`**Conversations**\n${result.data.conversations.map((c) => `\u2022 ${c.title ?? "Untitled"}`).join("\n")}`);
+      }
+      if (result.data.memories.length > 0) {
+        sections.push(`**Memories**\n${result.data.memories.map((m) => `\u2022 [${m.category}] ${m.key}: ${m.content}`).join("\n")}`);
+      }
+      const searchEmbed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle("Search Results")
+        .setDescription(truncate(sections.join("\n\n"), 4096));
+      await interaction.editReply({ embeds: [searchEmbed] });
+      return;
+    }
+
+    case "analytics": {
+      const goalStatusIcon: Record<string, string> = { active: "\ud83d\udfe2", completed: "\u2705", cancelled: "\u274c", draft: "\ud83d\udcdd", failed: "\u274c" };
+      const statusLines = Object.entries(result.data.byStatus)
+        .map(([s, c]) => `${goalStatusIcon[s] ?? "\u2022"} ${s}: ${c}`)
+        .join("\n");
+      const analyticsEmbed = new EmbedBuilder()
+        .setColor(0x7c3aed)
+        .setTitle("Goal Analytics")
+        .addFields(
+          { name: "Total Goals", value: String(result.data.totalGoals), inline: true },
+          { name: "Completion Rate", value: `${result.data.completionRate.toFixed(1)}%`, inline: true },
+          { name: "Task Success", value: `${result.data.taskSuccessRate.toFixed(1)}%`, inline: true },
+          { name: "Total Tasks", value: String(result.data.totalTasks), inline: true },
+        )
+        .setDescription(statusLines);
+      await interaction.editReply({ embeds: [analyticsEmbed] });
       return;
     }
 

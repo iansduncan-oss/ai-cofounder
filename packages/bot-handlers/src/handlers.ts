@@ -383,7 +383,16 @@ const COMMAND_LIST = [
   { name: "/clear", description: "Clear conversation in this channel" },
   { name: "/execute", description: "Execute a goal by ID" },
   { name: "/approve", description: "Approve a pending approval" },
+  { name: "/reject", description: "Reject a pending approval" },
+  { name: "/approvals", description: "List pending approvals" },
+  { name: "/budget", description: "View spend vs budget limits" },
+  { name: "/errors", description: "Error summary for past N hours" },
+  { name: "/standup", description: "Daily standup narrative" },
+  { name: "/followups", description: "List action items" },
+  { name: "/search", description: "Search across all resources" },
+  { name: "/analytics", description: "Goal completion analytics" },
   { name: "/schedule", description: "List or create scheduled tasks" },
+  { name: "/gmail", description: "Gmail inbox and send" },
   { name: "/register", description: "Register yourself with AI Cofounder" },
   { name: "/help", description: "Show this help message" },
 ];
@@ -511,6 +520,126 @@ export async function handleRegister(
     };
   } catch {
     return { type: "error", message: "Failed to register. Please try again later." };
+  }
+}
+
+export async function handleBudget(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const data = await client.getBudgetStatus();
+    return {
+      type: "budget",
+      data: {
+        daily: data.daily,
+        weekly: data.weekly,
+        suggestions: data.optimizationSuggestions,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch budget status." };
+  }
+}
+
+export async function handleErrors(client: ApiClient, hours = 24): Promise<HandlerResult> {
+  try {
+    const data = await client.getErrorSummary(hours);
+    if (data.totalErrors === 0) {
+      return { type: "info", message: `No errors in the past ${hours} hours.` };
+    }
+    return {
+      type: "errors",
+      data: {
+        hours: data.hours,
+        totalErrors: data.totalErrors,
+        errors: data.errors.map((e) => ({
+          toolName: e.toolName,
+          errorMessage: e.errorMessage,
+          count: e.count,
+        })),
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch error summary." };
+  }
+}
+
+export async function handleStandup(client: ApiClient, date?: string): Promise<HandlerResult> {
+  try {
+    const data = await client.getStandup(date);
+    return {
+      type: "standup",
+      data: {
+        date: data.date,
+        narrative: data.narrative,
+        totalEntries: data.data.totalEntries,
+        costUsd: data.data.costUsd,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch standup." };
+  }
+}
+
+export async function handleFollowUps(client: ApiClient, status?: string): Promise<HandlerResult> {
+  try {
+    const opts: { status?: "pending" | "done" | "dismissed"; limit?: number } = { limit: 15 };
+    if (status === "pending" || status === "done" || status === "dismissed") opts.status = status;
+    const data = await client.listFollowUps(opts);
+    if (data.data.length === 0) {
+      return { type: "info", message: "No follow-ups found." };
+    }
+    return {
+      type: "follow_ups",
+      data: {
+        followUps: data.data.map((f) => ({
+          id: f.id,
+          title: f.title,
+          status: f.status,
+          dueDate: f.dueDate,
+        })),
+        totalCount: data.total,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch follow-ups." };
+  }
+}
+
+export async function handleSearch(client: ApiClient, query: string): Promise<HandlerResult> {
+  try {
+    const data = await client.globalSearch(query);
+    const total = data.goals.length + data.tasks.length + data.conversations.length + data.memories.length;
+    if (total === 0) {
+      return { type: "info", message: `No results found for "${query}".` };
+    }
+    return {
+      type: "search",
+      data: {
+        goals: data.goals.map((g) => ({ id: g.id, title: g.title, status: g.status })),
+        tasks: data.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status })),
+        conversations: data.conversations.map((c) => ({ id: c.id, title: c.title })),
+        memories: data.memories.map((m) => ({ key: m.key, content: m.content, category: m.category })),
+      },
+    };
+  } catch {
+    return { type: "error", message: "Search failed. Please try again." };
+  }
+}
+
+export async function handleAnalytics(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const data = await client.getGoalAnalytics();
+    return {
+      type: "analytics",
+      data: {
+        totalGoals: data.totalGoals,
+        completionRate: data.completionRate,
+        taskSuccessRate: data.taskSuccessRate,
+        totalTasks: data.totalTasks,
+        byStatus: data.byStatus,
+      },
+    };
+  } catch {
+    return { type: "error", message: "Failed to fetch analytics." };
   }
 }
 

@@ -12,6 +12,14 @@ import { helpCommand } from "./help.js";
 import { scheduleCommand } from "./schedule.js";
 import { gmailCommand } from "./gmail.js";
 import { registerUserCommand } from "./register-user.js";
+import { approvalsCommand } from "./approvals.js";
+import { rejectCommand } from "./reject.js";
+import { budgetCommand } from "./budget.js";
+import { errorsCommand } from "./errors.js";
+import { standupCommand } from "./standup.js";
+import { followupsCommand } from "./followups.js";
+import { searchCommand } from "./search.js";
+import { analyticsCommand } from "./analytics.js";
 
 const logger = createLogger("discord-commands");
 
@@ -24,6 +32,14 @@ const commands = [
   clearCommand.toJSON(),
   executeCommand.toJSON(),
   approveCommand.toJSON(),
+  rejectCommand.toJSON(),
+  approvalsCommand.toJSON(),
+  budgetCommand.toJSON(),
+  errorsCommand.toJSON(),
+  standupCommand.toJSON(),
+  followupsCommand.toJSON(),
+  searchCommand.toJSON(),
+  analyticsCommand.toJSON(),
   helpCommand.toJSON(),
   scheduleCommand.toJSON(),
   gmailCommand.toJSON(),
