@@ -30,5 +30,8 @@ export { GroqProvider } from "./providers/groq.js";
 export { OpenRouterProvider } from "./providers/openrouter.js";
 export { GeminiProvider } from "./providers/gemini.js";
 export { OllamaProvider } from "./providers/ollama.js";
+export { TogetherProvider } from "./providers/together.js";
+export { CerebrasProvider } from "./providers/cerebras.js";
+export { HuggingFaceProvider } from "./providers/huggingface.js";
 
 export { createEmbeddingService, type EmbeddingService } from "./embeddings.js";

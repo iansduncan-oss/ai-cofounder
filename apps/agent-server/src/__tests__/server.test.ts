@@ -52,6 +52,15 @@ vi.mock("@ai-cofounder/llm", () => {
     OllamaProvider: class {
       constructor() {}
     },
+    TogetherProvider: class {
+      constructor() {}
+    },
+    CerebrasProvider: class {
+      constructor() {}
+    },
+    HuggingFaceProvider: class {
+      constructor() {}
+    },
     createEmbeddingService: vi.fn(),
   };
 });

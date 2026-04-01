@@ -60,7 +60,7 @@ vi.mock("@ai-cofounder/llm", () => {
     register = vi.fn();
     getProvider = vi.fn();
     resolveProvider = vi.fn();
-    listProviders = vi.fn().mockReturnValue([]);
+    listProviders = vi.fn().mockReturnValue([{ name: "test", available: true, defaultModel: "test-model" }]);
     getProviderHealth = vi.fn().mockReturnValue([]);
   }
   return {
@@ -70,6 +70,9 @@ vi.mock("@ai-cofounder/llm", () => {
     OpenRouterProvider: class {},
     GeminiProvider: class {},
     OllamaProvider: class {},
+    TogetherProvider: class {},
+    CerebrasProvider: class {},
+    HuggingFaceProvider: class {},
     createEmbeddingService: vi.fn(),
   };
 });
@@ -136,7 +139,7 @@ describe("Scheduler autonomyTierService wiring", () => {
     });
 
     // Advance enough for the initial async tick to settle (flushes promises/microtasks)
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(31_000);
 
     handle.stop();
     vi.useRealTimers();
@@ -164,7 +167,7 @@ describe("Scheduler autonomyTierService wiring", () => {
       briefingHour: 25,
     });
 
-    await vi.advanceTimersByTimeAsync(1000);
+    await vi.advanceTimersByTimeAsync(31_000);
 
     handle.stop();
     vi.useRealTimers();

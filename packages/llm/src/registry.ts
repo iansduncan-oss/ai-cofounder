@@ -39,6 +39,12 @@ const MODEL_COSTS: Record<string, ModelCost> = {
   // Gemini
   "gemini-2.5-pro": { inputPer1M: 1.25, outputPer1M: 10 },
   "gemini-2.5-flash": { inputPer1M: 0.15, outputPer1M: 0.6 },
+  // Together.ai (free tier available)
+  "meta-llama/Llama-3.3-70B-Instruct-Turbo": { inputPer1M: 0.88, outputPer1M: 0.88 },
+  // Cerebras (free tier available)
+  "llama-3.3-70b": { inputPer1M: 0, outputPer1M: 0 },
+  // HuggingFace Inference (free tier available)
+  "meta-llama/Llama-3.3-70B-Instruct": { inputPer1M: 0, outputPer1M: 0 },
   // Ollama (local inference — free)
   "llama3.2": { inputPer1M: 0, outputPer1M: 0 },
   "llama3.1": { inputPer1M: 0, outputPer1M: 0 },
@@ -120,29 +126,43 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
     { provider: "gemini", model: "gemini-2.5-pro" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+    { provider: "cerebras", model: "llama-3.3-70b" },
+    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "ollama", model: "llama3.2" },
   ],
   conversation: [
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "cerebras", model: "llama-3.3-70b" },
+    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "ollama", model: "llama3.2" },
   ],
   simple: [
     { provider: "groq", model: "llama-3.1-8b-instant" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "cerebras", model: "llama-3.3-70b" },
+    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "ollama", model: "llama3.2" },
   ],
   research: [
     { provider: "gemini", model: "gemini-2.5-flash" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+    { provider: "cerebras", model: "llama-3.3-70b" },
+    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "ollama", model: "llama3.2" },
   ],
   code: [
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
+    { provider: "cerebras", model: "llama-3.3-70b" },
+    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "ollama", model: "llama3.2" },
   ],
 };
@@ -512,6 +532,11 @@ export class LlmRegistry {
       throw new Error(`Provider "${providerName}" not available`);
     }
     return provider.complete(request);
+  }
+
+  /** Check if any registered provider is available */
+  hasAvailableProviders(): boolean {
+    return Array.from(this.providers.values()).some((p) => p.available);
   }
 
   /** List all registered providers and their availability */

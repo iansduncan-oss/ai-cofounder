@@ -75,6 +75,12 @@ async function main() {
   process.on("SIGINT", () => shutdown("SIGINT"));
 
   process.on("unhandledRejection", (reason) => {
+    // Don't crash the entire server for provider exhaustion — it's a transient condition
+    const message = reason instanceof Error ? reason.message : String(reason);
+    if (/all providers exhausted/i.test(message)) {
+      logger.error({ err: reason }, "unhandled rejection (provider exhaustion) — continuing");
+      return;
+    }
     logger.fatal({ err: reason }, "unhandled rejection — exiting");
     process.exit(1);
   });

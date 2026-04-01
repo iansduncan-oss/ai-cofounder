@@ -30,6 +30,9 @@ vi.mock("@ai-cofounder/llm", () => {
     OpenRouterProvider: MockProvider,
     GeminiProvider: MockProvider,
     OllamaProvider: MockProvider,
+    TogetherProvider: MockProvider,
+    CerebrasProvider: MockProvider,
+    HuggingFaceProvider: MockProvider,
     createEmbeddingService: vi.fn(),
   };
 });

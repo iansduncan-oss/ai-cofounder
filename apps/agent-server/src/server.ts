@@ -14,6 +14,9 @@ import {
   OpenRouterProvider,
   GeminiProvider,
   OllamaProvider,
+  TogetherProvider,
+  CerebrasProvider,
+  HuggingFaceProvider,
   createEmbeddingService,
   type EmbeddingService,
   type CompletionEvent,
@@ -105,6 +108,9 @@ export function createLlmRegistry(): LlmRegistry {
   registry.register(new OpenRouterProvider(optionalEnv("OPENROUTER_API_KEY", "")));
   registry.register(new GeminiProvider(optionalEnv("GEMINI_API_KEY", "")));
   registry.register(new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")));
+  registry.register(new TogetherProvider(optionalEnv("TOGETHER_API_KEY", "")));
+  registry.register(new CerebrasProvider(optionalEnv("CEREBRAS_API_KEY", "")));
+  registry.register(new HuggingFaceProvider(optionalEnv("HF_API_KEY", "")));
 
   return registry;
 }

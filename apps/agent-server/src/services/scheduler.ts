@@ -238,6 +238,25 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             context: { actionPrompt: schedule.actionPrompt, cronExpression: schedule.cronExpression },
           });
 
+          // Skip if no LLM providers are available (e.g., all API credits exhausted)
+          const availableProviders = llmRegistry.listProviders().filter((p) => p.available);
+          if (availableProviders.length === 0) {
+            logger.warn({ scheduleId: schedule.id }, "no LLM providers available, skipping schedule execution");
+            // Still update next run so we don't hammer on the next tick
+            const interval = CronExpressionParser.parse(schedule.cronExpression);
+            const nextRunAt = interval.next().toDate();
+            await updateScheduleLastRun(db, schedule.id, new Date(), nextRunAt);
+            if (session) {
+              await completeWorkSession(db, session.id, {
+                tokensUsed: 0,
+                durationMs: Date.now() - startTime,
+                status: "failed",
+                summary: "No LLM providers available — skipped",
+              });
+            }
+            continue;
+          }
+
           // Create an orchestrator instance for this execution
           const orchestrator = new Orchestrator({
             registry: llmRegistry,
@@ -320,8 +339,9 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     }
   }
 
-  // Run immediately on start, then poll
-  tick();
+  // Delay first tick to let providers stabilize after startup
+  const startupDelay = setTimeout(tick, 30_000);
+  startupDelay.unref();
   const intervalId = setInterval(tick, pollIntervalMs);
   intervalId.unref();
 
@@ -329,6 +349,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
 
   return {
     stop: () => {
+      clearTimeout(startupDelay);
       clearInterval(intervalId);
       logger.info("scheduler stopped");
     },

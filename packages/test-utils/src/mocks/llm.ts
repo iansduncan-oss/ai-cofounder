@@ -34,6 +34,9 @@ export function mockLlmModule(mockComplete = vi.fn()) {
     OpenRouterProvider: class {},
     GeminiProvider: class {},
     OllamaProvider: class {},
+    TogetherProvider: class {},
+    CerebrasProvider: class {},
+    HuggingFaceProvider: class {},
     createEmbeddingService: vi.fn(),
   };
 }
