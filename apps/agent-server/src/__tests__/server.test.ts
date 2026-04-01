@@ -49,6 +49,9 @@ vi.mock("@ai-cofounder/llm", () => {
     GeminiProvider: class {
       constructor() {}
     },
+    OllamaProvider: class {
+      constructor() {}
+    },
     createEmbeddingService: vi.fn(),
   };
 });

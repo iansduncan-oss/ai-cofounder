@@ -38,6 +38,12 @@ vi.mock("@ai-cofounder/db", () => ({
   deleteSchedule: vi.fn(),
   getActivePrompt: vi.fn().mockResolvedValue(null),
   getActivePersona: vi.fn().mockResolvedValue(null),
+  getTodayTokenTotal: vi.fn().mockResolvedValue(0),
+  listGoalBacklog: vi.fn().mockResolvedValue([]),
+  getSystemDefaultWorkspace: vi.fn().mockResolvedValue({ id: "ws-default" }),
+  createConversation: vi.fn().mockResolvedValue({ id: "conv-auto" }),
+  touchMemory: vi.fn().mockResolvedValue(undefined),
+  recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
 }));
 
 vi.mock("@ai-cofounder/llm", () => {

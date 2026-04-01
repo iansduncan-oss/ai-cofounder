@@ -67,8 +67,9 @@ describe("LlmRegistry", () => {
 
       const result = registry.resolveProvider("conversation");
       expect(result).not.toBeNull();
-      expect(result!.provider.name).toBe("anthropic");
-      expect(result!.model).toBe("claude-sonnet-4-20250514");
+      // conversation route: groq first (cost-optimized), then openrouter, then anthropic
+      expect(result!.provider.name).toBe("groq");
+      expect(result!.model).toBe("llama-3.3-70b-versatile");
     });
 
     it("skips unavailable providers", () => {
@@ -162,20 +163,23 @@ describe("LlmRegistry", () => {
       registry.register(mockProvider("groq", true));
       registry.register(mockProvider("gemini", true));
 
+      // simple: groq first (llama-3.1-8b-instant)
       const simple = await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
       expect(simple.provider).toBe("groq");
 
+      // research: gemini first (gemini-2.5-flash)
       const research = await registry.complete("research", {
         messages: [{ role: "user", content: "search" }],
       });
       expect(research.provider).toBe("gemini");
 
+      // planning: gemini first (gemini-2.5-pro), not anthropic
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("anthropic");
+      expect(planning.provider).toBe("gemini");
     });
   });
 
@@ -239,51 +243,53 @@ describe("LlmRegistry", () => {
   describe("circuit breaker", () => {
     it("opens circuit after consecutive failures and skips provider", async () => {
       let callCount = 0;
-      const failing = mockProvider("anthropic", true, () => {
+      // groq is first in the conversation route, so use it as the failing provider
+      const failing = mockProvider("groq", true, () => {
         callCount++;
         throw new Error(`fail-${callCount}`);
       });
-      const groq = mockProvider("groq", true);
+      const anthropic = mockProvider("anthropic", true);
 
       registry.register(failing);
-      registry.register(groq);
+      registry.register(anthropic);
 
-      // Exhaust the circuit breaker (5 consecutive failures for anthropic)
+      // Exhaust the circuit breaker (5 consecutive failures for groq)
       for (let i = 0; i < 5; i++) {
         await registry.complete("conversation", {
           messages: [{ role: "user", content: "hi" }],
         });
       }
 
-      // Now anthropic's circuit should be open — next call should go straight to groq
+      // Now groq's circuit should be open — next call should go straight to anthropic
       callCount = 0; // reset
       await registry.complete("conversation", {
         messages: [{ role: "user", content: "hi" }],
       });
-      // anthropic should NOT have been called since circuit is open
+      // groq should NOT have been called since circuit is open
       expect(callCount).toBe(0);
 
       // Verify circuit state
       const states = registry.getCircuitBreakerStates();
-      const anthropicState = states.find((s) => s.provider === "anthropic");
-      expect(anthropicState?.state).toBe("open");
+      const groqState = states.find((s) => s.provider === "groq");
+      expect(groqState?.state).toBe("open");
     });
 
     it("resets circuit breaker on success", async () => {
       let shouldFail = true;
-      const anthropic = mockProvider("anthropic", true, async () => {
+      // groq is first in the conversation route
+      const groq = mockProvider("groq", true, async () => {
         if (shouldFail) throw new Error("fail");
         return {
           content: [{ type: "text" as const, text: "ok" }],
-          model: "anthropic-model",
+          model: "groq-model",
           stop_reason: "end_turn" as const,
           usage: { inputTokens: 10, outputTokens: 20 },
         };
       });
-      const groq = mockProvider("groq", true);
+      const anthropic = mockProvider("anthropic", true);
 
-      registry.register(anthropic);
       registry.register(groq);
+      registry.register(anthropic);
 
       // Create 3 failures (under threshold)
       for (let i = 0; i < 3; i++) {
@@ -299,9 +305,9 @@ describe("LlmRegistry", () => {
       });
 
       const states = registry.getCircuitBreakerStates();
-      const anthropicState = states.find((s) => s.provider === "anthropic");
-      expect(anthropicState?.state).toBe("closed");
-      expect(anthropicState?.consecutiveFailures).toBe(0);
+      const groqState = states.find((s) => s.provider === "groq");
+      expect(groqState?.state).toBe("closed");
+      expect(groqState?.consecutiveFailures).toBe(0);
     });
 
     it("returns circuit breaker states for all providers", () => {
@@ -392,22 +398,23 @@ describe("LlmRegistry", () => {
 
     it("does not retry on non-transient errors", async () => {
       let attempt = 0;
-      const failing = mockProvider("anthropic", true, async () => {
+      // groq is first in the conversation route
+      const failing = mockProvider("groq", true, async () => {
         attempt++;
         throw new Error("invalid_api_key");
       });
-      const groq = mockProvider("groq", true);
+      const anthropic = mockProvider("anthropic", true);
 
       registry.register(failing);
-      registry.register(groq);
+      registry.register(anthropic);
 
       const result = await registry.complete("conversation", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      // Should only try anthropic once (no retry), then fall back to groq
+      // Should only try groq once (no retry), then fall back to anthropic
       expect(attempt).toBe(1);
-      expect(result.provider).toBe("groq");
+      expect(result.provider).toBe("anthropic");
     });
   });
 });

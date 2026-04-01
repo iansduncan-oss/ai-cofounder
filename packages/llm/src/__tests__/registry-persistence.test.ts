@@ -47,25 +47,26 @@ describe("LlmRegistry persistence methods", () => {
     });
 
     it("records errors in snapshots", async () => {
+      // groq is first in the conversation route, so use it as the failing provider
       const failing: LlmProvider = {
-        name: "anthropic",
-        defaultModel: "anthropic-default",
+        name: "groq",
+        defaultModel: "groq-default",
         available: true,
         complete: vi.fn().mockRejectedValue(new Error("API error")),
       };
       registry.register(failing);
-      registry.register(mockProvider("groq", true));
+      registry.register(mockProvider("anthropic", true));
 
       await registry.complete("conversation", {
         messages: [{ role: "user", content: "hello" }],
       });
 
       const snapshots = registry.getStatsSnapshots();
-      const anthropicSnap = snapshots.find((s) => s.providerName === "anthropic");
-      expect(anthropicSnap).toBeDefined();
-      expect(anthropicSnap!.errorCount).toBe(1);
-      expect(anthropicSnap!.lastErrorMessage).toBe("API error");
-      expect(anthropicSnap!.lastErrorAt).toBeInstanceOf(Date);
+      const groqSnap = snapshots.find((s) => s.providerName === "groq");
+      expect(groqSnap).toBeDefined();
+      expect(groqSnap!.errorCount).toBe(1);
+      expect(groqSnap!.lastErrorMessage).toBe("API error");
+      expect(groqSnap!.lastErrorAt).toBeInstanceOf(Date);
     });
   });
 

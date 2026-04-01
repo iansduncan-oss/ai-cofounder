@@ -28,6 +28,16 @@ export function mockDbModule() {
     deleteConversation: vi.fn().mockResolvedValue(null),
     restoreConversation: vi.fn().mockResolvedValue(null),
     purgeDeletedConversations: vi.fn().mockResolvedValue(0),
+    // Workspaces
+    createWorkspace: vi.fn().mockResolvedValue({ id: "ws-1", slug: "default", isDefault: true }),
+    getWorkspace: vi.fn().mockResolvedValue(null),
+    getWorkspaceBySlug: vi.fn().mockResolvedValue(null),
+    listWorkspacesByOwner: vi.fn().mockResolvedValue([]),
+    getDefaultWorkspace: vi.fn().mockResolvedValue(null),
+    getSystemDefaultWorkspace: vi.fn().mockResolvedValue({ id: "ws-default", slug: "default", isDefault: true }),
+    updateWorkspace: vi.fn().mockResolvedValue({}),
+    deleteWorkspace: vi.fn().mockResolvedValue(null),
+    ensureDefaultWorkspace: vi.fn().mockResolvedValue({ id: "ws-1", slug: "default", isDefault: true }),
     // Channel conversations
     getChannelConversation: vi.fn().mockResolvedValue(null),
     upsertChannelConversation: vi.fn().mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),

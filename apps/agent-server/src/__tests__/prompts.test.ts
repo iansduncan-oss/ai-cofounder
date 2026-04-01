@@ -232,7 +232,8 @@ describe("buildSystemPrompt", () => {
 
     it("leaves non-prompt XML tags intact", () => {
       expect(sanitizeForPrompt("<div>safe</div>")).toBe("<div>safe</div>");
-      expect(sanitizeForPrompt("<user-data>ok</user-data>")).toBe("<user-data>ok</user-data>");
+      // user-data is now stripped by sanitizeForPrompt (used internally by buildSystemPrompt)
+      expect(sanitizeForPrompt("<user-data>ok</user-data>")).toBe("[STRIPPED]ok[STRIPPED]");
     });
 
     it("handles text with no tags", () => {

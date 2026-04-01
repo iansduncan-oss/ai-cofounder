@@ -104,6 +104,8 @@ const { LlmRegistry } = await import("@ai-cofounder/llm");
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Reset mockComplete to clear any unconsumed mockResolvedValueOnce values from prior tests
+  mockComplete.mockReset();
 });
 
 function textResponse(text: string) {
@@ -397,21 +399,20 @@ describe("Orchestrator", () => {
   });
 
   describe("tool loop", () => {
-    it("respects MAX_TOOL_ROUNDS (10)", async () => {
-      // Return tool_use 11 times — should stop after 10 rounds
-      for (let i = 0; i < 11; i++) {
+    it("respects dynamic roundBudget from ComplexityEstimator", async () => {
+      // Low-complexity tasks get roundBudget=3, so return tool_use 4 times — should stop after 3 rounds
+      for (let i = 0; i < 4; i++) {
         mockComplete.mockResolvedValueOnce(
           toolUseResponse("search_web", { query: `q${i}` }, `tu-${i}`),
         );
       }
-      // 12th call won't happen since loop stops at 10
 
       const registry = new LlmRegistry();
       const orchestrator = new Orchestrator({ registry });
       const _result = await orchestrator.run("search a lot");
 
-      // 1 initial + 10 rounds = 11 calls total
-      expect(mockComplete).toHaveBeenCalledTimes(11);
+      // 1 initial + 3 rounds = 4 calls total (roundBudget=3 for low-complexity)
+      expect(mockComplete).toHaveBeenCalledTimes(4);
     });
 
     it("accumulates token usage across rounds", async () => {
@@ -442,8 +443,8 @@ describe("Orchestrator", () => {
       await orchestrator.run("What's my name?", "conv-1", history as any);
 
       const callArgs = mockComplete.mock.calls[0][1];
-      // history (2 messages) + current message = 3
-      expect(callArgs.messages).toHaveLength(3);
+      // history (2 messages) + current message + context injection blocks
+      expect(callArgs.messages.length).toBeGreaterThanOrEqual(3);
       expect(callArgs.messages[0].content).toBe("My name is Ian");
     });
 

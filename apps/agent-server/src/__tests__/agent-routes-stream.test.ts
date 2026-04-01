@@ -123,6 +123,7 @@ vi.mock("../agents/orchestrator.js", () => ({
   Orchestrator: class {
     runStream = mockRunStream;
     run = mockRun;
+    setWorkspaceId = vi.fn();
   },
 }));
 
