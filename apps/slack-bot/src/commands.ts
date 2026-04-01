@@ -17,6 +17,12 @@ import {
   handleGmailInbox,
   handleGmailSend,
   handleRegister,
+  handleBudget,
+  handleErrors,
+  handleStandup,
+  handleFollowUps,
+  handleSearch,
+  handleAnalytics,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -291,6 +297,105 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       return;
     }
 
+    case "budget": {
+      const d = result.data.daily;
+      const w = result.data.weekly;
+      const blocks: Record<string, unknown>[] = [
+        { type: "header", text: { type: "plain_text", text: "Budget Status" } },
+        {
+          type: "section",
+          fields: [
+            { type: "mrkdwn", text: `*Daily:* $${d.spentUsd.toFixed(4)} / $${d.limitUsd.toFixed(2)} (${d.percentUsed?.toFixed(1) ?? "N/A"}%)` },
+            { type: "mrkdwn", text: `*Weekly:* $${w.spentUsd.toFixed(4)} / $${w.limitUsd.toFixed(2)} (${w.percentUsed?.toFixed(1) ?? "N/A"}%)` },
+          ],
+        },
+      ];
+      if (result.data.suggestions.length > 0) {
+        blocks.push({ type: "section", text: { type: "mrkdwn", text: `*Suggestions*\n${result.data.suggestions.join("\n")}` } });
+      }
+      await respond({ ...base, blocks });
+      return;
+    }
+
+    case "errors": {
+      const errorLines = result.data.errors.map(
+        (e) => `\u2022 *${e.toolName}* (x${e.count}) \u2014 ${e.errorMessage ?? "unknown"}`,
+      );
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: `Errors (${result.data.totalErrors} in past ${result.data.hours}h)` } },
+          { type: "section", text: { type: "mrkdwn", text: errorLines.join("\n") } },
+        ],
+      });
+      return;
+    }
+
+    case "standup":
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: `Standup \u2014 ${result.data.date}` } },
+          { type: "section", text: { type: "mrkdwn", text: truncate(result.data.narrative, 3000) } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalEntries} entries \u00b7 $${result.data.costUsd.toFixed(4)}` }] },
+        ],
+      });
+      return;
+
+    case "follow_ups": {
+      const fuLines = result.data.followUps.map((f) => {
+        const due = f.dueDate ? ` \u2014 due ${f.dueDate}` : "";
+        const icon = f.status === "pending" ? "\u23f3" : f.status === "done" ? "\u2705" : "\u274c";
+        return `${icon} *${f.title}*${due}`;
+      });
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Follow-Ups" } },
+          { type: "section", text: { type: "mrkdwn", text: fuLines.join("\n") } },
+          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} total` }] },
+        ],
+      });
+      return;
+    }
+
+    case "search": {
+      const sections: string[] = [];
+      if (result.data.goals.length > 0) sections.push(`*Goals*\n${result.data.goals.map((g) => `\u2022 ${g.title} [${g.status}]`).join("\n")}`);
+      if (result.data.tasks.length > 0) sections.push(`*Tasks*\n${result.data.tasks.map((t) => `\u2022 ${t.title} [${t.status}]`).join("\n")}`);
+      if (result.data.conversations.length > 0) sections.push(`*Conversations*\n${result.data.conversations.map((c) => `\u2022 ${c.title ?? "Untitled"}`).join("\n")}`);
+      if (result.data.memories.length > 0) sections.push(`*Memories*\n${result.data.memories.map((m) => `\u2022 [${m.category}] ${m.key}: ${m.content}`).join("\n")}`);
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Search Results" } },
+          { type: "section", text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) } },
+        ],
+      });
+      return;
+    }
+
+    case "analytics": {
+      const statusLines = Object.entries(result.data.byStatus).map(([s, c]) => `\u2022 ${s}: ${c}`).join("\n");
+      await respond({
+        ...base,
+        blocks: [
+          { type: "header", text: { type: "plain_text", text: "Goal Analytics" } },
+          {
+            type: "section",
+            fields: [
+              { type: "mrkdwn", text: `*Total Goals:* ${result.data.totalGoals}` },
+              { type: "mrkdwn", text: `*Completion Rate:* ${result.data.completionRate.toFixed(1)}%` },
+              { type: "mrkdwn", text: `*Task Success:* ${result.data.taskSuccessRate.toFixed(1)}%` },
+              { type: "mrkdwn", text: `*Total Tasks:* ${result.data.totalTasks}` },
+            ],
+          },
+          { type: "section", text: { type: "mrkdwn", text: statusLines } },
+        ],
+      });
+      return;
+    }
+
     case "info":
       await respond({ ...base, text: result.message });
       return;
@@ -555,6 +660,74 @@ export function registerCommands(app: App): void {
     const subject = headerParts.slice(1).join(" ");
     const body = parts.slice(1).join("|").trim();
     await sendSlackResponse(respond, await handleGmailSend(client, { to, subject, body }));
+  });
+
+  app.command("/budget", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "budget");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    await sendSlackResponse(respond, await handleBudget(client));
+  });
+
+  app.command("/errors", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "errors");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    const hours = parseInt(command.text.trim(), 10) || 24;
+    await sendSlackResponse(respond, await handleErrors(client, hours));
+  });
+
+  app.command("/standup", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "standup");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    const date = command.text.trim() || undefined;
+    await sendSlackResponse(respond, await handleStandup(client, date));
+  });
+
+  app.command("/followups", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "followups");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    const status = command.text.trim() || undefined;
+    await sendSlackResponse(respond, await handleFollowUps(client, status));
+  });
+
+  app.command("/search", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "search");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    const query = command.text.trim();
+    if (!query) {
+      await respond("Usage: `/search <query>`");
+      return;
+    }
+    await sendSlackResponse(respond, await handleSearch(client, query));
+  });
+
+  app.command("/analytics", async ({ command, ack, respond }) => {
+    await ack();
+    const remaining = checkCooldown(command.user_id, "analytics");
+    if (remaining !== null) {
+      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      return;
+    }
+    await sendSlackResponse(respond, await handleAnalytics(client));
   });
 
   // Interactive button handlers
