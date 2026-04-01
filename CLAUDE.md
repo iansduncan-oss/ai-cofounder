@@ -32,8 +32,8 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 ## Monorepo Structure
 
 - **apps/agent-server** — Fastify server, multi-agent orchestration (port 3100)
-- **apps/discord-bot** — Discord bot with 8 slash commands, uses `@ai-cofounder/api-client` + `@ai-cofounder/bot-handlers`
-- **apps/slack-bot** — Slack bot (Bolt + Socket Mode) with 8 slash commands, uses `@ai-cofounder/api-client` + `@ai-cofounder/bot-handlers`
+- **apps/discord-bot** — Discord bot with 20 slash commands, uses `@ai-cofounder/api-client` + `@ai-cofounder/bot-handlers`
+- **apps/slack-bot** — Slack bot (Bolt + Socket Mode) with 20 slash commands, uses `@ai-cofounder/api-client` + `@ai-cofounder/bot-handlers`
 - **apps/dashboard** — React + Vite + TanStack Query + React Router + Tailwind v4
 - **apps/voice-ui** — Static HTML/CSS/JS voice interface served at `/voice/` by agent-server
 - **apps/n8n** — n8n workflow automation (Docker-based)
@@ -46,7 +46,7 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 - **packages/rag** — RAG pipeline for document retrieval
 - **packages/shared** — Shared types, pino logger (`createLogger`), env config helpers (`requireEnv`, `optionalEnv`)
 - **packages/test-utils** — Shared test fixtures (mockSharedModule, mockLlmModule, mockDbModule)
-- **packages/mcp-server** — MCP server wrapping ApiClient (12 tools for Claude Code integration)
+- **packages/mcp-server** — MCP server wrapping ApiClient (38 tools for Claude Code integration)
 
 ## Commands
 
@@ -186,7 +186,7 @@ Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path trav
 
 ## Claude Code Enhancements
 
-**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (12 tools wrapping ApiClient)
+**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (38 tools wrapping ApiClient)
 
 **Skills** (5 in `~/.claude/skills/`): `ai-cofounder-deploy`, `ai-cofounder-test`, `ai-cofounder-db`, `ai-cofounder-monitor`, `ai-cofounder-logs`
 
