@@ -58,7 +58,7 @@ EXISTING=$(sudo crontab -l 2>/dev/null | grep -v 'backup-db\|docker-cleanup\|che
   echo ""
   echo "# === Automation Scripts (managed by deploy-vps.sh) ==="
   echo "0 2 * * * /opt/scripts/backup-db.sh >> /var/log/automation/backup-db.log 2>&1"
-  echo "0 3 * * 0 /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1"
+  echo "0 3 * * * /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1"
   echo "0 8 * * * /opt/scripts/check-ssl.sh >> /var/log/automation/check-ssl.log 2>&1"
   echo "0 7 * * * /opt/scripts/daily-status.sh >> /var/log/automation/daily-status.log 2>&1"
   echo "0 20 * * * /opt/scripts/cost-tracker.sh >> /var/log/automation/cost-tracker.log 2>&1"
