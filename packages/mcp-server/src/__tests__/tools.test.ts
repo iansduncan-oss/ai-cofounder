@@ -33,6 +33,16 @@ function createMockClient(): ApiClient {
     globalSearch: vi.fn(),
     listFollowUps: vi.fn(),
     getGoalAnalytics: vi.fn(),
+    listTasks: vi.fn(),
+    getCostByGoal: vi.fn(),
+    listN8nWorkflows: vi.fn(),
+    listDeployments: vi.fn(),
+    getCircuitBreakerStatus: vi.fn(),
+    ragSearch: vi.fn(),
+    getToolStats: vi.fn(),
+    exportConversation: vi.fn(),
+    listReflections: vi.fn(),
+    listJournalEntries: vi.fn(),
   } as unknown as ApiClient;
 }
 
@@ -46,9 +56,9 @@ describe("MCP tools registration", () => {
     registerTools(server, client);
   });
 
-  it("registers 28 tools", () => {
+  it("registers 38 tools", () => {
     const tools = getRegisteredTools(server);
-    expect(tools.size).toBe(28);
+    expect(tools.size).toBe(38);
   });
 
   it("ask_agent calls runAgent and formats response", async () => {
@@ -339,6 +349,104 @@ describe("MCP tools registration", () => {
     expect(client.getGoalAnalytics).toHaveBeenCalled();
     expect(result.content[0].text).toContain("73.3");
     expect(result.content[0].text).toContain("15");
+  });
+
+  it("list_tasks calls listTasks", async () => {
+    (client.listTasks as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: [{ id: "t-1", goalId: "g-1", title: "Write tests", status: "pending", orderIndex: 0, createdAt: "2026-04-01", updatedAt: "2026-04-01" }],
+      total: 1, limit: 20, offset: 0,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("list_tasks")!.handler({ goalId: "g-1" });
+    expect(client.listTasks).toHaveBeenCalledWith("g-1", { limit: 20 });
+    expect(result.content[0].text).toContain("Write tests");
+  });
+
+  it("get_cost_by_goal calls getCostByGoal", async () => {
+    (client.getCostByGoal as ReturnType<typeof vi.fn>).mockResolvedValue({
+      totalCostUsd: 0.25, totalInputTokens: 5000, totalOutputTokens: 2000, requestCount: 10,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("get_cost_by_goal")!.handler({ goalId: "g-1" });
+    expect(client.getCostByGoal).toHaveBeenCalledWith("g-1");
+    expect(result.content[0].text).toContain("$0.2500");
+  });
+
+  it("list_n8n_workflows calls listN8nWorkflows", async () => {
+    (client.listN8nWorkflows as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: "w-1", name: "Deploy Pipeline", webhookUrl: "http://...", isActive: true, direction: "inbound" },
+    ]);
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("list_n8n_workflows")!.handler({});
+    expect(result.content[0].text).toContain("Deploy Pipeline");
+  });
+
+  it("list_deployments calls listDeployments", async () => {
+    (client.listDeployments as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: [{ id: "d-1", commitSha: "abc123", shortSha: "abc123", branch: "main", status: "success", triggeredBy: "ci" }],
+      total: 1,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("list_deployments")!.handler({});
+    expect(result.content[0].text).toContain("abc123");
+    expect(result.content[0].text).toContain("success");
+  });
+
+  it("get_circuit_breaker_status calls getCircuitBreakerStatus", async () => {
+    (client.getCircuitBreakerStatus as ReturnType<typeof vi.fn>).mockResolvedValue({
+      isPaused: false, failureCount: 0, pausedAt: null, pausedReason: null, failureWindowStart: null, resumedAt: null, resumedBy: null,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("get_circuit_breaker_status")!.handler({});
+    expect(result.content[0].text).toContain("Active");
+  });
+
+  it("rag_search calls ragSearch", async () => {
+    (client.ragSearch as ReturnType<typeof vi.fn>).mockResolvedValue({
+      results: [{ content: "Test chunk", score: 0.9 }], query: "test",
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("rag_search")!.handler({ query: "test" });
+    expect(client.ragSearch).toHaveBeenCalledWith("test", { limit: 5 });
+    expect(result.content[0].text).toContain("RAG Results");
+  });
+
+  it("get_tool_stats calls getToolStats", async () => {
+    (client.getToolStats as ReturnType<typeof vi.fn>).mockResolvedValue({
+      timestamp: "2026-04-01", tools: [{ toolName: "search_web", totalExecutions: 50, successCount: 45, errorCount: 5, avgDurationMs: 1200, p95DurationMs: 3000 }],
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("get_tool_stats")!.handler({});
+    expect(result.content[0].text).toContain("search_web");
+    expect(result.content[0].text).toContain("90.0%");
+  });
+
+  it("export_conversation calls exportConversation", async () => {
+    (client.exportConversation as ReturnType<typeof vi.fn>).mockResolvedValue({ id: "conv-1", messages: [] });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("export_conversation")!.handler({ id: "conv-1" });
+    expect(client.exportConversation).toHaveBeenCalledWith("conv-1");
+    expect(result.content[0].text).toContain("conv-1");
+  });
+
+  it("list_reflections calls listReflections", async () => {
+    (client.listReflections as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: [{ id: "r-1", reflectionType: "goal_completion", content: "Completed deploy successfully", lessons: [], createdAt: "2026-04-01", updatedAt: "2026-04-01" }],
+      total: 1,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("list_reflections")!.handler({});
+    expect(result.content[0].text).toContain("Completed deploy");
+  });
+
+  it("list_journal_entries calls listJournalEntries", async () => {
+    (client.listJournalEntries as ReturnType<typeof vi.fn>).mockResolvedValue({
+      data: [{ id: "j-1", entryType: "goal_completed", title: "Deploy v2 done", summary: "All tasks passed", occurredAt: "2026-04-01", createdAt: "2026-04-01" }],
+      total: 1,
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("list_journal_entries")!.handler({});
+    expect(result.content[0].text).toContain("Deploy v2 done");
   });
 
   it("handles errors gracefully", async () => {

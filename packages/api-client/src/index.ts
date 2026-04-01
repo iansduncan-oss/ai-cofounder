@@ -114,4 +114,7 @@ export type {
   Workspace,
   StandupResponse,
   GlobalSearchResults,
+  Deployment,
+  DeployCircuitBreakerStatus,
+  GoalCostSummary,
 } from "./types.js";

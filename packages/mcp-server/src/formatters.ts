@@ -16,6 +16,13 @@ import type {
   GoalAnalytics,
   FollowUp,
   GlobalSearchResults,
+  Task,
+  ToolStat,
+  Deployment,
+  DeployCircuitBreakerStatus,
+  GoalCostSummary,
+  JournalEntry,
+  Reflection,
 } from "@ai-cofounder/api-client";
 
 export function formatDashboard(data: DashboardSummary): string {
@@ -344,6 +351,89 @@ export function formatGoalAnalytics(data: GoalAnalytics): string {
     for (const a of data.tasksByAgent) {
       lines.push(`- **${a.agent}**: ${a.completed}/${a.total} completed, ${a.failed} failed`);
     }
+  }
+  return lines.join("\n");
+}
+
+export function formatTasks(data: PaginatedResponse<Task>): string {
+  if (data.data.length === 0) return "No tasks found.";
+  const lines: string[] = [`# Tasks (${data.data.length} of ${data.total})`, ""];
+  for (const t of data.data) {
+    lines.push(`- **${t.title}** [${t.status}] agent: ${t.assignedAgent ?? "unassigned"} (${t.id})`);
+    if (t.error) lines.push(`  Error: ${t.error}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatGoalCost(data: GoalCostSummary): string {
+  const lines: string[] = ["# Goal Cost", ""];
+  lines.push(`- Total Cost: $${data.totalCostUsd.toFixed(4)}`);
+  lines.push(`- Input Tokens: ${data.totalInputTokens.toLocaleString()}`);
+  lines.push(`- Output Tokens: ${data.totalOutputTokens.toLocaleString()}`);
+  lines.push(`- Requests: ${data.requestCount}`);
+  return lines.join("\n");
+}
+
+export function formatN8nWorkflows(data: Array<{ id: string; name: string; description?: string; webhookUrl: string; isActive: boolean; direction: string }>): string {
+  if (data.length === 0) return "No n8n workflows found.";
+  const lines: string[] = [`# n8n Workflows (${data.length})`, ""];
+  for (const w of data) {
+    lines.push(`- ${w.isActive ? "\u2705" : "\u23f8"} **${w.name}** [${w.direction}] (${w.id})`);
+    if (w.description) lines.push(`  ${w.description}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatDeployments(data: { data: Deployment[]; total: number }): string {
+  if (data.data.length === 0) return "No deployments found.";
+  const lines: string[] = [`# Deployments (${data.data.length} of ${data.total})`, ""];
+  for (const d of data.data) {
+    lines.push(`- **${d.shortSha}** [${d.status}] ${d.branch} — by ${d.triggeredBy}`);
+    if (d.errorLog) lines.push(`  Error: ${d.errorLog}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatCircuitBreaker(data: DeployCircuitBreakerStatus): string {
+  const lines: string[] = ["# Deploy Circuit Breaker", ""];
+  lines.push(`- Status: ${data.isPaused ? "PAUSED" : "Active"}`);
+  lines.push(`- Failures: ${data.failureCount}`);
+  if (data.pausedAt) lines.push(`- Paused At: ${data.pausedAt}`);
+  if (data.pausedReason) lines.push(`- Reason: ${data.pausedReason}`);
+  if (data.resumedAt) lines.push(`- Resumed At: ${data.resumedAt}`);
+  return lines.join("\n");
+}
+
+export function formatToolStats(data: { timestamp: string; tools: ToolStat[] }): string {
+  if (data.tools.length === 0) return "No tool stats available.";
+  const lines: string[] = [`# Tool Stats (${data.tools.length} tools)`, ""];
+  for (const t of data.tools) {
+    const rate = t.totalExecutions > 0 ? ((t.successCount / t.totalExecutions) * 100).toFixed(1) : "N/A";
+    lines.push(`- **${t.toolName}**: ${rate}% success, ${t.avgDurationMs.toFixed(0)}ms avg, ${t.totalExecutions} calls`);
+  }
+  return lines.join("\n");
+}
+
+export function formatReflections(data: { data: Reflection[]; total: number }): string {
+  if (data.data.length === 0) return "No reflections found.";
+  const lines: string[] = [`# Reflections (${data.data.length} of ${data.total})`, ""];
+  for (const r of data.data) {
+    lines.push(`- [${r.reflectionType}] ${r.content.slice(0, 120)}${r.content.length > 120 ? "..." : ""}`);
+    if (r.lessons && r.lessons.length > 0) {
+      for (const l of r.lessons.slice(0, 2)) {
+        lines.push(`  Lesson: ${l.lesson}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
+export function formatJournalEntries(data: { data: JournalEntry[]; total: number }): string {
+  if (data.data.length === 0) return "No journal entries found.";
+  const lines: string[] = [`# Journal (${data.data.length} of ${data.total})`, ""];
+  for (const j of data.data) {
+    lines.push(`- [${j.entryType}] **${j.title}** — ${j.occurredAt}`);
+    if (j.summary) lines.push(`  ${j.summary}`);
   }
   return lines.join("\n");
 }

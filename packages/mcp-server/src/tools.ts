@@ -21,6 +21,14 @@ import {
   formatSearchResults,
   formatFollowUps,
   formatGoalAnalytics,
+  formatTasks,
+  formatGoalCost,
+  formatN8nWorkflows,
+  formatDeployments,
+  formatCircuitBreaker,
+  formatToolStats,
+  formatReflections,
+  formatJournalEntries,
 } from "./formatters.js";
 
 export function registerTools(server: McpServer, client: ApiClient): void {
@@ -507,6 +515,168 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const data = await client.getGoalAnalytics();
         return { content: [{ type: "text" as const, text: formatGoalAnalytics(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_tasks",
+    "List tasks for a goal",
+    {
+      goalId: z.string().describe("The goal ID"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+    },
+    async ({ goalId, limit }) => {
+      try {
+        const data = await client.listTasks(goalId, { limit: limit ?? 20 });
+        return { content: [{ type: "text" as const, text: formatTasks(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_cost_by_goal",
+    "Get cost breakdown for a specific goal",
+    {
+      goalId: z.string().describe("The goal ID"),
+    },
+    async ({ goalId }) => {
+      try {
+        const data = await client.getCostByGoal(goalId);
+        return { content: [{ type: "text" as const, text: formatGoalCost(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_n8n_workflows",
+    "List available n8n automation workflows",
+    {},
+    async () => {
+      try {
+        const data = await client.listN8nWorkflows();
+        return { content: [{ type: "text" as const, text: formatN8nWorkflows(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_deployments",
+    "List recent deployments",
+    {
+      limit: z.number().optional().describe("Max results (default 20)"),
+    },
+    async ({ limit }) => {
+      try {
+        const data = await client.listDeployments(limit ?? 20);
+        return { content: [{ type: "text" as const, text: formatDeployments(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_circuit_breaker_status",
+    "Get deploy circuit breaker status (paused/active, failure count)",
+    {},
+    async () => {
+      try {
+        const data = await client.getCircuitBreakerStatus();
+        return { content: [{ type: "text" as const, text: formatCircuitBreaker(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "rag_search",
+    "Semantic search over the knowledge base",
+    {
+      query: z.string().describe("Search query"),
+      limit: z.number().optional().describe("Max results (default 5)"),
+    },
+    async ({ query, limit }) => {
+      try {
+        const data = await client.ragSearch(query, { limit: limit ?? 5 });
+        if (data.results.length === 0) return { content: [{ type: "text" as const, text: "No RAG results found." }] };
+        const lines = data.results.map((r, i) => `${i + 1}. ${JSON.stringify(r).slice(0, 200)}`);
+        return { content: [{ type: "text" as const, text: `# RAG Results (${data.results.length})\n\n${lines.join("\n")}` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_tool_stats",
+    "Get tool execution stats: success rates, latency, call counts",
+    {},
+    async () => {
+      try {
+        const data = await client.getToolStats();
+        return { content: [{ type: "text" as const, text: formatToolStats(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "export_conversation",
+    "Export a conversation as JSON",
+    {
+      id: z.string().describe("The conversation ID"),
+    },
+    async ({ id }) => {
+      try {
+        const data = await client.exportConversation(id);
+        return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_reflections",
+    "List goal completion reflections and lessons learned",
+    {
+      type: z.string().optional().describe("Filter by type (e.g. goal_completion, failure_analysis)"),
+      limit: z.number().optional().describe("Max results (default 10)"),
+    },
+    async ({ type, limit }) => {
+      try {
+        const data = await client.listReflections({ type, limit: limit ?? 10 });
+        return { content: [{ type: "text" as const, text: formatReflections(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_journal_entries",
+    "List journal entries (activity log: goals, tasks, deploys, git commits)",
+    {
+      goalId: z.string().optional().describe("Filter by goal ID"),
+      entryType: z.string().optional().describe("Filter by type (goal_started, task_completed, deployment, etc.)"),
+      search: z.string().optional().describe("Full-text search"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+    },
+    async ({ goalId, entryType, search, limit }) => {
+      try {
+        const data = await client.listJournalEntries({ goalId, entryType, search, limit: limit ?? 20 });
+        return { content: [{ type: "text" as const, text: formatJournalEntries(data) }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
       }
