@@ -2,6 +2,8 @@ import type {
   DashboardSummary,
   ProviderHealth,
   Goal,
+  Approval,
+  Conversation,
   PipelineRun,
   Memory,
   BriefingResponse,
@@ -9,6 +11,11 @@ import type {
   MonitoringReport,
   PaginatedResponse,
   SubagentRun,
+  BudgetStatusResponse,
+  StandupResponse,
+  GoalAnalytics,
+  FollowUp,
+  GlobalSearchResults,
 } from "@ai-cofounder/api-client";
 
 export function formatDashboard(data: DashboardSummary): string {
@@ -174,6 +181,169 @@ export function formatProviderHealth(
       lines.push(`- Recent Errors: ${p.recentErrors.length}`);
     }
     lines.push("");
+  }
+  return lines.join("\n");
+}
+
+export function formatGoal(data: Goal): string {
+  const lines: string[] = [`# ${data.title}`, ""];
+  lines.push(`- **ID**: ${data.id}`);
+  lines.push(`- **Status**: ${data.status}`);
+  lines.push(`- **Priority**: ${data.priority}`);
+  if (data.scope) lines.push(`- **Scope**: ${data.scope}`);
+  lines.push(`- **Conversation**: ${data.conversationId}`);
+  if (data.description) lines.push(`- **Description**: ${data.description}`);
+  if (data.createdBy) lines.push(`- **Created By**: ${data.createdBy}`);
+  lines.push(`- **Created**: ${data.createdAt}`);
+  lines.push(`- **Updated**: ${data.updatedAt}`);
+  return lines.join("\n");
+}
+
+export function formatApprovals(data: Approval[]): string {
+  if (data.length === 0) return "No pending approvals.";
+
+  const lines: string[] = [`# Pending Approvals (${data.length})`, ""];
+  for (const a of data) {
+    lines.push(`- **${a.id}** — Task: ${a.taskId}`);
+    lines.push(`  Requested by: ${a.requestedBy} | Reason: ${a.reason}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatBudgetStatus(data: BudgetStatusResponse): string {
+  const lines: string[] = ["# Budget Status", ""];
+  lines.push("## Daily");
+  lines.push(`- Spent: $${data.daily.spentUsd.toFixed(4)}`);
+  lines.push(`- Limit: $${data.daily.limitUsd.toFixed(4)}`);
+  lines.push(`- Used: ${data.daily.percentUsed != null ? `${data.daily.percentUsed.toFixed(1)}%` : "N/A"}`);
+  lines.push("");
+  lines.push("## Weekly");
+  lines.push(`- Spent: $${data.weekly.spentUsd.toFixed(4)}`);
+  lines.push(`- Limit: $${data.weekly.limitUsd.toFixed(4)}`);
+  lines.push(`- Used: ${data.weekly.percentUsed != null ? `${data.weekly.percentUsed.toFixed(1)}%` : "N/A"}`);
+  if (data.optimizationSuggestions.length > 0) {
+    lines.push("");
+    lines.push("## Suggestions");
+    for (const s of data.optimizationSuggestions) {
+      lines.push(`- ${s}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export function formatErrorSummary(
+  data: { timestamp: string; hours: number; totalErrors: number; errors: Array<{ toolName: string; errorMessage: string | null; count: number; lastSeen: string }> },
+): string {
+  if (data.totalErrors === 0) return `No errors in the past ${data.hours} hours.`;
+
+  const lines: string[] = [`# Error Summary (${data.totalErrors} errors in past ${data.hours}h)`, ""];
+  for (const e of data.errors) {
+    lines.push(`- **${e.toolName}** (x${e.count}) — ${e.errorMessage ?? "unknown error"}`);
+    lines.push(`  Last seen: ${e.lastSeen}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatStandup(data: StandupResponse): string {
+  const lines: string[] = [`# Standup — ${data.date}`, ""];
+  lines.push(data.narrative);
+  lines.push("");
+  lines.push("## Metrics");
+  lines.push(`- Total entries: ${data.data.totalEntries}`);
+  lines.push(`- Cost: $${data.data.costUsd.toFixed(4)}`);
+  if (data.data.highlights.length > 0) {
+    lines.push("");
+    lines.push("## Highlights");
+    for (const h of data.data.highlights) {
+      lines.push(`- ${h}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export function formatConversations(data: PaginatedResponse<Conversation>): string {
+  if (data.data.length === 0) return "No conversations found.";
+
+  const lines: string[] = [`# Conversations (${data.data.length} of ${data.total})`, ""];
+  for (const c of data.data) {
+    lines.push(`- **${c.title ?? "Untitled"}** (${c.id})`);
+    lines.push(`  Created: ${c.createdAt}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatSearchResults(data: GlobalSearchResults): string {
+  const total = data.goals.length + data.tasks.length + data.conversations.length + data.memories.length;
+  if (total === 0) return "No search results found.";
+
+  const lines: string[] = [`# Search Results (${total})`, ""];
+  if (data.goals.length > 0) {
+    lines.push(`## Goals (${data.goals.length})`);
+    for (const g of data.goals) {
+      lines.push(`- **${g.title}** [${g.status}] (${g.id})`);
+    }
+    lines.push("");
+  }
+  if (data.tasks.length > 0) {
+    lines.push(`## Tasks (${data.tasks.length})`);
+    for (const t of data.tasks) {
+      lines.push(`- **${t.title}** [${t.status}] (${t.id})`);
+    }
+    lines.push("");
+  }
+  if (data.conversations.length > 0) {
+    lines.push(`## Conversations (${data.conversations.length})`);
+    for (const c of data.conversations) {
+      lines.push(`- **${c.title ?? "Untitled"}** (${c.id})`);
+    }
+    lines.push("");
+  }
+  if (data.memories.length > 0) {
+    lines.push(`## Memories (${data.memories.length})`);
+    for (const m of data.memories) {
+      lines.push(`- [${m.category}/${m.key}] ${m.content}`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+export function formatFollowUps(data: { data: FollowUp[]; total: number }): string {
+  if (data.data.length === 0) return "No follow-ups found.";
+
+  const lines: string[] = [`# Follow-Ups (${data.data.length} of ${data.total})`, ""];
+  for (const f of data.data) {
+    const due = f.dueDate ? ` — due ${f.dueDate}` : "";
+    lines.push(`- [${f.status}] **${f.title}**${due} (${f.id})`);
+    if (f.description) lines.push(`  ${f.description}`);
+  }
+  return lines.join("\n");
+}
+
+export function formatGoalAnalytics(data: GoalAnalytics): string {
+  const lines: string[] = ["# Goal Analytics", ""];
+  lines.push("## Summary");
+  lines.push(`- Total Goals: ${data.totalGoals}`);
+  lines.push(`- Completion Rate: ${data.completionRate.toFixed(1)}%`);
+  if (data.avgCompletionHours != null) lines.push(`- Avg Completion: ${data.avgCompletionHours.toFixed(1)}h`);
+  lines.push(`- Task Success Rate: ${data.taskSuccessRate.toFixed(1)}%`);
+  lines.push(`- Total Tasks: ${data.totalTasks}`);
+  lines.push("");
+  lines.push("## By Status");
+  for (const [status, count] of Object.entries(data.byStatus)) {
+    lines.push(`- ${status}: ${count}`);
+  }
+  lines.push("");
+  lines.push("## By Priority");
+  for (const [priority, count] of Object.entries(data.byPriority)) {
+    lines.push(`- ${priority}: ${count}`);
+  }
+  if (data.tasksByAgent.length > 0) {
+    lines.push("");
+    lines.push("## By Agent");
+    for (const a of data.tasksByAgent) {
+      lines.push(`- **${a.agent}**: ${a.completed}/${a.total} completed, ${a.failed} failed`);
+    }
   }
   return lines.join("\n");
 }

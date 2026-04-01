@@ -112,4 +112,6 @@ export type {
   SelfHealingStatus,
   SelfHealingReport,
   Workspace,
+  StandupResponse,
+  GlobalSearchResults,
 } from "./types.js";

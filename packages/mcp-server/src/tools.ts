@@ -6,12 +6,21 @@ import {
   formatMonitoring,
   formatQueues,
   formatGoals,
+  formatGoal,
   formatBriefing,
   formatPipelines,
   formatMemories,
   formatProviderHealth,
   formatSubagentRun,
   formatSubagentRuns,
+  formatApprovals,
+  formatBudgetStatus,
+  formatErrorSummary,
+  formatStandup,
+  formatConversations,
+  formatSearchResults,
+  formatFollowUps,
+  formatGoalAnalytics,
 } from "./formatters.js";
 
 export function registerTools(server: McpServer, client: ApiClient): void {
@@ -330,6 +339,174 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const data = await client.listSubagentRuns({ goalId, status, limit: limit ?? 20 });
         return { content: [{ type: "text" as const, text: formatSubagentRuns(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_goal",
+    "Get full details of a goal by ID",
+    {
+      id: z.string().describe("The goal ID"),
+    },
+    async ({ id }) => {
+      try {
+        const data = await client.getGoal(id);
+        return { content: [{ type: "text" as const, text: formatGoal(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_pending_approvals",
+    "List approvals awaiting human decision",
+    {
+      limit: z.number().optional().describe("Max results (default 50)"),
+    },
+    async ({ limit }) => {
+      try {
+        const data = await client.listPendingApprovals(limit ?? 50);
+        return { content: [{ type: "text" as const, text: formatApprovals(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "resolve_approval",
+    "Approve or reject a pending approval",
+    {
+      id: z.string().describe("The approval ID"),
+      status: z.enum(["approved", "rejected"]).describe("Decision"),
+      decision: z.string().describe("Reason for the decision"),
+      decidedBy: z.string().optional().describe("Who made the decision"),
+    },
+    async ({ id, status, decision, decidedBy }) => {
+      try {
+        const a = await client.resolveApproval(id, { status, decision, decidedBy });
+        return {
+          content: [{
+            type: "text" as const,
+            text: `Approval ${a.id} ${a.status}: ${a.decision}`,
+          }],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_budget_status",
+    "Get daily and weekly spend vs budget limits",
+    {},
+    async () => {
+      try {
+        const data = await client.getBudgetStatus();
+        return { content: [{ type: "text" as const, text: formatBudgetStatus(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_error_summary",
+    "Get tool error summary for the past N hours",
+    {
+      hours: z.number().optional().describe("Hours to look back (default 24)"),
+    },
+    async ({ hours }) => {
+      try {
+        const data = await client.getErrorSummary(hours ?? 24);
+        return { content: [{ type: "text" as const, text: formatErrorSummary(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_standup",
+    "Get daily standup narrative and metrics for a date",
+    {
+      date: z.string().optional().describe("Date in YYYY-MM-DD format (defaults to today)"),
+    },
+    async ({ date }) => {
+      try {
+        const data = await client.getStandup(date);
+        return { content: [{ type: "text" as const, text: formatStandup(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_conversations",
+    "List conversations for a user",
+    {
+      userId: z.string().describe("The user ID"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async ({ userId, limit, offset }) => {
+      try {
+        const data = await client.listConversations(userId, { limit: limit ?? 20, offset });
+        return { content: [{ type: "text" as const, text: formatConversations(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "global_search",
+    "Search across goals, tasks, conversations, and memories",
+    {
+      q: z.string().describe("Search query"),
+    },
+    async ({ q }) => {
+      try {
+        const data = await client.globalSearch(q);
+        return { content: [{ type: "text" as const, text: formatSearchResults(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_follow_ups",
+    "List follow-up action items by status",
+    {
+      status: z.enum(["pending", "done", "dismissed"]).optional().describe("Filter by status"),
+      limit: z.number().optional().describe("Max results (default 20)"),
+      offset: z.number().optional().describe("Offset for pagination"),
+    },
+    async ({ status, limit, offset }) => {
+      try {
+        const data = await client.listFollowUps({ status, limit: limit ?? 20, offset });
+        return { content: [{ type: "text" as const, text: formatFollowUps(data) }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "get_goal_analytics",
+    "Get aggregate goal analytics: completion rates, task success, agent performance",
+    {},
+    async () => {
+      try {
+        const data = await client.getGoalAnalytics();
+        return { content: [{ type: "text" as const, text: formatGoalAnalytics(data) }] };
       } catch (e) {
         return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
       }
