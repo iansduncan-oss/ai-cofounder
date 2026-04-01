@@ -66,7 +66,8 @@ vi.mock("@ai-cofounder/llm", () => {
     getCircuitBreakerStates = vi.fn().mockReturnValue([]);
     getTotalCost = vi.fn().mockReturnValue(0);
   }
-  return { LlmRegistry: MockLlmRegistry, AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {}, createEmbeddingService: vi.fn() };
+  return { LlmRegistry: MockLlmRegistry, AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {},
+    OllamaProvider: class {}, createEmbeddingService: vi.fn() };
 });
 
 vi.mock("@ai-cofounder/shared", () => ({

@@ -48,7 +48,8 @@ vi.mock("@ai-cofounder/llm", () => {
     getProviderHealth = vi.fn().mockReturnValue([]);
     getStatsSnapshots = vi.fn().mockReturnValue([]);
   }
-  return { LlmRegistry: MockLlmRegistry, createLlmRegistry: () => new MockLlmRegistry(), AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {}, createEmbeddingService: vi.fn() };
+  return { LlmRegistry: MockLlmRegistry, createLlmRegistry: () => new MockLlmRegistry(), AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {},
+    OllamaProvider: class {}, createEmbeddingService: vi.fn() };
 });
 
 vi.mock("@ai-cofounder/rag", () => ({

@@ -145,6 +145,7 @@ vi.mock("@ai-cofounder/llm", () => {
     GroqProvider: class {},
     OpenRouterProvider: class {},
     GeminiProvider: class {},
+    OllamaProvider: class {},
     createLlmRegistry: () => new MockLlmRegistry(),
   };
 });

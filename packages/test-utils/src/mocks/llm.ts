@@ -33,6 +33,7 @@ export function mockLlmModule(mockComplete = vi.fn()) {
     GroqProvider: class {},
     OpenRouterProvider: class {},
     GeminiProvider: class {},
+    OllamaProvider: class {},
     createEmbeddingService: vi.fn(),
   };
 }

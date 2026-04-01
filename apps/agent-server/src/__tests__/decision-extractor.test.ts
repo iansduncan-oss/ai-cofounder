@@ -53,6 +53,7 @@ vi.mock("@ai-cofounder/llm", () => {
     AnthropicProvider: class {},
     GroqProvider: class {},
     GeminiProvider: class {},
+    OllamaProvider: class {},
     createEmbeddingService: vi.fn(),
   };
 });
