@@ -1,7 +1,45 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import { Type, type Static } from "@sinclair/typebox";
 import { CalendarService } from "../services/calendar.js";
 import { getMeetingPrep } from "@ai-cofounder/db";
 import { MeetingPrepService } from "../services/meeting-prep.js";
+
+const CreateEventBody = Type.Object({
+  summary: Type.String({ minLength: 1 }),
+  start: Type.String(),
+  end: Type.String(),
+  description: Type.Optional(Type.String()),
+  location: Type.Optional(Type.String()),
+  attendees: Type.Optional(Type.Array(Type.String())),
+  timeZone: Type.Optional(Type.String()),
+});
+type CreateEventBody = Static<typeof CreateEventBody>;
+
+const UpdateEventBody = Type.Object({
+  summary: Type.Optional(Type.String()),
+  start: Type.Optional(Type.String()),
+  end: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  location: Type.Optional(Type.String()),
+  attendees: Type.Optional(Type.Array(Type.String())),
+  timeZone: Type.Optional(Type.String()),
+});
+type UpdateEventBody = Static<typeof UpdateEventBody>;
+
+const RespondEventBody = Type.Object({
+  responseStatus: Type.Union([
+    Type.Literal("accepted"),
+    Type.Literal("declined"),
+    Type.Literal("tentative"),
+  ]),
+});
+type RespondEventBody = Static<typeof RespondEventBody>;
+
+const FreeBusyBody = Type.Object({
+  timeMin: Type.String(),
+  timeMax: Type.String(),
+});
+type FreeBusyBody = Static<typeof FreeBusyBody>;
 
 export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   function getService(request: FastifyRequest, reply: FastifyReply): CalendarService | null {
@@ -84,17 +122,14 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // POST /api/calendar/events
-  app.post<{ Body: { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string } }>(
+  app.post<{ Body: CreateEventBody }>(
     "/events",
-    { schema: { tags: ["calendar"] } },
+    { schema: { tags: ["calendar"], body: CreateEventBody } },
     async (request, reply) => {
       try {
         const svc = getService(request, reply);
         if (!svc) return;
-        const { summary, start, end } = request.body ?? {} as Record<string, string>;
-        if (!summary || !start || !end) {
-          return reply.code(400).send({ error: "Fields 'summary', 'start', and 'end' are required" });
-        }
+        const { summary, start, end } = request.body;
         return await svc.createEvent(request.body);
       } catch (err) {
         return handleError(err, reply);
@@ -103,9 +138,9 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // PATCH /api/calendar/events/:id
-  app.patch<{ Params: { id: string }; Body: { summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string } }>(
+  app.patch<{ Params: { id: string }; Body: UpdateEventBody }>(
     "/events/:id",
-    { schema: { tags: ["calendar"] } },
+    { schema: { tags: ["calendar"], body: UpdateEventBody } },
     async (request, reply) => {
       try {
         const svc = getService(request, reply);
@@ -134,17 +169,14 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // POST /api/calendar/events/:id/respond
-  app.post<{ Params: { id: string }; Body: { responseStatus: "accepted" | "declined" | "tentative" } }>(
+  app.post<{ Params: { id: string }; Body: RespondEventBody }>(
     "/events/:id/respond",
-    { schema: { tags: ["calendar"] } },
+    { schema: { tags: ["calendar"], body: RespondEventBody } },
     async (request, reply) => {
       try {
         const svc = getService(request, reply);
         if (!svc) return;
-        const { responseStatus } = request.body ?? {} as Record<string, string>;
-        if (!responseStatus) {
-          return reply.code(400).send({ error: "Field 'responseStatus' is required" });
-        }
+        const { responseStatus } = request.body;
         const event = await svc.respondToEvent(request.params.id, responseStatus);
         return { success: true, eventId: event.id };
       } catch (err) {
@@ -215,17 +247,14 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
   );
 
   // POST /api/calendar/free-busy
-  app.post<{ Body: { timeMin: string; timeMax: string } }>(
+  app.post<{ Body: FreeBusyBody }>(
     "/free-busy",
-    { schema: { tags: ["calendar"] } },
+    { schema: { tags: ["calendar"], body: FreeBusyBody } },
     async (request, reply) => {
       try {
         const svc = getService(request, reply);
         if (!svc) return;
-        const { timeMin, timeMax } = request.body ?? {} as Record<string, string>;
-        if (!timeMin || !timeMax) {
-          return reply.code(400).send({ error: "Fields 'timeMin' and 'timeMax' are required" });
-        }
+        const { timeMin, timeMax } = request.body;
         return await svc.getFreeBusy(timeMin, timeMax);
       } catch (err) {
         return handleError(err, reply);

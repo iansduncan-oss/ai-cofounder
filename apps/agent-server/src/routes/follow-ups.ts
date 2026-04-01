@@ -1,4 +1,5 @@
 import type { FastifyInstance } from "fastify";
+import { Type, type Static } from "@sinclair/typebox";
 import {
   createFollowUp,
   getFollowUp,
@@ -7,15 +8,31 @@ import {
   deleteFollowUp,
 } from "@ai-cofounder/db";
 
+const CreateFollowUpBody = Type.Object({
+  title: Type.String({ minLength: 1 }),
+  description: Type.Optional(Type.String()),
+  dueDate: Type.Optional(Type.String()),
+  source: Type.Optional(Type.String()),
+});
+type CreateFollowUpBody = Static<typeof CreateFollowUpBody>;
+
+const UpdateFollowUpBody = Type.Object({
+  title: Type.Optional(Type.String()),
+  description: Type.Optional(Type.String()),
+  status: Type.Optional(Type.Union([
+    Type.Literal("pending"),
+    Type.Literal("done"),
+    Type.Literal("dismissed"),
+  ])),
+  dueDate: Type.Optional(Type.Union([Type.String(), Type.Null()])),
+  source: Type.Optional(Type.String()),
+});
+type UpdateFollowUpBody = Static<typeof UpdateFollowUpBody>;
+
 export async function followUpRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/follow-ups — create
-  app.post("/", async (request) => {
-    const { title, description, dueDate, source } = request.body as {
-      title: string;
-      description?: string;
-      dueDate?: string;
-      source?: string;
-    };
+  app.post<{ Body: CreateFollowUpBody }>("/", { schema: { body: CreateFollowUpBody } }, async (request) => {
+    const { title, description, dueDate, source } = request.body;
     const row = await createFollowUp(app.db, {
       workspaceId: request.workspaceId,
       title,
@@ -51,15 +68,9 @@ export async function followUpRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH /api/follow-ups/:id — update
-  app.patch("/:id", async (request, reply) => {
+  app.patch<{ Body: UpdateFollowUpBody }>("/:id", { schema: { body: UpdateFollowUpBody } }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { title, description, status, dueDate, source } = request.body as {
-      title?: string;
-      description?: string;
-      status?: "pending" | "done" | "dismissed";
-      dueDate?: string | null;
-      source?: string;
-    };
+    const { title, description, status, dueDate, source } = request.body;
     const row = await updateFollowUp(app.db, id, {
       title,
       description,

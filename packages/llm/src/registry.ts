@@ -39,6 +39,11 @@ const MODEL_COSTS: Record<string, ModelCost> = {
   // Gemini
   "gemini-2.5-pro": { inputPer1M: 1.25, outputPer1M: 10 },
   "gemini-2.5-flash": { inputPer1M: 0.15, outputPer1M: 0.6 },
+  // Ollama (local inference — free)
+  "llama3.2": { inputPer1M: 0, outputPer1M: 0 },
+  "llama3.1": { inputPer1M: 0, outputPer1M: 0 },
+  "mistral": { inputPer1M: 0, outputPer1M: 0 },
+  "codellama": { inputPer1M: 0, outputPer1M: 0 },
 };
 
 /* ── Circuit breaker ── */
@@ -115,25 +120,30 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
     { provider: "gemini", model: "gemini-2.5-pro" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "ollama", model: "llama3.2" },
   ],
   conversation: [
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "ollama", model: "llama3.2" },
   ],
   simple: [
     { provider: "groq", model: "llama-3.1-8b-instant" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "ollama", model: "llama3.2" },
   ],
   research: [
     { provider: "gemini", model: "gemini-2.5-flash" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "ollama", model: "llama3.2" },
   ],
   code: [
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
+    { provider: "ollama", model: "llama3.2" },
   ],
 };
 

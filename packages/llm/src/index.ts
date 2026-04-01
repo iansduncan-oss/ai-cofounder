@@ -29,5 +29,6 @@ export { OpenAICompatibleProvider } from "./providers/openai-compatible.js";
 export { GroqProvider } from "./providers/groq.js";
 export { OpenRouterProvider } from "./providers/openrouter.js";
 export { GeminiProvider } from "./providers/gemini.js";
+export { OllamaProvider } from "./providers/ollama.js";
 
 export { createEmbeddingService, type EmbeddingService } from "./embeddings.js";

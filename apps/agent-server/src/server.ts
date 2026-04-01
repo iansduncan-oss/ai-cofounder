@@ -13,6 +13,7 @@ import {
   GroqProvider,
   OpenRouterProvider,
   GeminiProvider,
+  OllamaProvider,
   createEmbeddingService,
   type EmbeddingService,
   type CompletionEvent,
@@ -103,6 +104,7 @@ export function createLlmRegistry(): LlmRegistry {
   registry.register(new GroqProvider(optionalEnv("GROQ_API_KEY", "")));
   registry.register(new OpenRouterProvider(optionalEnv("OPENROUTER_API_KEY", "")));
   registry.register(new GeminiProvider(optionalEnv("GEMINI_API_KEY", "")));
+  registry.register(new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")));
 
   return registry;
 }

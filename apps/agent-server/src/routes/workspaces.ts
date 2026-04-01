@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { Type, type Static } from "@sinclair/typebox";
 import {
   createWorkspace,
   listWorkspacesByOwner,
@@ -6,6 +7,18 @@ import {
   updateWorkspace,
   deleteWorkspace,
 } from "@ai-cofounder/db";
+
+const CreateWorkspaceBody = Type.Object({
+  name: Type.String({ minLength: 1 }),
+  slug: Type.String({ minLength: 1 }),
+});
+type CreateWorkspaceBody = Static<typeof CreateWorkspaceBody>;
+
+const UpdateWorkspaceBody = Type.Object({
+  name: Type.Optional(Type.String()),
+  slug: Type.Optional(Type.String()),
+});
+type UpdateWorkspaceBody = Static<typeof UpdateWorkspaceBody>;
 
 export const workspaceTenantRoutes: FastifyPluginAsync = async (app) => {
   // List workspaces for the authenticated user
@@ -17,7 +30,7 @@ export const workspaceTenantRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Create a new workspace
-  app.post<{ Body: { name: string; slug: string } }>("/", async (request, reply) => {
+  app.post<{ Body: CreateWorkspaceBody }>("/", { schema: { body: CreateWorkspaceBody } }, async (request, reply) => {
     const user = request.user as { sub?: string; role?: string } | undefined;
     if (!user?.sub) return reply.code(401).send({ error: "Unauthorized" });
 
@@ -48,8 +61,9 @@ export const workspaceTenantRoutes: FastifyPluginAsync = async (app) => {
   });
 
   // Update workspace
-  app.patch<{ Params: { id: string }; Body: { name?: string; slug?: string } }>(
+  app.patch<{ Params: { id: string }; Body: UpdateWorkspaceBody }>(
     "/:id",
+    { schema: { body: UpdateWorkspaceBody } },
     async (request, reply) => {
       const ws = await getWorkspace(app.db, request.params.id);
       if (!ws) return reply.code(404).send({ error: "Workspace not found" });

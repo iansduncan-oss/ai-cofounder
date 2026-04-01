@@ -777,16 +777,18 @@ export async function searchMemoriesByVector(
   userId: string,
   limit = 10,
   agentRole?: string,
+  workspaceId?: string,
 ) {
   const vectorLiteral = `[${embedding.join(",")}]`;
   const agentFilter = agentRole
     ? sql`AND (agent_role = ${agentRole} OR agent_role IS NULL)`
     : sql``;
+  const wsFilter = workspaceId ? sql`AND workspace_id = ${workspaceId}` : sql``;
   const rows = await db.execute(
     sql`SELECT id, user_id, category, key, content, source, agent_role, metadata, created_at, updated_at,
                embedding <=> ${vectorLiteral}::vector AS distance
         FROM memories
-        WHERE user_id = ${userId} AND embedding IS NOT NULL ${agentFilter}
+        WHERE user_id = ${userId} AND embedding IS NOT NULL ${agentFilter} ${wsFilter}
         ORDER BY distance ASC
         LIMIT ${limit}`,
   );
@@ -3246,8 +3248,11 @@ export async function getPatternAnalytics(db: Db, userId?: string, workspaceId?:
   };
 }
 
-export async function getActionHeatmap(db: Db, userId?: string) {
-  const conditions = userId ? sql`WHERE user_id = ${userId}` : sql``;
+export async function getActionHeatmap(db: Db, userId?: string, workspaceId?: string) {
+  const parts: ReturnType<typeof sql>[] = [];
+  if (userId) parts.push(sql`user_id = ${userId}`);
+  if (workspaceId) parts.push(sql`workspace_id = ${workspaceId}`);
+  const conditions = parts.length > 0 ? sql`WHERE ${sql.join(parts, sql` AND `)}` : sql``;
 
   const rows = await db.execute(
     sql`SELECT day_of_week, hour_of_day, COUNT(*)::int AS count
@@ -4309,14 +4314,16 @@ export async function searchEpisodicMemoriesByVector(
   embedding: number[],
   limit = 5,
   minScore = 0.3,
+  workspaceId?: string,
 ) {
   const vectorLiteral = `[${embedding.join(",")}]`;
+  const wsFilter = workspaceId ? sql`AND workspace_id = ${workspaceId}` : sql``;
   const rows = await db.execute(
     sql`SELECT id, conversation_id, summary, key_decisions, tools_used, goals_worked_on,
                emotional_context, importance, accessed_at, access_count, created_at,
                embedding <=> ${vectorLiteral}::vector AS distance
         FROM episodic_memories
-        WHERE embedding IS NOT NULL
+        WHERE embedding IS NOT NULL ${wsFilter}
         ORDER BY distance ASC
         LIMIT ${limit}`,
   );
@@ -4460,13 +4467,15 @@ export async function findSimilarMemories(
   embedding: number[],
   limit = 5,
   minScore = 0.85,
+  workspaceId?: string,
 ) {
   const vectorLiteral = `[${embedding.join(",")}]`;
+  const wsFilter = workspaceId ? sql`AND workspace_id = ${workspaceId}` : sql``;
   const rows = await db.execute(
     sql`SELECT id, key, content, category, importance, access_count, created_at,
                embedding <=> ${vectorLiteral}::vector AS distance
         FROM memories
-        WHERE user_id = ${userId} AND embedding IS NOT NULL AND archived_at IS NULL
+        WHERE user_id = ${userId} AND embedding IS NOT NULL AND archived_at IS NULL ${wsFilter}
         ORDER BY distance ASC
         LIMIT ${limit}`,
   );
