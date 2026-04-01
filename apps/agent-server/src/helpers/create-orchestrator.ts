@@ -39,6 +39,7 @@ export function createOrchestrator(app: FastifyInstance, options?: { workspaceId
     conversationBranchingService,
     discordService: (app as unknown as Record<string, unknown>).discordService as DiscordService | undefined,
     vpsCommandService: (app as unknown as Record<string, unknown>).vpsCommandService as VpsCommandService | undefined,
+    failurePatternsService: app.failurePatternsService,
     workspaceId: options?.workspaceId,
   });
 }

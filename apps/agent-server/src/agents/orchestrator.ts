@@ -56,6 +56,7 @@ import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
 import type { ConversationBranchingService } from "../services/conversation-branching.js";
 import type { DiscordService } from "../services/discord.js";
 import type { VpsCommandService } from "../services/vps-command.js";
+import type { FailurePatternService } from "../services/failure-patterns.js";
 import { ToolCache } from "../services/tool-cache.js";
 import { ComplexityEstimator } from "../services/complexity-estimator.js";
 import { ToolEfficacyService } from "../services/tool-efficacy.js";
@@ -317,6 +318,7 @@ export interface OrchestratorOptions {
   conversationBranchingService?: ConversationBranchingService;
   discordService?: DiscordService;
   vpsCommandService?: VpsCommandService;
+  failurePatternsService?: FailurePatternService;
   isAutonomous?: boolean;
   workspaceId?: string;
 }
@@ -346,6 +348,7 @@ export class Orchestrator {
   private conversationBranchingService?: ConversationBranchingService;
   private discordService?: DiscordService;
   private vpsCommandService?: VpsCommandService;
+  private failurePatternsService?: FailurePatternService;
   private isAutonomous: boolean;
   private workspaceId?: string;
   private requestId?: string;
@@ -372,6 +375,7 @@ export class Orchestrator {
     this.conversationBranchingService = options.conversationBranchingService;
     this.discordService = options.discordService;
     this.vpsCommandService = options.vpsCommandService;
+    this.failurePatternsService = options.failurePatternsService;
     this.isAutonomous = options.isAutonomous ?? false;
     this.workspaceId = options.workspaceId;
   }
@@ -565,6 +569,42 @@ export class Orchestrator {
         memoryContext = parts.join("\n");
       }
 
+      // Proactive episodic memory priming
+      if (this.episodicMemoryService) {
+        try {
+          const episodes = await this.episodicMemoryService.recallEpisodes(message, { limit: 3 });
+          if (episodes.length > 0) {
+            const episodeBlock = [
+              "Recent relevant episodes:",
+              ...episodes.map((e) => `- ${sanitizeForPrompt(e.summary)} (importance: ${e.importance.toFixed(1)})`),
+            ].join("\n");
+            memoryContext = memoryContext ? `${memoryContext}\n\n${episodeBlock}` : episodeBlock;
+          }
+        } catch (err) {
+          this.logger.warn({ err }, "episodic memory priming failed (non-fatal)");
+        }
+      }
+
+      // Proactive procedural memory priming
+      if (this.proceduralMemoryService) {
+        try {
+          const procedures = await this.proceduralMemoryService.findMatchingProcedures(message, 3);
+          if (procedures.length > 0) {
+            const procBlock = [
+              "Relevant procedures from past successes:",
+              ...procedures.map((p) => {
+                const total = p.successCount + p.failureCount;
+                const reliability = total > 0 ? ` (${p.successCount}/${total} successes)` : "";
+                return `- ${sanitizeForPrompt(p.triggerPattern)}${reliability}`;
+              }),
+            ].join("\n");
+            memoryContext = memoryContext ? `${memoryContext}\n\n${procBlock}` : procBlock;
+          }
+        } catch (err) {
+          this.logger.warn({ err }, "procedural memory priming failed (non-fatal)");
+        }
+      }
+
       // Contextual awareness: inject time-of-day, recent activity, tone guidance
       try {
         const awarenessService = new ContextualAwarenessService(this.db, {
@@ -622,6 +662,16 @@ export class Orchestrator {
         const hints = await efficacyService.getEfficacyHints();
         if (hints) {
           memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
+        }
+      } catch { /* non-fatal */ }
+    }
+
+    // Failure pattern hints
+    if (this.failurePatternsService) {
+      try {
+        const failureHints = await this.failurePatternsService.formatPatternsForPrompt();
+        if (failureHints) {
+          memoryContext = memoryContext ? `${memoryContext}\n\n${failureHints}` : failureHints;
         }
       } catch { /* non-fatal */ }
     }
