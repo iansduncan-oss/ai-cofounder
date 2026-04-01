@@ -10,7 +10,7 @@ services:
       - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.time=14d"
       - "--web.enable-lifecycle"
     mem_limit: 512m
     ports:

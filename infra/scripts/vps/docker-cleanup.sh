@@ -1,9 +1,9 @@
 #!/bin/bash
 # Docker cleanup — prune unused resources
-# Runs Sunday at 3 AM via cron
+# Runs daily at 3 AM via cron
 # Alerts Discord only if >500MB freed
 #
-# Cron: 0 3 * * 0 /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1
+# Cron: 0 3 * * * /opt/scripts/docker-cleanup.sh >> /var/log/automation/docker-cleanup.log 2>&1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
@@ -15,9 +15,9 @@ log "Starting Docker cleanup..."
 # Capture disk usage before
 BEFORE=$(df / --output=used | tail -1 | tr -d ' ')
 
-# Prune dangling images
-log "Pruning dangling images..."
-if OUTPUT=$(docker image prune -f 2>&1); then
+# Prune all images older than 48h (not just dangling)
+log "Pruning images older than 48h..."
+if OUTPUT=$(docker image prune -a -f --filter "until=48h" 2>&1); then
   log "Image prune done"
 else
   log_error "Image prune failed: ${OUTPUT}"
@@ -39,9 +39,9 @@ else
   log_error "Volume prune failed: ${OUTPUT}"
 fi
 
-# Prune build cache older than 7 days
-log "Pruning build cache (>7d)..."
-if OUTPUT=$(docker builder prune -f --filter "until=168h" 2>&1); then
+# Prune build cache older than 3 days
+log "Pruning build cache (>3d)..."
+if OUTPUT=$(docker builder prune -f --filter "until=72h" 2>&1); then
   log "Build cache prune done"
 else
   log_error "Build cache prune failed: ${OUTPUT}"
