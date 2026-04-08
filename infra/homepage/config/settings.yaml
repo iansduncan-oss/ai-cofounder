@@ -1,0 +1,29 @@
+title: Avion Command Center
+
+theme: dark
+color: slate
+
+headerStyle: clean
+
+layout:
+  AI Platform:
+    style: row
+    columns: 3
+  Bots:
+    style: row
+    columns: 2
+  Content Pipeline:
+    style: row
+    columns: 2
+  Monitoring:
+    style: row
+    columns: 4
+  Data:
+    style: row
+    columns: 4
+  Infrastructure:
+    style: row
+    columns: 4
+  Applications:
+    style: row
+    columns: 3

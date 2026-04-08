@@ -1,0 +1,150 @@
+- AI Platform:
+    - Agent Server:
+        href: https://api.aviontechs.com
+        description: AI agent orchestration API
+        icon: node-red
+        server: docker
+        container: ai-cofounder-agent-server
+    - n8n:
+        href: https://n8n.aviontechs.com
+        description: Workflow automation platform
+        icon: n8n
+        server: docker
+        container: ai-cofounder-n8n
+    - Worker:
+        description: BullMQ job consumer
+        icon: node-red
+        server: docker
+        container: ai-cofounder-worker
+
+- Bots:
+    - Discord Bot:
+        description: Discord integration bot
+        icon: discord
+        server: docker
+        container: ai-cofounder-discord-bot
+    - Slack Bot:
+        description: Slack integration bot
+        icon: slack
+        server: docker
+        container: ai-cofounder-slack-bot
+
+- Content Pipeline:
+    - Edge TTS:
+        description: Text-to-speech service
+        icon: piper-tts
+        server: docker
+        container: edge-tts
+    - FFmpeg Render:
+        description: Video rendering service
+        icon: jellyfin
+        server: docker
+        container: ffmpeg-render
+
+- Monitoring:
+    - Grafana:
+        href: https://grafana.aviontechs.com
+        description: Metrics dashboards & alerting
+        icon: grafana
+        server: docker
+        container: ai-cofounder-grafana
+        widget:
+          type: grafana
+          url: http://ai-cofounder-grafana:3000
+    - Prometheus:
+        description: Metrics collection & storage
+        icon: prometheus
+        server: docker
+        container: ai-cofounder-prometheus
+        widget:
+          type: prometheus
+          url: http://ai-cofounder-prometheus:9090
+    - Uptime Kuma:
+        href: https://status.aviontechs.com
+        description: Service uptime monitoring
+        icon: uptime-kuma
+        server: docker
+        container: ai-cofounder-uptime-kuma
+        widget:
+          type: uptimekuma
+          url: http://ai-cofounder-uptime-kuma:3001
+          slug: default
+    - Alertmanager:
+        description: Alert routing & management
+        icon: prometheus
+        server: docker
+        container: ai-cofounder-alertmanager
+    - cAdvisor:
+        description: Container resource monitoring
+        icon: cadvisor
+        server: docker
+        container: ai-cofounder-cadvisor
+
+- Data:
+    - Postgres:
+        description: Primary relational database
+        icon: postgres
+        server: docker
+        container: avion-postgres-1
+    - Redis:
+        description: Cache & message broker
+        icon: redis
+        server: docker
+        container: ai-cofounder-redis
+    - ClickHouse:
+        description: Analytics column store
+        icon: clickhouse
+        server: docker
+        container: avion-clickhouse-1
+    - MinIO:
+        href: https://minio.aviontechs.com
+        description: S3-compatible object storage
+        icon: minio
+        server: docker
+        container: avion-minio-1
+
+- Infrastructure:
+    - Nginx Proxy Manager:
+        description: Reverse proxy & SSL management
+        icon: nginx-proxy-manager
+        server: docker
+        container: avion-npm-1
+    - Vaultwarden:
+        href: https://vault.aviontechs.com
+        description: Password manager
+        icon: vaultwarden
+        server: docker
+        container: avion-vaultwarden-1
+    - Watchtower:
+        description: Automatic container updates
+        icon: watchtower
+        server: docker
+        container: avion-watchtower-1
+    - Docker Proxy:
+        description: Tecnativa Docker socket proxy
+        icon: docker
+        server: docker
+        container: ai-cofounder-docker-proxy
+
+- Applications:
+    - Postiz:
+        href: https://postiz.aviontechs.com
+        description: Social media scheduling
+        icon: buffer
+        server: docker
+        container: avion-postiz-1
+    - Plausible:
+        href: https://analytics.aviontechs.com
+        description: Privacy-friendly web analytics
+        icon: plausible
+        server: docker
+        container: avion-plausible-1
+        widget:
+          type: plausible
+          url: http://avion-plausible-1:8000
+          siteId: aviontechs.com
+    - Temporal:
+        description: Workflow execution engine
+        icon: temporal
+        server: docker
+        container: avion-temporal-1

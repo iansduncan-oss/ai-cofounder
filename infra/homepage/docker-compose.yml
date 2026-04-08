@@ -1,0 +1,24 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    ports:
+      - "127.0.0.1:3300:3000"
+    volumes:
+      - ./config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - avion_net
+      - ai_cofounder_net
+    restart: unless-stopped
+    environment:
+      PUID: 1000
+      PGID: 1000
+
+networks:
+  avion_net:
+    external: true
+    name: avion_avion_net
+  ai_cofounder_net:
+    external: true
+    name: ai-cofounder_default

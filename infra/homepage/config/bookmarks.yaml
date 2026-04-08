@@ -1,0 +1,23 @@
+- Development:
+    - GitHub:
+        - abbr: GH
+          href: https://github.com/avion-technologies
+          icon: github
+    - Anthropic Console:
+        - abbr: AC
+          href: https://console.anthropic.com
+          icon: si-anthropic
+    - OpenRouter:
+        - abbr: OR
+          href: https://openrouter.ai
+          icon: openai
+
+- Infrastructure:
+    - Cloudflare Dashboard:
+        - abbr: CF
+          href: https://dash.cloudflare.com
+          icon: cloudflare
+    - Hetzner Cloud:
+        - abbr: HZ
+          href: https://console.hetzner.cloud
+          icon: hetzner
