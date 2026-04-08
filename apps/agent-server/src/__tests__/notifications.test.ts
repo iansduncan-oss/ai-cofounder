@@ -131,7 +131,7 @@ describe("NotificationService", () => {
       const body = JSON.parse(
         (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
       );
-      expect(body.embeds[0].title).toContain("Approval Required");
+      expect(body.embeds[0].title).toContain("approval is required");
       expect(body.embeds[0].color).toBe(0xfee75c);
     });
 
@@ -202,8 +202,8 @@ describe("NotificationService", () => {
       const body = JSON.parse(
         (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
       );
-      expect(body.text).toContain("Goal Completed");
-      expect(body.blocks[0].text.text).toContain("Goal Completed");
+      expect(body.text).toContain("Objective Complete");
+      expect(body.blocks[0].text.text).toContain("Objective Complete");
       expect(body.blocks[1].text.text).toContain("3/3 tasks completed");
       expect(body.blocks[1].text.text).toContain("2m 5s");
     });
@@ -220,7 +220,7 @@ describe("NotificationService", () => {
       const body = JSON.parse(
         (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
       );
-      expect(body.embeds[0].title).toContain("Goal Failed");
+      expect(body.embeds[0].title).toContain("Objective Failed");
       expect(body.embeds[0].color).toBe(0xed4245);
       expect(body.embeds[0].description).toContain("1/3 tasks completed");
     });
@@ -279,7 +279,7 @@ describe("NotificationService", () => {
       const body = JSON.parse(
         (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
       );
-      expect(body.embeds[0].title).toContain("Task Failed");
+      expect(body.embeds[0].title).toContain("Task failed");
       expect(body.embeds[0].color).toBe(0xe67e22);
       expect(body.embeds[0].description).toContain("coder");
     });

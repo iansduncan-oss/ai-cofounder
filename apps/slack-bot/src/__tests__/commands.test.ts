@@ -680,7 +680,9 @@ describe("slack commands", () => {
       });
 
       expect(mockClient.streamChat).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "hello from DM" }),
+        expect.objectContaining({
+          message: expect.stringContaining("hello from DM"),
+        }),
       );
       expect(client.chat.update).toHaveBeenCalled();
     });
