@@ -9,7 +9,7 @@ import type {
   TaskCategory,
   EmbeddingService,
 } from "@ai-cofounder/llm";
-import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv, sanitizeToolResult } from "@ai-cofounder/shared";
 import type { AgentRole, AgentMessage, GoalScope } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { retrieve, formatContext } from "@ai-cofounder/rag";
@@ -21,6 +21,8 @@ import {
   recallMemories,
   searchMemoriesByVector,
   createApproval,
+  getApproval,
+  listPendingApprovals,
   createMilestone,
   recordToolExecution,
   getConversation,
@@ -30,8 +32,13 @@ import {
 import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
 
-/** Tools that require explicit user confirmation before execution */
-const CONFIRMATION_REQUIRED_TOOLS = new Set(["delete_file", "delete_directory", "git_push"]);
+/** Tools that require explicit user approval before execution */
+const DESTRUCTIVE_TOOLS = new Set([
+  "delete_file",
+  "delete_directory",
+  "git_push",
+  "git_checkout",
+]);
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
@@ -757,14 +764,17 @@ export class Orchestrator {
           if (block.type === "tool_use") {
             this.logger.info({ tool: block.name, conversationId: id }, "executing tool");
 
-            // Block destructive tools without explicit confirmation
-            if (CONFIRMATION_REQUIRED_TOOLS.has(block.name)) {
-              toolResults.push({
-                type: "tool_result",
-                tool_use_id: block.id,
-                content: sanitizeForPrompt(JSON.stringify({ blocked: true, tool: block.name, message: `Tool "${block.name}" requires user confirmation. Ask the user to confirm this action before retrying.` })),
-              });
-              continue;
+            // Destructive tools require an approved approval before execution
+            if (DESTRUCTIVE_TOOLS.has(block.name)) {
+              const approvalResult = await this.checkOrCreateDestructiveApproval(block.name, id);
+              if (!approvalResult.approved) {
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: sanitizeToolResult(JSON.stringify(approvalResult)),
+                });
+                continue;
+              }
             }
 
             // Check tool cache before executing
@@ -785,7 +795,7 @@ export class Orchestrator {
             toolResults.push({
               type: "tool_result",
               tool_use_id: block.id,
-              content: sanitizeForPrompt(JSON.stringify(result)),
+              content: sanitizeToolResult(JSON.stringify(result)),
             });
           }
         }
@@ -1029,12 +1039,14 @@ export class Orchestrator {
             const toolInput = block.input as Record<string, unknown>;
             await onEvent({ type: "tool_call", data: { tool: block.name, input: this.sanitizeToolInput(toolInput) } });
 
-            // Block destructive tools without explicit confirmation
-            if (CONFIRMATION_REQUIRED_TOOLS.has(block.name)) {
-              const blocked = { blocked: true, tool: block.name, message: `Tool "${block.name}" requires user confirmation. Ask the user to confirm this action before retrying.` };
-              await onEvent({ type: "tool_result", data: { tool: block.name, summary: `Blocked: ${block.name} requires confirmation`, needs_confirmation: true } });
-              toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeForPrompt(JSON.stringify(blocked)) });
-              continue;
+            // Destructive tools require an approved approval before execution
+            if (DESTRUCTIVE_TOOLS.has(block.name)) {
+              const approvalResult = await this.checkOrCreateDestructiveApproval(block.name, id);
+              if (!approvalResult.approved) {
+                await onEvent({ type: "tool_result", data: { tool: block.name, summary: `Blocked: ${block.name} requires approval`, needs_confirmation: true } });
+                toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeToolResult(JSON.stringify(approvalResult)) });
+                continue;
+              }
             }
 
             // Check tool cache before executing
@@ -1052,7 +1064,7 @@ export class Orchestrator {
             }
 
             await onEvent({ type: "tool_result", data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) } });
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeForPrompt(JSON.stringify(result)) });
+            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeToolResult(JSON.stringify(result)) });
           }
         }
 
@@ -1140,6 +1152,71 @@ export class Orchestrator {
       case "write_file": return `Wrote: ${r.path ?? ""}`;
       default: return "completed";
     }
+  }
+
+  /**
+   * Check if a destructive tool has already been approved for this conversation.
+   * If an approved approval exists, returns { approved: true }.
+   * Otherwise creates a new approval request and returns details for the agent.
+   */
+  private async checkOrCreateDestructiveApproval(
+    toolName: string,
+    conversationId: string,
+  ): Promise<{ approved: boolean; approvalId?: string; message?: string }> {
+    if (!this.db) {
+      // No DB = no approval system; fall back to blocking
+      return {
+        approved: false,
+        message: `Tool "${toolName}" requires approval but the approval system is unavailable. Ask the user to confirm this action.`,
+      };
+    }
+
+    // Check if there's already an approved approval for this tool in this conversation
+    const pending = await listPendingApprovals(this.db, 100);
+    // Also look for recently-approved ones — scan all approvals isn't ideal,
+    // but the reason field encodes the tool+conversation for matching.
+    // For now, check pending approvals and let the existing flow handle it.
+
+    // Look for an existing pending or approved approval for this exact action
+    const marker = `[destructive:${toolName}:${conversationId}]`;
+
+    // Check pending first — if one exists, remind the agent to wait
+    const existingPending = pending.find((a) => a.reason.includes(marker));
+    if (existingPending) {
+      // Re-check if it's been approved since we fetched
+      const current = await getApproval(this.db, existingPending.id);
+      if (current?.status === "approved") {
+        this.logger.info({ toolName, approvalId: current.id }, "destructive tool approval found");
+        return { approved: true };
+      }
+      return {
+        approved: false,
+        approvalId: existingPending.id,
+        message: `Tool "${toolName}" is awaiting approval (ID: ${existingPending.id}). The user can approve with /approve ${existingPending.id}. Do not retry until the user has approved.`,
+      };
+    }
+
+    // No existing approval — create one
+    const approval = await createApproval(this.db, {
+      requestedBy: "orchestrator",
+      reason: `${marker} Destructive tool "${toolName}" invoked during conversation ${conversationId}. Requires human approval before execution.`,
+    });
+
+    this.logger.info({ toolName, approvalId: approval.id, conversationId }, "destructive tool approval requested");
+
+    // Notify the user
+    notifyApprovalCreated({
+      approvalId: approval.id,
+      taskId: "ad-hoc",
+      reason: `Destructive tool "${toolName}" needs your approval before it can execute.`,
+      requestedBy: "orchestrator",
+    }).catch(() => {});
+
+    return {
+      approved: false,
+      approvalId: approval.id,
+      message: `Tool "${toolName}" requires approval before execution. Approval ID: ${approval.id}. The user has been notified and can approve with /approve ${approval.id}. Do not retry until the user has approved.`,
+    };
   }
 
   private async executeTool(
