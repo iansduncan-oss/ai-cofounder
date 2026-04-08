@@ -102,6 +102,26 @@ export interface MeetingPrepJob {
   action: "generate_upcoming" | "send_notifications";
 }
 
+export interface DiscordTriageMessage {
+  messageId: string;
+  channelId: string;
+  channelName: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  timestamp: string;
+  hasAttachments: boolean;
+  referencedMessageId?: string;
+}
+
+export interface DiscordTriageJob {
+  channelId: string;
+  channelName: string;
+  guildId: string;
+  messages: DiscordTriageMessage[];
+  batchedAt: string;
+}
+
 // ── Queue names ──
 
 export const QUEUE_NAMES = {
@@ -117,6 +137,7 @@ export const QUEUE_NAMES = {
   DEAD_LETTER: "dead-letter",
   AUTONOMOUS_SESSIONS: "autonomous-sessions",
   MEETING_PREP: "meeting-prep",
+  DISCORD_TRIAGE: "discord-triage",
 } as const;
 
 export interface DeadLetterJob {
@@ -195,6 +216,10 @@ export function getAutonomousSessionQueue(): Queue<AutonomousSessionJob> {
 
 export function getMeetingPrepQueue(): Queue<MeetingPrepJob> {
   return getOrCreateQueue<MeetingPrepJob>(QUEUE_NAMES.MEETING_PREP);
+}
+
+export function getDiscordTriageQueue(): Queue<DiscordTriageJob> {
+  return getOrCreateQueue<DiscordTriageJob>(QUEUE_NAMES.DISCORD_TRIAGE);
 }
 
 export async function closeAllQueues(): Promise<void> {

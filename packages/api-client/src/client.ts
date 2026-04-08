@@ -1552,6 +1552,27 @@ export class ApiClient {
     const url = this.getChatWebSocketUrl(conversationId);
     return new ChatWebSocket(url, () => this.getChatWebSocketUrl(conversationId));
   }
+
+  // ── Discord Watcher ──
+
+  async ingestDiscordMessages(batch: {
+    channelId: string;
+    channelName: string;
+    guildId: string;
+    messages: Array<{
+      messageId: string;
+      channelId: string;
+      channelName: string;
+      authorId: string;
+      authorName: string;
+      content: string;
+      timestamp: string;
+      hasAttachments: boolean;
+      referencedMessageId?: string;
+    }>;
+  }): Promise<{ accepted: boolean; batchId?: string; reason?: string }> {
+    return this.request("POST", "/api/discord-watcher/ingest", batch);
+  }
 }
 
 /** Events emitted by ChatWebSocket */

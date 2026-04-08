@@ -14,6 +14,7 @@ import {
   getAutonomousSessionQueue,
   getDeployVerificationQueue,
   getMeetingPrepQueue,
+  getDiscordTriageQueue,
   type AgentTaskJob,
   type MonitoringJob,
   type BriefingJob,
@@ -26,6 +27,7 @@ import {
   type DeadLetterJob,
   type AutonomousSessionJob,
   type MeetingPrepJob,
+  type DiscordTriageJob,
 } from "./queues.js";
 
 const logger = createLogger("queue-helpers");
@@ -137,6 +139,20 @@ export async function enqueueMeetingPrep(
   return added.id;
 }
 
+export async function enqueueDiscordTriage(
+  job: DiscordTriageJob,
+): Promise<string | undefined> {
+  const queue = getDiscordTriageQueue();
+  const added = await queue.add("discord-triage", job, {
+    jobId: `discord-triage-${job.channelId}-${job.batchedAt}`,
+  });
+  logger.info(
+    { jobId: added.id, channelId: job.channelId, channelName: job.channelName, messageCount: job.messages.length },
+    "Discord triage job enqueued",
+  );
+  return added.id;
+}
+
 export async function enqueueAutonomousSession(
   job: AutonomousSessionJob,
 ): Promise<string | undefined> {
@@ -227,6 +243,7 @@ export async function getAllQueueStatus(): Promise<QueueStatus[]> {
     { name: "rag-ingestion", queue: getRagIngestionQueue() },
     { name: "reflections", queue: getReflectionQueue() },
     { name: "dead-letter", queue: getDeadLetterQueue() },
+    { name: "discord-triage", queue: getDiscordTriageQueue() },
   ];
 
   return Promise.all(
@@ -319,6 +336,7 @@ export async function retryDeadLetterJob(dlqJobId: string): Promise<{ requeued: 
     "reflections": getReflectionQueue,
     "deploy-verification": getDeployVerificationQueue,
     "autonomous-sessions": getAutonomousSessionQueue,
+    "discord-triage": getDiscordTriageQueue,
   };
 
   const getQueue = queueMap[originalQueue];
@@ -361,6 +379,7 @@ export async function getStaleJobCounts(thresholdMs = 30 * 60 * 1000): Promise<S
     { name: "rag-ingestion", queue: getRagIngestionQueue() },
     { name: "reflections", queue: getReflectionQueue() },
     { name: "autonomous-sessions", queue: getAutonomousSessionQueue() },
+    { name: "discord-triage", queue: getDiscordTriageQueue() },
   ];
 
   const now = Date.now();
@@ -399,6 +418,7 @@ export async function trimEventStreams(maxLen = 500): Promise<void> {
     getReflectionQueue(),
     getAutonomousSessionQueue(),
     getMeetingPrepQueue(),
+    getDiscordTriageQueue(),
   ];
 
   for (const queue of queues) {

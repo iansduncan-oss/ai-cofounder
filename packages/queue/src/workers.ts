@@ -14,6 +14,7 @@ import {
   type DeployVerificationJob,
   type AutonomousSessionJob,
   type MeetingPrepJob,
+  type DiscordTriageJob,
 } from "./queues.js";
 import { sendToDeadLetter } from "./helpers.js";
 
@@ -36,6 +37,7 @@ export type SubagentTaskProcessor = (job: Job<SubagentTaskJob>) => Promise<void>
 export type DeployVerificationProcessor = (job: Job<DeployVerificationJob>) => Promise<void>;
 export type AutonomousSessionProcessor = (job: Job<AutonomousSessionJob>) => Promise<void>;
 export type MeetingPrepProcessor = (job: Job<MeetingPrepJob>) => Promise<void>;
+export type DiscordTriageProcessor = (job: Job<DiscordTriageJob>) => Promise<void>;
 
 export interface WorkerProcessors {
   agentTask?: AgentTaskProcessor;
@@ -49,6 +51,7 @@ export interface WorkerProcessors {
   deployVerification?: DeployVerificationProcessor;
   autonomousSession?: AutonomousSessionProcessor;
   meetingPrep?: MeetingPrepProcessor;
+  discordTriage?: DiscordTriageProcessor;
 }
 
 const activeWorkers: Worker[] = [];
@@ -213,6 +216,20 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.MEETING_PREP);
+    activeWorkers.push(worker);
+  }
+
+  if (processors.discordTriage) {
+    const worker = new Worker<DiscordTriageJob>(
+      QUEUE_NAMES.DISCORD_TRIAGE,
+      processors.discordTriage,
+      {
+        connection,
+        concurrency: 2,              // can triage multiple channels in parallel
+        lockDuration: 660_000,       // 11 min — 5 min session budget + 6 min headroom for triage + overhead
+      },
+    );
+    attachWorkerEvents(worker, QUEUE_NAMES.DISCORD_TRIAGE);
     activeWorkers.push(worker);
   }
 

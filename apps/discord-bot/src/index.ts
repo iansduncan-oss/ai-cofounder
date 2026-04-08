@@ -3,6 +3,7 @@ import { Client, GatewayIntentBits, Events } from "discord.js";
 import { createLogger, requireEnv, optionalEnv } from "@ai-cofounder/shared";
 import { registerCommands } from "./commands/register.js";
 import { handleInteraction } from "./handlers/interaction.js";
+import { setupMessageWatcher } from "./handlers/message-watcher.js";
 
 const logger = createLogger("discord-bot");
 
@@ -13,9 +14,14 @@ async function main() {
   // Deploy slash commands to Discord API
   await registerCommands(token, clientId);
 
-  const client = new Client({
-    intents: [GatewayIntentBits.Guilds],
-  });
+  const watcherEnabled = optionalEnv("DISCORD_WATCHER_ENABLED", "false") === "true";
+
+  const intents = [GatewayIntentBits.Guilds];
+  if (watcherEnabled) {
+    intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
+  }
+
+  const client = new Client({ intents });
 
   client.once(Events.ClientReady, (c) => {
     logger.info({ user: c.user.tag }, "Discord bot online");
@@ -28,6 +34,11 @@ async function main() {
   });
 
   await client.login(token);
+
+  // Set up passive message watcher (Discord Watcher feature)
+  if (watcherEnabled) {
+    setupMessageWatcher(client);
+  }
 
   // Health check HTTP server
   const healthPort = Number(optionalEnv("DISCORD_HEALTH_PORT", "3101"));

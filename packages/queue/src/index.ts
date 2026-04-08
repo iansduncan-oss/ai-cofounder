@@ -51,7 +51,10 @@ export {
   type DeadLetterJob,
   type AutonomousSessionJob,
   getMeetingPrepQueue,
+  getDiscordTriageQueue,
   type MeetingPrepJob,
+  type DiscordTriageJob,
+  type DiscordTriageMessage,
 } from "./queues.js";
 
 // Workers
@@ -70,6 +73,7 @@ export {
   type DeployVerificationProcessor,
   type AutonomousSessionProcessor,
   type MeetingPrepProcessor,
+  type DiscordTriageProcessor,
 } from "./workers.js";
 
 // Scheduler (recurring jobs)
@@ -86,6 +90,7 @@ export {
   enqueueReflection,
   enqueueSubagentTask,
   enqueueMeetingPrep,
+  enqueueDiscordTriage,
   enqueueAutonomousSession,
   getAllQueueStatus,
   getJobStatus,
