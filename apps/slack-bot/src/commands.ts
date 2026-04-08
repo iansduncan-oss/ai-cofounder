@@ -828,12 +828,13 @@ export function registerCommands(app: App): void {
       text = `[User greeting — greet sir, then use recall_memories and list available tools to give a real status update. Check active goals, pending approvals, and system health. Do NOT invent or hallucinate calendar events, emails, or meetings — only report data you actually retrieve from tools. If no data is available, simply greet and ask how you can help.] ${text}`;
     }
 
-    // Thread continuity: reuse recent thread or start new one
-    const threadTs = (msg.thread_ts as string | undefined) ?? getOrCreateThread(channel, msg.ts as string);
+    // For DMs, reply directly in channel (not in a thread) so sir doesn't have to click "Replies"
+    // Only use threads if the user is already in a thread
+    const threadTs = msg.thread_ts as string | undefined;
 
     const initial = await slackClient.chat.postMessage({
       channel,
-      thread_ts: threadTs,
+      ...(threadTs ? { thread_ts: threadTs } : {}),
       text: "One moment, sir...",
     });
     const replyTs = initial.ts;
