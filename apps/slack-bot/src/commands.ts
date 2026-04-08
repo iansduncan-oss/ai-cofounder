@@ -825,7 +825,7 @@ export function registerCommands(app: App): void {
 
     // Detect greetings and inject context hint for briefing-style response
     if (GREETING_PATTERN.test(text)) {
-      text = `[User greeting — provide a brief status update with calendar/email context, address as 'sir'] ${text}`;
+      text = `[User greeting — greet sir, then use recall_memories and list available tools to give a real status update. Check active goals, pending approvals, and system health. Do NOT invent or hallucinate calendar events, emails, or meetings — only report data you actually retrieve from tools. If no data is available, simply greet and ask how you can help.] ${text}`;
     }
 
     // Thread continuity: reuse recent thread or start new one
