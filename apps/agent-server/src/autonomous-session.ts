@@ -10,6 +10,7 @@ import {
   completeWorkSession,
   getTodayTokenTotal,
   getSystemDefaultWorkspace,
+  findOrCreateUser,
 } from "@ai-cofounder/db";
 import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { SandboxService } from "@ai-cofounder/sandbox";
@@ -326,7 +327,7 @@ async function _runSessionBody(
       try {
         const { progress, actions, tokensUsed: execTokens } = await executor.executeGoal({
           goalId: topGoal.id,
-          userId: "system-autonomous",
+          userId: (await findOrCreateUser(db, "system-autonomous", "system")).id,
           workSessionId: session.id,
           repoDir: workspaceService ? optionalEnv("WORKSPACE_DIR", "/tmp/ai-cofounder-workspace") : undefined,
           createPr: true,
@@ -428,7 +429,8 @@ async function _runSessionBody(
 
     // Ensure a conversation record exists so goals can reference it via FK
     const defaultWs = await getSystemDefaultWorkspace(db);
-    await createConversation(db, { userId: "system-autonomous", title: `Autonomous session ${session.id}`, workspaceId: defaultWs?.id ?? "" })
+    const systemUser = await findOrCreateUser(db, "system-autonomous", "system");
+    await createConversation(db, { userId: systemUser.id, title: `Autonomous session ${session.id}`, workspaceId: defaultWs?.id ?? "" })
       .then((conv) => {
         // Use the conversation ID for the orchestrator instead of session ID
         (session as { conversationId?: string }).conversationId = conv.id;

@@ -95,12 +95,18 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       .join("");
     const hour = Number(localTime.find((p) => p.type === "hour")?.value ?? 0);
 
-    // Daily briefing: send once when hour matches
+    // Daily briefing: send once when hour matches (check DB cache to survive restarts)
     if (hour >= briefingHour && lastBriefingDate !== dateStr && notificationService) {
       lastBriefingDate = dateStr;
       try {
-        await sendDailyBriefing(db, notificationService, llmRegistry);
-        logger.info({ dateStr }, "daily briefing sent by scheduler");
+        const { getBriefingCache } = await import("@ai-cofounder/db");
+        const cached = await getBriefingCache(db, dateStr);
+        if (cached) {
+          logger.debug({ dateStr }, "briefing already sent today (cached), skipping");
+        } else {
+          await sendDailyBriefing(db, notificationService, llmRegistry);
+          logger.info({ dateStr }, "daily briefing sent by scheduler");
+        }
       } catch (err) {
         logger.error({ err }, "failed to send daily briefing");
       }
