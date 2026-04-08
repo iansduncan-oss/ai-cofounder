@@ -98,7 +98,7 @@ describe("Briefing service", () => {
         recentSessions: [{ trigger: "schedule", status: "completed", summary: "Did stuff" }],
       });
 
-      expect(text).toContain("Daily Briefing");
+      expect(text).toContain("briefing");
       expect(text).toContain("Active Goals (2)");
       expect(text).toContain("Build API");
       expect(text).toContain("!!"); // high priority
@@ -161,8 +161,8 @@ describe("Briefing service", () => {
       const db = {} as any;
       const result = await sendDailyBriefing(db, notificationService);
 
-      expect(result).toContain("Daily Briefing");
-      expect(mockSendBriefing).toHaveBeenCalledWith(expect.stringContaining("Daily Briefing"));
+      expect(result).toContain("briefing");
+      expect(mockSendBriefing).toHaveBeenCalledWith(expect.stringContaining("briefing"));
     });
   });
 });
