@@ -22,6 +22,7 @@ export interface TriageResult {
   summary: string;
   urgency: "high" | "medium" | "low";
   relevantMessageIds: string[];
+  suggestedAction: string;
 }
 
 const MAX_MSG_LEN = 500;
@@ -30,7 +31,7 @@ function truncateContent(content: string): string {
   return content.length > MAX_MSG_LEN ? content.slice(0, MAX_MSG_LEN) + "…" : content;
 }
 
-const TRIAGE_PROMPT = `You are a message triage system for a software development team's Discord server.
+const TRIAGE_PROMPT = `You are Jarvis, a message triage system for a software development team's Discord server.
 Analyze the following batch of messages and determine if they contain anything actionable.
 
 Actionable items include: bug reports, feature requests, questions needing answers, deployment alerts, status updates requiring action, requests for the AI system to do something, error reports, CI/CD failures, infrastructure issues.
@@ -46,7 +47,8 @@ Respond with JSON only (no markdown fencing):
   "confidence": number between 0 and 1,
   "summary": "1-2 sentence summary of what is happening",
   "urgency": "high" | "medium" | "low",
-  "relevantMessageIds": ["ids of the messages that are relevant"]
+  "relevantMessageIds": ["ids of the messages that are relevant"],
+  "suggestedAction": "A concrete 1-sentence recommendation for what the human should do, framed as advice from Jarvis. Example: 'Check the CI logs and re-run the build, sir.' or 'Worth adding to the backlog, sir.'"
 }`;
 
 export class DiscordTriageService {
@@ -57,7 +59,10 @@ export class DiscordTriageService {
     messages: DiscordTriageMessage[];
   }): Promise<TriageResult> {
     const messagesText = batch.messages
-      .map((m) => `[${m.timestamp}] (${m.messageId}) ${m.authorName}: ${truncateContent(m.content)}`)
+      .map((m) => {
+        const threadIndicator = m.referencedMessageId ? ` (reply to ${m.referencedMessageId})` : "";
+        return `[${m.timestamp}] (${m.messageId}) ${m.authorName}${threadIndicator}: ${truncateContent(m.content)}`;
+      })
       .join("\n");
 
     const prompt =
@@ -66,7 +71,7 @@ export class DiscordTriageService {
     try {
       const result = await this.registry.complete("simple", {
         messages: [{ role: "user", content: [{ type: "text", text: prompt }] }],
-        max_tokens: 400,
+        max_tokens: 500,
         temperature: 0.1,
       });
 
@@ -81,6 +86,7 @@ export class DiscordTriageService {
       }
 
       const parsed = JSON.parse(jsonMatch[0]) as TriageResult;
+      if (!parsed.suggestedAction) parsed.suggestedAction = "";
 
       logger.info(
         {
@@ -103,7 +109,75 @@ export class DiscordTriageService {
         summary: "Failed to triage batch",
         urgency: "low",
         relevantMessageIds: [],
+        suggestedAction: "",
       };
     }
   }
+}
+
+// ── Slack Block Kit formatting ──
+
+export function buildDiscordAlertBlocks(
+  triage: TriageResult,
+  channelName: string,
+  messages: DiscordTriageMessage[],
+): object[] {
+  const relevantMsgs = messages
+    .filter((m) => triage.relevantMessageIds.includes(m.messageId))
+    .slice(0, 3);
+
+  const urgencyEmoji = { high: "🔴", medium: "🟡", low: "🟢" }[triage.urgency];
+  const categoryLabel = triage.category.replace(/_/g, " ");
+
+  const blocks: object[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: triage.urgency === "high"
+          ? `${urgencyEmoji} Sir, a matter requiring your attention in #${channelName}`
+          : `${urgencyEmoji} Discord activity in #${channelName}`,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${triage.summary}*\n_${categoryLabel} · ${triage.urgency} urgency_`,
+      },
+    },
+  ];
+
+  // Message previews
+  for (const m of relevantMsgs) {
+    const time = new Date(m.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+    blocks.push({
+      type: "context",
+      elements: [{
+        type: "mrkdwn",
+        text: `*${m.authorName}* (${time}): ${m.content.slice(0, 200)}`,
+      }],
+    });
+  }
+
+  if (triage.suggestedAction) {
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Suggested action:* ${triage.suggestedAction}`,
+      },
+    });
+  }
+
+  blocks.push({
+    type: "context",
+    elements: [{
+      type: "mrkdwn",
+      text: `_Jarvis · ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}_`,
+    }],
+  });
+
+  return blocks;
 }

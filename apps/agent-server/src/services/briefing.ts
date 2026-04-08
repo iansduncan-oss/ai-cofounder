@@ -27,6 +27,7 @@ export interface BriefingData {
   todayEvents?: Array<{ summary: string; start: string; end: string; attendeeCount: number }>;
   unreadEmailCount?: number;
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
+  discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -194,6 +195,22 @@ export function formatBriefing(data: BriefingData): string {
     lines.push("");
   }
 
+  // Discord activity
+  if (data.discordActivity && data.discordActivity.length > 0) {
+    lines.push(`**Discord Activity (${data.discordActivity.length}):**`);
+    for (const d of data.discordActivity.slice(0, 5)) {
+      const urgencyTag = d.urgency === "high" ? " [!]" : "";
+      lines.push(`  - #${d.channelName}: ${d.summary}${urgencyTag}`);
+      if (d.suggestedAction) {
+        lines.push(`    _Suggested: ${d.suggestedAction}_`);
+      }
+    }
+    if (data.discordActivity.length > 5) {
+      lines.push(`  _...and ${data.discordActivity.length - 5} more_`);
+    }
+    lines.push("");
+  }
+
   // Stale goals
   if (data.staleGoalCount > 0) {
     lines.push(`**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`);
@@ -301,6 +318,14 @@ function buildBriefingPrompt(data: BriefingData): string {
     }
   }
 
+  if (data.discordActivity && data.discordActivity.length > 0) {
+    lines.push("");
+    lines.push(`Discord activity since last briefing (${data.discordActivity.length} items):`);
+    for (const d of data.discordActivity.slice(0, 5)) {
+      lines.push(`  - #${d.channelName} [${d.urgency}] ${d.category}: ${d.summary}`);
+    }
+  }
+
   lines.push("");
   lines.push(
     "Based on this data, write the briefing. Include: " +
@@ -355,6 +380,24 @@ export async function sendDailyBriefing(
     }
   }
 
+  // Flush Discord daily digest into briefing
+  try {
+    const { DiscordDigestService } = await import("./discord-digest.js");
+    const digestService = new DiscordDigestService();
+    const dailyItems = await digestService.flush("daily");
+    if (dailyItems.length > 0) {
+      data.discordActivity = dailyItems.map((d) => ({
+        channelName: d.channelName,
+        summary: d.summary,
+        category: d.category,
+        urgency: d.urgency,
+        suggestedAction: d.suggestedAction,
+      }));
+    }
+  } catch {
+    // Discord digest unavailable — skip
+  }
+
   const text = llmRegistry
     ? await generateLlmBriefing(llmRegistry, data)
     : formatBriefing(data);
@@ -396,6 +439,14 @@ function buildEveningPrompt(data: BriefingData): string {
   if (data.pendingApprovalCount > 0) {
     lines.push("");
     lines.push(`Pending approvals carried over: ${data.pendingApprovalCount}`);
+  }
+
+  if (data.discordActivity && data.discordActivity.length > 0) {
+    lines.push("");
+    lines.push(`Discord activity today (${data.discordActivity.length} items):`);
+    for (const d of data.discordActivity.slice(0, 3)) {
+      lines.push(`  - #${d.channelName}: ${d.summary}`);
+    }
   }
 
   lines.push("");

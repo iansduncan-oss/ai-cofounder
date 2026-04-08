@@ -549,7 +549,7 @@ export class NotificationService {
   }
 
   /** Determine best Slack channel: prefer DM if configured, else notification channel */
-  private async sendSlackPreferred(text: string, blocks: object[]): Promise<void> {
+  async sendSlackPreferred(text: string, blocks: object[]): Promise<void> {
     if (this.slackDmUserId && this.slackToken) {
       await this.sendSlackDm(text, blocks);
     } else if (this.hasSlack()) {

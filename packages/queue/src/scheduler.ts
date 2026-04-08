@@ -295,4 +295,19 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info({ intervalMin: autonomousIntervalMin }, "Scheduled recurring autonomous session");
+
+  // ── Discord hourly digest (top of every hour) ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "discord-hourly-digest",
+    {
+      pattern: "0 * * * *",
+      tz: briefingTimezone,
+    },
+    {
+      name: "discord-hourly-digest",
+      data: { check: "discord_hourly_digest" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled Discord hourly digest");
 }

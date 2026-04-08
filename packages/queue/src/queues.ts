@@ -14,7 +14,7 @@ export interface AgentTaskJob {
 }
 
 export interface MonitoringJob {
-  check: "github_ci" | "github_prs" | "vps_health" | "vps_containers" | "approval_timeout_sweep" | "budget_check" | "dlq_check" | "follow_up_reminders" | "sandbox_orphan_cleanup" | "self_healing_check" | "custom";
+  check: "github_ci" | "github_prs" | "vps_health" | "vps_containers" | "approval_timeout_sweep" | "budget_check" | "dlq_check" | "follow_up_reminders" | "sandbox_orphan_cleanup" | "self_healing_check" | "discord_hourly_digest" | "custom";
   target?: string; // repo name, service name, etc.
   metadata?: Record<string, unknown>;
 }
