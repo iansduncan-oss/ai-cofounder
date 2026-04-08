@@ -1120,7 +1120,8 @@ export class Orchestrator {
     }
   }
 
-  private sanitizeToolInput(input: Record<string, unknown>): Record<string, unknown> {
+  private sanitizeToolInput(input: Record<string, unknown> | null | undefined): Record<string, unknown> {
+    if (!input) return {};
     const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input)) {
       if (typeof value === "string" && value.length > 200) {
