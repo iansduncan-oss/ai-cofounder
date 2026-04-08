@@ -128,7 +128,9 @@ export async function enrichWithGoogle(
 export function formatBriefing(data: BriefingData): string {
   const lines: string[] = [];
   const now = new Date();
-  lines.push(`**Daily Briefing** — ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}`);
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  lines.push(`**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`);
   lines.push("");
 
   // Today's schedule
@@ -163,7 +165,7 @@ export function formatBriefing(data: BriefingData): string {
       lines.push(`  - ${g.title} (${g.progress}) ${icon}`);
     }
   } else {
-    lines.push("**No active goals.** Time to plan something?");
+    lines.push("**No active goals, sir.** Shall I suggest something to work on?");
   }
   lines.push("");
 
@@ -188,7 +190,7 @@ export function formatBriefing(data: BriefingData): string {
 
   // Pending approvals
   if (data.pendingApprovalCount > 0) {
-    lines.push(`**Pending Approvals:** ${data.pendingApprovalCount} \u2014 use \`/approve\` to review`);
+    lines.push(`**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`);
     lines.push("");
   }
 
@@ -230,7 +232,7 @@ export function formatBriefing(data: BriefingData): string {
 /** Build a prompt for the LLM to generate a narrative briefing */
 function buildBriefingPrompt(data: BriefingData): string {
   const lines: string[] = [];
-  lines.push("Generate a concise morning briefing for a solo founder. Be direct, no fluff.");
+  lines.push("Generate a concise morning briefing. You are Jarvis, a composed British AI assistant. Address the user as 'sir'. Be direct, measured, and useful. No exclamation marks.");
   lines.push("Use markdown (bold, bullet points). Keep it under 1500 characters.");
   lines.push("");
 
@@ -302,12 +304,12 @@ function buildBriefingPrompt(data: BriefingData): string {
   lines.push("");
   lines.push(
     "Based on this data, write the briefing. Include: " +
-      "(1) a one-line overall status, " +
+      "(1) a one-line overall status (e.g. 'All quiet overnight, sir' or 'A few matters to address, sir'), " +
       "(2) what was accomplished, " +
-      "(3) what needs attention today (prioritize stale goals + pending approvals), " +
+      "(3) what needs attention today (prioritise stale goals + pending approvals), " +
       (data.todayEvents && data.todayEvents.length > 0 ? "(4) today's meeting schedule, " : "") +
-      `(${data.todayEvents && data.todayEvents.length > 0 ? "5" : "4"}) a suggested focus for the day. ` +
-      "Keep the tone like a sharp co-founder, not a corporate dashboard.",
+      `(${data.todayEvents && data.todayEvents.length > 0 ? "5" : "4"}) recommended priorities for today — frame as 'Might I suggest the following priorities, sir...' ` +
+      "Keep the tone composed, formal but warm — like Jarvis from Iron Man. Use 'sir' sparingly but naturally. No exclamation marks.",
   );
 
   return lines.join("\n");
@@ -318,8 +320,9 @@ export async function generateLlmBriefing(registry: LlmRegistry, data: BriefingD
   try {
     const response = await registry.complete("simple", {
       system:
-        "You are an AI co-founder sending a morning briefing. " +
-        "Be direct, concise, and useful. Use markdown formatting.",
+        "You are Jarvis, a personal AI assistant with dry British wit. " +
+        "Deliver the briefing with composed efficiency. Address the user as 'sir'. " +
+        "Be concise, measured, and useful. No exclamation marks. Use markdown formatting.",
       messages: [{ role: "user", content: buildBriefingPrompt(data) }],
       max_tokens: 1024,
     });
@@ -364,6 +367,87 @@ export async function sendDailyBriefing(
   await upsertBriefingCache(db, today, text).catch((err) => {
     logger.warn({ err }, "Failed to cache briefing");
   });
+
+  return text;
+}
+
+/** Build prompt for evening wind-down summary */
+function buildEveningPrompt(data: BriefingData): string {
+  const lines: string[] = [];
+  lines.push("Generate a concise evening wrap-up. You are Jarvis. Address the user as 'sir'. Be warm but measured. No exclamation marks.");
+  lines.push("Use markdown (bold, bullet points). Keep it under 1000 characters.");
+  lines.push("");
+
+  if (data.completedYesterday.length > 0) {
+    lines.push("Completed today:");
+    for (const g of data.completedYesterday) {
+      lines.push(`  - "${g.title}"`);
+    }
+  } else {
+    lines.push("No goals completed today.");
+  }
+
+  lines.push("");
+  lines.push(`Active goals remaining: ${data.activeGoals.length}`);
+  for (const g of data.activeGoals.slice(0, 5)) {
+    lines.push(`  - "${g.title}" (${g.priority}, ${g.progress})`);
+  }
+
+  if (data.pendingApprovalCount > 0) {
+    lines.push("");
+    lines.push(`Pending approvals carried over: ${data.pendingApprovalCount}`);
+  }
+
+  lines.push("");
+  lines.push(
+    "Based on this data, write an evening summary. Include: " +
+      "(1) a brief acknowledgement of what was accomplished today, " +
+      "(2) anything left open that carries over to tomorrow, " +
+      "(3) a suggested top priority for tomorrow morning. " +
+      "Frame it warmly — sir is winding down. Example opening: 'Good evening, sir. A productive day, all told.'",
+  );
+
+  return lines.join("\n");
+}
+
+/** Generate an evening wrap-up briefing using LLM */
+export async function generateEveningWrapUp(registry: LlmRegistry, data: BriefingData): Promise<string> {
+  try {
+    const response = await registry.complete("simple", {
+      system:
+        "You are Jarvis, a personal AI assistant. " +
+        "Deliver an evening summary with warmth and composure. Address the user as 'sir'. " +
+        "Be brief — sir is winding down. No exclamation marks. Use markdown formatting.",
+      messages: [{ role: "user", content: buildEveningPrompt(data) }],
+      max_tokens: 768,
+    });
+
+    const text = response.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+
+    return text || "Good evening, sir. All matters are in order. Rest well.";
+  } catch (err) {
+    logger.warn({ err }, "LLM evening wrap-up generation failed");
+    return "Good evening, sir. I was unable to generate a full summary, but all critical systems are operational.";
+  }
+}
+
+/** Send evening wind-down briefing */
+export async function sendEveningWrapUp(
+  db: Db,
+  notificationService: NotificationService,
+  llmRegistry?: LlmRegistry,
+): Promise<string> {
+  const data = await gatherBriefingData(db);
+
+  const text = llmRegistry
+    ? await generateEveningWrapUp(llmRegistry, data)
+    : "Good evening, sir. Today's session is complete. All systems remain operational.";
+
+  await notificationService.sendBriefing(text);
+  logger.info("evening wrap-up sent");
 
   return text;
 }

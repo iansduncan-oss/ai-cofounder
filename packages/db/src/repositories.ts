@@ -1493,6 +1493,7 @@ export async function createSchedule(
     description?: string;
     enabled?: boolean;
     nextRunAt?: Date;
+    metadata?: Record<string, unknown>;
   },
 ) {
   const [schedule] = await db

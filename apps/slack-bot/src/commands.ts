@@ -771,7 +771,7 @@ export function registerCommands(app: App): void {
     const initial = await slackClient.chat.postMessage({
       channel: event.channel,
       thread_ts: threadTs,
-      text: "Thinking...",
+      text: "One moment, sir...",
     });
     const replyTs = initial.ts;
     let lastEditTime = 0;
@@ -789,7 +789,29 @@ export function registerCommands(app: App): void {
     }
   });
 
-  // Event: message — respond to DMs (in thread)
+  // ── Greeting detection for Jarvis-like responses ──
+  const GREETING_PATTERN = /^(morning|good morning|hey jarvis|jarvis|yo|hi|hello|evening|good evening|what's up|sup|howdy)/i;
+
+  // ── Thread continuity: track latest thread per DM channel (30-minute window) ──
+  const dmThreadMap = new Map<string, { threadTs: string; lastActivity: number }>();
+  const THREAD_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
+
+  function getOrCreateThread(channel: string, messageTs: string): string {
+    const existing = dmThreadMap.get(channel);
+    const now = Date.now();
+
+    if (existing && now - existing.lastActivity < THREAD_WINDOW_MS) {
+      // Continue existing thread
+      existing.lastActivity = now;
+      return existing.threadTs;
+    }
+
+    // Start new thread
+    dmThreadMap.set(channel, { threadTs: messageTs, lastActivity: now });
+    return messageTs;
+  }
+
+  // Event: message — respond to DMs (in thread) with Jarvis personality
   app.event("message", async ({ event, client: slackClient }) => {
     const msg = event as unknown as Record<string, unknown>;
     if (msg.channel_type !== "im") return;
@@ -799,18 +821,25 @@ export function registerCommands(app: App): void {
     const channel = msg.channel as string;
     const ctx = makeContext(channel, msg.user as string, msg.user as string);
 
-    // Reply in thread using the original message as parent
-    const threadTs = (msg.thread_ts as string | undefined) ?? (msg.ts as string);
+    let text = msg.text as string;
+
+    // Detect greetings and inject context hint for briefing-style response
+    if (GREETING_PATTERN.test(text)) {
+      text = `[User greeting — provide a brief status update with calendar/email context, address as 'sir'] ${text}`;
+    }
+
+    // Thread continuity: reuse recent thread or start new one
+    const threadTs = (msg.thread_ts as string | undefined) ?? getOrCreateThread(channel, msg.ts as string);
 
     const initial = await slackClient.chat.postMessage({
       channel,
       thread_ts: threadTs,
-      text: "Thinking...",
+      text: "One moment, sir...",
     });
     const replyTs = initial.ts;
     let lastEditTime = 0;
 
-    const result = await handleAskStreaming(client, ctx, msg.text as string, async (chunk) => {
+    const result = await handleAskStreaming(client, ctx, text, async (chunk) => {
       const now = Date.now();
       if (replyTs && now - lastEditTime >= 1500) {
         lastEditTime = now;

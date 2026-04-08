@@ -1,4 +1,4 @@
-// AI Co-Founder Voice UI — Real-time Audio Pipeline
+// Jarvis Voice UI — Real-time Audio Pipeline
 (function () {
   "use strict";
 
@@ -53,7 +53,7 @@
 
   // VAD parameters
   var VAD_THRESHOLD = 0.015;
-  var VAD_SILENCE_TIMEOUT = 1500; // ms of silence before auto-stop
+  var VAD_SILENCE_TIMEOUT = 2000; // ms of silence before auto-stop
   var vadSilenceTimer = null;
   var vadHasSpoken = false;
 
@@ -109,13 +109,13 @@
     statusText.className = newState;
     switch (newState) {
       case "idle":
-        statusText.textContent = "Ready";
+        statusText.textContent = "At your service, sir";
         break;
       case "listening":
         statusText.textContent = "Listening...";
         break;
       case "processing":
-        statusText.textContent = "Processing...";
+        statusText.textContent = "One moment, sir...";
         break;
       case "speaking":
         statusText.textContent = "Speaking...";
@@ -373,14 +373,12 @@
       return;
     }
 
-    // Try server-side transcription first, fall back to browser speech recognition
-    if (transcribeAvailable) {
+    // Use browser speech recognition (Web Speech API) as primary — free, no API key needed
+    // Fall back to server-side Whisper only if browser speech is unavailable
+    if (browserSpeechSupported) {
+      await browserTranscribeAndSend(audioBlob);
+    } else if (transcribeAvailable) {
       await transcribeAndSend(audioBlob);
-    } else if (browserSpeechSupported) {
-      // Fall back: use browser speech recognition on next tap
-      // For now, show a hint
-      showError("Transcription unavailable. Use text input.");
-      setState("idle");
     } else {
       showError("No transcription available. Use text input.");
       setState("idle");
@@ -422,6 +420,69 @@
       showError(err.message || "Transcription failed");
       setState("idle");
     }
+  }
+
+  // ── Browser Speech Recognition (Web Speech API — free, no API key) ──
+  var recognitionActive = false;
+
+  async function browserTranscribeAndSend() {
+    setState("processing");
+    showTranscript(userTranscript, "Listening...");
+
+    var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showError("Speech recognition not supported in this browser.");
+      setState("idle");
+      return;
+    }
+
+    // Use a fresh recognition instance that listens to the already-recorded audio
+    // Web Speech API works in real-time, so we need to restart listening briefly
+    var recognition = new SpeechRecognition();
+    recognition.lang = "en-US";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.continuous = false;
+    recognitionActive = true;
+
+    return new Promise(function (resolve) {
+      recognition.onresult = function (event) {
+        recognitionActive = false;
+        var text = event.results[0][0].transcript.trim();
+        if (!text) {
+          showTranscript(userTranscript, "(no speech detected)");
+          setTimeout(function () {
+            hideTranscript(userTranscript);
+            setState("idle");
+          }, 1500);
+          resolve();
+          return;
+        }
+        showTranscript(userTranscript, text);
+        sendMessage(text).then(resolve);
+      };
+
+      recognition.onerror = function (event) {
+        recognitionActive = false;
+        if (event.error === "no-speech") {
+          showTranscript(userTranscript, "(no speech detected)");
+          setTimeout(function () {
+            hideTranscript(userTranscript);
+            setState("idle");
+          }, 1500);
+        } else {
+          showError("Speech recognition error: " + event.error);
+          setState("idle");
+        }
+        resolve();
+      };
+
+      recognition.onend = function () {
+        recognitionActive = false;
+      };
+
+      recognition.start();
+    });
   }
 
   // ── Text Sending (Streaming SSE) ──
@@ -476,14 +537,14 @@
 
             switch (event.type) {
               case "thinking":
-                statusText.textContent = "Thinking...";
+                statusText.textContent = "Allow me a moment, sir...";
                 break;
 
               case "text_delta":
                 if (!messageDiv) {
                   messageDiv = addMessage("agent", "");
                   ring.className = "streaming";
-                  statusText.textContent = "Responding...";
+                  statusText.textContent = "Speaking...";
                 }
                 fullResponse += event.data.delta || "";
                 messageDiv.firstChild.textContent = fullResponse;
@@ -495,7 +556,7 @@
                 if (!messageDiv) {
                   messageDiv = addMessage("agent", "");
                 }
-                statusText.textContent = "Using " + (event.data.name || "tool") + "...";
+                statusText.textContent = "Consulting " + (event.data.name || "systems") + "...";
                 break;
 
               case "done":
@@ -539,7 +600,7 @@
     } catch (err) {
       console.error("API error:", err);
       showError("Connection failed");
-      addMessage("agent", "Something went wrong. Is the server running?");
+      addMessage("agent", "I'm afraid I've lost connection to the server, sir. Please verify it's running.");
       setTimeout(function () { setState("idle"); }, 3000);
     }
   }
@@ -629,9 +690,9 @@
     var voices = synthesis.getVoices();
     var preferred = voices.find(function (v) {
       return (
-        v.name.includes("Samantha") ||
         v.name.includes("Daniel") ||
-        v.name.includes("Google UK English Male")
+        v.name.includes("Google UK English Male") ||
+        v.name.includes("Samantha")
       );
     });
     if (preferred) utterance.voice = preferred;
@@ -799,6 +860,46 @@
     };
   }
 
-  // Initialize
+  // Initialize with Jarvis greeting
   setState("idle");
+
+  // Play greeting after capabilities are checked
+  setTimeout(async function () {
+    var hour = new Date().getHours();
+    var greeting = hour < 12 ? "Good morning, sir." : hour < 18 ? "Good afternoon, sir." : "Good evening, sir.";
+    greeting += " How may I assist you?";
+
+    // Try server TTS first, then browser fallback
+    if (ttsAvailable) {
+      try {
+        var res = await fetch(API_URL + "/voice/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: greeting }),
+        });
+        if (res.ok) {
+          var arrayBuffer = await res.arrayBuffer();
+          ensureAudioContext();
+          var audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          var source = audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContext.destination);
+          source.start(0);
+          addMessage("agent", greeting);
+          return;
+        }
+      } catch (e) { /* fall through to browser */ }
+    }
+    // Browser fallback
+    if (window.speechSynthesis) {
+      var utterance = new SpeechSynthesisUtterance(greeting);
+      utterance.rate = 1.0;
+      utterance.pitch = 0.9;
+      var voices = window.speechSynthesis.getVoices();
+      var british = voices.find(function (v) { return v.name.includes("Daniel") || v.name.includes("Google UK English Male"); });
+      if (british) utterance.voice = british;
+      window.speechSynthesis.speak(utterance);
+      addMessage("agent", greeting);
+    }
+  }, 1500);
 })();

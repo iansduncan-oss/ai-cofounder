@@ -49,17 +49,20 @@ interface GoalProposedNotification {
 interface NotificationConfig {
   slackToken?: string;
   slackChannel?: string;
+  slackDmUserId?: string;
   discordWebhookUrl?: string;
 }
 
 export class NotificationService {
   private slackToken: string;
   private slackChannel: string;
+  private slackDmUserId: string;
   private discordWebhookUrl: string;
 
   constructor(config: NotificationConfig) {
     this.slackToken = config.slackToken ?? "";
     this.slackChannel = config.slackChannel ?? "";
+    this.slackDmUserId = config.slackDmUserId ?? "";
     this.discordWebhookUrl = config.discordWebhookUrl ?? "";
   }
 
@@ -84,7 +87,7 @@ export class NotificationService {
           [
             {
               type: "header",
-              text: { type: "plain_text", text: "Approval Required" },
+              text: { type: "plain_text", text: "A Matter Requiring Your Approval, Sir" },
             },
             {
               type: "section",
@@ -128,7 +131,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: `Approval Required: ${approval.reason}`,
+            title: `Sir, your approval is required: ${approval.reason}`,
             description: `Requested by: ${approval.requestedBy}\nTask: \`${approval.taskId.slice(0, 8)}…\``,
             color: 0xfee75c, // yellow
             footer: { text: `ID: ${approval.approvalId}` },
@@ -143,7 +146,7 @@ export class NotificationService {
   async notifyGoalCompleted(notification: GoalCompletedNotification): Promise<void> {
     const isSuccess = notification.status === "completed";
     const emoji = isSuccess ? "\u2705" : "\u274c";
-    const title = isSuccess ? "Goal Completed" : "Goal Failed";
+    const title = isSuccess ? "Objective Complete, Sir" : "Objective Failed, Sir";
     const color = isSuccess ? 0x57f287 : 0xed4245; // green or red
 
     const durationText = notification.durationMs
@@ -206,7 +209,7 @@ export class NotificationService {
           [
             {
               type: "header",
-              text: { type: "plain_text", text: "\u274c Task Failed" },
+              text: { type: "plain_text", text: "I'm Afraid a Task Has Failed, Sir" },
             },
             {
               type: "section",
@@ -231,7 +234,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: `Task Failed: ${notification.taskTitle}`,
+            title: `Task failed, sir: ${notification.taskTitle}`,
             description: `Agent: ${notification.agent}\nError: ${errorTruncated}`,
             color: 0xe67e22, // orange
             footer: {
@@ -305,7 +308,7 @@ export class NotificationService {
           [
             {
               type: "header",
-              text: { type: "plain_text", text: `${scopeEmoji} Goal Needs Approval` },
+              text: { type: "plain_text", text: `${scopeEmoji} A Proposed Objective Awaits Your Approval, Sir` },
             },
             {
               type: "section",
@@ -350,7 +353,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: `${scopeEmoji} Goal Needs Approval: ${notification.goalTitle}`,
+            title: `${scopeEmoji} Proposed objective awaits your approval, sir: ${notification.goalTitle}`,
             description: `Scope: **${scopeLabel}** · ${notification.taskCount} task(s)\n\nApprove or reject via the dashboard.`,
             color: discordColor,
             footer: { text: `Goal: ${notification.goalId.slice(0, 8)}…` },
@@ -368,13 +371,13 @@ export class NotificationService {
       .map((g) => `- **${g.title}** \u2014 ${g.hoursStale}h since last update`)
       .join("\n");
 
-    const text = `${goals.length} goal(s) sitting idle:\n\n${goalList}\n\nWant to \`/execute\` them or close them out?`;
+    const text = `Sir, ${goals.length} objective(s) appear to have stalled:\n\n${goalList}\n\nShall I proceed with execution, or would you prefer to close them out?`;
 
     const slackPromise = this.hasSlack()
       ? this.sendSlack(this.slackChannel, text, [
           {
             type: "header",
-            text: { type: "plain_text", text: "Goals going cold" },
+            text: { type: "plain_text", text: "Sir, a Few Items Appear to Have Stalled" },
           },
           {
             type: "section",
@@ -386,7 +389,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: "Goals going cold",
+            title: "Sir, a few items appear to have stalled",
             description: text,
             color: 0xf0932b, // orange
           },
@@ -398,13 +401,13 @@ export class NotificationService {
 
   /** Remind about pending approvals that need attention */
   async notifyApprovalReminder(count: number): Promise<void> {
-    const text = `**${count}** task(s) need your sign-off before execution can continue.\n\nUse \`/approve <id>\` to review and approve.`;
+    const text = `There are **${count}** matter(s) awaiting your approval, sir, before execution can continue.\n\nUse \`/approve <id>\` to review at your convenience.`;
 
     const slackPromise = this.hasSlack()
       ? this.sendSlack(this.slackChannel, text, [
           {
             type: "header",
-            text: { type: "plain_text", text: "Approvals waiting on you" },
+            text: { type: "plain_text", text: "Matters Awaiting Your Approval, Sir" },
           },
           {
             type: "section",
@@ -416,7 +419,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: "Approvals waiting on you",
+            title: "Matters awaiting your approval, sir",
             description: text,
             color: 0xfee75c, // amber
           },
@@ -426,23 +429,22 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
-  /** Notify about inactivity with a suggested focus */
+  /** Notify about inactivity with a suggested focus — prefers DM */
   async notifyQuietCheckIn(suggestion: string): Promise<void> {
-    const text = `Haven't heard from you in a while. Here's what I'd suggest focusing on:\n\n${suggestion}`;
+    const text = `It's been rather quiet, sir. Might I suggest a focus area?\n\n${suggestion}`;
+    const blocks = [
+      {
+        type: "section",
+        text: { type: "mrkdwn", text },
+      },
+    ];
 
-    const slackPromise = this.hasSlack()
-      ? this.sendSlack(this.slackChannel, text, [
-          {
-            type: "section",
-            text: { type: "mrkdwn", text },
-          },
-        ])
-      : Promise.resolve();
+    const slackPromise = this.sendSlackPreferred(text, blocks);
 
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: "Checking in",
+            title: "Checking in, sir",
             description: text,
             color: 0x5865f2, // blurple
           },
@@ -459,13 +461,13 @@ export class NotificationService {
       .map((j) => `- \`${j.originalQueue}\`: ${j.failedReason.slice(0, 100)} (${j.failedAt})`)
       .join("\n");
 
-    const text = `Dead-letter queue has **${count}** unresolved job(s):\n\n${jobList}\n\nReview at /dashboard/dlq or use the API to retry/delete.`;
+    const text = `Sir, there are **${count}** unresolved system error(s) requiring attention:\n\n${jobList}\n\nReview at /dashboard/dlq or use the API to retry.`;
 
     const slackPromise = this.hasSlack()
       ? this.sendSlack(this.slackChannel, text, [
           {
             type: "header",
-            text: { type: "plain_text", text: "DLQ Alert" },
+            text: { type: "plain_text", text: "System Errors Requiring Attention, Sir" },
           },
           {
             type: "section",
@@ -477,7 +479,7 @@ export class NotificationService {
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: "Dead-Letter Queue Alert",
+            title: "System errors requiring attention, sir",
             description: text,
             color: 0xed4245, // red
           },
@@ -487,25 +489,24 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
-  /** Send a daily briefing to configured channels */
+  /** Send a daily briefing — prefers DM for personal delivery */
   async sendBriefing(text: string): Promise<void> {
-    const slackPromise = this.hasSlack()
-      ? this.sendSlack(this.slackChannel, text, [
-          {
-            type: "header",
-            text: { type: "plain_text", text: "Daily Briefing" },
-          },
-          {
-            type: "section",
-            text: { type: "mrkdwn", text },
-          },
-        ])
-      : Promise.resolve();
+    const blocks = [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "Morning Briefing, Sir" },
+      },
+      {
+        type: "section",
+        text: { type: "mrkdwn", text },
+      },
+    ];
+    const slackPromise = this.sendSlackPreferred(text, blocks);
 
     const discordPromise = this.hasDiscord()
       ? this.sendDiscord([
           {
-            title: "Daily Briefing",
+            title: "Morning Briefing, Sir",
             description: text.slice(0, 4000),
             color: 0x5865f2, // blurple
           },
@@ -513,6 +514,47 @@ export class NotificationService {
       : Promise.resolve();
 
     await Promise.allSettled([slackPromise, discordPromise]);
+  }
+
+  /** Send a Slack DM to the configured user (opens conversation first) */
+  private async sendSlackDm(text: string, blocks: object[]): Promise<void> {
+    if (!this.slackToken || !this.slackDmUserId) return;
+
+    try {
+      // Open DM conversation with user
+      const openRes = await fetch("https://slack.com/api/conversations.open", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.slackToken}`,
+        },
+        body: JSON.stringify({ users: this.slackDmUserId }),
+      });
+
+      if (!openRes.ok) {
+        logger.warn({ status: openRes.status }, "Failed to open Slack DM conversation");
+        return;
+      }
+
+      const openData = (await openRes.json()) as { ok: boolean; channel?: { id: string }; error?: string };
+      if (!openData.ok || !openData.channel) {
+        logger.warn({ error: openData.error }, "Slack DM open failed");
+        return;
+      }
+
+      await this.sendSlack(openData.channel.id, text, blocks);
+    } catch (err) {
+      logger.warn({ err }, "failed to send Slack DM");
+    }
+  }
+
+  /** Determine best Slack channel: prefer DM if configured, else notification channel */
+  private async sendSlackPreferred(text: string, blocks: object[]): Promise<void> {
+    if (this.slackDmUserId && this.slackToken) {
+      await this.sendSlackDm(text, blocks);
+    } else if (this.hasSlack()) {
+      await this.sendSlack(this.slackChannel, text, blocks);
+    }
   }
 
   private async sendSlack(
@@ -577,6 +619,7 @@ export function createNotificationService(): NotificationService {
   return new NotificationService({
     slackToken: optionalEnv("SLACK_BOT_TOKEN", ""),
     slackChannel: optionalEnv("SLACK_NOTIFICATION_CHANNEL", ""),
+    slackDmUserId: optionalEnv("SLACK_DM_USER_ID", ""),
     discordWebhookUrl: optionalEnv("DISCORD_NOTIFICATION_WEBHOOK_URL", ""),
   });
 }

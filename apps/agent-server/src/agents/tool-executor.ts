@@ -44,6 +44,7 @@ import {
   LIST_SCHEDULES_TOOL,
   DELETE_SCHEDULE_TOOL,
 } from "./tools/schedule-tools.js";
+import { REMIND_ME_TOOL } from "./tools/reminder-tools.js";
 import {
   READ_FILE_TOOL,
   WRITE_FILE_TOOL,
@@ -205,6 +206,7 @@ export function buildSharedToolList(
     add(CREATE_SCHEDULE_TOOL);
     add(LIST_SCHEDULES_TOOL);
     add(DELETE_SCHEDULE_TOOL);
+    add(REMIND_ME_TOOL);
     add(QUERY_DATABASE_TOOL);
     add(CREATE_FOLLOW_UP_TOOL);
   }
@@ -608,6 +610,39 @@ export async function executeSharedTool(
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         return { error: `Invalid cron expression: ${msg}` };
+      }
+    }
+
+    case "remind_me": {
+      if (!db) return { error: "Database not available" };
+      const input = block.input as { reminder_text: string; cron_expression: string; description?: string };
+      try {
+        const { CronExpressionParser } = await import("cron-parser");
+        const interval = CronExpressionParser.parse(input.cron_expression);
+        const nextRunAt = interval.next().toDate();
+
+        const reminderPrompt = `[REMINDER for sir] ${input.reminder_text}. Send this reminder to sir via notification. Be brief: "Sir, a reminder: ${input.reminder_text}"`;
+        const desc = input.description ?? `Reminder: ${input.reminder_text}`;
+
+        const schedule = await createSchedule(db, {
+          cronExpression: input.cron_expression,
+          actionPrompt: reminderPrompt,
+          description: desc,
+          userId: context.userId,
+          enabled: true,
+          nextRunAt,
+          workspaceId: context.workspaceId ?? "",
+          metadata: { isOneShot: true },
+        });
+
+        return {
+          scheduleId: schedule.id,
+          nextRunAt: nextRunAt.toISOString(),
+          message: `Very well, sir. I shall remind you at ${nextRunAt.toLocaleString()} regarding: ${input.reminder_text}`,
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { error: `Failed to set reminder: ${msg}` };
       }
     }
 

@@ -3,6 +3,7 @@ import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import {
   listDueSchedules,
   updateScheduleLastRun,
+  toggleSchedule,
   createWorkSession,
   completeWorkSession,
   createConversation,
@@ -20,7 +21,7 @@ import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { N8nService } from "./n8n.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./workspace.js";
-import { sendDailyBriefing } from "./briefing.js";
+import { sendDailyBriefing, sendEveningWrapUp } from "./briefing.js";
 import type { NotificationService } from "./notifications.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
 import type { AutonomyTierService } from "./autonomy-tier.js";
@@ -43,6 +44,8 @@ export interface SchedulerConfig {
   pollIntervalMs?: number;
   briefingHour?: number;
   briefingTimezone?: string;
+  eveningCheckinHour?: number;
+  quietCheckinThresholdHours?: number;
 }
 
 export function startScheduler(config: SchedulerConfig): { stop: () => void } {
@@ -60,6 +63,8 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     pollIntervalMs = 60_000,
     briefingHour = 8,
     briefingTimezone = "America/New_York",
+    eveningCheckinHour = 18,
+    quietCheckinThresholdHours = 3,
   } = config;
 
   let running = false;
@@ -68,6 +73,8 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
   let lastCheckInHour = -1; // track last hour we ran proactive check-in
   let lastQuietCheckDate = ""; // "YYYY-MM-DD" to send quiet check-in at most once per day
   let lastBackupCheckDate = ""; // "YYYY-MM-DD" to check backup freshness once per day
+  let lastEveningCheckDate = ""; // "YYYY-MM-DD" to send evening wrap-up once per day
+  const notifiedMeetings = new Set<string>(); // track meetings already notified for prep
 
   /** Run built-in daily system tasks (briefing + memory decay) */
   async function runSystemTasks() {
@@ -135,6 +142,65 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
         logger.error({ err }, "backup health check failed");
       }
     }
+
+    // Evening wrap-up: send once at configured evening hour
+    if (hour >= eveningCheckinHour && lastEveningCheckDate !== dateStr && notificationService) {
+      lastEveningCheckDate = dateStr;
+      try {
+        await sendEveningWrapUp(db, notificationService, llmRegistry);
+        logger.info({ dateStr }, "evening wrap-up sent by scheduler");
+      } catch (err) {
+        logger.error({ err }, "failed to send evening wrap-up");
+      }
+    }
+
+    // Pre-meeting prep: check for upcoming calendar events in next 20 minutes
+    if (notificationService) {
+      try {
+        const { CalendarService } = await import("./calendar.js");
+        // Find admin user for calendar access
+        const { findOrCreateUser: findUser } = await import("@ai-cofounder/db");
+        const adminUser = await findUser(db, "system-scheduler", "system");
+        const calService = new CalendarService(db, adminUser.id);
+
+        const nowMs = Date.now();
+        const windowStart = new Date(nowMs);
+        const windowEnd = new Date(nowMs + 20 * 60 * 1000);
+
+        const upcomingEvents = await calService.listEvents({
+          timeMin: windowStart.toISOString(),
+          timeMax: windowEnd.toISOString(),
+          maxResults: 5,
+        });
+
+        for (const event of upcomingEvents) {
+          const eventKey = `${dateStr}-${event.id || event.summary}`;
+          if (notifiedMeetings.has(eventKey)) continue;
+          notifiedMeetings.add(eventKey);
+
+          const eventTime = event.start.includes("T")
+            ? new Date(event.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: briefingTimezone })
+            : "shortly";
+
+          const prepText = `Sir, your meeting "${event.summary}" begins at ${eventTime}.${event.attendeeCount > 0 ? ` ${event.attendeeCount} attendee(s) expected.` : ""}`;
+          await notificationService.sendBriefing(prepText);
+          logger.info({ event: event.summary, eventTime }, "pre-meeting prep notification sent");
+        }
+
+        // Clean up old entries (keep set manageable)
+        if (notifiedMeetings.size > 50) {
+          const entries = Array.from(notifiedMeetings);
+          entries.slice(0, entries.length - 20).forEach((e) => notifiedMeetings.delete(e));
+        }
+      } catch (err) {
+        // Calendar may not be configured — that's fine, skip silently
+        if ((err as Error).message?.includes("token") || (err as Error).message?.includes("auth")) {
+          // Skip — Google auth not configured
+        } else {
+          logger.debug({ err }, "pre-meeting prep check skipped");
+        }
+      }
+    }
   }
 
   /** Check for stale goals and pending approvals, send reminders */
@@ -183,7 +249,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       const latestUserMessage = await getLatestUserMessageTime(db);
       if (latestUserMessage) {
         const silenceHours = (now - latestUserMessage.getTime()) / (60 * 60 * 1000);
-        if (silenceHours >= 6) {
+        if (silenceHours >= quietCheckinThresholdHours) {
           lastQuietCheckDate = localDateStr;
           // Build suggestion from top stale goal or pending task
           let suggestion = "No specific suggestions — everything looks on track.";
@@ -304,6 +370,13 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             workSessionId: session.id,
             details: { scheduleId: schedule.id, durationMs, tokensUsed: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0) },
           }).catch((err) => logger.warn({ err }, "journal entry write failed"));
+
+          // Auto-disable one-shot schedules (reminders) after they fire
+          const meta = schedule.metadata as Record<string, unknown> | null;
+          if (meta?.isOneShot) {
+            await toggleSchedule(db, schedule.id, false);
+            logger.info({ scheduleId: schedule.id }, "one-shot schedule auto-disabled after execution");
+          }
 
           logger.info(
             { scheduleId: schedule.id, durationMs, nextRunAt },
