@@ -215,7 +215,7 @@ describe("Scheduler", () => {
       });
       const text = formatBriefing(data);
 
-      expect(text).toContain("/approve");
+      expect(text).toContain("Pending Approvals");
     });
   });
 
