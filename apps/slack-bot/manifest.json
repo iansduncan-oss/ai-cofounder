@@ -1,0 +1,167 @@
+{
+  "_metadata": {
+    "major_version": 2,
+    "minor_version": 1
+  },
+  "display_information": {
+    "name": "AI Cofounder",
+    "description": "Multi-agent AI system for business collaboration",
+    "background_color": "#1a1a2e"
+  },
+  "features": {
+    "app_home": {
+      "home_tab_enabled": true,
+      "messages_tab_enabled": true,
+      "messages_tab_read_only_enabled": false
+    },
+    "bot_user": {
+      "display_name": "AI Cofounder",
+      "always_online": true
+    },
+    "slash_commands": [
+      {
+        "command": "/ask",
+        "description": "Ask the AI Cofounder a question",
+        "usage_hint": "[your question]",
+        "should_escape": false
+      },
+      {
+        "command": "/status",
+        "description": "Check system health and uptime",
+        "should_escape": false
+      },
+      {
+        "command": "/goals",
+        "description": "List goals for this channel",
+        "should_escape": false
+      },
+      {
+        "command": "/tasks",
+        "description": "List pending tasks",
+        "should_escape": false
+      },
+      {
+        "command": "/memory",
+        "description": "Show your stored memories",
+        "usage_hint": "[search query]",
+        "should_escape": false
+      },
+      {
+        "command": "/clear",
+        "description": "Clear conversation in this channel",
+        "should_escape": false
+      },
+      {
+        "command": "/execute",
+        "description": "Execute a goal by ID",
+        "usage_hint": "[goal-id]",
+        "should_escape": false
+      },
+      {
+        "command": "/approve",
+        "description": "Approve a pending approval",
+        "usage_hint": "[approval-id]",
+        "should_escape": false
+      },
+      {
+        "command": "/approvals",
+        "description": "List pending approvals",
+        "should_escape": false
+      },
+      {
+        "command": "/register",
+        "description": "Register yourself with AI Cofounder",
+        "should_escape": false
+      },
+      {
+        "command": "/help",
+        "description": "Show available commands and usage",
+        "should_escape": false
+      },
+      {
+        "command": "/schedule",
+        "description": "List or create scheduled tasks",
+        "usage_hint": "[list | create <cron> <description>]",
+        "should_escape": false
+      },
+      {
+        "command": "/gmail-inbox",
+        "description": "View Gmail inbox",
+        "usage_hint": "[count]",
+        "should_escape": false
+      },
+      {
+        "command": "/gmail-send",
+        "description": "Send a Gmail message",
+        "usage_hint": "[to] [subject] [body]",
+        "should_escape": false
+      },
+      {
+        "command": "/budget",
+        "description": "View spend vs budget limits",
+        "should_escape": false
+      },
+      {
+        "command": "/errors",
+        "description": "Error summary for past N hours",
+        "usage_hint": "[hours]",
+        "should_escape": false
+      },
+      {
+        "command": "/standup",
+        "description": "Daily standup narrative",
+        "should_escape": false
+      },
+      {
+        "command": "/followups",
+        "description": "List action items and follow-ups",
+        "should_escape": false
+      },
+      {
+        "command": "/search",
+        "description": "Search across all resources",
+        "usage_hint": "[query]",
+        "should_escape": false
+      },
+      {
+        "command": "/analytics",
+        "description": "Goal completion analytics",
+        "usage_hint": "[days]",
+        "should_escape": false
+      }
+    ]
+  },
+  "oauth_config": {
+    "scopes": {
+      "bot": [
+        "app_mentions:read",
+        "channels:history",
+        "channels:read",
+        "chat:write",
+        "commands",
+        "groups:history",
+        "groups:read",
+        "im:history",
+        "im:read",
+        "im:write",
+        "mpim:history",
+        "mpim:read",
+        "users:read"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "bot_events": [
+        "app_mention",
+        "message.im"
+      ]
+    },
+    "interactivity": {
+      "is_enabled": true
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": true,
+    "token_rotation_enabled": false
+  }
+}
