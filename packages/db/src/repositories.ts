@@ -1,6 +1,11 @@
 import { eq, and, desc, asc, ilike, or, sql, lte, isNull, isNotNull, inArray, gt } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
+
+/** Coerce empty string to undefined for UUID columns (prevents "invalid input syntax for type uuid" errors) */
+function nullifyEmpty(val: string | undefined | null): string | undefined {
+  return val ? val : undefined;
+}
 import {
   users,
   goals,
@@ -111,7 +116,7 @@ export async function deleteChannelConversation(db: Db, channelId: string) {
 /* ──────────────── Conversations ──────────────────────────── */
 
 export async function createConversation(db: Db, data: { userId: string; workspaceId?: string; title?: string }) {
-  const [conv] = await db.insert(conversations).values(data).returning();
+  const [conv] = await db.insert(conversations).values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) }).returning();
   return conv;
 }
 
@@ -202,7 +207,7 @@ export async function createGoal(
     requiresApproval?: boolean;
   },
 ) {
-  const [goal] = await db.insert(goals).values(data).returning();
+  const [goal] = await db.insert(goals).values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) }).returning();
   return goal;
 }
 
@@ -1262,6 +1267,7 @@ export async function recordLlmUsage(
     .insert(llmUsage)
     .values({
       ...data,
+      workspaceId: nullifyEmpty(data.workspaceId),
       estimatedCostUsd: costMicros,
     })
     .returning();
@@ -1498,7 +1504,7 @@ export async function createSchedule(
 ) {
   const [schedule] = await db
     .insert(schedules)
-    .values(data)
+    .values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) })
     .returning();
   return schedule;
 }
