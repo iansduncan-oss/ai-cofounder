@@ -133,6 +133,7 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   ],
   conversation: [
     { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "gemini", model: "gemini-2.5-flash" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
     { provider: "cerebras", model: "llama-3.3-70b" },
     { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
