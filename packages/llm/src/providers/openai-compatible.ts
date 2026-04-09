@@ -16,11 +16,13 @@ export class OpenAICompatibleProvider implements LlmProvider {
   readonly available: boolean;
 
   protected client: OpenAI | null = null;
+  protected timeoutMs: number;
 
-  constructor(name: string, apiKey: string | undefined, defaultModel: string, baseURL: string) {
+  constructor(name: string, apiKey: string | undefined, defaultModel: string, baseURL: string, timeoutMs = 120_000) {
     this.name = name;
     this.defaultModel = defaultModel;
     this.available = !!apiKey;
+    this.timeoutMs = timeoutMs;
     if (apiKey) {
       this.client = new OpenAI({ apiKey, baseURL });
     }
@@ -43,7 +45,7 @@ export class OpenAICompatibleProvider implements LlmProvider {
         max_tokens: request.max_tokens ?? 4096,
         ...(request.temperature != null ? { temperature: request.temperature } : {}),
       },
-      { signal: AbortSignal.timeout(120_000) },
+      { signal: AbortSignal.timeout(this.timeoutMs) },
     );
 
     const choice = response.choices[0];

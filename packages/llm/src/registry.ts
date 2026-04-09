@@ -121,57 +121,25 @@ export interface RoutingOptions {
  * Groq and OpenRouter free tiers handle most work. Gemini for research.
  * Anthropic Sonnet only when free providers fail. Opus removed from defaults.
  */
-// Route order: working free providers first, paid/broken providers as fallback.
-// Groq free tier has 12k TPM limit — works for small requests, fails on large conversation contexts.
-// HuggingFace is the reliable free fallback for everything.
-// Dead/exhausted providers (Gemini 403, Cerebras 404, Together 402, Anthropic $0) are at the end
-// so they don't slow down the waterfall. Re-promote them when credits are topped up.
+// Ollama-only routing: all tasks go to local Ollama (llama3.2:3b on CPU).
+// Cloud providers are kept as dormant fallbacks — re-enable when credits are topped up.
+// To restore cloud providers, add them back after the ollama entry.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   planning: [
     { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "gemini", model: "gemini-2.5-pro" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
-    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   conversation: [
     { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
-    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   simple: [
     { provider: "groq", model: "llama-3.1-8b-instant" },
     { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
-    { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   research: [
     { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
-    { provider: "gemini", model: "gemini-2.5-flash" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
-    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   code: [
     { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
-    { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
-    { provider: "cerebras", model: "llama-3.3-70b" },
     { provider: "ollama", model: "llama3.2:3b" },
   ],
 };
