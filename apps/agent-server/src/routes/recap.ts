@@ -34,8 +34,9 @@ export const recapRoutes: FastifyPluginAsync = async (app) => {
 
       const period = request.body?.period ?? "today";
       const now = new Date();
-      const hour = now.getHours();
-      const isMorning = hour < 14;
+      const tz = optionalEnv("BRIEFING_TIMEZONE", "America/Los_Angeles");
+      const localHour = Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(now));
+      const isMorning = localHour < 14;
       const title = isMorning ? "Good Morning — Daily Recap" : "End of Day — Evening Recap";
 
       try {
