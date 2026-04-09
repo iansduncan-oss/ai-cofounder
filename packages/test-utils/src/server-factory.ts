@@ -1,7 +1,5 @@
 import { vi, afterAll, beforeEach } from "vitest";
-import { mockSharedModule } from "./mocks/shared.js";
-import { mockLlmModule, textResponse } from "./mocks/llm.js";
-import { mockDbModule } from "./mocks/db.js";
+import { textResponse } from "./mocks/llm.js";
 import { setupTestEnv } from "./setup.js";
 
 /**
@@ -24,13 +22,12 @@ export function createMockComplete() {
   return vi.fn().mockResolvedValue(textResponse("Mock response"));
 }
 
+// ---------------------------------------------------------------------------
+// Queue mock
+// ---------------------------------------------------------------------------
+
 export interface MockQueueModule {
-  getRedisConnection: ReturnType<typeof vi.fn>;
-  startWorkers: ReturnType<typeof vi.fn>;
-  stopWorkers: ReturnType<typeof vi.fn>;
-  closeAllQueues: ReturnType<typeof vi.fn>;
-  setupRecurringJobs: ReturnType<typeof vi.fn>;
-  enqueueAgentTask: ReturnType<typeof vi.fn>;
+  [key: string]: unknown;
 }
 
 /**
@@ -43,74 +40,73 @@ export interface MockQueueModule {
  * vi.mock("@ai-cofounder/queue", () => queueModule);
  * ```
  */
-export function mockQueueModule(): { queueModule: MockQueueModule; mockEnqueueAgentTask: ReturnType<typeof vi.fn> } {
+export function mockQueueModule(): {
+  queueModule: MockQueueModule;
+  mockEnqueueAgentTask: ReturnType<typeof vi.fn>;
+} {
   const mockEnqueueAgentTask = vi.fn().mockResolvedValue("job-abc");
+  const mockQueueGetter = () =>
+    vi.fn().mockReturnValue({ add: vi.fn(), upsertJobScheduler: vi.fn() });
+
   return {
     queueModule: {
+      RedisPubSub: vi.fn().mockImplementation(() => ({
+        subscribe: vi.fn(),
+        publish: vi.fn(),
+        close: vi.fn(),
+      })),
       getRedisConnection: vi.fn().mockReturnValue({}),
       startWorkers: vi.fn(),
       stopWorkers: vi.fn().mockResolvedValue(undefined),
       closeAllQueues: vi.fn().mockResolvedValue(undefined),
       setupRecurringJobs: vi.fn().mockResolvedValue(undefined),
       enqueueAgentTask: (...args: unknown[]) => mockEnqueueAgentTask(...args),
+      enqueueRagIngestion: vi.fn().mockResolvedValue(undefined),
+      getMonitoringQueue: mockQueueGetter(),
+      getNotificationQueue: mockQueueGetter(),
+      getAgentTaskQueue: mockQueueGetter(),
+      getBriefingQueue: mockQueueGetter(),
+      getPipelineQueue: mockQueueGetter(),
+      getRagIngestionQueue: mockQueueGetter(),
+      getReflectionQueue: mockQueueGetter(),
+      getSubagentTaskQueue: mockQueueGetter(),
+      getDeployVerificationQueue: mockQueueGetter(),
+      getDeadLetterQueue: mockQueueGetter(),
+      getAutonomousSessionQueue: mockQueueGetter(),
+      getMeetingPrepQueue: mockQueueGetter(),
+      listDeadLetterJobs: vi.fn().mockResolvedValue([]),
     },
     mockEnqueueAgentTask,
   };
 }
 
-export interface SetupServerMocksOptions {
-  /**
-   * Custom mockComplete function. If not provided, one is created via createMockComplete().
-   */
-  mockComplete?: ReturnType<typeof vi.fn>;
-  /**
-   * Additional DB mock overrides. Merged on top of mockDbModule() defaults.
-   * Use arrow-fn wrappers for mocks you need to control per-test:
-   * `{ getGoal: (...args) => mockGetGoal(...args) }`
-   */
-  dbOverrides?: Record<string, unknown>;
-  /**
-   * Additional env var overrides passed to setupTestEnv().
-   */
-  envOverrides?: Record<string, string>;
-  /**
-   * If true, also sets up @ai-cofounder/queue mocks. Default: false.
-   */
-  mockQueue?: boolean;
-}
-
-export interface SetupServerMocksResult {
-  /** The mockComplete fn controlling LLM responses. */
-  mockComplete: ReturnType<typeof vi.fn>;
-  /** The full DB mock object (for accessing individual mock fns if needed). */
-  dbMock: ReturnType<typeof mockDbModule>;
-  /** Queue mock (only present if mockQueue: true). */
-  queueMock?: { queueModule: MockQueueModule; mockEnqueueAgentTask: ReturnType<typeof vi.fn> };
-}
+// ---------------------------------------------------------------------------
+// Sandbox mock
+// ---------------------------------------------------------------------------
 
 /**
- * Declaratively sets up all standard vi.mock() calls needed for agent-server
- * route tests. Must be called at the **module level** (top of file, outside
- * describe blocks) because vi.mock is hoisted.
+ * Returns the factory object for vi.mock("@ai-cofounder/sandbox").
  *
- * IMPORTANT: This function returns the mock references, but the actual
- * vi.mock() calls must still be written by the test author because vitest
- * hoists vi.mock() calls to the top of the file — they can't be called
- * inside a function at runtime.
- *
- * Instead, use this as a recipe reference. The real value is `createTestApp()`
- * below, which handles the dynamic import + build + cleanup pattern.
- *
- * For the vi.mock calls themselves, use the existing helpers directly:
- * - `vi.mock("@ai-cofounder/shared", () => mockSharedModule())`
- * - `vi.mock("@ai-cofounder/db", () => ({ ...mockDbModule(), ...overrides }))`
- * - `vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete))`
+ * Usage:
+ * ```typescript
+ * vi.mock("@ai-cofounder/sandbox", () => mockSandboxModule());
+ * ```
  */
+export function mockSandboxModule() {
+  return {
+    createSandboxService: vi.fn().mockReturnValue({ available: false }),
+    hashCode: vi.fn().mockReturnValue("hash"),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// createTestApp — builds a test Fastify instance with automatic cleanup
+// ---------------------------------------------------------------------------
 
 export interface CreateTestAppOptions {
   /**
-   * Extra env overrides applied before importing the server.
-   * Common: `{ BRIEFING_HOUR: "25" }` to prevent scheduler from firing.
+   * Extra env overrides applied before building the server.
+   * BRIEFING_HOUR defaults to "25" to prevent scheduler from firing.
    */
   envOverrides?: Record<string, string>;
   /**
@@ -121,29 +117,33 @@ export interface CreateTestAppOptions {
 }
 
 /**
- * Creates a Fastify app instance via the agent-server's `buildServer()`,
- * dynamically imported so that vi.mock() calls have already taken effect.
+ * Creates a Fastify app instance for route-level testing with automatic cleanup.
  *
  * Automatically:
  * - Calls `setupTestEnv()` to set ANTHROPIC_API_KEY, DATABASE_URL, NODE_ENV
  * - Registers `afterAll(() => app.close())` for cleanup
  * - Optionally registers `beforeEach(() => vi.clearAllMocks())`
  *
- * **Prerequisites**: The caller MUST have already set up vi.mock() calls for
- * `@ai-cofounder/shared`, `@ai-cofounder/db`, and `@ai-cofounder/llm`
- * before calling this function. Those mocks are hoisted and must be at
- * module level.
+ * **Prerequisites**: The caller MUST have already:
+ * 1. Set up vi.mock() calls for `@ai-cofounder/shared`, `@ai-cofounder/db`,
+ *    `@ai-cofounder/llm`, and `@ai-cofounder/queue` at module level
+ * 2. Dynamically imported buildServer AFTER mocks:
+ *    `const { buildServer } = await import("../server.js");`
  *
  * Usage:
  * ```typescript
- * import { mockSharedModule, mockLlmModule, mockDbModule, createMockComplete, createTestApp } from "@ai-cofounder/test-utils";
+ * import { mockSharedModule, mockLlmModule, mockDbModule, mockQueueModule,
+ *          createMockComplete, createTestApp } from "@ai-cofounder/test-utils";
  *
  * const mockComplete = createMockComplete();
  * vi.mock("@ai-cofounder/shared", () => mockSharedModule());
  * vi.mock("@ai-cofounder/db", () => ({ ...mockDbModule(), getGoal: vi.fn() }));
  * vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
+ * const { queueModule } = mockQueueModule();
+ * vi.mock("@ai-cofounder/queue", () => queueModule);
  *
- * const { app, buildServer } = await createTestApp();
+ * const { buildServer } = await import("../server.js");
+ * const { app } = await createTestApp(buildServer);
  *
  * describe("my routes", () => {
  *   it("returns 200", async () => {
@@ -153,7 +153,10 @@ export interface CreateTestAppOptions {
  * });
  * ```
  */
-export async function createTestApp(options: CreateTestAppOptions = {}) {
+export async function createTestApp(
+  buildServer: () => { app: { close: () => Promise<void>; ready: () => Promise<void>; inject: (opts: unknown) => unknown }; logger: unknown },
+  options: CreateTestAppOptions = {},
+) {
   const { envOverrides = {}, clearMocksBeforeEach = true } = options;
 
   // Ensure standard test env vars are set (idempotent if already set)
@@ -162,9 +165,10 @@ export async function createTestApp(options: CreateTestAppOptions = {}) {
     ...envOverrides,
   });
 
-  // Dynamic import so vi.mock() hoisting has already taken effect
-  const { buildServer } = await import("../../../apps/agent-server/src/server.js");
   const { app } = buildServer();
+
+  // Wait for all plugins to finish registering
+  await app.ready();
 
   afterAll(async () => {
     await app.close();
@@ -188,7 +192,17 @@ export async function createTestApp(options: CreateTestAppOptions = {}) {
  *
  * Usage:
  * ```typescript
- * const { buildServer } = await importBuildServer();
+ * import { mockSharedModule, mockLlmModule, mockDbModule, mockQueueModule,
+ *          createMockComplete, importBuildServer } from "@ai-cofounder/test-utils";
+ *
+ * const mockComplete = createMockComplete();
+ * vi.mock("@ai-cofounder/shared", () => mockSharedModule());
+ * vi.mock("@ai-cofounder/db", () => mockDbModule());
+ * vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
+ *
+ * const { buildServer } = await importBuildServer(
+ *   () => import("../server.js"),
+ * );
  *
  * it("my test", async () => {
  *   const { app } = buildServer();
@@ -198,7 +212,10 @@ export async function createTestApp(options: CreateTestAppOptions = {}) {
  * });
  * ```
  */
-export async function importBuildServer(options: CreateTestAppOptions = {}) {
+export async function importBuildServer(
+  importServer: () => Promise<{ buildServer: (...args: unknown[]) => { app: unknown; logger: unknown } }>,
+  options: CreateTestAppOptions = {},
+) {
   const { envOverrides = {}, clearMocksBeforeEach = true } = options;
 
   setupTestEnv({
@@ -206,7 +223,7 @@ export async function importBuildServer(options: CreateTestAppOptions = {}) {
     ...envOverrides,
   });
 
-  const { buildServer } = await import("../../../apps/agent-server/src/server.js");
+  const { buildServer } = await importServer();
 
   if (clearMocksBeforeEach) {
     beforeEach(() => {
