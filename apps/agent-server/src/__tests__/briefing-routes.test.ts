@@ -147,6 +147,23 @@ vi.mock("@ai-cofounder/queue", () => ({
   pingRedis: vi.fn().mockResolvedValue(true),
 }));
 
+vi.mock("ioredis", () => {
+  class MockRedis {
+    on = vi.fn().mockReturnThis();
+    connect = vi.fn().mockResolvedValue(undefined);
+    disconnect = vi.fn().mockResolvedValue(undefined);
+    quit = vi.fn().mockResolvedValue(undefined);
+    subscribe = vi.fn().mockResolvedValue(undefined);
+    unsubscribe = vi.fn().mockResolvedValue(undefined);
+    publish = vi.fn().mockResolvedValue(0);
+    get = vi.fn().mockResolvedValue(null);
+    set = vi.fn().mockResolvedValue("OK");
+    del = vi.fn().mockResolvedValue(1);
+    status = "ready";
+  }
+  return { default: MockRedis };
+});
+
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({
     content: [{ type: "text", text: "Mock response" }],

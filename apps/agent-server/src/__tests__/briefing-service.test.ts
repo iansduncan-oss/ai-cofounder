@@ -32,6 +32,23 @@ vi.mock("@ai-cofounder/db", () => ({
   listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
 }));
 
+vi.mock("ioredis", () => {
+  class MockRedis {
+    on = vi.fn().mockReturnThis();
+    connect = vi.fn().mockResolvedValue(undefined);
+    disconnect = vi.fn().mockResolvedValue(undefined);
+    quit = vi.fn().mockResolvedValue(undefined);
+    subscribe = vi.fn().mockResolvedValue(undefined);
+    unsubscribe = vi.fn().mockResolvedValue(undefined);
+    publish = vi.fn().mockResolvedValue(0);
+    get = vi.fn().mockResolvedValue(null);
+    set = vi.fn().mockResolvedValue("OK");
+    del = vi.fn().mockResolvedValue(1);
+    status = "ready";
+  }
+  return { default: MockRedis };
+});
+
 const { gatherBriefingData, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
 
 beforeEach(() => {
