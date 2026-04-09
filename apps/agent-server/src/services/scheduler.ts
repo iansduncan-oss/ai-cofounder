@@ -123,8 +123,8 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       }
     }
 
-    // Proactive check-in: run at most once per hour
-    if (hour !== lastCheckInHour && notificationService) {
+    // Proactive check-in: run once per day at briefing hour (not every hour)
+    if (hour === briefingHour && lastCheckInHour !== hour && notificationService) {
       lastCheckInHour = hour;
       try {
         await runProactiveCheckIn();
@@ -149,16 +149,8 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       }
     }
 
-    // Evening wrap-up: send once at configured evening hour
-    if (hour >= eveningCheckinHour && lastEveningCheckDate !== dateStr && notificationService) {
-      lastEveningCheckDate = dateStr;
-      try {
-        await sendEveningWrapUp(db, notificationService, llmRegistry);
-        logger.info({ dateStr }, "evening wrap-up sent by scheduler");
-      } catch (err) {
-        logger.error({ err }, "failed to send evening wrap-up");
-      }
-    }
+    // Evening wrap-up: handled by BullMQ evening-briefing recurring job (scheduler.ts in queue package).
+    // Removed from tick() to prevent duplicate sends.
 
     // Pre-meeting prep: check for upcoming calendar events in next 20 minutes
     if (notificationService) {
