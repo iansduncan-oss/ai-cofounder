@@ -57,7 +57,7 @@ export class ConversationIngestionService {
       enqueueRagIngestion({
         action: "ingest_conversations",
         sourceId: conversationId,
-      }).catch(() => {}); // fire-and-forget
+      }).catch((err) => logger.warn({ err }, "conversation ingestion enqueue failed")); // fire-and-forget
     } catch (err) {
       logger.warn({ err, conversationId }, "conversation ingestion failed (non-fatal)");
     }

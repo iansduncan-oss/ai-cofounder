@@ -611,11 +611,16 @@ export const queuePlugin = fp(async (app) => {
           const { ingestFiles, shouldSkipFile } = await import("@ai-cofounder/rag");
           const entries = await app.workspaceService.listDirectory(sourceId);
           const filePaths = entries.filter((e) => e.type === "file").map((e) => e.name);
-          const fileContents = await Promise.all(
-            filePaths
-              .filter((f) => !shouldSkipFile(f))
-              .slice(0, 500) // limit to 500 files per ingestion
-              .map(async (f) => {
+          // Read files with bounded concurrency to avoid overwhelming I/O
+          const filesToRead = filePaths
+            .filter((f) => !shouldSkipFile(f))
+            .slice(0, 500);
+          const CONCURRENCY = 20;
+          const fileContents: ({ path: string; content: string } | null)[] = [];
+          for (let i = 0; i < filesToRead.length; i += CONCURRENCY) {
+            const batch = filesToRead.slice(i, i + CONCURRENCY);
+            const results = await Promise.all(
+              batch.map(async (f) => {
                 try {
                   const content = await app.workspaceService!.readFile(`${sourceId}/${f}`);
                   return { path: f, content };
@@ -623,11 +628,17 @@ export const queuePlugin = fp(async (app) => {
                   return null;
                 }
               }),
-          );
+            );
+            fileContents.push(...results);
+          }
           const validFiles = fileContents.filter((f): f is { path: string; content: string } => f !== null);
+          if (!app.embeddingService) {
+            logger.warn("RAG repo ingestion skipped — no embedding service");
+            return;
+          }
           await ingestFiles(
             app.db,
-            app.embeddingService!.embed.bind(app.embeddingService!),
+            app.embeddingService.embed.bind(app.embeddingService),
             "git",
             sourceId,
             validFiles,

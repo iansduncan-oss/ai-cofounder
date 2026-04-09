@@ -17,9 +17,18 @@ const DOCKER_IMAGES: Record<SandboxLanguage, string> = {
   bash: "alpine:3.20",
 };
 
+/** Validate dependency names to prevent shell injection via crafted package names */
+const SAFE_DEP_PATTERN = /^(@[a-z0-9._-]+\/)?[a-z0-9._-]+(@[a-z0-9._^~>=<|-]+)?$/i;
+
+function sanitizeDeps(deps: string[] | undefined): string[] {
+  if (!deps?.length) return [];
+  return deps.filter((d) => SAFE_DEP_PATTERN.test(d));
+}
+
 const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[]) => string[]> = {
   typescript: (code, deps) => {
-    const install = deps?.length ? `npm install --no-save ${deps.join(" ")} && ` : "";
+    const safeDeps = sanitizeDeps(deps);
+    const install = safeDeps.length ? `npm install --no-save ${safeDeps.join(" ")} && ` : "";
     return [
       "sh",
       "-c",
@@ -27,14 +36,16 @@ const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[])
     ];
   },
   javascript: (code, deps) => {
-    if (deps?.length) {
-      return ["sh", "-c", `npm install --no-save ${deps.join(" ")} && node -e ${JSON.stringify(code)}`];
+    const safeDeps = sanitizeDeps(deps);
+    if (safeDeps.length) {
+      return ["sh", "-c", `npm install --no-save ${safeDeps.join(" ")} && node -e ${JSON.stringify(code)}`];
     }
     return ["node", "-e", code];
   },
   python: (code, deps) => {
-    if (deps?.length) {
-      return ["sh", "-c", `pip install --quiet ${deps.join(" ")} && python3 -c ${JSON.stringify(code)}`];
+    const safeDeps = sanitizeDeps(deps);
+    if (safeDeps.length) {
+      return ["sh", "-c", `pip install --quiet ${safeDeps.join(" ")} && python3 -c ${JSON.stringify(code)}`];
     }
     return ["python3", "-c", code];
   },

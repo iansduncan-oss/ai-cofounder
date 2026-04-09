@@ -367,7 +367,7 @@ async function executeYellowTierTool(
     taskId: approval.taskId ?? "ad-hoc",
     reason,
     requestedBy: context.agentRole ?? "orchestrator",
-  }).catch(() => {});
+  }).catch((err) => logger.warn({ err }, "approval notification failed"));
 
   logger.info({ approvalId: approval.id, toolName: block.name, timeoutMs }, "yellow-tier approval requested");
 
@@ -483,7 +483,7 @@ export async function executeSharedTool(
           const results = await searchMemoriesByVector(db, queryEmbedding, context.userId, 10, agentRoleForSearch);
           if (results.length > 0) {
             for (const m of results) {
-              touchMemory(db, m.id).catch(() => {});
+              touchMemory(db, m.id).catch((err) => logger.warn({ err }, "memory touch failed"));
             }
             return results.map((m) => ({
               key: m.key,
@@ -505,7 +505,7 @@ export async function executeSharedTool(
         scope: input.scope,
       });
       for (const m of memories) {
-        touchMemory(db, m.id).catch(() => {});
+        touchMemory(db, m.id).catch((err) => logger.warn({ err }, "memory touch failed"));
       }
       const memoryResults = memories.map((m) => ({
         key: m.key,
@@ -788,7 +788,7 @@ export async function executeSharedTool(
         enqueueRagIngestion({
           action: "ingest_repo",
           sourceId: dirName,
-        }).catch(() => {}); // fire-and-forget
+        }).catch((err) => logger.warn({ err }, "RAG ingestion enqueue failed")); // fire-and-forget
       } catch {
         /* non-fatal */
       }
@@ -1014,7 +1014,7 @@ export async function executeSharedTool(
       // Optionally enqueue RAG ingestion (fire-and-forget)
       try {
         const { enqueueRagIngestion } = await import("@ai-cofounder/queue");
-        enqueueRagIngestion({ action: "ingest_repo", sourceId: slug }).catch(() => {});
+        enqueueRagIngestion({ action: "ingest_repo", sourceId: slug }).catch((err) => logger.warn({ err }, "RAG ingestion enqueue failed"));
       } catch { /* non-fatal */ }
 
       return { projectId: project.id, name: project.name, slug, message: `Project "${project.name}" registered successfully. Use switch_project to make it active.` };

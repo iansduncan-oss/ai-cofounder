@@ -31,8 +31,15 @@ const BLOCKED_USER_AGENTS = [
   "libwww-perl",
 ];
 
-// Paths that trigger tighter rate limits (expensive LLM calls)
-const EXPENSIVE_PATHS = ["/api/agents/run", "/api/n8n/webhook", "/api/goals/"];
+// Paths that trigger tighter rate limits (expensive LLM calls + admin endpoints)
+const EXPENSIVE_PATHS = [
+  "/api/agents/run",
+  "/api/n8n/webhook",
+  "/api/goals/",
+  "/api/settings",
+  "/api/database/",
+  "/api/autonomy/",
+];
 
 // --- Rate limiter state ---
 
@@ -169,7 +176,7 @@ function recordHit(ip: string): boolean {
         source: "security",
         type: "ip_banned",
         payload: { ip, hits: record.hits, durationMs: BAN_DURATION_MS },
-      }).catch(() => {});
+      }).catch((err) => logger.warn({ err }, "ban event DB write failed"));
     }
     return true; // newly banned
   }

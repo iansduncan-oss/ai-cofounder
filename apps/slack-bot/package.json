@@ -17,5 +17,8 @@
     "@ai-cofounder/shared": "*",
     "@ai-cofounder/api-client": "*",
     "@ai-cofounder/bot-handlers": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
   }
 }

@@ -190,7 +190,7 @@ export class BrowserService {
     } finally {
       this.activeContexts--;
       if (context) {
-        await context.close().catch(() => {});
+        await context.close().catch((err) => logger.warn({ err }, "browser context close failed"));
       }
     }
   }

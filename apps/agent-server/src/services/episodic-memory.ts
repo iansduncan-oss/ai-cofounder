@@ -160,7 +160,7 @@ ${transcript.slice(0, 3000)}`,
 
     // Touch accessed episodes to update access count
     for (const ep of results) {
-      touchEpisodicMemory(this.db, ep.id).catch(() => {});
+      touchEpisodicMemory(this.db, ep.id).catch((err) => logger.warn({ err }, "episodic memory touch failed"));
     }
 
     return results.map(({ finalScore: _, ...rest }) => rest);

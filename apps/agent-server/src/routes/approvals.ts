@@ -6,6 +6,7 @@ import {
   listApprovalsByTask,
   resolveApproval,
 } from "@ai-cofounder/db";
+import { createLogger } from "@ai-cofounder/shared";
 import {
   CreateApprovalBody,
   ResolveApprovalBody,
@@ -15,6 +16,8 @@ import {
 } from "../schemas.js";
 import { notifyApprovalCreated } from "../services/notifications.js";
 import { recordActionSafe } from "../services/action-recorder.js";
+
+const logger = createLogger("approval-routes");
 
 export const approvalRoutes: FastifyPluginAsync = async (app) => {
   /* POST / — create an approval request */
@@ -29,7 +32,7 @@ export const approvalRoutes: FastifyPluginAsync = async (app) => {
         taskId: request.body.taskId,
         reason: request.body.reason,
         requestedBy: request.body.requestedBy,
-      }).catch(() => {});
+      }).catch((err) => logger.warn({ err }, "approval event creation failed"));
       return reply.status(201).send(approval);
     },
   );

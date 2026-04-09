@@ -173,7 +173,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
 
     // Fire-and-forget conversation title generation for new conversations
     if (result.conversationId && !conversationId) {
-      generateConversationTitle(app, result.conversationId, message, result.response).catch(() => {});
+      generateConversationTitle(app, result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation title generation failed"));
     }
 
     // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
@@ -202,7 +202,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
     // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
     const redisEnabled = !!optionalEnv("REDIS_URL", "");
     if (redisEnabled && app.embeddingService && result.conversationId) {
-      conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
+      conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation ingestion failed"));
     }
 
     // Fire-and-forget decision extraction (MEM-02)
@@ -213,7 +213,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         response: result.response,
         userId: dbUserId,
         conversationId: result.conversationId,
-      }).catch(() => {}); // fire-and-forget
+      }).catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
     }
 
     // Generate anticipatory suggestions (pattern-aware)
@@ -318,7 +318,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
 
       // Fire-and-forget conversation title generation for new conversations
       if (result.conversationId && !conversationId) {
-        generateConversationTitle(app, result.conversationId, message, result.response).catch(() => {});
+        generateConversationTitle(app, result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation title generation failed"));
       }
 
       if (result.usage && result.model) {
@@ -346,7 +346,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
       const streamRedisEnabled = !!optionalEnv("REDIS_URL", "");
       if (streamRedisEnabled && app.embeddingService && result.conversationId) {
-        conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch(() => {});
+        conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation ingestion failed"));
       }
 
       // Fire-and-forget decision extraction (MEM-02)
@@ -357,7 +357,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           response: result.response,
           userId: dbUserId,
           conversationId: result.conversationId,
-        }).catch(() => {}); // fire-and-forget
+        }).catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
       }
 
       // Generate and emit anticipatory suggestions (pattern-aware)
@@ -401,8 +401,8 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (patternId) {
-        incrementPatternAcceptCount(app.db, patternId).catch(() => {});
-        adjustPatternConfidence(app.db, patternId, 5).catch(() => {});
+        incrementPatternAcceptCount(app.db, patternId).catch((err) => logger.warn({ err }, "pattern accept count increment failed"));
+        adjustPatternConfidence(app.db, patternId, 5).catch((err) => logger.warn({ err }, "pattern confidence adjustment failed"));
       }
 
       return { ok: true };

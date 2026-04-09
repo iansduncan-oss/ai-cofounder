@@ -14,5 +14,8 @@
     "@ai-cofounder/bot-handlers": "*",
     "@ai-cofounder/shared": "*",
     "discord.js": "^14.25.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3"
   }
 }
