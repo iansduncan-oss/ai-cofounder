@@ -2,6 +2,11 @@
 (function () {
   "use strict";
 
+  // ── Service Worker Registration ──
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/voice/sw.js").catch(function () {});
+  }
+
   const API_URL = window.location.origin;
 
   // ── DOM Elements ──
@@ -17,6 +22,7 @@
   const waveformCanvas = document.getElementById("waveform");
   const userTranscript = document.getElementById("user-transcript");
   const agentTranscript = document.getElementById("agent-transcript");
+  const autoListenBtn = document.getElementById("auto-listen-btn");
   const canvasCtx = waveformCanvas.getContext("2d");
 
   // ── Persistent User ID ──
@@ -56,6 +62,9 @@
   var VAD_SILENCE_TIMEOUT = 2000; // ms of silence before auto-stop
   var vadSilenceTimer = null;
   var vadHasSpoken = false;
+
+  // Auto-listen mode: automatically start listening after TTS finishes
+  var autoListenEnabled = localStorage.getItem("voice-ui-auto-listen") === "true";
 
   // ── Capability Checks ──
   async function checkCapabilities() {
@@ -651,6 +660,9 @@
         clearWaveform();
         hideTranscript(agentTranscript);
         setState("idle");
+        if (autoListenEnabled) {
+          setTimeout(function () { startListening(); }, 300);
+        }
       };
 
       playbackSource.start(0);
@@ -674,8 +686,14 @@
 
     var cleanText = text
       .replace(/```[\s\S]*?```/g, " (code block) ")
-      .replace(/[*_#`~]/g, "")
+      .replace(/`[^`]+`/g, function (m) { return m.slice(1, -1); })
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/[*_~]+/g, "")
+      .replace(/^\s*[-*+]\s+/gm, "")
+      .replace(/^\s*\d+\.\s+/gm, "")
+      .replace(/\n{2,}/g, ". ")
+      .replace(/\n/g, " ")
       .trim();
 
     if (!cleanText) {
@@ -704,6 +722,9 @@
     utterance.onend = function () {
       hideTranscript(agentTranscript);
       setState("idle");
+      if (autoListenEnabled) {
+        setTimeout(function () { startListening(); }, 300);
+      }
     };
 
     utterance.onerror = function () {
@@ -771,6 +792,8 @@
   // Mic button: tap to start, tap again to stop
   micBtn.addEventListener("click", function (e) {
     e.preventDefault();
+    // Haptic feedback on mobile
+    if (navigator.vibrate) navigator.vibrate(30);
     if (currentState === "idle") {
       startListening();
     } else if (currentState === "listening") {
@@ -850,6 +873,15 @@
       stopSpeaking();
       setState("idle");
     }
+  });
+
+  // Auto-listen toggle
+  if (autoListenEnabled) autoListenBtn.classList.add("active");
+  autoListenBtn.addEventListener("click", function () {
+    autoListenEnabled = !autoListenEnabled;
+    localStorage.setItem("voice-ui-auto-listen", autoListenEnabled);
+    autoListenBtn.classList.toggle("active", autoListenEnabled);
+    if (navigator.vibrate) navigator.vibrate(15);
   });
 
   // Load browser voices
