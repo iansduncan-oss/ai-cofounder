@@ -23,6 +23,11 @@ services:
       - N8N_DIAGNOSTICS_ENABLED=false
       - N8N_PERSONALIZATION_ENABLED=false
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-avion}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - MINIO_PUBLIC_URL=https://s3.aviontechs.com
     mem_limit: 1536m
     extra_hosts:
       - "host.docker.internal:host-gateway"
