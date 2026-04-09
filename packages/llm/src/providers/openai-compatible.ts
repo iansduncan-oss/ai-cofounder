@@ -159,11 +159,17 @@ export class OpenAICompatibleProvider implements LlmProvider {
 
     if (choice.message.tool_calls) {
       for (const tc of choice.message.tool_calls) {
+        let input: Record<string, unknown>;
+        try {
+          input = JSON.parse(tc.function.arguments || "{}");
+        } catch {
+          input = { _raw: tc.function.arguments };
+        }
         blocks.push({
           type: "tool_use",
           id: tc.id,
           name: tc.function.name,
-          input: JSON.parse(tc.function.arguments || "{}"),
+          input,
         });
       }
     }
