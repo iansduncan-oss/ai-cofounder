@@ -73,7 +73,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
   let lastCheckInHour = -1; // track last hour we ran proactive check-in
   let lastQuietCheckDate = ""; // "YYYY-MM-DD" to send quiet check-in at most once per day
   let lastBackupCheckDate = ""; // "YYYY-MM-DD" to check backup freshness once per day
-  let lastEveningCheckDate = ""; // "YYYY-MM-DD" to send evening wrap-up once per day
+  const lastEveningCheckDate = ""; // "YYYY-MM-DD" to send evening wrap-up once per day
   const notifiedMeetings = new Set<string>(); // track meetings already notified for prep
 
   /** Run built-in daily system tasks (briefing + memory decay) */
