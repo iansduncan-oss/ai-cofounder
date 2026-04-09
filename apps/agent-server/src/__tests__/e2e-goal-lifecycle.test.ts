@@ -26,6 +26,7 @@ vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   requireEnv: (_name: string) => "postgres://test:test@localhost:5432/test",
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+  sanitizeToolResult: (text: string) => text,
 }));
 
 vi.mock("@ai-cofounder/db", () => ({

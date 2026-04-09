@@ -25,5 +25,6 @@ export function mockSharedModule() {
     createLogger: () => createMockLogger(),
     requireEnv: (name: string) => `test-${name}`,
     optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+    sanitizeToolResult: (text: string) => text,
   };
 }
