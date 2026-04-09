@@ -121,26 +121,30 @@ export interface RoutingOptions {
  * Groq and OpenRouter free tiers handle most work. Gemini for research.
  * Anthropic Sonnet only when free providers fail. Opus removed from defaults.
  */
-// Ollama-only routing: all tasks go to local Ollama (llama3.2:3b on CPU).
-// Cloud providers are kept as dormant fallbacks — re-enable when credits are topped up.
-// To restore cloud providers, add them back after the ollama entry.
+// Optimized routing: Anthropic primary (best quality + tool use), Groq for cheap tasks,
+// Ollama 8B as always-available free fallback. Other cloud providers disabled until topped up.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   planning: [
-    { provider: "ollama", model: "llama3.2:3b" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "ollama", model: "llama3.1:8b" },
   ],
   conversation: [
-    { provider: "ollama", model: "llama3.2:3b" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "ollama", model: "llama3.1:8b" },
   ],
   simple: [
     { provider: "groq", model: "llama-3.1-8b-instant" },
-    { provider: "ollama", model: "llama3.2:3b" },
+    { provider: "ollama", model: "llama3.1:8b" },
   ],
   research: [
-    { provider: "ollama", model: "llama3.2:3b" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "ollama", model: "llama3.1:8b" },
   ],
   code: [
-    { provider: "ollama", model: "llama3.2:3b" },
-    { provider: "ollama", model: "llama3.2:3b" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
+    { provider: "ollama", model: "llama3.1:8b" },
   ],
 };
 
