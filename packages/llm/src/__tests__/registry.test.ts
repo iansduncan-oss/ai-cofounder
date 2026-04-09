@@ -169,17 +169,17 @@ describe("LlmRegistry", () => {
       });
       expect(simple.provider).toBe("groq");
 
-      // research: gemini first (gemini-2.5-flash)
+      // research: groq first (llama-3.3-70b-versatile)
       const research = await registry.complete("research", {
         messages: [{ role: "user", content: "search" }],
       });
-      expect(research.provider).toBe("gemini");
+      expect(research.provider).toBe("groq");
 
-      // planning: gemini first (gemini-2.5-pro), not anthropic
+      // planning: groq first (llama-3.3-70b-versatile)
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("gemini");
+      expect(planning.provider).toBe("groq");
     });
   });
 
