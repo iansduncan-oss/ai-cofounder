@@ -30,6 +30,7 @@ vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
   requireEnv: (name: string) => process.env[name] ?? `mock-${name}`,
+  sanitizeToolResult: (text: string) => text,
 }));
 
 vi.mock("@ai-cofounder/queue", () => ({
