@@ -130,4 +130,46 @@ describe("handleAskStreaming", () => {
     expect(chunks[1]).toBe("AB");
     expect(chunks[2]).toBe("ABC");
   });
+
+  it("starts a fresh conversation when existing one is stale (>30 min)", async () => {
+    async function* fakeStream() {
+      yield { type: "text_delta" as const, data: { text: "Fresh" } };
+      yield { type: "done" as const, data: { response: "Fresh", model: "claude", conversationId: "new-conv" } };
+    }
+
+    const staleTime = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+    const client = mockClient({
+      getChannelConversation: vi.fn().mockResolvedValue({ conversationId: "old-conv", updatedAt: staleTime }),
+      streamChat: vi.fn().mockReturnValue(fakeStream()),
+      setChannelConversation: vi.fn().mockResolvedValue({}),
+    });
+
+    await handleAskStreaming(client, ctx, "hi", vi.fn());
+
+    // streamChat should have been called WITHOUT the old conversationId
+    expect(client.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: undefined }),
+    );
+  });
+
+  it("reuses conversation when not stale (<30 min)", async () => {
+    async function* fakeStream() {
+      yield { type: "text_delta" as const, data: { text: "Continued" } };
+      yield { type: "done" as const, data: { response: "Continued", model: "claude", conversationId: "c-1" } };
+    }
+
+    const recentTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const client = mockClient({
+      getChannelConversation: vi.fn().mockResolvedValue({ conversationId: "existing-conv", updatedAt: recentTime }),
+      streamChat: vi.fn().mockReturnValue(fakeStream()),
+      setChannelConversation: vi.fn().mockResolvedValue({}),
+    });
+
+    await handleAskStreaming(client, ctx, "hi", vi.fn());
+
+    // streamChat should have been called WITH the existing conversationId
+    expect(client.streamChat).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "existing-conv" }),
+    );
+  });
 });

@@ -61,9 +61,11 @@ beforeEach(() => {
 describe("Channel routes", () => {
   describe("GET /api/channels/:channelId/conversation", () => {
     it("returns the conversation for a channel", async () => {
+      const now = new Date();
       mockGetChannelConversation.mockResolvedValueOnce({
         channelId: "ch-1",
         conversationId: "conv-1",
+        updatedAt: now,
       });
 
       const { app } = buildServer();
@@ -75,6 +77,7 @@ describe("Channel routes", () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.json().conversationId).toBe("conv-1");
+      expect(res.json().updatedAt).toBe(now.toISOString());
     });
 
     it("returns 404 when no conversation mapped", async () => {

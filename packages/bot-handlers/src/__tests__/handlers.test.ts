@@ -143,6 +143,25 @@ describe("handleAsk", () => {
     const result = await handleAsk(client, ctx, "hi");
     expect(result.type).toBe("error");
   });
+
+  it("starts fresh conversation when existing one is stale (>30 min)", async () => {
+    const staleTime = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+    const client = mockClient({
+      getChannelConversation: vi.fn().mockResolvedValue({ conversationId: "old-conv", updatedAt: staleTime }),
+      runAgent: vi.fn().mockResolvedValue({
+        response: "Fresh start!",
+        agentRole: "orchestrator",
+        model: "claude-3",
+        conversationId: "new-conv",
+      }),
+      setChannelConversation: vi.fn().mockResolvedValue({}),
+    });
+
+    await handleAsk(client, ctx, "hi");
+    expect(client.runAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: undefined }),
+    );
+  });
 });
 
 describe("handleStatus", () => {

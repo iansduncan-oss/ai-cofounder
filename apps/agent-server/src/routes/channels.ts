@@ -9,7 +9,7 @@ export const channelRoutes: FastifyPluginAsync = async (app) => {
     if (!record) {
       return reply.status(404).send({ error: "No conversation for channel" });
     }
-    return { conversationId: record.conversationId };
+    return { conversationId: record.conversationId, updatedAt: record.updatedAt.toISOString() };
   });
 
   // PUT /api/channels/:channelId/conversation

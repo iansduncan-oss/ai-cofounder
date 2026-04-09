@@ -495,9 +495,11 @@ describe("Approval routes", () => {
 
 describe("Channel routes", () => {
   it("GET /api/channels/:channelId/conversation — returns conversation", async () => {
+    const now = new Date();
     mockGetChannelConversation.mockResolvedValueOnce({
       channelId: "ch-1",
       conversationId: "conv-1",
+      updatedAt: now,
     });
 
     const { app } = buildServer();
@@ -509,6 +511,7 @@ describe("Channel routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.json().conversationId).toBe("conv-1");
+    expect(res.json().updatedAt).toBe(now.toISOString());
   });
 
   it("GET /api/channels/:channelId/conversation — 404 when no mapping", async () => {

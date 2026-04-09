@@ -514,7 +514,7 @@ export class ApiClient {
   /* ── Channels ── */
 
   getChannelConversation(channelId: string) {
-    return this.request<{ conversationId: string }>("GET", `/api/channels/${channelId}/conversation`);
+    return this.request<{ conversationId: string; updatedAt?: string }>("GET", `/api/channels/${channelId}/conversation`);
   }
 
   setChannelConversation(channelId: string, conversationId: string, platform: string) {

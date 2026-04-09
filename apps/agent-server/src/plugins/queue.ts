@@ -499,6 +499,37 @@ export const queuePlugin = fp(async (app) => {
           );
         }
       }
+
+      // Trigger n8n webhook if a mapping exists for this category
+      try {
+        const webhooksJson = optionalEnv("N8N_ACTION_WEBHOOKS", "");
+        if (webhooksJson) {
+          const webhooks: Record<string, string> = JSON.parse(webhooksJson);
+          const webhookUrl = webhooks[result.category];
+          if (webhookUrl) {
+            const relevantText = messages
+              .filter((m) => result.relevantMessageIds.includes(m.messageId))
+              .map((m) => `${m.authorName}: ${m.content.slice(0, 300)}`)
+              .join("\n");
+            await fetch(webhookUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                category: result.category,
+                summary: result.summary,
+                suggestedAction: result.suggestedAction,
+                urgency: result.urgency,
+                channelName,
+                messages: relevantText,
+                batchedAt,
+              }),
+            });
+            logger.info({ category: result.category, webhookUrl }, "n8n action webhook triggered");
+          }
+        }
+      } catch (err) {
+        logger.warn({ err, category: result.category }, "n8n action webhook failed (non-fatal)");
+      }
     },
 
     ragIngestion: async (job) => {

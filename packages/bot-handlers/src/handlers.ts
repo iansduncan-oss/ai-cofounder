@@ -4,6 +4,9 @@ import type {
   HandlerResult,
 } from "./types.js";
 
+/** Auto-reset conversations idle longer than this (30 minutes) */
+const STALE_CONVERSATION_MS = 30 * 60 * 1000;
+
 export const STATUS_ICON: Record<string, string> = {
   draft: "📝",
   active: "🔵",
@@ -28,7 +31,10 @@ export async function handleAsk(
     let conversationId: string | undefined;
     try {
       const mapping = await client.getChannelConversation(ctx.channelId);
-      conversationId = mapping.conversationId;
+      const isStale = mapping.updatedAt && Date.now() - new Date(mapping.updatedAt).getTime() > STALE_CONVERSATION_MS;
+      if (!isStale) {
+        conversationId = mapping.conversationId;
+      }
     } catch {
       // No existing conversation
     }
@@ -71,7 +77,10 @@ export async function handleAskStreaming(
     let conversationId: string | undefined;
     try {
       const mapping = await client.getChannelConversation(ctx.channelId);
-      conversationId = mapping.conversationId;
+      const isStale = mapping.updatedAt && Date.now() - new Date(mapping.updatedAt).getTime() > STALE_CONVERSATION_MS;
+      if (!isStale) {
+        conversationId = mapping.conversationId;
+      }
     } catch {
       // No existing conversation
     }
