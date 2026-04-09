@@ -43,7 +43,7 @@ vi.mock("@opentelemetry/api", () => ({
 }));
 
 // Mock complexity estimator — default roundBudget = 3
-vi.mock("../../services/complexity-estimator.js", () => ({
+vi.mock("../services/complexity-estimator.js", () => ({
   ComplexityEstimator: class {
     estimate = mockEstimate;
   },
@@ -150,8 +150,12 @@ function mockToolUseResponse(name: string, input: Record<string, unknown>, id = 
 }
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockEstimate.mockReturnValue({ roundBudget: 3 });
+  vi.restoreAllMocks();
+  mockComplete.mockReset();
+  mockSetAttribute.mockReset();
+  mockSetStatus.mockReset();
+  mockSpanEnd.mockReset();
+  mockEstimate.mockReset().mockReturnValue({ roundBudget: 3 });
 });
 
 afterEach(() => {
@@ -334,21 +338,22 @@ describe("SpecialistAgent base class", () => {
       expect(result.output).toBe("(No output produced)");
     });
 
-    it("returns '(No output produced)' when content has only tool_use blocks", async () => {
+    it("returns '(No output produced)' when content has only tool_use blocks after max rounds", async () => {
       // Final response is tool_use but loop has ended (round === MAX_TOOL_ROUNDS)
-      mockEstimate.mockReturnValue({ roundBudget: 0 });
+      mockEstimate.mockReturnValue({ roundBudget: 1 });
 
-      mockComplete.mockResolvedValueOnce(
-        mockToolUseResponse("test_tool", { query: "q" }, "tu-1"),
-      );
+      // Initial call returns tool_use, round 1 also returns tool_use -> loop ends
+      mockComplete
+        .mockResolvedValueOnce(mockToolUseResponse("test_tool", { query: "q1" }, "tu-1"))
+        .mockResolvedValueOnce(mockToolUseResponse("test_tool", { query: "q2" }, "tu-2"));
 
       const registry = new LlmRegistry();
       const agent = new ToolHandlerAgent("test", registry);
       const result = await agent.execute(makeContext());
 
-      // With roundBudget=0, max rounds = min(0, 5) = 0, so no tool rounds execute
+      // With roundBudget=1, max rounds = min(1, 5) = 1, so 1 initial + 1 round = 2 calls
       expect(result.output).toBe("(No output produced)");
-      expect(mockComplete).toHaveBeenCalledTimes(1);
+      expect(mockComplete).toHaveBeenCalledTimes(2);
     });
   });
 
