@@ -193,6 +193,16 @@ export const queuePlugin = fp(async (app) => {
       const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
       const adminUserId = await getPrimaryAdminUserId(app.db);
       await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry, adminUserId ?? undefined);
+
+      // Write daily vault note alongside briefing
+      try {
+        const { writeDailyNote, ensureVaultStructure } = await import("../services/vault.js");
+        await ensureVaultStructure();
+        await writeDailyNote(app.db);
+      } catch (err) {
+        logger.warn({ err }, "vault daily note failed (non-fatal)");
+      }
+
       app.agentEvents.emit("ws:briefing_complete");
     },
 
