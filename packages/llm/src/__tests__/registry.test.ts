@@ -62,27 +62,28 @@ describe("LlmRegistry", () => {
 
   describe("resolveProvider", () => {
     it("returns first available provider for a task", () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
       registry.register(mockProvider("groq", true));
 
       const result = registry.resolveProvider("conversation");
       expect(result).not.toBeNull();
-      // conversation route: groq first (cost-optimized), then openrouter, then anthropic
-      expect(result!.provider.name).toBe("groq");
-      expect(result!.model).toBe("llama-3.3-70b-versatile");
+      // conversation route: ollama first (Ollama-only routing)
+      expect(result!.provider.name).toBe("ollama");
+      expect(result!.model).toBe("llama3.2:3b");
     });
 
     it("skips unavailable providers", () => {
-      registry.register(mockProvider("anthropic", false));
+      registry.register(mockProvider("ollama", false));
       registry.register(mockProvider("groq", true));
 
-      const result = registry.resolveProvider("conversation");
+      // simple route: groq first, then ollama — groq is available
+      const result = registry.resolveProvider("simple");
       expect(result).not.toBeNull();
       expect(result!.provider.name).toBe("groq");
     });
 
     it("returns null when no providers available", () => {
-      registry.register(mockProvider("anthropic", false));
+      registry.register(mockProvider("ollama", false));
       const result = registry.resolveProvider("planning");
       expect(result).toBeNull();
     });
@@ -94,51 +95,53 @@ describe("LlmRegistry", () => {
 
   describe("complete", () => {
     it("routes to correct provider for task category", async () => {
-      const anthropic = mockProvider("anthropic", true);
-      registry.register(anthropic);
+      const ollama = mockProvider("ollama", true);
+      registry.register(ollama);
 
       const result = await registry.complete("conversation", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      expect(anthropic.complete).toHaveBeenCalledWith({
+      expect(ollama.complete).toHaveBeenCalledWith({
         messages: [{ role: "user", content: "hello" }],
-        model: "claude-sonnet-4-20250514",
+        model: "llama3.2:3b",
       });
-      expect(result.provider).toBe("anthropic");
+      expect(result.provider).toBe("ollama");
     });
 
     it("falls back when first provider fails", async () => {
-      const failing = mockProvider("anthropic", true, () => {
+      const failing = mockProvider("groq", true, () => {
         throw new Error("API rate limited");
       });
-      const groq = mockProvider("groq", true);
+      const ollama = mockProvider("ollama", true);
 
       registry.register(failing);
-      registry.register(groq);
+      registry.register(ollama);
 
-      const result = await registry.complete("conversation", {
+      // simple route: groq first, then ollama
+      const result = await registry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      expect(result.provider).toBe("groq");
-      expect(result.content[0]).toEqual({ type: "text", text: "response from groq" });
+      expect(result.provider).toBe("ollama");
+      expect(result.content[0]).toEqual({ type: "text", text: "response from ollama" });
     });
 
     it("skips unavailable providers and uses next available", async () => {
-      registry.register(mockProvider("anthropic", false));
-      const groq = mockProvider("groq", true);
-      registry.register(groq);
+      registry.register(mockProvider("groq", false));
+      const ollama = mockProvider("ollama", true);
+      registry.register(ollama);
 
-      const result = await registry.complete("conversation", {
+      // simple route: groq first (unavailable), then ollama
+      const result = await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
 
-      expect(result.provider).toBe("groq");
+      expect(result.provider).toBe("ollama");
     });
 
     it("throws when all providers exhausted", async () => {
-      const failing = mockProvider("anthropic", true, () => {
+      const failing = mockProvider("ollama", true, () => {
         throw new Error("fail");
       });
       registry.register(failing);
@@ -159,9 +162,8 @@ describe("LlmRegistry", () => {
     });
 
     it("routes different task categories to different providers", async () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
       registry.register(mockProvider("groq", true));
-      registry.register(mockProvider("gemini", true));
 
       // simple: groq first (llama-3.1-8b-instant)
       const simple = await registry.complete("simple", {
@@ -169,17 +171,17 @@ describe("LlmRegistry", () => {
       });
       expect(simple.provider).toBe("groq");
 
-      // research: groq first (llama-3.3-70b-versatile)
+      // research: ollama first (llama3.2:3b)
       const research = await registry.complete("research", {
         messages: [{ role: "user", content: "search" }],
       });
-      expect(research.provider).toBe("groq");
+      expect(research.provider).toBe("ollama");
 
-      // planning: groq first (llama-3.3-70b-versatile)
+      // planning: ollama first (llama3.2:3b)
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("groq");
+      expect(planning.provider).toBe("ollama");
     });
   });
 
@@ -243,26 +245,27 @@ describe("LlmRegistry", () => {
   describe("circuit breaker", () => {
     it("opens circuit after consecutive failures and skips provider", async () => {
       let callCount = 0;
-      // groq is first in the conversation route, so use it as the failing provider
+      // groq is first in the simple route, so use it as the failing provider
       const failing = mockProvider("groq", true, () => {
         callCount++;
         throw new Error(`fail-${callCount}`);
       });
-      const anthropic = mockProvider("anthropic", true);
+      const ollama = mockProvider("ollama", true);
 
       registry.register(failing);
-      registry.register(anthropic);
+      registry.register(ollama);
 
       // Exhaust the circuit breaker (5 consecutive failures for groq)
+      // simple route: groq -> ollama
       for (let i = 0; i < 5; i++) {
-        await registry.complete("conversation", {
+        await registry.complete("simple", {
           messages: [{ role: "user", content: "hi" }],
         });
       }
 
-      // Now groq's circuit should be open — next call should go straight to anthropic
+      // Now groq's circuit should be open — next call should go straight to ollama
       callCount = 0; // reset
-      await registry.complete("conversation", {
+      await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
       // groq should NOT have been called since circuit is open
@@ -276,7 +279,7 @@ describe("LlmRegistry", () => {
 
     it("resets circuit breaker on success", async () => {
       let shouldFail = true;
-      // groq is first in the conversation route
+      // groq is first in the simple route
       const groq = mockProvider("groq", true, async () => {
         if (shouldFail) throw new Error("fail");
         return {
@@ -286,21 +289,21 @@ describe("LlmRegistry", () => {
           usage: { inputTokens: 10, outputTokens: 20 },
         };
       });
-      const anthropic = mockProvider("anthropic", true);
+      const ollama = mockProvider("ollama", true);
 
       registry.register(groq);
-      registry.register(anthropic);
+      registry.register(ollama);
 
-      // Create 3 failures (under threshold)
+      // Create 3 failures (under threshold) — simple route: groq -> ollama
       for (let i = 0; i < 3; i++) {
-        await registry.complete("conversation", {
+        await registry.complete("simple", {
           messages: [{ role: "user", content: "hi" }],
         });
       }
 
       // Now succeed
       shouldFail = false;
-      await registry.complete("conversation", {
+      await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
 
@@ -322,19 +325,19 @@ describe("LlmRegistry", () => {
 
   describe("cost tracking", () => {
     it("returns cost estimate in completions", async () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
 
       const result = await registry.complete("conversation", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      // claude-sonnet-4 at 10 input + 20 output tokens
+      // ollama (local) — free, cost should be 0
       expect(result.costMicrodollars).toBeTypeOf("number");
       expect(result.costMicrodollars).toBeGreaterThanOrEqual(0);
     });
 
     it("accumulates total cost across calls", async () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
 
       const before = registry.getTotalCost();
       await registry.complete("conversation", {
@@ -359,12 +362,12 @@ describe("LlmRegistry", () => {
   describe("transient retry", () => {
     it("retries once on 429 then succeeds", async () => {
       let attempt = 0;
-      const provider = mockProvider("anthropic", true, async () => {
+      const provider = mockProvider("ollama", true, async () => {
         attempt++;
         if (attempt === 1) throw new Error("429 rate limit exceeded");
         return {
           content: [{ type: "text" as const, text: "ok" }],
-          model: "anthropic-model",
+          model: "ollama-model",
           stop_reason: "end_turn" as const,
           usage: { inputTokens: 10, outputTokens: 20 },
         };
@@ -377,44 +380,46 @@ describe("LlmRegistry", () => {
       });
 
       expect(attempt).toBe(2);
-      expect(result.provider).toBe("anthropic");
+      expect(result.provider).toBe("ollama");
     });
 
     it("falls back to next provider after retry exhaustion on transient error", async () => {
-      const failing = mockProvider("anthropic", true, async () => {
+      const failing = mockProvider("groq", true, async () => {
         throw new Error("503 overloaded");
       });
-      const groq = mockProvider("groq", true);
+      const ollama = mockProvider("ollama", true);
 
       registry.register(failing);
-      registry.register(groq);
+      registry.register(ollama);
 
-      const result = await registry.complete("conversation", {
+      // simple route: groq -> ollama
+      const result = await registry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      expect(result.provider).toBe("groq");
+      expect(result.provider).toBe("ollama");
     });
 
     it("does not retry on non-transient errors", async () => {
       let attempt = 0;
-      // groq is first in the conversation route
+      // groq is first in the simple route
       const failing = mockProvider("groq", true, async () => {
         attempt++;
         throw new Error("invalid_api_key");
       });
-      const anthropic = mockProvider("anthropic", true);
+      const ollama = mockProvider("ollama", true);
 
       registry.register(failing);
-      registry.register(anthropic);
+      registry.register(ollama);
 
-      const result = await registry.complete("conversation", {
+      // simple route: groq -> ollama
+      const result = await registry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      // Should only try groq once (no retry), then fall back to anthropic
+      // Should only try groq once (no retry), then fall back to ollama
       expect(attempt).toBe(1);
-      expect(result.provider).toBe("anthropic");
+      expect(result.provider).toBe("ollama");
     });
   });
 });

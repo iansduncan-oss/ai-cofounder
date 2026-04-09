@@ -5,6 +5,10 @@ beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
   process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
+  process.env.JWT_SECRET = "test-jwt-secret-32-chars-minimum!!";
+  process.env.COOKIE_SECRET = "test-cookie-secret-32-chars-min!!";
+  process.env.ADMIN_EMAIL = "admin@example.com";
+  process.env.ADMIN_PASSWORD = "supersecret";
 });
 
 const mockListActiveGoals = vi.fn().mockResolvedValue([]);
@@ -22,11 +26,20 @@ const mockGetUsageSummary = vi.fn().mockResolvedValue({
 const mockListEnabledSchedules = vi.fn().mockResolvedValue([]);
 const mockListRecentWorkSessions = vi.fn().mockResolvedValue([]);
 
+vi.mock("@ai-cofounder/shared", () => ({
+  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
+  optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+  requireEnv: (name: string) => process.env[name] ?? `mock-${name}`,
+  sanitizeToolResult: (text: string) => text,
+}));
+
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({
     execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
   }),
+  runMigrations: vi.fn().mockResolvedValue(undefined),
+  getPrimaryAdminUserId: vi.fn().mockResolvedValue("admin-uuid-1"),
   listActiveGoals: (...args: unknown[]) => mockListActiveGoals(...args),
   listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
   countTasksByStatus: (...args: unknown[]) => mockCountTasksByStatus(...args),
@@ -114,6 +127,24 @@ vi.mock("@ai-cofounder/db", () => ({
   workSessions: {},
 }));
 
+vi.mock("@ai-cofounder/rag", () => ({
+  ingestText: vi.fn().mockResolvedValue(undefined),
+  needsReingestion: vi.fn().mockResolvedValue(false),
+  shouldSkipFile: vi.fn().mockReturnValue(false),
+  ingestFiles: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@ai-cofounder/queue", () => ({
+  getRedisConnection: vi.fn().mockReturnValue({}),
+  startWorkers: vi.fn(),
+  stopWorkers: vi.fn().mockResolvedValue(undefined),
+  closeAllQueues: vi.fn().mockResolvedValue(undefined),
+  setupRecurringJobs: vi.fn().mockResolvedValue(undefined),
+  enqueueAgentTask: vi.fn().mockResolvedValue("job-abc"),
+  goalChannel: vi.fn().mockReturnValue("goal:test"),
+  pingRedis: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock("@ai-cofounder/llm", () => {
   const mockComplete = vi.fn().mockResolvedValue({
     content: [{ type: "text", text: "Mock response" }],
@@ -130,9 +161,11 @@ vi.mock("@ai-cofounder/llm", () => {
     resolveProvider = vi.fn();
     listProviders = vi.fn().mockReturnValue([]);
     getProviderHealth = vi.fn().mockReturnValue([]);
+    getStatsSnapshots = vi.fn().mockReturnValue([]);
   }
   return {
     LlmRegistry: MockLlmRegistry,
+    createLlmRegistry: () => new MockLlmRegistry(),
     AnthropicProvider: class {},
     GroqProvider: class {},
     OpenRouterProvider: class {},

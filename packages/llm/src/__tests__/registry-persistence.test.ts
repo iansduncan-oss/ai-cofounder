@@ -29,7 +29,7 @@ describe("LlmRegistry persistence methods", () => {
     });
 
     it("returns snapshots after successful completions", async () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
 
       await registry.complete("conversation", {
         messages: [{ role: "user", content: "hello" }],
@@ -37,7 +37,7 @@ describe("LlmRegistry persistence methods", () => {
 
       const snapshots = registry.getStatsSnapshots();
       expect(snapshots).toHaveLength(1);
-      expect(snapshots[0].providerName).toBe("anthropic");
+      expect(snapshots[0].providerName).toBe("ollama");
       expect(snapshots[0].requestCount).toBe(1);
       expect(snapshots[0].successCount).toBe(1);
       expect(snapshots[0].errorCount).toBe(0);
@@ -47,7 +47,7 @@ describe("LlmRegistry persistence methods", () => {
     });
 
     it("records errors in snapshots", async () => {
-      // groq is first in the conversation route, so use it as the failing provider
+      // groq is first in the simple route, so use it as the failing provider
       const failing: LlmProvider = {
         name: "groq",
         defaultModel: "groq-default",
@@ -55,9 +55,10 @@ describe("LlmRegistry persistence methods", () => {
         complete: vi.fn().mockRejectedValue(new Error("API error")),
       };
       registry.register(failing);
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
 
-      await registry.complete("conversation", {
+      // simple route: groq -> ollama
+      await registry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
@@ -95,7 +96,7 @@ describe("LlmRegistry persistence methods", () => {
     });
 
     it("does not overwrite existing in-memory stats", async () => {
-      registry.register(mockProvider("anthropic", true));
+      registry.register(mockProvider("ollama", true));
 
       // Make a completion first
       await registry.complete("conversation", {
@@ -105,7 +106,7 @@ describe("LlmRegistry persistence methods", () => {
       // Then try to seed
       registry.seedStats([
         {
-          providerName: "anthropic",
+          providerName: "ollama",
           requestCount: 100,
           successCount: 95,
           errorCount: 5,
@@ -115,8 +116,8 @@ describe("LlmRegistry persistence methods", () => {
 
       // Should keep the in-memory stats (1 request), not the seeded ones
       const health = registry.getProviderHealth();
-      const anthropic = health.find((p) => p.provider === "anthropic");
-      expect(anthropic!.totalRequests).toBe(1);
+      const ollamaHealth = health.find((p) => p.provider === "ollama");
+      expect(ollamaHealth!.totalRequests).toBe(1);
     });
 
     it("seeds stats for providers not yet in memory", () => {

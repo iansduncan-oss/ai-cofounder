@@ -37,12 +37,12 @@ describe("buildSystemPrompt", () => {
 
     it("includes capabilities section", async () => {
       const prompt = await buildSystemPrompt();
-      expect(prompt).toContain("What you can do");
+      expect(prompt).toContain("## Capabilities");
       expect(prompt).toContain("Think through problems");
-      expect(prompt).toContain("Create plans");
+      expect(prompt).toContain("create plans");
       expect(prompt).toContain("Remember things");
       expect(prompt).toContain("Search the web");
-      expect(prompt).toContain("Trigger automations");
+      expect(prompt).toContain("n8n automations");
     });
 
     it("includes specialist agents section", async () => {
@@ -56,7 +56,7 @@ describe("buildSystemPrompt", () => {
 
     it("includes behavioral guidelines", async () => {
       const prompt = await buildSystemPrompt();
-      expect(prompt).toContain("How to behave");
+      expect(prompt).toContain("## Behaviour");
     });
 
     it("does not include memory context when not provided", async () => {
@@ -122,7 +122,7 @@ describe("buildSystemPrompt", () => {
 
       expect(prompt).toContain("Custom core personality from DB.");
       // Should still contain default capabilities since DB returned null for those
-      expect(prompt).toContain("What you can do");
+      expect(prompt).toContain("## Capabilities");
     });
 
     it("uses DB content when available for capabilities", async () => {
@@ -138,7 +138,7 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("Custom Capabilities");
       expect(prompt).toContain("Do everything");
       // Default capabilities should not appear
-      expect(prompt).not.toContain("What you can do");
+      expect(prompt).not.toContain("## Capabilities");
     });
 
     it("uses DB content when available for behavioral_guidelines", async () => {
@@ -154,7 +154,7 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("Custom Guidelines");
       expect(prompt).toContain("Be nice");
       // Default guidelines should not appear
-      expect(prompt).not.toContain("How to behave");
+      expect(prompt).not.toContain("## Behaviour");
     });
 
     it("replaces all three sections when DB has all prompts", async () => {
@@ -173,9 +173,9 @@ describe("buildSystemPrompt", () => {
       expect(prompt).toContain("DB Capabilities.");
       expect(prompt).toContain("DB Guidelines.");
       // Defaults should all be replaced
-      expect(prompt).not.toContain("AI Co-Founder");
-      expect(prompt).not.toContain("What you can do");
-      expect(prompt).not.toContain("How to behave");
+      expect(prompt).not.toContain("Jarvis");
+      expect(prompt).not.toContain("## Capabilities");
+      expect(prompt).not.toContain("## Behaviour");
     });
 
     it("falls back to hardcoded defaults when DB returns null", async () => {
