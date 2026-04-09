@@ -1451,7 +1451,7 @@ export class Orchestrator {
     }
   }
 
-  private trimHistory(history: AgentMessage[], maxTokenEstimate = 80_000): AgentMessage[] {
+  private trimHistory(history: AgentMessage[], maxTokenEstimate = 8_000): AgentMessage[] {
     let tokenCount = 0;
     const trimmed: AgentMessage[] = [];
     for (let i = history.length - 1; i >= 0; i--) {
