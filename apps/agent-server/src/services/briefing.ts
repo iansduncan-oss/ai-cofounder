@@ -8,6 +8,7 @@ import {
   listEnabledSchedules,
   listRecentlyCompletedGoals,
   listPendingApprovals,
+  listFailurePatterns,
   upsertBriefingCache,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
@@ -28,6 +29,7 @@ export interface BriefingData {
   unreadEmailCount?: number;
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
   discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
+  systemInsights?: string[];
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -37,7 +39,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
 
-  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals] =
+  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, failurePatternRows] =
     await Promise.all([
       listActiveGoals(db),
       listRecentlyCompletedGoals(db, yesterday),
@@ -46,6 +48,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
       listEnabledSchedules(db),
       listRecentWorkSessions(db, 5),
       listPendingApprovals(db),
+      listFailurePatterns(db, 5),
     ]);
 
   const now = Date.now();
@@ -78,6 +81,9 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     })),
     pendingApprovalCount: pendingApprovals.length,
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
+    systemInsights: failurePatternRows
+      .filter((p) => p.frequency >= 3)
+      .map((p) => `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`),
   };
 }
 
@@ -214,6 +220,15 @@ export function formatBriefing(data: BriefingData): string {
   // Stale goals
   if (data.staleGoalCount > 0) {
     lines.push(`**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`);
+    lines.push("");
+  }
+
+  // System insights (repeated failures)
+  if (data.systemInsights && data.systemInsights.length > 0) {
+    lines.push(`**System Patterns (${data.systemInsights.length}):**`);
+    for (const insight of data.systemInsights) {
+      lines.push(`  - ${insight}`);
+    }
     lines.push("");
   }
 

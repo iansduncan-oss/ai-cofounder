@@ -155,19 +155,26 @@ export const queuePlugin = fp(async (app) => {
             const unhealthyAgents = report.healthScores.filter((h) => h.score < 50 && (h.recentSuccesses + h.recentFailures) >= 5);
             const openBreakers = report.activeCircuitBreakers;
 
-            if (unhealthyAgents.length > 0 || openBreakers.length > 0) {
-              const lines = ["**Self-Healing Alert**"];
-              for (const agent of unhealthyAgents) {
-                lines.push(`- Agent "${agent.agentRole}" health: ${agent.score}% (${agent.recentFailures} failures / ${agent.recentSuccesses + agent.recentFailures} recent)`);
+            const insights: string[] = [];
+            for (const agent of unhealthyAgents) {
+              insights.push(`Agent **${agent.agentRole}** health: ${agent.score}% (${agent.recentFailures} failures / ${agent.recentSuccesses + agent.recentFailures} recent)`);
+            }
+            for (const cb of openBreakers) {
+              insights.push(`Circuit breaker **${cb.state.status.toUpperCase()}** for "${cb.agentRole}" (${cb.state.failureCount} failures)`);
+            }
+            for (const pattern of report.systematicFailures.slice(0, 3)) {
+              insights.push(`Repeated failure: **${pattern.key}** occurred ${pattern.count}x in 24h — "${pattern.samples[0]?.slice(0, 100) ?? "unknown"}"`);
+            }
+            if (report.recommendations.length > 0 && insights.length === 0) {
+              // Include recommendations only if no specific insights already captured
+              for (const rec of report.recommendations.slice(0, 2)) {
+                insights.push(rec);
               }
-              for (const cb of openBreakers) {
-                lines.push(`- Circuit breaker ${cb.state.status.toUpperCase()} for "${cb.agentRole}" (${cb.state.failureCount} failures)`);
-              }
-              if (report.systematicFailures.length > 0) {
-                lines.push(`- ${report.systematicFailures.length} systematic failure pattern(s) detected`);
-              }
-              await app.notificationService.sendBriefing(lines.join("\n"));
-              logger.warn({ unhealthy: unhealthyAgents.length, openBreakers: openBreakers.length }, "self-healing alert sent");
+            }
+
+            if (insights.length > 0) {
+              await app.notificationService.notifySystemInsights(insights);
+              logger.warn({ insights: insights.length }, "system intelligence report sent");
             }
           }
           break;
