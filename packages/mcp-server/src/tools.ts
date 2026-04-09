@@ -210,6 +210,26 @@ export function registerTools(server: McpServer, client: ApiClient): void {
   );
 
   server.tool(
+    "save_memory",
+    "Save a memory/fact to the Jarvis knowledge base. Use this to share context between Claude Code and Jarvis.",
+    {
+      userId: z.string().describe("The user ID to save the memory for"),
+      category: z.enum(["user_info", "preferences", "projects", "decisions", "goals", "technical", "business", "other"]).describe("Memory category"),
+      key: z.string().describe("Unique key for this memory (used for upsert deduplication)"),
+      content: z.string().describe("The memory content — a fact, preference, or context to remember"),
+      source: z.string().optional().describe("Source identifier (defaults to 'claude-code')"),
+    },
+    async ({ userId, category, key, content, source }) => {
+      try {
+        const result = await client.saveMemory({ userId, category, key, content, source });
+        return { content: [{ type: "text" as const, text: `Memory saved: [${category}] ${key} (id: ${result.id})` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
     "search_memories",
     "Browse agent memories for a user",
     {

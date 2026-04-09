@@ -31,6 +31,7 @@ const mockResolveApproval = vi.fn();
 const mockListMemoriesByUser = vi.fn().mockResolvedValue([]);
 const mockCountMemoriesByUser = vi.fn().mockResolvedValue(0);
 const mockDeleteMemory = vi.fn();
+const mockSaveMemory = vi.fn();
 const mockGetChannelConversation = vi.fn();
 const mockUpsertChannelConversation = vi.fn();
 const mockFindUserByPlatform = vi.fn();
@@ -76,7 +77,7 @@ vi.mock("@ai-cofounder/db", () => ({
   getActivePrompt: mockGetActivePrompt,
   listPromptVersions: mockListPromptVersions,
   createPromptVersion: mockCreatePromptVersion,
-  saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
+  saveMemory: (...args: unknown[]) => mockSaveMemory(...args),
   recallMemories: vi.fn().mockResolvedValue([]),
   searchMemoriesByVector: vi.fn().mockResolvedValue([]),
   getConversation: vi.fn(),
@@ -573,6 +574,44 @@ describe("Memory routes", () => {
   it("GET /api/memories — 400 without userId", async () => {
     const { app } = buildServer();
     const res = await app.inject({ method: "GET", url: "/api/memories" });
+    await app.close();
+
+    expect(res.statusCode).toBe(400);
+  });
+
+  it("POST /api/memories — saves a memory", async () => {
+    mockSaveMemory.mockResolvedValueOnce({
+      id: UUID,
+      userId: UUID,
+      category: "projects",
+      key: "test-key",
+      content: "some context",
+      importance: 50,
+    });
+
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      payload: { userId: UUID, category: "projects", key: "test-key", content: "some context" },
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(201);
+    expect(res.json().key).toBe("test-key");
+    expect(mockSaveMemory).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userId: UUID, category: "projects", key: "test-key", source: "claude-code" }),
+    );
+  });
+
+  it("POST /api/memories — 400 with invalid category", async () => {
+    const { app } = buildServer();
+    const res = await app.inject({
+      method: "POST",
+      url: "/api/memories",
+      payload: { userId: UUID, category: "invalid", key: "k", content: "c" },
+    });
     await app.close();
 
     expect(res.statusCode).toBe(400);

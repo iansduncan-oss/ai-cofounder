@@ -56,9 +56,9 @@ describe("MCP tools registration", () => {
     registerTools(server, client);
   });
 
-  it("registers 38 tools", () => {
+  it("registers 39 tools", () => {
     const tools = getRegisteredTools(server);
-    expect(tools.size).toBe(38);
+    expect(tools.size).toBe(39);
   });
 
   it("ask_agent calls runAgent and formats response", async () => {

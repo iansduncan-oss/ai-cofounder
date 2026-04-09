@@ -440,6 +440,10 @@ export class ApiClient {
     return this.request<PaginatedResponse<Memory>>("GET", `/api/memories?${params}`);
   }
 
+  saveMemory(data: { userId: string; category: string; key: string; content: string; source?: string; metadata?: Record<string, unknown> }) {
+    return this.request<Memory>("POST", "/api/memories", data);
+  }
+
   deleteMemory(id: string) {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
   }
