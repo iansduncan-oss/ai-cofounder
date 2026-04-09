@@ -11,6 +11,6 @@ export class OllamaProvider extends OpenAICompatibleProvider {
     const url = baseURL || "http://localhost:11434/v1";
     // Ollama doesn't need a real API key but OpenAI SDK requires one.
     // Pass "ollama" as dummy key; use baseURL presence to control availability.
-    super("ollama", baseURL ? "ollama" : undefined, defaultModel ?? "llama3.2", url);
+    super("ollama", baseURL ? "ollama" : undefined, defaultModel ?? "llama3.2:3b", url);
   }
 }

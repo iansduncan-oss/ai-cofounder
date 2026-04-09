@@ -128,7 +128,7 @@ export interface RoutingOptions {
 // so they don't slow down the waterfall. Re-promote them when credits are topped up.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   planning: [
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
@@ -138,7 +138,7 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
     { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   conversation: [
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
@@ -149,13 +149,13 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   ],
   simple: [
     { provider: "groq", model: "llama-3.1-8b-instant" },
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
     { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
     { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   research: [
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "gemini", model: "gemini-2.5-flash" },
@@ -165,14 +165,14 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
     { provider: "cerebras", model: "llama-3.3-70b" },
   ],
   code: [
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "huggingface", model: "meta-llama/Llama-3.3-70B-Instruct" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free" },
     { provider: "together", model: "meta-llama/Llama-3.3-70B-Instruct-Turbo" },
     { provider: "cerebras", model: "llama-3.3-70b" },
-    { provider: "ollama", model: "llama3.2" },
+    { provider: "ollama", model: "llama3.2:3b" },
   ],
 };
 
