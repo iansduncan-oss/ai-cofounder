@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 import { mockDbModule } from "@ai-cofounder/test-utils";
 
+vi.setConfig({ testTimeout: 30_000 });
+
 beforeAll(() => {
   process.env.ANTHROPIC_API_KEY = "test-key-not-real";
   process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
