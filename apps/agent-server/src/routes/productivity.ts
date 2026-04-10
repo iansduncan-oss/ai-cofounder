@@ -217,6 +217,16 @@ export async function productivityRoutes(app: FastifyInstance): Promise<void> {
     };
   });
 
+  // POST /api/productivity/proactive-check — manually trigger the proactive engine tick.
+  // Normally runs every 30 min automatically; this endpoint is for testing / forcing it.
+  app.post("/proactive-check", async () => {
+    const { ProactiveEngine } = await import("../services/proactive-engine.js");
+    const engine = new ProactiveEngine(app.db, app.llmRegistry, app.notificationService);
+    const result = await engine.tick();
+    if (result.fired.length > 0) app.wsBroadcast?.("productivity");
+    return result;
+  });
+
   // POST /api/productivity/sync — auto-mark completed items and top up with new urgent work
   // Body: { lookbackMinutes?: number, topUp?: boolean }
   app.post("/sync", async (request) => {

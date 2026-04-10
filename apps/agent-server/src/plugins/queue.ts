@@ -136,13 +136,29 @@ export const queuePlugin = fp(async (app) => {
         }
         case "codebase_scan": {
           const { CodebaseScannerService } = await import("../services/codebase-scanner.js");
-          const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService);
+          const { ProactiveEngine } = await import("../services/proactive-engine.js");
+          const proactiveEngine = new ProactiveEngine(app.db, app.llmRegistry, app.notificationService);
+          const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService, proactiveEngine);
           try {
             const result = await scanner.scan({ synthesize: true });
             logger.info(result, "scheduled codebase scan complete");
             app.agentEvents.emit("ws:codebase_updated");
           } catch (err) {
             logger.warn({ err }, "scheduled codebase scan failed");
+          }
+          break;
+        }
+        case "proactive_check": {
+          try {
+            const { ProactiveEngine } = await import("../services/proactive-engine.js");
+            const engine = new ProactiveEngine(app.db, app.llmRegistry, app.notificationService);
+            const result = await engine.tick();
+            if (result.fired.length > 0) {
+              logger.info(result, "proactive engine fired push(es)");
+              app.wsBroadcast?.("productivity");
+            }
+          } catch (err) {
+            logger.warn({ err }, "proactive engine tick failed");
           }
           break;
         }

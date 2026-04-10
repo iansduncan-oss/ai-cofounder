@@ -15,6 +15,7 @@ import {
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { MonitoringService } from "./monitoring.js";
+import type { ProactiveEngine } from "./proactive-engine.js";
 
 const execFile = promisify(execFileCb);
 const logger = createLogger("codebase-scanner");
@@ -64,6 +65,7 @@ export class CodebaseScannerService {
     private readonly db: Db,
     private readonly llmRegistry: LlmRegistry,
     private readonly monitoringService?: MonitoringService,
+    private readonly proactiveEngine?: ProactiveEngine,
   ) {}
 
   /** Run a full scan: gather signals → upsert insights → optionally LLM-synthesize extra insights. */
@@ -94,12 +96,27 @@ export class CodebaseScannerService {
     const existingFingerprints = new Set(before.data.map((i) => i.fingerprint));
 
     let refreshedCount = 0;
+    const newCriticalTitles: string[] = [];
     for (const sig of signals) {
       const fingerprint = fingerprintOf(sig);
-      if (existingFingerprints.has(fingerprint)) refreshedCount += 1;
+      const isNew = !existingFingerprints.has(fingerprint);
+      if (!isNew) refreshedCount += 1;
       await upsertCodebaseInsight(this.db, { fingerprint, ...sig });
+      if (isNew && sig.severity === "critical") {
+        newCriticalTitles.push(sig.title);
+      }
     }
     const createdCount = signals.length - refreshedCount;
+
+    // Fire an immediate proactive push if any NEW critical insights landed.
+    // Don't wait for the 30-min proactive tick.
+    if (newCriticalTitles.length > 0 && this.proactiveEngine) {
+      try {
+        await this.proactiveEngine.pushCriticalInsights(newCriticalTitles.length, newCriticalTitles);
+      } catch (err) {
+        logger.warn({ err }, "failed to push critical insights proactively (non-fatal)");
+      }
+    }
 
     // 6. Optional: LLM synthesis — let the model look at recent commits + existing signals
     //    and suggest higher-level improvements (refactor opportunities, architectural issues)

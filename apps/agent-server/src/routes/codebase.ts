@@ -7,12 +7,14 @@ import {
   type InsightSeverity,
 } from "@ai-cofounder/db";
 import { CodebaseScannerService } from "../services/codebase-scanner.js";
+import { ProactiveEngine } from "../services/proactive-engine.js";
 
 export async function codebaseRoutes(app: FastifyInstance): Promise<void> {
   // POST /api/codebase/scan — trigger a fresh scan
   app.post("/scan", async (request) => {
     const body = (request.body ?? {}) as { synthesize?: boolean; repoDir?: string };
-    const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService);
+    const proactiveEngine = new ProactiveEngine(app.db, app.llmRegistry, app.notificationService);
+    const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService, proactiveEngine);
     const result = await scanner.scan({
       synthesize: body.synthesize ?? true,
       repoDir: body.repoDir,

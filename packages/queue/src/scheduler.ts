@@ -278,6 +278,20 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled productivity plan sync every 15 minutes");
 
+  // ── Proactive engine check (every 30 minutes) ──
+  // Evaluates stall detection, wake-up nudges, celebrations, end-of-day wrap-up
+  // without user input. Respects quiet hours (8 AM - 8 PM) and daily push cap.
+
+  await monitoringQueue.upsertJobScheduler(
+    "proactive-check",
+    { every: 30 * 60 * 1000 },
+    {
+      name: "proactive-check",
+      data: { check: "proactive_check" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled proactive engine check every 30 minutes");
+
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
   const meetingPrepQueue = getMeetingPrepQueue();
