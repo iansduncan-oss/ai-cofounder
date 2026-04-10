@@ -18,9 +18,6 @@ export function GlobalChatBar() {
     () => localStorage.getItem(CONVERSATION_STORAGE_KEY) || undefined,
   );
 
-  // Hide on the full chat page
-  if (location.pathname.includes("/chat")) return null;
-
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed || stream.isStreaming) return;
@@ -48,6 +45,9 @@ export function GlobalChatBar() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
+
+  // Hide on the full chat page (AFTER all hooks to satisfy rules-of-hooks)
+  if (location.pathname.includes("/chat")) return null;
 
   return (
     <>
