@@ -23,6 +23,9 @@ export {
   handleFollowUps,
   handleSearch,
   handleAnalytics,
+  handlePlan,
+  handleReflect,
+  handleStreak,
   truncate,
 } from "./handlers.js";
 

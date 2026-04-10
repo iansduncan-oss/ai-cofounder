@@ -677,3 +677,122 @@ export async function handleListApprovals(client: ApiClient): Promise<HandlerRes
     return { type: "error", message: "Failed to fetch pending approvals." };
   }
 }
+
+/* ── Productivity Tracker ── */
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * /plan — log today's plan as a list of tasks.
+ * `tasks` is a comma or newline separated list.
+ */
+export async function handlePlan(
+  client: ApiClient,
+  tasks: string,
+  mood?: string,
+  energy?: number,
+): Promise<HandlerResult> {
+  try {
+    const plannedItems = tasks
+      .split(/[,\n]/)
+      .map((t) => t.trim())
+      .filter((t) => t.length > 0)
+      .map((text) => ({ text, completed: false }));
+
+    if (plannedItems.length === 0) {
+      return { type: "error", message: "Please provide at least one task." };
+    }
+
+    const validMood = ["great", "good", "okay", "rough", "terrible"].includes(mood ?? "")
+      ? (mood as "great" | "good" | "okay" | "rough" | "terrible")
+      : undefined;
+
+    const log = await client.upsertProductivity({
+      date: todayStr(),
+      plannedItems,
+      mood: validMood,
+      energyLevel: energy,
+    });
+
+    const itemLines = plannedItems.map((i, idx) => `  ${idx + 1}. ${i.text}`).join("\n");
+    const streak = log.streakDays > 1 ? `\n\n**${log.streakDays}-day streak** — keep it going.` : "";
+    return {
+      type: "info",
+      message: `**Plan logged for today (${log.date}):**\n${itemLines}${streak}`,
+    };
+  } catch (err) {
+    return { type: "error", message: `Failed to log plan: ${(err as Error).message}` };
+  }
+}
+
+/**
+ * /reflect — end-of-day reflection (highlights, blockers, optional notes).
+ */
+export async function handleReflect(
+  client: ApiClient,
+  highlights?: string,
+  blockers?: string,
+  notes?: string,
+  mood?: string,
+): Promise<HandlerResult> {
+  try {
+    const validMood = ["great", "good", "okay", "rough", "terrible"].includes(mood ?? "")
+      ? (mood as "great" | "good" | "okay" | "rough" | "terrible")
+      : undefined;
+
+    const log = await client.upsertProductivity({
+      date: todayStr(),
+      highlights,
+      blockers,
+      reflectionNotes: notes,
+      mood: validMood,
+    });
+
+    const lines = ["**Reflection saved.**"];
+    if (log.completionScore != null) {
+      lines.push(`Completion: ${log.completionScore}%`);
+    }
+    if (log.streakDays > 0) {
+      lines.push(`Streak: ${log.streakDays} day(s)`);
+    }
+    if (highlights) lines.push(`\n**Highlights:** ${highlights}`);
+    if (blockers) lines.push(`**Blockers:** ${blockers}`);
+    return { type: "info", message: lines.join("\n") };
+  } catch (err) {
+    return { type: "error", message: `Failed to save reflection: ${(err as Error).message}` };
+  }
+}
+
+/**
+ * /streak — show current streak and today's progress.
+ */
+export async function handleStreak(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const today = await client.getProductivityToday();
+    const plannedItems = (today.plannedItems as { text: string; completed: boolean }[] | null) ?? [];
+    const done = plannedItems.filter((i) => i.completed).length;
+
+    const lines = [`**Streak:** ${today.streakDays} day(s)`];
+    if (plannedItems.length > 0) {
+      lines.push(`**Today:** ${done}/${plannedItems.length} tasks complete${today.completionScore != null ? ` (${today.completionScore}%)` : ""}`);
+      const previewItems = plannedItems.slice(0, 5).map((i) => {
+        const check = i.completed ? "[x]" : "[ ]";
+        return `  ${check} ${i.text}`;
+      });
+      lines.push(...previewItems);
+      if (plannedItems.length > 5) {
+        lines.push(`  _...and ${plannedItems.length - 5} more_`);
+      }
+    } else {
+      lines.push("_No plan logged for today yet. Use `/plan` to get started._");
+    }
+    if (today.mood) lines.push(`**Mood:** ${today.mood}`);
+    if (today.energyLevel != null) lines.push(`**Energy:** ${today.energyLevel}/5`);
+
+    return { type: "info", message: lines.join("\n") };
+  } catch (err) {
+    return { type: "error", message: `Failed to fetch streak: ${(err as Error).message}` };
+  }
+}

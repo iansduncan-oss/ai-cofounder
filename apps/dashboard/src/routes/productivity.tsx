@@ -15,8 +15,10 @@ import {
   CloudRain,
   SmilePlus,
   History,
+  Sparkles,
+  RefreshCw,
 } from "lucide-react";
-import { useProductivityToday, useProductivityStats } from "@/api/queries";
+import { useProductivityToday, useProductivityStats, useProductivityWeekly } from "@/api/queries";
 import { useUpsertProductivity } from "@/api/mutations";
 import type { PlannedItem, ProductivityMood } from "@ai-cofounder/api-client";
 
@@ -39,6 +41,13 @@ export function ProductivityPage() {
   const { data: todayLog, isLoading: loadingToday } = useProductivityToday();
   const { data: stats, isLoading: loadingStats } = useProductivityStats(30);
   const upsert = useUpsertProductivity();
+
+  const [showWeekly, setShowWeekly] = useState(false);
+  const {
+    data: weekly,
+    isFetching: fetchingWeekly,
+    refetch: refetchWeekly,
+  } = useProductivityWeekly(showWeekly);
 
   const [newItemText, setNewItemText] = useState("");
   const [reflectionDraft, setReflectionDraft] = useState("");
@@ -144,6 +153,48 @@ export function ProductivityPage() {
           </div>
         </div>
       )}
+
+      {/* Weekly AI Reflection */}
+      <div className="rounded-lg border bg-gradient-to-br from-amber-500/5 to-primary/5 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-amber-500" />
+            <h2 className="text-sm font-semibold">Weekly Reflection</h2>
+            <span className="text-xs text-muted-foreground">— AI-generated from last 7 days</span>
+          </div>
+          <div className="flex items-center gap-1">
+            {showWeekly && (
+              <button
+                onClick={() => refetchWeekly()}
+                disabled={fetchingWeekly}
+                className="rounded p-1 text-muted-foreground hover:bg-accent disabled:opacity-50"
+                title="Regenerate"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${fetchingWeekly ? "animate-spin" : ""}`} />
+              </button>
+            )}
+            <button
+              onClick={() => setShowWeekly((s) => !s)}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent"
+            >
+              {showWeekly ? "Hide" : "Generate"}
+            </button>
+          </div>
+        </div>
+        {showWeekly && (
+          <div className="mt-3">
+            {fetchingWeekly ? (
+              <p className="text-sm text-muted-foreground">Reflecting on your week...</p>
+            ) : weekly ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm">
+                {weekly.summary}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No data available.</p>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: Plan + Items */}
