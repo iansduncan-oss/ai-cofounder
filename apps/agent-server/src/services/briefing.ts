@@ -30,6 +30,8 @@ export interface BriefingData {
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
   discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
   systemInsights?: string[];
+  githubCi?: Array<{ repo: string; status: string; conclusion: string | null; url: string }>;
+  githubPrs?: Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -223,6 +225,32 @@ export function formatBriefing(data: BriefingData): string {
     lines.push("");
   }
 
+  // GitHub CI / PR status
+  if (data.githubCi && data.githubCi.length > 0) {
+    const failing = data.githubCi.filter((c) => c.status === "failure");
+    const passing = data.githubCi.filter((c) => c.status === "success");
+    if (failing.length > 0) {
+      lines.push(`**CI Failures (${failing.length}):**`);
+      for (const ci of failing) {
+        lines.push(`  - ${ci.repo}: ${ci.conclusion ?? "failed"}`);
+      }
+      lines.push("");
+    }
+    if (passing.length > 0) {
+      lines.push(`**CI Passing:** ${passing.map((c) => c.repo).join(", ")}`);
+      lines.push("");
+    }
+  }
+
+  if (data.githubPrs && data.githubPrs.length > 0) {
+    lines.push(`**Open PRs (${data.githubPrs.length}):**`);
+    for (const pr of data.githubPrs.slice(0, 5)) {
+      const draft = pr.isDraft ? " [draft]" : "";
+      lines.push(`  - ${pr.repo}#${pr.number}: ${pr.title} (${pr.author})${draft}`);
+    }
+    lines.push("");
+  }
+
   // System insights (repeated failures)
   if (data.systemInsights && data.systemInsights.length > 0) {
     lines.push(`**System Patterns (${data.systemInsights.length}):**`);
@@ -384,8 +412,23 @@ export async function sendDailyBriefing(
   notificationService: NotificationService,
   llmRegistry?: LlmRegistry,
   adminUserId?: string,
+  monitoringService?: { checkGitHubCI(): Promise<Array<{ repo: string; status: string; conclusion: string | null; url: string }>>; checkGitHubPRs(): Promise<Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>> },
 ): Promise<string> {
   const data = await gatherBriefingData(db);
+
+  // Enrich with GitHub CI + PR data
+  if (monitoringService) {
+    try {
+      const [ciStatus, openPRs] = await Promise.all([
+        monitoringService.checkGitHubCI(),
+        monitoringService.checkGitHubPRs(),
+      ]);
+      if (ciStatus.length > 0) data.githubCi = ciStatus;
+      if (openPRs.length > 0) data.githubPrs = openPRs;
+    } catch {
+      // GitHub data unavailable — skip
+    }
+  }
 
   // Enrich with Google Calendar + Gmail data when admin user is available
   if (adminUserId) {

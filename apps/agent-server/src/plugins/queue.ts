@@ -35,6 +35,8 @@ export const queuePlugin = fp(async (app) => {
       switch (check) {
         case "github_ci": {
           const ciResults = await app.monitoringService.checkGitHubCI();
+          const ciFailures = ciResults.filter((ci) => ci.status === "failure");
+
           // Feed CI results to self-heal service for failure tracking (SCHED-04)
           if (app.ciSelfHealService) {
             for (const ci of ciResults) {
@@ -45,11 +47,22 @@ export const queuePlugin = fp(async (app) => {
               }
             }
           }
+
+          // Notify user of CI failures via Slack
+          if (ciFailures.length > 0) {
+            const lines = ciFailures.map((ci) => `- **${ci.repo}** (${ci.branch}): ${ci.conclusion ?? "failed"} — ${ci.url}`);
+            await app.notificationService.notifySystemInsights([
+              `CI failure(s) detected:\n${lines.join("\n")}`,
+            ]);
+            logger.warn({ count: ciFailures.length }, "CI failure notification sent");
+          }
           break;
         }
-        case "github_prs":
-          await app.monitoringService.checkGitHubPRs();
+        case "github_prs": {
+          const prResults = await app.monitoringService.checkGitHubPRs();
+          logger.debug({ openPRs: prResults.length }, "GitHub PR check complete");
           break;
+        }
         case "vps_health":
         case "vps_containers":
           await app.monitoringService.checkVPSHealth();
@@ -199,7 +212,7 @@ export const queuePlugin = fp(async (app) => {
       const { sendDailyBriefing } = await import("../services/briefing.js");
       const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
       const adminUserId = await getPrimaryAdminUserId(app.db);
-      await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry, adminUserId ?? undefined);
+      await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry, adminUserId ?? undefined, app.monitoringService);
 
       // Write daily vault note alongside briefing
       try {
