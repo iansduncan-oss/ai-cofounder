@@ -46,7 +46,7 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 - **packages/rag** — RAG pipeline for document retrieval
 - **packages/shared** — Shared types, pino logger (`createLogger`), env config helpers (`requireEnv`, `optionalEnv`)
 - **packages/test-utils** — Shared test fixtures (mockSharedModule, mockLlmModule, mockDbModule)
-- **packages/mcp-server** — MCP server wrapping ApiClient (39 tools for Claude Code integration)
+- **packages/mcp-server** — MCP server wrapping ApiClient (42 tools for Claude Code integration)
 
 ## Commands
 
@@ -186,7 +186,7 @@ Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path trav
 
 ## Claude Code Enhancements
 
-**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (39 tools wrapping ApiClient)
+**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (42 tools wrapping ApiClient)
 
 **Skills** (5 in `~/.claude/skills/`): `ai-cofounder-deploy`, `ai-cofounder-test`, `ai-cofounder-db`, `ai-cofounder-monitor`, `ai-cofounder-logs`
 

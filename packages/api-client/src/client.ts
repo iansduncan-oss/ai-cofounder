@@ -448,6 +448,24 @@ export class ApiClient {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
   }
 
+  /* ── Vault ── */
+
+  listVaultDailyNotes() {
+    return this.request<{ dates: string[] }>("GET", "/api/vault/daily");
+  }
+
+  getVaultDailyNote(date: string) {
+    return this.request<{ date: string; content: string }>("GET", `/api/vault/daily/${date}`);
+  }
+
+  listVaultFiles(section: string) {
+    return this.request<{ section: string; files: string[] }>("GET", `/api/vault/${section}`);
+  }
+
+  getVaultFile(section: string, slug: string) {
+    return this.request<{ section: string; slug: string; content: string }>("GET", `/api/vault/${section}/${slug}`);
+  }
+
   /* ── Milestones ── */
 
   createMilestone(data: {

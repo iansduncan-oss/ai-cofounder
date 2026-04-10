@@ -31,6 +31,7 @@ import { healthRoutes } from "./routes/health.js";
 import { channelRoutes } from "./routes/channels.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { voiceRoutes } from "./routes/voice.js";
+import { vaultRoutes } from "./routes/vault.js";
 import { deployWebhookRoute } from "./routes/deploys.js";
 import { recapRoutes } from "./routes/recap.js";
 import { discordWatcherRoutes } from "./routes/discord-watcher.js";
@@ -510,6 +511,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(channelRoutes, { prefix: "/api/channels" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
+  app.register(vaultRoutes, { prefix: "/api/vault" });
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
   app.register(recapRoutes, { prefix: "/api/recap" }); // Public: token-protected via RECAP_TOKEN
   app.register(discordWatcherRoutes, { prefix: "/api/discord-watcher" }); // Internal: API_SECRET bearer auth from Discord bot

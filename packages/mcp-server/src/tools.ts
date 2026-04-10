@@ -702,4 +702,60 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       }
     },
   );
+
+  // ── Vault Tools ──
+
+  server.tool(
+    "read_vault_daily",
+    "Read a Jarvis daily note from the Obsidian vault. Returns goals, journal entries, and memories for that day.",
+    {
+      date: z.string().optional().describe("Date in YYYY-MM-DD format (defaults to today)"),
+    },
+    async ({ date }) => {
+      try {
+        const d = date ?? new Date().toISOString().slice(0, 10);
+        const data = await client.getVaultDailyNote(d);
+        return { content: [{ type: "text" as const, text: data.content }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_vault_notes",
+    "List available daily notes or files in a vault section (projects, decisions, people)",
+    {
+      section: z.enum(["daily", "projects", "decisions", "people"]).describe("Vault section to list"),
+    },
+    async ({ section }) => {
+      try {
+        if (section === "daily") {
+          const data = await client.listVaultDailyNotes();
+          return { content: [{ type: "text" as const, text: `Daily notes: ${data.dates.join(", ") || "(none)"}` }] };
+        }
+        const data = await client.listVaultFiles(section);
+        return { content: [{ type: "text" as const, text: `${section}: ${data.files.join(", ") || "(none)"}` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "read_vault_file",
+    "Read a specific file from the Jarvis vault (project notes, decision records, etc.)",
+    {
+      section: z.enum(["projects", "decisions", "people"]).describe("Vault section"),
+      slug: z.string().describe("File slug (filename without .md extension)"),
+    },
+    async ({ section, slug }) => {
+      try {
+        const data = await client.getVaultFile(section, slug);
+        return { content: [{ type: "text" as const, text: data.content }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
 }
