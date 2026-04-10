@@ -9,6 +9,8 @@ import {
   listRecentlyCompletedGoals,
   listPendingApprovals,
   upsertBriefingCache,
+  getProductivityLog,
+  getPrimaryAdminUserId,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -28,6 +30,13 @@ export interface BriefingData {
   unreadEmailCount?: number;
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
   discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
+  productivity?: {
+    todayPlan: Array<{ text: string; completed: boolean }>;
+    streakDays: number;
+    completionScore: number | null;
+    mood: string | null;
+    energyLevel: number | null;
+  };
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -37,7 +46,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
 
-  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals] =
+  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, adminUserId] =
     await Promise.all([
       listActiveGoals(db),
       listRecentlyCompletedGoals(db, yesterday),
@@ -46,7 +55,24 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
       listEnabledSchedules(db),
       listRecentWorkSessions(db, 5),
       listPendingApprovals(db),
+      getPrimaryAdminUserId(db),
     ]);
+
+  // Fetch today's productivity log if admin user exists
+  let productivity: BriefingData["productivity"];
+  if (adminUserId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const log = await getProductivityLog(db, adminUserId, today);
+    if (log) {
+      productivity = {
+        todayPlan: (log.plannedItems as { text: string; completed: boolean }[] | null) ?? [],
+        streakDays: log.streakDays,
+        completionScore: log.completionScore,
+        mood: log.mood,
+        energyLevel: log.energyLevel,
+      };
+    }
+  }
 
   const now = Date.now();
   const goalsWithStaleness = activeGoals.map((g) => ({
@@ -78,6 +104,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     })),
     pendingApprovalCount: pendingApprovals.length,
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
+    productivity,
   };
 }
 
@@ -133,6 +160,29 @@ export function formatBriefing(data: BriefingData): string {
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
   lines.push(`**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`);
   lines.push("");
+
+  // Productivity check-in (if logged today)
+  if (data.productivity) {
+    const p = data.productivity;
+    const streakStr = p.streakDays > 1 ? ` — ${p.streakDays}-day streak` : "";
+    const scoreStr = p.completionScore != null ? ` (${p.completionScore}% complete)` : "";
+    lines.push(`**Productivity${streakStr}:**${scoreStr}`);
+    if (p.todayPlan.length > 0) {
+      for (const item of p.todayPlan) {
+        const check = item.completed ? "[x]" : "[ ]";
+        lines.push(`  ${check} ${item.text}`);
+      }
+    } else {
+      lines.push(`  _No plan logged for today yet, sir._`);
+    }
+    if (p.mood || p.energyLevel != null) {
+      const bits: string[] = [];
+      if (p.mood) bits.push(`mood: ${p.mood}`);
+      if (p.energyLevel != null) bits.push(`energy: ${p.energyLevel}/5`);
+      lines.push(`  _${bits.join(", ")}_`);
+    }
+    lines.push("");
+  }
 
   // Today's schedule
   if (data.todayEvents && data.todayEvents.length > 0) {

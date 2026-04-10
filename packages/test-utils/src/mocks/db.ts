@@ -341,6 +341,14 @@ export function mockDbModule() {
     listDueFollowUps: vi.fn().mockResolvedValue([]),
     markFollowUpReminderSent: vi.fn().mockResolvedValue(undefined),
     followUps: {},
+    // Productivity tracker
+    upsertProductivityLog: vi.fn().mockResolvedValue({ id: "pl-1", date: "2025-01-01", streakDays: 1, plannedItems: [], completionScore: null, mood: null, energyLevel: null }),
+    getProductivityLog: vi.fn().mockResolvedValue(null),
+    listProductivityLogs: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    getProductivityStreak: vi.fn().mockResolvedValue(0),
+    getProductivityStats: vi.fn().mockResolvedValue({ totalDays: 0, avgCompletion: 0, avgEnergy: 0, moodCounts: {}, currentStreak: 0, history: [] }),
+    deleteProductivityLog: vi.fn().mockResolvedValue(null),
+    productivityLogs: {},
     // Thinking traces
     saveThinkingTrace: vi.fn().mockResolvedValue({ id: "tt-1", conversationId: "conv-1", round: 0, content: "test" }),
     getThinkingTraces: vi.fn().mockResolvedValue([]),

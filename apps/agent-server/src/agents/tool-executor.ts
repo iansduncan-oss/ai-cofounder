@@ -21,6 +21,9 @@ import {
   deleteSchedule,
   touchMemory,
   createFollowUp,
+  upsertProductivityLog,
+  getProductivityLog,
+  getPrimaryAdminUserId,
   getChunkCount,
   listIngestionStates,
   getToolStats,
@@ -80,6 +83,7 @@ import {
 } from "./tools/project-tools.js";
 import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
 import { CREATE_FOLLOW_UP_TOOL } from "./tools/follow-up-tools.js";
+import { LOG_PRODUCTIVITY_TOOL } from "./tools/productivity-tools.js";
 import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import { RECALL_EPISODES_TOOL } from "./tools/episodic-tools.js";
@@ -209,6 +213,7 @@ export function buildSharedToolList(
     add(REMIND_ME_TOOL);
     add(QUERY_DATABASE_TOOL);
     add(CREATE_FOLLOW_UP_TOOL);
+    add(LOG_PRODUCTIVITY_TOOL);
   }
 
   if (services.n8nService && services.db) {
@@ -1102,6 +1107,57 @@ export async function executeSharedTool(
         workspaceId: context.workspaceId ?? "",
       });
       return { created: true, followUpId: followUp.id, title: followUp.title };
+    }
+
+    case "log_productivity": {
+      if (!db) return { error: "Database not available" };
+      const adminUserId = await getPrimaryAdminUserId(db);
+      if (!adminUserId) return { error: "No admin user configured" };
+
+      const input = block.input as {
+        planned_items?: { text: string; completed: boolean }[];
+        mood?: "great" | "good" | "okay" | "rough" | "terrible";
+        energy_level?: number;
+        highlights?: string;
+        blockers?: string;
+        reflection_notes?: string;
+      };
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Calculate completion score if planned items provided
+      let completionScore: number | undefined;
+      if (input.planned_items && input.planned_items.length > 0) {
+        const done = input.planned_items.filter((i) => i.completed).length;
+        completionScore = Math.round((done / input.planned_items.length) * 100);
+      }
+
+      // Compute streak from yesterday
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const prevLog = await getProductivityLog(db, adminUserId, yesterday.toISOString().slice(0, 10));
+      const streakDays = prevLog ? prevLog.streakDays + 1 : 1;
+
+      const row = await upsertProductivityLog(db, {
+        userId: adminUserId,
+        date: today,
+        plannedItems: input.planned_items,
+        mood: input.mood,
+        energyLevel: input.energy_level,
+        highlights: input.highlights,
+        blockers: input.blockers,
+        reflectionNotes: input.reflection_notes,
+        completionScore,
+        streakDays,
+      });
+
+      return {
+        logged: true,
+        date: today,
+        streakDays: row.streakDays,
+        completionScore: row.completionScore,
+        itemsPlanned: (row.plannedItems as unknown[] | null)?.length ?? 0,
+      };
     }
 
     case "query_vps": {

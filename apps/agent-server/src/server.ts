@@ -81,6 +81,7 @@ const DEFAULT_TOOLS = [
   "create_plan", "create_milestone", "request_approval",
   "browser_action",
   "create_follow_up",
+  "log_productivity",
   "recall_episodes",
   "recall_procedures",
 ] as const;
