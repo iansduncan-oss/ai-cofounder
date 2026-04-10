@@ -43,6 +43,7 @@ jobs:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ai_cofounder_test
       REDIS_URL: redis://localhost:6379
       ANTHROPIC_API_KEY: test-key-not-real
+      NODE_OPTIONS: --max-old-space-size=6144
 
     steps:
       - uses: actions/checkout@v5
