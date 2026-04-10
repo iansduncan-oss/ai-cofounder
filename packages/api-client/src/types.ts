@@ -930,6 +930,26 @@ export interface FreeBusyResponse {
   busy: Array<{ start: string; end: string }>;
 }
 
+/* ── Calendar Day Map ── */
+
+export interface TimeSlot {
+  type: "event" | "free";
+  start: string;
+  end: string;
+  durationMinutes: number;
+  event?: CalendarEventSummary;
+}
+
+export interface CalendarDayMap {
+  date: string;
+  timeMin: string;
+  timeMax: string;
+  totalEvents: number;
+  totalFreeMinutes: number;
+  totalBusyMinutes: number;
+  slots: TimeSlot[];
+}
+
 /* ── Meeting Prep ── */
 
 export interface MeetingPrepResponse {

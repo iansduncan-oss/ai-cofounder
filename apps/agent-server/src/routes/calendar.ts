@@ -88,6 +88,22 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  // GET /api/calendar/day-map
+  app.get<{ Querystring: { date?: string; timeMin?: string; timeMax?: string } }>(
+    "/day-map",
+    { schema: { tags: ["calendar"] } },
+    async (request, reply) => {
+      try {
+        const svc = getService(request, reply);
+        if (!svc) return;
+        const { date, timeMin, timeMax } = request.query;
+        return await svc.getDayMap({ date, timeMin, timeMax });
+      } catch (err) {
+        return handleError(err, reply);
+      }
+    },
+  );
+
   // GET /api/calendar/events/search — registered before :id to avoid conflicts
   app.get<{ Querystring: { q: string; maxResults?: string } }>(
     "/events/search",

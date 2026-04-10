@@ -117,6 +117,7 @@ import {
   GET_CALENDAR_EVENT_TOOL,
   SEARCH_CALENDAR_EVENTS_TOOL,
   GET_FREE_BUSY_TOOL,
+  GET_CALENDAR_DAY_MAP_TOOL,
   CREATE_CALENDAR_EVENT_TOOL,
   UPDATE_CALENDAR_EVENT_TOOL,
   DELETE_CALENDAR_EVENT_TOOL,
@@ -277,6 +278,7 @@ export function buildSharedToolList(
     add(GET_CALENDAR_EVENT_TOOL);
     add(SEARCH_CALENDAR_EVENTS_TOOL);
     add(GET_FREE_BUSY_TOOL);
+    add(GET_CALENDAR_DAY_MAP_TOOL);
     add(CREATE_CALENDAR_EVENT_TOOL);
     add(UPDATE_CALENDAR_EVENT_TOOL);
     add(DELETE_CALENDAR_EVENT_TOOL);
@@ -1195,6 +1197,13 @@ export async function executeSharedTool(
       const { timeMin, timeMax } = block.input as { timeMin: string; timeMax: string };
       if (!timeMin || !timeMax) return { error: "timeMin and timeMax are required" };
       return cal.getFreeBusy(timeMin, timeMax);
+    }
+
+    case "get_calendar_day_map": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { date, timeMin, timeMax } = block.input as { date?: string; timeMin?: string; timeMax?: string };
+      return cal.getDayMap({ date, timeMin, timeMax });
     }
 
     case "create_calendar_event": {
