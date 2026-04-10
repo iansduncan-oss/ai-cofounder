@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from "vites
 import { mkdtemp, rm, readFile, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { FastifyInstance } from "fastify";
 
 // Unique tmp vault for this test file; set BEFORE importing the modules under test
 const vaultDir = await mkdtemp(join(tmpdir(), "vault-test-"));
@@ -157,7 +158,7 @@ describe("vault service", () => {
 
 describe("vault routes", () => {
   // Use a minimal Fastify instance — vault routes have no app-decorator deps
-  let app: import("fastify").FastifyInstance;
+  let app: FastifyInstance;
 
   beforeAll(async () => {
     const fastify = (await import("fastify")).default;

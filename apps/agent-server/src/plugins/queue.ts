@@ -10,6 +10,8 @@ import {
   type WorkerProcessors,
 } from "@ai-cofounder/queue";
 import { notifyCiFailures, fireN8nActionWebhook } from "../helpers/queue-processors.js";
+import type { DiscordTriageService, buildDiscordAlertBlocks } from "../services/discord-triage.js";
+type BuildDiscordAlertBlocksFn = typeof buildDiscordAlertBlocks;
 
 const logger = createLogger("queue-plugin");
 
@@ -26,10 +28,8 @@ export const queuePlugin = fp(async (app) => {
 
   // Cached per-plugin instance; discord-triage jobs can fire many times per
   // minute during active discussions, so we avoid re-instantiating per job.
-  let cachedTriageService: import("../services/discord-triage.js").DiscordTriageService | null = null;
-  let cachedBuildDiscordAlertBlocks:
-    | typeof import("../services/discord-triage.js").buildDiscordAlertBlocks
-    | null = null;
+  let cachedTriageService: DiscordTriageService | null = null;
+  let cachedBuildDiscordAlertBlocks: BuildDiscordAlertBlocksFn | null = null;
 
   // NOTE: agentTask processor is NOT registered here.
   // Agent task processing is handled exclusively by the worker process (worker.ts).
