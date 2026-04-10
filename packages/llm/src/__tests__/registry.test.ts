@@ -177,11 +177,11 @@ describe("LlmRegistry", () => {
       });
       expect(research.provider).toBe("groq");
 
-      // planning: anthropic → ollama; ollama is first available (no anthropic registered)
+      // planning: groq → anthropic → ollama; groq is first available
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("ollama");
+      expect(planning.provider).toBe("groq");
     });
   });
 
