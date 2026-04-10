@@ -147,6 +147,13 @@ export const CREATE_CALENDAR_EVENT_TOOL: LlmTool = {
         type: "string",
         description: "IANA time zone (e.g. 'America/New_York', optional)",
       },
+      recurrence: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "RFC 5545 recurrence rules (e.g. ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']). " +
+          "Use this for recurring events like work hours or weekly meetings.",
+      },
     },
     required: ["summary", "start", "end"],
   },
@@ -192,6 +199,11 @@ export const UPDATE_CALENDAR_EVENT_TOOL: LlmTool = {
       timeZone: {
         type: "string",
         description: "IANA time zone (optional)",
+      },
+      recurrence: {
+        type: "array",
+        items: { type: "string" },
+        description: "RFC 5545 recurrence rules (optional, replaces existing)",
       },
     },
     required: ["eventId"],

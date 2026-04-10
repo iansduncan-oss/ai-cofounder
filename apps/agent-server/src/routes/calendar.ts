@@ -12,6 +12,7 @@ const CreateEventBody = Type.Object({
   location: Type.Optional(Type.String()),
   attendees: Type.Optional(Type.Array(Type.String())),
   timeZone: Type.Optional(Type.String()),
+  recurrence: Type.Optional(Type.Array(Type.String())),
 });
 type CreateEventBody = Static<typeof CreateEventBody>;
 
@@ -23,6 +24,7 @@ const UpdateEventBody = Type.Object({
   location: Type.Optional(Type.String()),
   attendees: Type.Optional(Type.Array(Type.String())),
   timeZone: Type.Optional(Type.String()),
+  recurrence: Type.Optional(Type.Array(Type.String())),
 });
 type UpdateEventBody = Static<typeof UpdateEventBody>;
 

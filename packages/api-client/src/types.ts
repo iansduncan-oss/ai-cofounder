@@ -912,6 +912,7 @@ export interface CreateCalendarEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface UpdateCalendarEventInput {
@@ -922,6 +923,7 @@ export interface UpdateCalendarEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface FreeBusyResponse {

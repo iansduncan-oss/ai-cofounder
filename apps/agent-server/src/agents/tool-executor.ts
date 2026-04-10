@@ -1209,7 +1209,7 @@ export async function executeSharedTool(
     case "create_calendar_event": {
       if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string; recurrence?: string[] };
       if (!input.summary || !input.start || !input.end) return { error: "summary, start, and end are required" };
       const event = await cal.createEvent(input);
       return { success: true, eventId: event.id, summary: event.summary, htmlLink: event.htmlLink };
@@ -1218,7 +1218,7 @@ export async function executeSharedTool(
     case "update_calendar_event": {
       if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string; recurrence?: string[] };
       if (!eventId) return { error: "eventId is required" };
       const event = await cal.updateEvent(eventId, updates);
       return { success: true, eventId: event.id, summary: event.summary };

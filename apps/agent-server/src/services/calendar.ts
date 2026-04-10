@@ -47,6 +47,7 @@ export interface CreateEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface UpdateEventInput {
@@ -57,6 +58,7 @@ export interface UpdateEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface FreeBusyResponse {
@@ -197,6 +199,7 @@ export class CalendarService {
     if (input.attendees?.length) {
       body.attendees = input.attendees.map((email) => ({ email }));
     }
+    if (input.recurrence?.length) body.recurrence = input.recurrence;
 
     return calendarFetch(token, "/calendars/primary/events", {
       method: "POST",
@@ -215,6 +218,7 @@ export class CalendarService {
     if (input.attendees) {
       body.attendees = input.attendees.map((email) => ({ email }));
     }
+    if (input.recurrence) body.recurrence = input.recurrence;
 
     return calendarFetch(token, `/calendars/primary/events/${eventId}`, {
       method: "PATCH",
