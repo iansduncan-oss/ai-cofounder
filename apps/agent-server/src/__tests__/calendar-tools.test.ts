@@ -4,6 +4,7 @@ import {
   GET_CALENDAR_EVENT_TOOL,
   SEARCH_CALENDAR_EVENTS_TOOL,
   GET_FREE_BUSY_TOOL,
+  GET_CALENDAR_DAY_MAP_TOOL,
   CREATE_CALENDAR_EVENT_TOOL,
   UPDATE_CALENDAR_EVENT_TOOL,
   DELETE_CALENDAR_EVENT_TOOL,
@@ -17,19 +18,21 @@ describe("calendar tool definitions", () => {
     GET_CALENDAR_EVENT_TOOL,
     SEARCH_CALENDAR_EVENTS_TOOL,
     GET_FREE_BUSY_TOOL,
+    GET_CALENDAR_DAY_MAP_TOOL,
     CREATE_CALENDAR_EVENT_TOOL,
     UPDATE_CALENDAR_EVENT_TOOL,
     DELETE_CALENDAR_EVENT_TOOL,
     RESPOND_TO_CALENDAR_EVENT_TOOL,
   ];
 
-  it("all 8 tools have the expected names", () => {
+  it("all 9 tools have the expected names", () => {
     const names = allTools.map((t) => t.name);
     expect(names).toEqual([
       "list_calendar_events",
       "get_calendar_event",
       "search_calendar_events",
       "get_free_busy",
+      "get_calendar_day_map",
       "create_calendar_event",
       "update_calendar_event",
       "delete_calendar_event",
@@ -37,7 +40,7 @@ describe("calendar tool definitions", () => {
     ]);
   });
 
-  it("all 8 tools have non-empty descriptions", () => {
+  it("all 9 tools have non-empty descriptions", () => {
     for (const tool of allTools) {
       expect(tool.description).toBeTruthy();
       expect(typeof tool.description).toBe("string");
@@ -71,6 +74,14 @@ describe("calendar tool definitions", () => {
     expect(schema.required).toEqual(expect.arrayContaining(["timeMin", "timeMax"]));
   });
 
+  it("get_calendar_day_map: all properties are optional", () => {
+    const schema = GET_CALENDAR_DAY_MAP_TOOL.input_schema;
+    expect(schema.required).toEqual([]);
+    expect(schema.properties.date.type).toBe("string");
+    expect(schema.properties.timeMin.type).toBe("string");
+    expect(schema.properties.timeMax.type).toBe("string");
+  });
+
   it("create_calendar_event: summary/start/end required, others optional", () => {
     const schema = CREATE_CALENDAR_EVENT_TOOL.input_schema;
     expect(schema.required).toEqual(expect.arrayContaining(["summary", "start", "end"]));
@@ -98,11 +109,12 @@ describe("calendar tool definitions", () => {
     expect(schema.properties.responseStatus.enum).toEqual(["accepted", "declined", "tentative"]);
   });
 
-  it("tier assignments: green for read/search/free-busy, yellow for create/update/delete/respond", () => {
+  it("tier assignments: green for read/search/free-busy/day-map, yellow for create/update/delete/respond", () => {
     expect(CALENDAR_TOOL_TIERS.list_calendar_events).toBe("green");
     expect(CALENDAR_TOOL_TIERS.get_calendar_event).toBe("green");
     expect(CALENDAR_TOOL_TIERS.search_calendar_events).toBe("green");
     expect(CALENDAR_TOOL_TIERS.get_free_busy).toBe("green");
+    expect(CALENDAR_TOOL_TIERS.get_calendar_day_map).toBe("green");
     expect(CALENDAR_TOOL_TIERS.create_calendar_event).toBe("yellow");
     expect(CALENDAR_TOOL_TIERS.update_calendar_event).toBe("yellow");
     expect(CALENDAR_TOOL_TIERS.delete_calendar_event).toBe("yellow");

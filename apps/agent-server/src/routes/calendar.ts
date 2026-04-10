@@ -12,6 +12,7 @@ const CreateEventBody = Type.Object({
   location: Type.Optional(Type.String()),
   attendees: Type.Optional(Type.Array(Type.String())),
   timeZone: Type.Optional(Type.String()),
+  recurrence: Type.Optional(Type.Array(Type.String())),
 });
 type CreateEventBody = Static<typeof CreateEventBody>;
 
@@ -23,6 +24,7 @@ const UpdateEventBody = Type.Object({
   location: Type.Optional(Type.String()),
   attendees: Type.Optional(Type.Array(Type.String())),
   timeZone: Type.Optional(Type.String()),
+  recurrence: Type.Optional(Type.Array(Type.String())),
 });
 type UpdateEventBody = Static<typeof UpdateEventBody>;
 
@@ -82,6 +84,22 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
         const maxResults = parseMaxResults(request.query.maxResults);
         const events = await svc.listEvents({ timeMin, timeMax, maxResults });
         return { events };
+      } catch (err) {
+        return handleError(err, reply);
+      }
+    },
+  );
+
+  // GET /api/calendar/day-map
+  app.get<{ Querystring: { date?: string; timeMin?: string; timeMax?: string } }>(
+    "/day-map",
+    { schema: { tags: ["calendar"] } },
+    async (request, reply) => {
+      try {
+        const svc = getService(request, reply);
+        if (!svc) return;
+        const { date, timeMin, timeMax } = request.query;
+        return await svc.getDayMap({ date, timeMin, timeMax });
       } catch (err) {
         return handleError(err, reply);
       }

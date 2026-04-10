@@ -141,6 +141,7 @@ export const queryKeys = {
     event: (id: string) => ["calendar", "event", id] as const,
     search: (q: string) => ["calendar", "search", q] as const,
     prep: (id: string) => ["calendar", "prep", id] as const,
+    dayMap: (date: string) => ["calendar", "day-map", date] as const,
   },
   followUps: {
     all: ["follow-ups"] as const,

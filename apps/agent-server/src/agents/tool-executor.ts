@@ -117,6 +117,7 @@ import {
   GET_CALENDAR_EVENT_TOOL,
   SEARCH_CALENDAR_EVENTS_TOOL,
   GET_FREE_BUSY_TOOL,
+  GET_CALENDAR_DAY_MAP_TOOL,
   CREATE_CALENDAR_EVENT_TOOL,
   UPDATE_CALENDAR_EVENT_TOOL,
   DELETE_CALENDAR_EVENT_TOOL,
@@ -277,6 +278,7 @@ export function buildSharedToolList(
     add(GET_CALENDAR_EVENT_TOOL);
     add(SEARCH_CALENDAR_EVENTS_TOOL);
     add(GET_FREE_BUSY_TOOL);
+    add(GET_CALENDAR_DAY_MAP_TOOL);
     add(CREATE_CALENDAR_EVENT_TOOL);
     add(UPDATE_CALENDAR_EVENT_TOOL);
     add(DELETE_CALENDAR_EVENT_TOOL);
@@ -1197,10 +1199,17 @@ export async function executeSharedTool(
       return cal.getFreeBusy(timeMin, timeMax);
     }
 
+    case "get_calendar_day_map": {
+      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      const cal = services.calendarService ?? new CalendarService(db, context.userId);
+      const { date, timeMin, timeMax } = block.input as { date?: string; timeMin?: string; timeMax?: string };
+      return cal.getDayMap({ date, timeMin, timeMax });
+    }
+
     case "create_calendar_event": {
       if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string; recurrence?: string[] };
       if (!input.summary || !input.start || !input.end) return { error: "summary, start, and end are required" };
       const event = await cal.createEvent(input);
       return { success: true, eventId: event.id, summary: event.summary, htmlLink: event.htmlLink };
@@ -1209,7 +1218,7 @@ export async function executeSharedTool(
     case "update_calendar_event": {
       if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string; recurrence?: string[] };
       if (!eventId) return { error: "eventId is required" };
       const event = await cal.updateEvent(eventId, updates);
       return { success: true, eventId: event.id, summary: event.summary };

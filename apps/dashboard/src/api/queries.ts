@@ -405,6 +405,14 @@ export function useMeetingPrep(eventId: string | null) {
   });
 }
 
+export function useCalendarDayMap(date?: string) {
+  const targetDate = date ?? new Date().toISOString().slice(0, 10);
+  return useQuery({
+    queryKey: queryKeys.calendar.dayMap(targetDate),
+    queryFn: () => apiClient.getCalendarDayMap({ date: targetDate }),
+  });
+}
+
 export function useTodayBriefing(refresh = false) {
   return useQuery({
     queryKey: queryKeys.briefing.today,

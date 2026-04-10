@@ -47,6 +47,7 @@ export interface CreateEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface UpdateEventInput {
@@ -57,12 +58,31 @@ export interface UpdateEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface FreeBusyResponse {
   timeMin: string;
   timeMax: string;
   busy: Array<{ start: string; end: string }>;
+}
+
+export interface TimeSlot {
+  type: "event" | "free";
+  start: string;
+  end: string;
+  durationMinutes: number;
+  event?: CalendarEventSummary;
+}
+
+export interface CalendarDayMap {
+  date: string;
+  timeMin: string;
+  timeMax: string;
+  totalEvents: number;
+  totalFreeMinutes: number;
+  totalBusyMinutes: number;
+  slots: TimeSlot[];
 }
 
 /* ── Helpers ── */
@@ -179,6 +199,7 @@ export class CalendarService {
     if (input.attendees?.length) {
       body.attendees = input.attendees.map((email) => ({ email }));
     }
+    if (input.recurrence?.length) body.recurrence = input.recurrence;
 
     return calendarFetch(token, "/calendars/primary/events", {
       method: "POST",
@@ -197,6 +218,7 @@ export class CalendarService {
     if (input.attendees) {
       body.attendees = input.attendees.map((email) => ({ email }));
     }
+    if (input.recurrence) body.recurrence = input.recurrence;
 
     return calendarFetch(token, `/calendars/primary/events/${eventId}`, {
       method: "PATCH",
@@ -224,6 +246,122 @@ export class CalendarService {
       method: "PATCH",
       body: JSON.stringify({ attendees }),
     }) as Promise<CalendarEvent>;
+  }
+
+  async getDayMap(opts?: { date?: string; timeMin?: string; timeMax?: string }): Promise<CalendarDayMap> {
+    const now = new Date();
+    let rangeStart: Date;
+    let rangeEnd: Date;
+    let dateStr: string;
+
+    if (opts?.timeMin && opts?.timeMax) {
+      rangeStart = new Date(opts.timeMin);
+      rangeEnd = new Date(opts.timeMax);
+      dateStr = rangeStart.toISOString().slice(0, 10);
+    } else {
+      const targetDate = opts?.date ?? now.toISOString().slice(0, 10);
+      dateStr = targetDate;
+      // Default: 8am to 10pm in local-ish range (use UTC for the day)
+      rangeStart = new Date(`${targetDate}T08:00:00Z`);
+      rangeEnd = new Date(`${targetDate}T22:00:00Z`);
+    }
+
+    const timeMin = rangeStart.toISOString();
+    const timeMax = rangeEnd.toISOString();
+
+    // Fetch events and free/busy in parallel
+    const [events, freeBusy] = await Promise.all([
+      this.listEvents({ timeMin, timeMax, maxResults: 50 }),
+      this.getFreeBusy(timeMin, timeMax),
+    ]);
+
+    // Build busy intervals from events (more detailed than free/busy which lacks event info)
+    const busyIntervals: Array<{ start: Date; end: Date; event: CalendarEventSummary }> = [];
+    for (const evt of events) {
+      if (evt.isAllDay) continue; // skip all-day events in timeline slots
+      const s = new Date(evt.start);
+      const e = new Date(evt.end);
+      if (s < rangeEnd && e > rangeStart) {
+        busyIntervals.push({
+          start: s < rangeStart ? rangeStart : s,
+          end: e > rangeEnd ? rangeEnd : e,
+          event: evt,
+        });
+      }
+    }
+
+    // Sort by start time
+    busyIntervals.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    // Merge overlapping intervals and build slots
+    const slots: TimeSlot[] = [];
+    let cursor = rangeStart;
+
+    for (const interval of busyIntervals) {
+      // Add free slot if there's a gap
+      if (interval.start > cursor) {
+        const freeMinutes = (interval.start.getTime() - cursor.getTime()) / 60000;
+        if (freeMinutes >= 1) {
+          slots.push({
+            type: "free",
+            start: cursor.toISOString(),
+            end: interval.start.toISOString(),
+            durationMinutes: Math.round(freeMinutes),
+          });
+        }
+      }
+
+      // Add event slot
+      const eventMinutes = (interval.end.getTime() - interval.start.getTime()) / 60000;
+      slots.push({
+        type: "event",
+        start: interval.start.toISOString(),
+        end: interval.end.toISOString(),
+        durationMinutes: Math.round(eventMinutes),
+        event: interval.event,
+      });
+
+      // Move cursor past this event (handle overlapping events)
+      if (interval.end > cursor) {
+        cursor = interval.end;
+      }
+    }
+
+    // Add trailing free slot
+    if (cursor < rangeEnd) {
+      const freeMinutes = (rangeEnd.getTime() - cursor.getTime()) / 60000;
+      if (freeMinutes >= 1) {
+        slots.push({
+          type: "free",
+          start: cursor.toISOString(),
+          end: rangeEnd.toISOString(),
+          durationMinutes: Math.round(freeMinutes),
+        });
+      }
+    }
+
+    // Add all-day events at the beginning
+    const allDayEvents = events.filter((e) => e.isAllDay);
+    const allDaySlots: TimeSlot[] = allDayEvents.map((evt) => ({
+      type: "event" as const,
+      start: evt.start,
+      end: evt.end,
+      durationMinutes: 1440,
+      event: evt,
+    }));
+
+    const totalFreeMinutes = slots.filter((s) => s.type === "free").reduce((sum, s) => sum + s.durationMinutes, 0);
+    const totalBusyMinutes = slots.filter((s) => s.type === "event").reduce((sum, s) => sum + s.durationMinutes, 0);
+
+    return {
+      date: dateStr,
+      timeMin,
+      timeMax,
+      totalEvents: events.length,
+      totalFreeMinutes,
+      totalBusyMinutes,
+      slots: [...allDaySlots, ...slots],
+    };
   }
 
   async getFreeBusy(timeMin: string, timeMax: string): Promise<FreeBusyResponse> {

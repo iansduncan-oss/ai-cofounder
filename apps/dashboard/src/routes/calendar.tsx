@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { useCalendarEvents, useCalendarEvent, useCalendarSearch, useMeetingPrep } from "@/api/queries";
+import { useCalendarEvents, useCalendarEvent, useCalendarSearch, useMeetingPrep, useCalendarDayMap } from "@/api/queries";
 import { useCreateCalendarEvent, useDeleteCalendarEvent, useRespondToCalendarEvent } from "@/api/mutations";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Calendar, Search, Plus, ArrowLeft, Trash2, Brain, RefreshCw, Loader2, Clock } from "lucide-react";
+import { Calendar, Search, Plus, ArrowLeft, Trash2, Brain, RefreshCw, Loader2, Clock, LayoutList, Map, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { TimeSlot } from "@ai-cofounder/api-client";
 
 function formatEventTime(start: string, end: string, isAllDay: boolean) {
   if (isAllDay) return "All day";
@@ -279,10 +280,165 @@ function EventDetail({ eventId, onBack }: { eventId: string; onBack: () => void 
   );
 }
 
+function formatSlotTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  } catch {
+    return iso;
+  }
+}
+
+function formatDuration(minutes: number) {
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${minutes}m`;
+}
+
+function SlotBar({ slot, onSelectEvent }: { slot: TimeSlot; onSelectEvent: (id: string) => void }) {
+  const isFree = slot.type === "free";
+  const minHeight = Math.max(32, Math.min(slot.durationMinutes * 1.2, 120));
+
+  if (isFree) {
+    return (
+      <div
+        className="flex items-center gap-3 rounded-md border border-dashed border-muted-foreground/30 px-3 py-2 text-muted-foreground"
+        style={{ minHeight }}
+      >
+        <div className="flex-1 text-xs">
+          {formatSlotTime(slot.start)} – {formatSlotTime(slot.end)}
+        </div>
+        <Badge variant="outline" className="text-[10px] text-green-600 border-green-600/40">
+          {formatDuration(slot.durationMinutes)} free
+        </Badge>
+      </div>
+    );
+  }
+
+  const isAllDay = slot.durationMinutes === 1440;
+  return (
+    <button
+      onClick={() => slot.event && onSelectEvent(slot.event.id)}
+      className="flex w-full items-center gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-left hover:bg-primary/10 transition-colors"
+      style={{ minHeight }}
+    >
+      <div className="w-1 self-stretch rounded-full bg-primary" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{slot.event?.summary ?? "Event"}</p>
+        <p className="text-xs text-muted-foreground">
+          {isAllDay ? "All day" : `${formatSlotTime(slot.start)} – ${formatSlotTime(slot.end)}`}
+        </p>
+        {slot.event?.location && (
+          <p className="text-xs text-muted-foreground truncate">{slot.event.location}</p>
+        )}
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <Badge variant="secondary" className="text-[10px]">
+          {isAllDay ? "All day" : formatDuration(slot.durationMinutes)}
+        </Badge>
+        {slot.event && slot.event.attendeeCount > 0 && (
+          <Badge variant="outline" className="text-[10px]">
+            {slot.event.attendeeCount} attendees
+          </Badge>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function DayMapView({ onSelectEvent }: { onSelectEvent: (id: string) => void }) {
+  const [dateOffset, setDateOffset] = useState(0);
+  const targetDate = new Date();
+  targetDate.setDate(targetDate.getDate() + dateOffset);
+  const dateStr = targetDate.toISOString().slice(0, 10);
+
+  const { data, isLoading } = useCalendarDayMap(dateStr);
+
+  const dateLabel = targetDate.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" size="sm" onClick={() => setDateOffset((d) => d - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="text-center">
+          <p className="text-sm font-medium">{dateLabel}</p>
+          {dateOffset !== 0 && (
+            <button
+              onClick={() => setDateOffset(0)}
+              className="text-xs text-primary hover:underline"
+            >
+              Back to today
+            </button>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setDateOffset((d) => d + 1)}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="h-12 animate-pulse rounded-md bg-muted" />
+          ))}
+        </div>
+      ) : !data ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+            <Calendar className="h-10 w-10 mb-3" />
+            <p>Unable to load day map</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="flex gap-3 text-xs">
+            <div className="flex items-center gap-1.5 rounded-md bg-muted px-2.5 py-1.5">
+              <Calendar className="h-3.5 w-3.5" />
+              <span>{data.totalEvents} events</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-md bg-green-500/10 text-green-700 dark:text-green-400 px-2.5 py-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{formatDuration(data.totalFreeMinutes)} free</span>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-md bg-primary/10 text-primary px-2.5 py-1.5">
+              <Clock className="h-3.5 w-3.5" />
+              <span>{formatDuration(data.totalBusyMinutes)} busy</span>
+            </div>
+          </div>
+
+          {data.slots.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Calendar className="h-10 w-10 mb-3" />
+                <p>No events — entire day is free</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-1">
+              {data.slots.map((slot, i) => (
+                <SlotBar key={i} slot={slot} onSelectEvent={onSelectEvent} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export function CalendarPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearch, setActiveSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<"list" | "daymap">("daymap");
 
   const { data: upcoming, isLoading } = useCalendarEvents();
   const { data: searchResults } = useCalendarSearch(activeSearch);
@@ -301,64 +457,92 @@ export function CalendarPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Calendar</h1>
-        <CreateEventDialog />
-      </div>
-
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="pl-9"
-            placeholder="Search events..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") setActiveSearch(searchQuery); }}
-          />
-        </div>
-        {activeSearch && (
-          <Button variant="outline" size="sm" onClick={() => { setActiveSearch(""); setSearchQuery(""); }}>Clear</Button>
-        )}
-      </div>
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />
-          ))}
-        </div>
-      ) : !events?.length ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-            <Calendar className="h-10 w-10 mb-3" />
-            <p>{activeSearch ? "No events found" : "No upcoming events"}</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-1">
-          {events.map((evt) => (
-            <button
-              key={evt.id}
-              onClick={() => setSelectedId(evt.id)}
-              className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors"
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-md border">
+            <Button
+              variant={view === "daymap" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-r-none"
+              onClick={() => setView("daymap")}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{evt.summary}</span>
-                <div className="flex items-center gap-2">
-                  {evt.isAllDay && <Badge variant="outline" className="text-[10px]">All day</Badge>}
-                  {evt.attendeeCount > 0 && (
-                    <Badge variant="secondary" className="text-[10px]">{evt.attendeeCount} attendees</Badge>
-                  )}
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {formatEventTime(evt.start, evt.end, evt.isAllDay)}
-              </p>
-              {evt.location && (
-                <p className="text-xs text-muted-foreground mt-0.5">{evt.location}</p>
-              )}
-            </button>
-          ))}
+              <Map className="mr-1.5 h-3.5 w-3.5" />
+              Day Map
+            </Button>
+            <Button
+              variant={view === "list" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-l-none"
+              onClick={() => setView("list")}
+            >
+              <LayoutList className="mr-1.5 h-3.5 w-3.5" />
+              List
+            </Button>
+          </div>
+          <CreateEventDialog />
         </div>
+      </div>
+
+      {view === "daymap" ? (
+        <DayMapView onSelectEvent={setSelectedId} />
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                placeholder="Search events..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") setActiveSearch(searchQuery); }}
+              />
+            </div>
+            {activeSearch && (
+              <Button variant="outline" size="sm" onClick={() => { setActiveSearch(""); setSearchQuery(""); }}>Clear</Button>
+            )}
+          </div>
+
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />
+              ))}
+            </div>
+          ) : !events?.length ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Calendar className="h-10 w-10 mb-3" />
+                <p>{activeSearch ? "No events found" : "No upcoming events"}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-1">
+              {events.map((evt) => (
+                <button
+                  key={evt.id}
+                  onClick={() => setSelectedId(evt.id)}
+                  className="w-full text-left rounded-md border p-3 hover:bg-accent transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{evt.summary}</span>
+                    <div className="flex items-center gap-2">
+                      {evt.isAllDay && <Badge variant="outline" className="text-[10px]">All day</Badge>}
+                      {evt.attendeeCount > 0 && (
+                        <Badge variant="secondary" className="text-[10px]">{evt.attendeeCount} attendees</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatEventTime(evt.start, evt.end, evt.isAllDay)}
+                  </p>
+                  {evt.location && (
+                    <p className="text-xs text-muted-foreground mt-0.5">{evt.location}</p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

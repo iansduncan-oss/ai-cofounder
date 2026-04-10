@@ -84,6 +84,32 @@ export const GET_FREE_BUSY_TOOL: LlmTool = {
   },
 };
 
+export const GET_CALENDAR_DAY_MAP_TOOL: LlmTool = {
+  name: "get_calendar_day_map",
+  description:
+    "Get a unified timeline showing both calendar events and free time slots for a given day. " +
+    "Returns a structured day map with event and free slots, total busy/free minutes, and event details. " +
+    "Useful for understanding the user's schedule at a glance and finding available time.",
+  input_schema: {
+    type: "object",
+    properties: {
+      date: {
+        type: "string",
+        description: "Target date in YYYY-MM-DD format (default: today)",
+      },
+      timeMin: {
+        type: "string",
+        description: "Custom range start (ISO 8601, overrides date if set with timeMax)",
+      },
+      timeMax: {
+        type: "string",
+        description: "Custom range end (ISO 8601, overrides date if set with timeMin)",
+      },
+    },
+    required: [],
+  },
+};
+
 export const CREATE_CALENDAR_EVENT_TOOL: LlmTool = {
   name: "create_calendar_event",
   description:
@@ -120,6 +146,13 @@ export const CREATE_CALENDAR_EVENT_TOOL: LlmTool = {
       timeZone: {
         type: "string",
         description: "IANA time zone (e.g. 'America/New_York', optional)",
+      },
+      recurrence: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "RFC 5545 recurrence rules (e.g. ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']). " +
+          "Use this for recurring events like work hours or weekly meetings.",
       },
     },
     required: ["summary", "start", "end"],
@@ -166,6 +199,11 @@ export const UPDATE_CALENDAR_EVENT_TOOL: LlmTool = {
       timeZone: {
         type: "string",
         description: "IANA time zone (optional)",
+      },
+      recurrence: {
+        type: "array",
+        items: { type: "string" },
+        description: "RFC 5545 recurrence rules (optional, replaces existing)",
       },
     },
     required: ["eventId"],
@@ -217,6 +255,7 @@ export const CALENDAR_TOOL_TIERS: Record<string, "green" | "yellow"> = {
   get_calendar_event: "green",
   search_calendar_events: "green",
   get_free_busy: "green",
+  get_calendar_day_map: "green",
   create_calendar_event: "yellow",
   update_calendar_event: "yellow",
   delete_calendar_event: "yellow",

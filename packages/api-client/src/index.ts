@@ -88,6 +88,8 @@ export type {
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   FreeBusyResponse,
+  TimeSlot,
+  CalendarDayMap,
   MeetingPrepResponse,
   BriefingSections,
   TodayBriefingResponse,

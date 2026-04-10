@@ -74,6 +74,7 @@ import type {
   CreateCalendarEventInput,
   UpdateCalendarEventInput,
   FreeBusyResponse,
+  CalendarDayMap,
   MeetingPrepResponse,
   TodayBriefingResponse,
   FollowUp,
@@ -1457,6 +1458,15 @@ export class ApiClient {
 
   getFreeBusy(timeMin: string, timeMax: string) {
     return this.request<FreeBusyResponse>("POST", "/api/calendar/free-busy", { timeMin, timeMax });
+  }
+
+  getCalendarDayMap(params?: { date?: string; timeMin?: string; timeMax?: string }) {
+    const qs = new URLSearchParams();
+    if (params?.date) qs.set("date", params.date);
+    if (params?.timeMin) qs.set("timeMin", params.timeMin);
+    if (params?.timeMax) qs.set("timeMax", params.timeMax);
+    const query = qs.toString();
+    return this.request<CalendarDayMap>("GET", `/api/calendar/day-map${query ? `?${query}` : ""}`);
   }
 
   getMeetingPrep(eventId: string, refresh = false) {

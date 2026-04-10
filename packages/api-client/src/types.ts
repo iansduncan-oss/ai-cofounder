@@ -912,6 +912,7 @@ export interface CreateCalendarEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface UpdateCalendarEventInput {
@@ -922,12 +923,33 @@ export interface UpdateCalendarEventInput {
   location?: string;
   attendees?: string[];
   timeZone?: string;
+  recurrence?: string[];
 }
 
 export interface FreeBusyResponse {
   timeMin: string;
   timeMax: string;
   busy: Array<{ start: string; end: string }>;
+}
+
+/* ── Calendar Day Map ── */
+
+export interface TimeSlot {
+  type: "event" | "free";
+  start: string;
+  end: string;
+  durationMinutes: number;
+  event?: CalendarEventSummary;
+}
+
+export interface CalendarDayMap {
+  date: string;
+  timeMin: string;
+  timeMax: string;
+  totalEvents: number;
+  totalFreeMinutes: number;
+  totalBusyMinutes: number;
+  slots: TimeSlot[];
 }
 
 /* ── Meeting Prep ── */
