@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { screen, within, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "./test-utils";
 
 // ── Shared mocks ────────────────────────────────────────
@@ -406,7 +406,7 @@ describe("Keyboard Navigation", () => {
     });
 
     it("goal list links are keyboard-navigable", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalsPage />, {
         initialEntries: ["/dashboard/goals"],
       });
@@ -423,7 +423,7 @@ describe("Keyboard Navigation", () => {
     });
 
     it("filter selects are reachable via Tab", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalsPage />, {
         initialEntries: ["/dashboard/goals"],
       });
@@ -480,7 +480,7 @@ describe("Keyboard Navigation", () => {
 
   describe("GoalDetailPage keyboard interaction", () => {
     it("all action buttons are reachable via Tab", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalDetailPage />, {
         initialEntries: ["/dashboard/goals/goal-1"],
       });

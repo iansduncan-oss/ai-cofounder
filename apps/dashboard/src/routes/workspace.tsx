@@ -58,7 +58,7 @@ export function WorkspacePage() {
     }
   };
 
-  const extToLang: Record<string, string> = {
+  const _extToLang: Record<string, string> = {
     ts: "typescript",
     tsx: "typescript",
     js: "javascript",
@@ -74,7 +74,7 @@ export function WorkspacePage() {
     html: "html",
   };
 
-  const getFileExt = (name: string) => name.split(".").pop() ?? "";
+  const _getFileExt = (name: string) => name.split(".").pop() ?? "";
 
   return (
     <div>

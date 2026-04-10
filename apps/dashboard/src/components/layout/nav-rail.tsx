@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Monitor,
   Target,
-  MessageSquare,
   Settings,
   Menu,
   X,

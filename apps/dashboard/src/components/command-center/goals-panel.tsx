@@ -32,7 +32,7 @@ export function GoalsPanel() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("active");
   const { selectedGoalId, openGoal, clearSelectedGoal, focusChat } = useCommandCenter();
-  const { data: approvals } = usePendingApprovals();
+  const { data: _approvals } = usePendingApprovals();
 
   // List view
   const { data: goalsData, isLoading } = useGoals("default");

@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { usePendingApprovals, usePendingTasks } from "@/api/queries";
 import { Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Link } from "react-router";
 import { RelativeTime } from "./relative-time";
 

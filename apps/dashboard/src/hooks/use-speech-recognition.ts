@@ -19,12 +19,6 @@ interface SpeechRecognitionResultList {
   [index: number]: SpeechRecognitionResult;
 }
 
-interface SpeechRecognitionEventMap {
-  result: { results: SpeechRecognitionResultList };
-  error: { error: string };
-  end: Event;
-}
-
 interface WebSpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;

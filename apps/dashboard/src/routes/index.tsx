@@ -3,7 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { App } from "@/app";
 import { CommandCenter } from "@/components/layout/command-center";
 
-const OverviewPage = lazy(() =>
+const _OverviewPage = lazy(() =>
   import("./overview").then((m) => ({ default: m.OverviewPage })),
 );
 const GoalsPage = lazy(() =>
