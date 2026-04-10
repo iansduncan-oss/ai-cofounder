@@ -731,6 +731,7 @@ export async function saveMemory(
     .insert(memories)
     .values({
       ...rest,
+      workspaceId: nullifyEmpty(data.workspaceId),
       importance,
       ...(rawRole
         ? { agentRole: rawRole as (typeof memories.agentRole.enumValues)[number] }
@@ -2873,8 +2874,8 @@ export async function recordUserAction(
   const [row] = await db
     .insert(userActions)
     .values({
-      userId: data.userId,
-      workspaceId: data.workspaceId,
+      userId: nullifyEmpty(data.userId),
+      workspaceId: nullifyEmpty(data.workspaceId),
       actionType: data.actionType,
       actionDetail: data.actionDetail,
       dayOfWeek: now.getDay(),
@@ -4028,7 +4029,7 @@ export async function createFollowUp(
     .insert(followUps)
     .values({
       title: data.title,
-      workspaceId: data.workspaceId,
+      workspaceId: nullifyEmpty(data.workspaceId),
       description: data.description,
       dueDate: data.dueDate,
       source: data.source,
