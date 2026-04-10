@@ -342,6 +342,77 @@ describe("NotificationService", () => {
     });
   });
 
+  describe("notifySystemInsights", () => {
+    it("no-ops when insights array is empty", async () => {
+      const service = new NotificationService({
+        slackToken: "xoxb-test",
+        slackChannel: "C12345",
+      });
+      await service.notifySystemInsights([]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("no-ops when Slack is not configured", async () => {
+      const service = new NotificationService({});
+      await service.notifySystemInsights(["Circuit breaker open on anthropic"]);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it("sends to Slack channel with header + bullet list when DM not configured", async () => {
+      const service = new NotificationService({
+        slackToken: "xoxb-test",
+        slackChannel: "C12345",
+      });
+      await service.notifySystemInsights([
+        "Circuit breaker open on anthropic",
+        "Memory decay job failed 3 times in a row",
+      ]);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      const [url, init] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(url).toBe("https://slack.com/api/chat.postMessage");
+
+      const body = JSON.parse(init.body);
+      expect(body.channel).toBe("C12345");
+      expect(body.text).toContain("Sir, I've noticed some patterns");
+      expect(body.text).toContain("- Circuit breaker open on anthropic");
+      expect(body.text).toContain("- Memory decay job failed 3 times in a row");
+      expect(body.blocks[0]).toEqual(
+        expect.objectContaining({
+          type: "header",
+          text: expect.objectContaining({ text: "System Intelligence Report, Sir" }),
+        }),
+      );
+      expect(body.blocks[1].type).toBe("section");
+      expect(body.blocks[1].text.type).toBe("mrkdwn");
+    });
+
+    it("prefers DM path when slackDmUserId is configured", async () => {
+      // conversations.open returns a channel id, then chat.postMessage is called
+      (globalThis.fetch as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, channel: { id: "D999" } }) })
+        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+
+      const service = new NotificationService({
+        slackToken: "xoxb-test",
+        slackChannel: "C12345",
+        slackDmUserId: "U123",
+      });
+      await service.notifySystemInsights(["Agent coder self-review failing"]);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      const [openUrl, openInit] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(openUrl).toBe("https://slack.com/api/conversations.open");
+      expect(JSON.parse(openInit.body)).toEqual({ users: "U123" });
+
+      const [postUrl, postInit] = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1];
+      expect(postUrl).toBe("https://slack.com/api/chat.postMessage");
+      const postBody = JSON.parse(postInit.body);
+      expect(postBody.channel).toBe("D999");
+      expect(postBody.text).toContain("- Agent coder self-review failing");
+    });
+  });
+
   describe("backwards compatibility", () => {
     it("notifyApprovalCreated standalone function works", async () => {
       mockOptionalEnv.mockImplementation((name: string, def: string) => {

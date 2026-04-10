@@ -9,6 +9,7 @@ import {
   closeAllQueues,
   type WorkerProcessors,
 } from "@ai-cofounder/queue";
+import { notifyCiFailures, fireN8nActionWebhook } from "../helpers/queue-processors.js";
 
 const logger = createLogger("queue-plugin");
 
@@ -35,7 +36,6 @@ export const queuePlugin = fp(async (app) => {
       switch (check) {
         case "github_ci": {
           const ciResults = await app.monitoringService.checkGitHubCI();
-          const ciFailures = ciResults.filter((ci) => ci.status === "failure");
 
           // Feed CI results to self-heal service for failure tracking (SCHED-04)
           if (app.ciSelfHealService) {
@@ -49,13 +49,7 @@ export const queuePlugin = fp(async (app) => {
           }
 
           // Notify user of CI failures via Slack
-          if (ciFailures.length > 0) {
-            const lines = ciFailures.map((ci) => `- **${ci.repo}** (${ci.branch}): ${ci.conclusion ?? "failed"} — ${ci.url}`);
-            await app.notificationService.notifySystemInsights([
-              `CI failure(s) detected:\n${lines.join("\n")}`,
-            ]);
-            logger.warn({ count: ciFailures.length }, "CI failure notification sent");
-          }
+          await notifyCiFailures(app.notificationService, ciResults);
           break;
         }
         case "github_prs": {
@@ -531,35 +525,7 @@ export const queuePlugin = fp(async (app) => {
       }
 
       // Trigger n8n webhook if a mapping exists for this category
-      try {
-        const webhooksJson = optionalEnv("N8N_ACTION_WEBHOOKS", "");
-        if (webhooksJson) {
-          const webhooks: Record<string, string> = JSON.parse(webhooksJson);
-          const webhookUrl = webhooks[result.category];
-          if (webhookUrl) {
-            const relevantText = messages
-              .filter((m) => result.relevantMessageIds.includes(m.messageId))
-              .map((m) => `${m.authorName}: ${m.content.slice(0, 300)}`)
-              .join("\n");
-            await fetch(webhookUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                category: result.category,
-                summary: result.summary,
-                suggestedAction: result.suggestedAction,
-                urgency: result.urgency,
-                channelName,
-                messages: relevantText,
-                batchedAt,
-              }),
-            });
-            logger.info({ category: result.category, webhookUrl }, "n8n action webhook triggered");
-          }
-        }
-      } catch (err) {
-        logger.warn({ err, category: result.category }, "n8n action webhook failed (non-fatal)");
-      }
+      await fireN8nActionWebhook({ result, messages, channelName, batchedAt });
     },
 
     ragIngestion: async (job) => {
