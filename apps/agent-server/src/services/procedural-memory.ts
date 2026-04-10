@@ -190,6 +190,7 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
         steps: sanitizedSessionSteps,
         preconditions: (parsed.preconditions ?? []).map((p: string) => sanitizeMemoryContent(p)),
         tags: [...(parsed.tags ?? []), "session-lesson"],
+        embedding,
       });
 
       logger.info({ procedureId: procedure.id }, "Learned lesson from autonomous session");

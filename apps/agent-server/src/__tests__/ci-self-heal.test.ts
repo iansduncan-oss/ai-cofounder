@@ -40,8 +40,8 @@ const mockNotificationService = {
 
 function makeService(): CiSelfHealService {
   return new CiSelfHealService(
-    mockRedis as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    mockRedis as any,  
+    mockNotificationService as any,  
   );
 }
 

@@ -304,8 +304,8 @@ describe("sendDailyBriefing", () => {
 
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      llmRegistry as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      mockNotificationService as any,  
+      llmRegistry as any,  
     );
 
     // LLM was called
@@ -345,8 +345,8 @@ describe("sendDailyBriefing", () => {
 
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      llmRegistry as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      mockNotificationService as any,  
+      llmRegistry as any,  
     );
 
     // Should still send a notification (with the static fallback)
@@ -361,7 +361,7 @@ describe("sendDailyBriefing", () => {
   it("uses static format when no llmRegistry is provided", async () => {
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      mockNotificationService as any,  
     );
 
     // LLM was NOT called
@@ -381,7 +381,7 @@ describe("sendDailyBriefing", () => {
     // Should not throw even when caching fails
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      mockNotificationService as any,  
     );
 
     expect(mockSendBriefing).toHaveBeenCalledOnce();

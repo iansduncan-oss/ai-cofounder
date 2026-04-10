@@ -68,9 +68,9 @@ vi.mock("@ai-cofounder/queue", () => ({
 }));
 
 describe("session context", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   let SessionContextService: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const mockDb = {} as any;
 
   beforeEach(async () => {

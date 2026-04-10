@@ -47,7 +47,7 @@ import {
 import { executeSharedTool, type ToolExecutorServices, type ToolExecutorContext } from "../agents/tool-executor.js";
 
 describe("project tools", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const mockDb = {} as any;
 
   const mockProjectRegistryService = {
@@ -110,7 +110,7 @@ describe("project tools", () => {
       updatedAt: new Date(),
     });
     vi.mocked(getRegisteredProjectByName).mockResolvedValue(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     vi.mocked(updateConversationMetadata).mockResolvedValue({ id: "conv-123" } as any);
     vi.mocked(listProjectDependencies).mockResolvedValue([]);
     vi.mocked(getRegisteredProjectById).mockResolvedValue(null);

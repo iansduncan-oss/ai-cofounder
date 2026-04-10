@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { getWorkspace, getDefaultWorkspace, getSystemDefaultWorkspace } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 
