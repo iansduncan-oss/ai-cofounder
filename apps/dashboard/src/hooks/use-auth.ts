@@ -152,10 +152,12 @@ export function useProactiveRefresh() {
     };
   }, [scheduleRefresh]);
 
-  // Re-schedule whenever the token changes
+  // Re-schedule whenever the hook remounts or scheduleRefresh identity changes.
+  // `_accessToken` is a module-level value and not a valid React dependency —
+  // reads happen through getAccessToken() inside scheduleRefresh.
   useEffect(() => {
     if (_accessToken) {
       scheduleRefresh();
     }
-  }, [_accessToken, scheduleRefresh]);
+  }, [scheduleRefresh]);
 }

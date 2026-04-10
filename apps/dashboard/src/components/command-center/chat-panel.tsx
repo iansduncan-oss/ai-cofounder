@@ -156,6 +156,8 @@ export function ChatPanel() {
       lastTranscript.current = speech.transcript;
       handleSend(speech.transcript);
     }
+    // handleSend is intentionally not a dep to avoid re-firing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.isListening, speech.transcript]);
 
   const ringState: RingState = useMemo(() => {
@@ -204,6 +206,8 @@ export function ChatPanel() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+    // handleNewChat / stream.cancel are stable; only rebind on isStreaming changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   const handleNewChat = () => {
@@ -282,6 +286,9 @@ export function ChatPanel() {
         }
         return elements;
       }),
+    // handleSuggestionSelect is stable within render and omitted intentionally
+    // to avoid re-rendering the full message list on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, lastAssistantIndex, stream.isStreaming],
   );
 
