@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, SubagentRunStatus, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, SubagentRunStatus, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput, UpsertProductivityInput } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -745,5 +745,18 @@ export function useRagDeleteSource() {
       toast.success("Source deleted");
     },
     onError: (err) => { toast.error(`Failed to delete source: ${err.message}`); },
+  });
+}
+
+/* ── Productivity ── */
+
+export function useUpsertProductivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpsertProductivityInput) => apiClient.upsertProductivity(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+    },
+    onError: (err) => { toast.error(`Failed to save: ${err.message}`); },
   });
 }

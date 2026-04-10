@@ -16,7 +16,8 @@ export type WsChannel =
   | "usage"
   | "follow-ups"
   | "conversations"
-  | "work-sessions";
+  | "work-sessions"
+  | "productivity";
 
 /** Client → Server messages */
 export type WsClientMessage =
@@ -73,11 +74,12 @@ export const WS_CHANNEL_QUERY_KEYS: Record<WsChannel, readonly string[][]> = {
   "follow-ups": [["follow-ups"]],
   conversations: [["conversations"]],
   "work-sessions": [["work-sessions"]],
+  productivity: [["productivity"]],
 };
 
 /** All valid channel names for runtime validation */
 export const WS_CHANNELS: WsChannel[] = [
   "tasks", "approvals", "monitoring", "queue",
   "health", "tools", "pipelines", "briefing", "goals", "deploys", "patterns", "context", "journal", "usage",
-  "follow-ups", "conversations", "work-sessions",
+  "follow-ups", "conversations", "work-sessions", "productivity",
 ];

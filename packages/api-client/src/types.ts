@@ -989,6 +989,56 @@ export interface UpdateFollowUpInput {
   source?: string;
 }
 
+/* ── Productivity Tracker ── */
+
+export type ProductivityMood = "great" | "good" | "okay" | "rough" | "terrible";
+
+export interface PlannedItem {
+  text: string;
+  completed: boolean;
+}
+
+export interface ProductivityLog {
+  id: string;
+  userId: string;
+  date: string;
+  plannedItems: PlannedItem[];
+  reflectionNotes?: string | null;
+  mood?: ProductivityMood | null;
+  energyLevel?: number | null;
+  completionScore?: number | null;
+  streakDays: number;
+  highlights?: string | null;
+  blockers?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertProductivityInput {
+  date: string;
+  plannedItems?: PlannedItem[];
+  reflectionNotes?: string;
+  mood?: ProductivityMood;
+  energyLevel?: number;
+  highlights?: string;
+  blockers?: string;
+}
+
+export interface ProductivityStats {
+  totalDays: number;
+  avgCompletion: number;
+  avgEnergy: number;
+  moodCounts: Record<string, number>;
+  currentStreak: number;
+  history: {
+    date: string;
+    completionScore?: number | null;
+    mood?: string | null;
+    energyLevel?: number | null;
+  }[];
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

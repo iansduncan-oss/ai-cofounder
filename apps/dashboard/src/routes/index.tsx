@@ -129,6 +129,9 @@ const WorkspacesPage = lazy(() =>
 const RegisterPage = lazy(() =>
   import("./register").then((m) => ({ default: m.RegisterPage })),
 );
+const ProductivityPage = lazy(() =>
+  import("./productivity").then((m) => ({ default: m.ProductivityPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -186,6 +189,7 @@ export const router = createBrowserRouter([
       { path: "routing", element: <RoutingPage /> },
       { path: "self-healing", element: <SelfHealingPage /> },
       { path: "workspaces", element: <WorkspacesPage /> },
+      { path: "productivity", element: <ProductivityPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

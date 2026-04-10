@@ -566,3 +566,27 @@ export function useKnowledgeSearch(query: string) {
     placeholderData: keepPreviousData,
   });
 }
+
+/* ── Productivity ── */
+
+export function useProductivityToday() {
+  return useQuery({
+    queryKey: queryKeys.productivity.today,
+    queryFn: () => apiClient.getProductivityToday(),
+  });
+}
+
+export function useProductivityStats(days?: number) {
+  return useQuery({
+    queryKey: queryKeys.productivity.stats(days),
+    queryFn: () => apiClient.getProductivityStats(days),
+  });
+}
+
+export function useProductivityHistory(opts?: { limit?: number; from?: string; to?: string }) {
+  const key = opts ? JSON.stringify(opts) : "";
+  return useQuery({
+    queryKey: queryKeys.productivity.history(key),
+    queryFn: () => apiClient.getProductivityHistory(opts),
+  });
+}

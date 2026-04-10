@@ -51,6 +51,7 @@ import {
   episodicMemories,
   proceduralMemories,
   failurePatterns,
+  productivityLogs,
 } from "./schema.js";
 
 /* ────────────────────────── Users ────────────────────────── */
@@ -4571,7 +4572,149 @@ export async function incrementFailureFrequency(db: Db, id: string) {
     .where(eq(failurePatterns.id, id));
 }
 
-/* ────────────────────── Global Search ────────────────────── */
+/* ──��─────────────────── Productivity Logs ────────────────���───── */
+
+export async function upsertProductivityLog(
+  db: Db,
+  data: {
+    userId: string;
+    date: string;
+    plannedItems?: { text: string; completed: boolean }[];
+    reflectionNotes?: string;
+    mood?: "great" | "good" | "okay" | "rough" | "terrible";
+    energyLevel?: number;
+    completionScore?: number;
+    streakDays?: number;
+    highlights?: string;
+    blockers?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [row] = await db
+    .insert(productivityLogs)
+    .values({
+      userId: data.userId,
+      date: data.date,
+      plannedItems: data.plannedItems ?? [],
+      reflectionNotes: data.reflectionNotes,
+      mood: data.mood,
+      energyLevel: data.energyLevel,
+      completionScore: data.completionScore,
+      streakDays: data.streakDays ?? 0,
+      highlights: data.highlights,
+      blockers: data.blockers,
+      metadata: data.metadata,
+    })
+    .onConflictDoUpdate({
+      target: [productivityLogs.userId, productivityLogs.date],
+      set: {
+        plannedItems: data.plannedItems !== undefined ? data.plannedItems : sql`${productivityLogs.plannedItems}`,
+        reflectionNotes: data.reflectionNotes !== undefined ? data.reflectionNotes : sql`${productivityLogs.reflectionNotes}`,
+        mood: data.mood !== undefined ? data.mood : sql`${productivityLogs.mood}`,
+        energyLevel: data.energyLevel !== undefined ? data.energyLevel : sql`${productivityLogs.energyLevel}`,
+        completionScore: data.completionScore !== undefined ? data.completionScore : sql`${productivityLogs.completionScore}`,
+        streakDays: data.streakDays !== undefined ? data.streakDays : sql`${productivityLogs.streakDays}`,
+        highlights: data.highlights !== undefined ? data.highlights : sql`${productivityLogs.highlights}`,
+        blockers: data.blockers !== undefined ? data.blockers : sql`${productivityLogs.blockers}`,
+        metadata: data.metadata !== undefined ? data.metadata : sql`${productivityLogs.metadata}`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function getProductivityLog(db: Db, userId: string, date: string) {
+  const rows = await db
+    .select()
+    .from(productivityLogs)
+    .where(and(eq(productivityLogs.userId, userId), eq(productivityLogs.date, date)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listProductivityLogs(
+  db: Db,
+  userId: string,
+  opts?: { limit?: number; offset?: number; from?: string; to?: string },
+) {
+  const { limit = 30, offset = 0, from, to } = opts ?? {};
+  const conditions = [eq(productivityLogs.userId, userId)];
+  if (from) conditions.push(sql`${productivityLogs.date} >= ${from}`);
+  if (to) conditions.push(sql`${productivityLogs.date} <= ${to}`);
+
+  const rows = await db
+    .select()
+    .from(productivityLogs)
+    .where(and(...conditions))
+    .orderBy(desc(productivityLogs.date))
+    .limit(limit)
+    .offset(offset);
+
+  return { data: rows, total: rows.length };
+}
+
+export async function getProductivityStreak(db: Db, userId: string) {
+  // Get the most recent log to read the stored streak
+  const rows = await db
+    .select()
+    .from(productivityLogs)
+    .where(eq(productivityLogs.userId, userId))
+    .orderBy(desc(productivityLogs.date))
+    .limit(1);
+  return rows[0]?.streakDays ?? 0;
+}
+
+export async function getProductivityStats(db: Db, userId: string, days = 30) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  const rows = await db
+    .select()
+    .from(productivityLogs)
+    .where(and(
+      eq(productivityLogs.userId, userId),
+      sql`${productivityLogs.date} >= ${cutoffStr}`,
+    ))
+    .orderBy(asc(productivityLogs.date));
+
+  const totalDays = rows.length;
+  const avgCompletion = totalDays > 0
+    ? Math.round(rows.reduce((sum, r) => sum + (r.completionScore ?? 0), 0) / totalDays)
+    : 0;
+  const avgEnergy = totalDays > 0
+    ? +(rows.reduce((sum, r) => sum + (r.energyLevel ?? 3), 0) / totalDays).toFixed(1)
+    : 0;
+  const moodCounts: Record<string, number> = {};
+  for (const r of rows) {
+    if (r.mood) moodCounts[r.mood] = (moodCounts[r.mood] || 0) + 1;
+  }
+
+  return {
+    totalDays,
+    avgCompletion,
+    avgEnergy,
+    moodCounts,
+    currentStreak: rows.length > 0 ? rows[rows.length - 1].streakDays : 0,
+    history: rows.map((r) => ({
+      date: r.date,
+      completionScore: r.completionScore,
+      mood: r.mood,
+      energyLevel: r.energyLevel,
+    })),
+  };
+}
+
+export async function deleteProductivityLog(db: Db, id: string) {
+  const [row] = await db
+    .delete(productivityLogs)
+    .where(eq(productivityLogs.id, id))
+    .returning();
+  return row ?? null;
+}
+
+/* ─────���──────────────── Global Search ────────────────────── */
 
 export async function globalSearch(
   db: Db,

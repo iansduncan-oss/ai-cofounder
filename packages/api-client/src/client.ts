@@ -80,6 +80,9 @@ import type {
   FollowUpStatus,
   CreateFollowUpInput,
   UpdateFollowUpInput,
+  ProductivityLog,
+  UpsertProductivityInput,
+  ProductivityStats,
   GlobalSearchResults,
   DeployCircuitBreakerStatus,
   ThinkingTrace,
@@ -1451,6 +1454,35 @@ export class ApiClient {
 
   deleteFollowUp(id: string) {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/follow-ups/${id}`);
+  }
+
+  /* ── Productivity Tracker ── */
+
+  upsertProductivity(data: UpsertProductivityInput) {
+    return this.request<ProductivityLog>("PUT", "/api/productivity", data);
+  }
+
+  getProductivityToday() {
+    return this.request<ProductivityLog>("GET", "/api/productivity/today");
+  }
+
+  getProductivityHistory(opts?: { limit?: number; offset?: number; from?: string; to?: string }) {
+    const params = new URLSearchParams();
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    if (opts?.from) params.set("from", opts.from);
+    if (opts?.to) params.set("to", opts.to);
+    const q = params.toString();
+    return this.request<{ data: ProductivityLog[]; total: number }>("GET", `/api/productivity/history${q ? `?${q}` : ""}`);
+  }
+
+  getProductivityStats(days?: number) {
+    const q = days ? `?days=${days}` : "";
+    return this.request<ProductivityStats>("GET", `/api/productivity/stats${q}`);
+  }
+
+  deleteProductivityLog(id: string) {
+    return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/productivity/${id}`);
   }
 
   /* ── Decisions ── */

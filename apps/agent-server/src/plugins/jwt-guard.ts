@@ -44,6 +44,7 @@ import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
 import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
 import { selfHealingRoutes } from "../routes/self-healing.js";
+import { productivityRoutes } from "../routes/productivity.js";
 import { workspaceTenantRoutes } from "../routes/workspaces.js";
 import { workspaceContextPlugin } from "../plugins/workspace-context.js";
 import type { AdminRole } from "../plugins/rbac.js";
@@ -187,4 +188,5 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(routingRoutes, { prefix: "/api/analytics/routing" });
   app.register(routingStatsRoutes, { prefix: "/api/routing" });
   app.register(selfHealingRoutes, { prefix: "/api/self-healing" });
+  app.register(productivityRoutes, { prefix: "/api/productivity" });
 }

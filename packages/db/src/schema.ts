@@ -916,6 +916,37 @@ export const proceduralMemories = pgTable("procedural_memories", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Productivity Logs (daily check-in / reflection tracker) ── */
+
+export const productivityMoodEnum = pgEnum("productivity_mood", [
+  "great",
+  "good",
+  "okay",
+  "rough",
+  "terrible",
+]);
+
+export const productivityLogs = pgTable("productivity_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => adminUsers.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // YYYY-MM-DD
+  plannedItems: jsonb("planned_items").default([]), // [{text, completed}]
+  reflectionNotes: text("reflection_notes"),
+  mood: productivityMoodEnum("mood"),
+  energyLevel: integer("energy_level"), // 1-5
+  completionScore: integer("completion_score"), // 0-100, auto-calculated
+  streakDays: integer("streak_days").notNull().default(0),
+  highlights: text("highlights"),
+  blockers: text("blockers"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("idx_productivity_logs_user_date").on(table.userId, table.date),
+]);
+
 /* ── Failure Patterns (tool error tracking and resolutions) ── */
 
 export const failurePatterns = pgTable("failure_patterns", {
