@@ -24,6 +24,13 @@ export const queuePlugin = fp(async (app) => {
   getRedisConnection(redisUrl);
   logger.info("Queue system initialized");
 
+  // Cached per-plugin instance; discord-triage jobs can fire many times per
+  // minute during active discussions, so we avoid re-instantiating per job.
+  let cachedTriageService: import("../services/discord-triage.js").DiscordTriageService | null = null;
+  let cachedBuildDiscordAlertBlocks:
+    | typeof import("../services/discord-triage.js").buildDiscordAlertBlocks
+    | null = null;
+
   // NOTE: agentTask processor is NOT registered here.
   // Agent task processing is handled exclusively by the worker process (worker.ts).
   // This prevents the HTTP server from blocking on long-running agent tasks.
@@ -403,8 +410,13 @@ export const queuePlugin = fp(async (app) => {
         return;
       }
 
-      const { DiscordTriageService, buildDiscordAlertBlocks } = await import("../services/discord-triage.js");
-      const triageService = new DiscordTriageService(app.llmRegistry);
+      if (!cachedTriageService || !cachedBuildDiscordAlertBlocks) {
+        const mod = await import("../services/discord-triage.js");
+        cachedTriageService = new mod.DiscordTriageService(app.llmRegistry);
+        cachedBuildDiscordAlertBlocks = mod.buildDiscordAlertBlocks;
+      }
+      const triageService = cachedTriageService;
+      const buildDiscordAlertBlocks = cachedBuildDiscordAlertBlocks;
       const result = await triageService.triageBatch({ channelName, messages });
 
       const minConfidence = parseFloat(optionalEnv("DISCORD_WATCHER_MIN_CONFIDENCE", "0.6"));

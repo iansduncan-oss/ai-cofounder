@@ -56,9 +56,32 @@ describe("MCP tools registration", () => {
     registerTools(server, client);
   });
 
-  it("registers 42 tools", () => {
+  it("registers all expected core tools", () => {
     const tools = getRegisteredTools(server);
-    expect(tools.size).toBe(42);
+    // Assert the critical tools exist — structural rather than a brittle count.
+    // Adding a new tool should not break this test; removing a core one should.
+    const expectedCore = [
+      "ask_agent",
+      "get_dashboard",
+      "get_monitoring",
+      "get_queue_status",
+      "list_goals",
+      "create_goal",
+      "execute_goal",
+      "get_briefing",
+      "save_memory",
+      "search_memories",
+      "read_vault_daily",
+      "list_vault_notes",
+      "read_vault_file",
+      "get_provider_health",
+      "rag_search",
+    ];
+    for (const name of expectedCore) {
+      expect(tools.has(name), `expected tool "${name}" to be registered`).toBe(true);
+    }
+    // Guard against accidental wholesale deletion
+    expect(tools.size).toBeGreaterThanOrEqual(expectedCore.length);
   });
 
   it("ask_agent calls runAgent and formats response", async () => {

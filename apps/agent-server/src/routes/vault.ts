@@ -5,9 +5,29 @@ import { optionalEnv } from "@ai-cofounder/shared";
 
 const VAULT_DIR = optionalEnv("VAULT_DIR", "/opt/jarvis-vault");
 
+interface VaultDailyResponse {
+  date: string;
+  content: string;
+}
+
+interface VaultDailyListResponse {
+  dates: string[];
+}
+
+interface VaultSectionListResponse {
+  section: string;
+  files: string[];
+}
+
+interface VaultFileResponse {
+  section: string;
+  slug: string;
+  content: string;
+}
+
 export const vaultRoutes: FastifyPluginAsync = async (app) => {
   // GET /api/vault/daily/:date — read a daily note (YYYY-MM-DD)
-  app.get<{ Params: { date: string } }>(
+  app.get<{ Params: { date: string }; Reply: VaultDailyResponse | { error: string } }>(
     "/daily/:date",
     { schema: { tags: ["vault"] } },
     async (request, reply) => {
@@ -25,22 +45,29 @@ export const vaultRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // GET /api/vault/daily — list available daily notes
-  app.get("/daily", { schema: { tags: ["vault"] } }, async () => {
-    try {
-      const files = await readdir(join(VAULT_DIR, "daily"));
-      const dates = files
-        .filter((f) => f.endsWith(".md"))
-        .map((f) => f.replace(".md", ""))
-        .sort()
-        .reverse();
-      return { dates };
-    } catch {
-      return { dates: [] };
-    }
-  });
+  app.get<{ Reply: VaultDailyListResponse }>(
+    "/daily",
+    { schema: { tags: ["vault"] } },
+    async (): Promise<VaultDailyListResponse> => {
+      try {
+        const files = await readdir(join(VAULT_DIR, "daily"));
+        const dates = files
+          .filter((f) => f.endsWith(".md"))
+          .map((f) => f.replace(".md", ""))
+          .sort()
+          .reverse();
+        return { dates };
+      } catch {
+        return { dates: [] };
+      }
+    },
+  );
 
   // GET /api/vault/:section — list files in a vault section (projects, decisions, people)
-  app.get<{ Params: { section: string } }>(
+  app.get<{
+    Params: { section: string };
+    Reply: VaultSectionListResponse | { error: string };
+  }>(
     "/:section",
     { schema: { tags: ["vault"] } },
     async (request, reply) => {
@@ -62,7 +89,10 @@ export const vaultRoutes: FastifyPluginAsync = async (app) => {
   );
 
   // GET /api/vault/:section/:slug — read a specific vault file
-  app.get<{ Params: { section: string; slug: string } }>(
+  app.get<{
+    Params: { section: string; slug: string };
+    Reply: VaultFileResponse | { error: string };
+  }>(
     "/:section/:slug",
     { schema: { tags: ["vault"] } },
     async (request, reply) => {
