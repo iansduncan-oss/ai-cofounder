@@ -7,6 +7,11 @@ import { router } from "@/routes";
 import { setAccessToken } from "@/hooks/use-auth";
 import "./globals.css";
 
+// Register service worker for PWA installability
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/dashboard/sw.js").catch(() => {});
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
