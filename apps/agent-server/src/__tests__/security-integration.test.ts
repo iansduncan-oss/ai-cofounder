@@ -187,7 +187,7 @@ describe("Honeypot hits count 3x toward IP ban", () => {
     }
 
     // Now a valid path should be blocked because the IP is banned
-    const res = await app.inject({
+    const _res = await app.inject({
       method: "GET",
       url: "/health",
       headers,

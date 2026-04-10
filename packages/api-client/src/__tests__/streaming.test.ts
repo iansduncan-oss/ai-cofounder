@@ -104,7 +104,6 @@ describe("streamChat", () => {
       body: createSSEStream([{ event: "done", data: { response: "ok" } }]),
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for await (const _ of client.streamChat({ message: "hello", userId: "u1" })) {
       // consume
     }

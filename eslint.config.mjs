@@ -35,6 +35,20 @@ export default tseslint.config(
     },
   },
 
+  // Test files: relax `any` rule — test mocks legitimately use `any` for
+  // simplified type assertions against production types. Strict types in
+  // tests add noise without catching bugs.
+  {
+    files: [
+      "**/__tests__/**/*.{ts,tsx}",
+      "**/*.test.{ts,tsx}",
+      "**/*.spec.{ts,tsx}",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
+
   // Disable rules that conflict with Prettier
   eslintConfigPrettier,
 );

@@ -171,6 +171,9 @@ export function ChatPage() {
       }
     }
     prevStreaming.current = stream.isStreaming;
+    // stream and tts are hook returns that change identity every render;
+    // we only care about isStreaming transitions here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   // Handle stream error — show as message
@@ -182,6 +185,8 @@ export function ChatPage() {
       ]);
       stream.reset();
     }
+    // stream is a hook return that changes identity every render; only trigger on error changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.error]);
 
   const handleSend = useCallback((text?: string) => {
@@ -193,6 +198,9 @@ export function ChatPage() {
     if (!text) setInput("");
 
     stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
+    // stream and tts are hook returns that change identity every render;
+    // only meaningful dependencies are tracked.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop]);
 
   // Send speech transcript when recognition completes (final result)
@@ -259,6 +267,8 @@ export function ChatPage() {
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+    // handleNewChat / stream are stable within a render; only rebind on isStreaming change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   const handleNewChat = () => {
@@ -357,6 +367,9 @@ export function ChatPage() {
 
         return elements;
       }),
+    // handleSuggestionSelect is stable within a render and intentionally excluded
+    // to avoid re-rendering all messages on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, lastAssistantIndex, stream.isStreaming],
   );
 

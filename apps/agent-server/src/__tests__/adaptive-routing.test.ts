@@ -20,7 +20,7 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 const { AdaptiveRoutingService } = await import("../services/adaptive-routing.js");
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const fakeDb = {} as any;
 
 describe("AdaptiveRoutingService", () => {

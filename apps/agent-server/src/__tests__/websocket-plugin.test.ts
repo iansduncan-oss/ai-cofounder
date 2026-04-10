@@ -84,7 +84,7 @@ vi.mock("@ai-cofounder/sandbox", () => ({
 import WebSocket from "ws";
 import { _wsClients, _goalListeners } from "../plugins/websocket.js";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 let app: any;
 
 /** Track all connections opened during a test for guaranteed cleanup */

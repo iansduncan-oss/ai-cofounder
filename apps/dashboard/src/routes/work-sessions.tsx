@@ -10,10 +10,6 @@ import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } fr
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
   PlayCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
   Timer,
   Zap,
   ChevronDown,

@@ -123,6 +123,9 @@ export function useWsChat(conversationId?: string) {
   const abortRef = useRef<AbortController | null>(null);
   const currentConvIdRef = useRef(conversationId);
   currentConvIdRef.current = conversationId;
+  // Track isStreaming via ref so sendMessage callback stays stable
+  const isStreamingRef = useRef(state.isStreaming);
+  isStreamingRef.current = state.isStreaming;
 
   // Connect WebSocket when conversationId changes
   useEffect(() => {
@@ -281,7 +284,7 @@ export function useWsChat(conversationId?: string) {
         }
 
         // If stream ended without a done event
-        if (!controller.signal.aborted && state.isStreaming) {
+        if (!controller.signal.aborted && isStreamingRef.current) {
           dispatch({ type: "agent_complete" });
         }
       } catch (err) {

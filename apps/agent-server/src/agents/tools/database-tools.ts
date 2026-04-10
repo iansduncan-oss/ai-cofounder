@@ -30,7 +30,7 @@ export const QUERY_DATABASE_TOOL: LlmTool = {
  */
 function stripLeadingComments(s: string): string {
   let result = s;
-  // eslint-disable-next-line no-constant-condition
+   
   while (true) {
     result = result.trimStart();
     if (result.startsWith("--")) {

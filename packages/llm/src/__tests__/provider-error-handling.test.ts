@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { LlmProvider } from "../provider.js";
 import type { LlmCompletionRequest, LlmCompletionResponse, TaskCategory } from "../types.js";
 import { LlmRegistry } from "../registry.js";
@@ -74,9 +74,9 @@ describe("LLM Provider Error Handling", () => {
     });
 
     it("half-open state probes after reset timeout", async () => {
-      let callCount = 0;
+      let _callCount = 0;
       const failing = mockProvider("anthropic", true, async () => {
-        callCount++;
+        _callCount++;
         throw new Error("server error");
       });
       const backup = mockProvider("groq", true);

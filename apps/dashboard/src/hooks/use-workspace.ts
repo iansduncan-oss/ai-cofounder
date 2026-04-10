@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Workspace } from "@ai-cofounder/api-client";
@@ -29,7 +29,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     queryFn: () => apiClient.listWorkspaces(),
   });
 
-  const workspaces = data?.workspaces ?? [];
+  const workspaces = useMemo(() => data?.workspaces ?? [], [data]);
 
   // Auto-select default workspace if none stored
   useEffect(() => {

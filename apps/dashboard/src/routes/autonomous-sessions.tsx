@@ -224,7 +224,7 @@ export function AutonomousSessionsPage() {
 
   // Summary stats
   const completed = sessions.filter((s) => s.status === "completed").length;
-  const failed = sessions.filter((s) => s.status === "failed" || s.status === "timeout").length;
+  const _failed = sessions.filter((s) => s.status === "failed" || s.status === "timeout").length;
   const totalTokens = sessions.reduce((s, sess) => s + (sess.tokensUsed ?? 0), 0);
   const avgDuration = sessions.length > 0
     ? sessions.reduce((s, sess) => s + (sess.durationMs ?? 0), 0) / sessions.length

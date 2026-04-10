@@ -1,7 +1,7 @@
 import { useRealtime } from "@/providers/realtime-provider";
 import { useHealth } from "@/api/queries";
 import { cn } from "@/lib/utils";
-import { Wifi, WifiOff, Activity } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 
 interface StatusBarProps {
   isStreaming?: boolean;

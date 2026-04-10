@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import {
   GitCommit, GitPullRequest, CheckCircle2, XCircle, FileText,
-  Zap, Clock, Target, Bot, Rocket, Search, Workflow,
+  Clock, Target, Bot, Rocket, Search, Workflow,
 } from "lucide-react";
 import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";

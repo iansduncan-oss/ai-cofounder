@@ -6,7 +6,7 @@ import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { TaskStatusBadge } from "@/components/common/status-badge";
 import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Target, ShieldCheck, Zap, Activity, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Target, ShieldCheck, Zap, Activity, AlertTriangle, CheckCircle, XCircle } from "lucide-react";
 import { Link } from "react-router";
 
 export function OverviewPage() {

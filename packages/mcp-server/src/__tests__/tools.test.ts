@@ -542,7 +542,7 @@ describe("MCP tools registration", () => {
 // Helper to extract registered tools from McpServer internals
 function getRegisteredTools(server: McpServer): Map<string, { handler: (args: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> }> {
   // McpServer stores tools in a private map. We access them via the internal structure.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const serverAny = server as any;
   const toolHandlers = serverAny._registeredTools ?? serverAny._tools;
 
@@ -553,7 +553,7 @@ function getRegisteredTools(server: McpServer): Map<string, { handler: (args: Re
   const result = new Map<string, { handler: (args: Record<string, unknown>) => Promise<{ content: Array<{ type: string; text: string }>; isError?: boolean }> }>();
 
   for (const [name, entry] of Object.entries(toolHandlers)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     const e = entry as any;
     result.set(name, {
       handler: async (args: Record<string, unknown>) => {

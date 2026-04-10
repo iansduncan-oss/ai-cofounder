@@ -118,6 +118,10 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
 export function useStreamChat() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const abortRef = useRef<AbortController | null>(null);
+  // Track isStreaming via ref so the callback can read latest value
+  // without being re-created on every state change (would lose closure stability)
+  const isStreamingRef = useRef(state.isStreaming);
+  isStreamingRef.current = state.isStreaming;
 
   const sendMessage = useCallback(
     async (message: string, conversationId?: string, userId?: string) => {
@@ -192,7 +196,7 @@ export function useStreamChat() {
         }
 
         // If stream ended without a done event
-        if (!controller.signal.aborted && state.isStreaming) {
+        if (!controller.signal.aborted && isStreamingRef.current) {
           dispatch({ type: "done" });
         }
       } catch (err) {

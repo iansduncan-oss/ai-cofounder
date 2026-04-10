@@ -21,7 +21,7 @@ import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { N8nService } from "./n8n.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./workspace.js";
-import { sendDailyBriefing, sendEveningWrapUp } from "./briefing.js";
+import { sendDailyBriefing } from "./briefing.js";
 import type { NotificationService } from "./notifications.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
 import type { AutonomyTierService } from "./autonomy-tier.js";
@@ -63,7 +63,6 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
     pollIntervalMs = 60_000,
     briefingHour = 8,
     briefingTimezone = "America/New_York",
-    eveningCheckinHour = 18,
     quietCheckinThresholdHours = 3,
   } = config;
 

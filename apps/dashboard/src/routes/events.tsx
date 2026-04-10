@@ -28,7 +28,7 @@ export function EventsPage() {
 
   const { data, isLoading, error, refetch } = useEvents(filters);
   const reprocess = useReprocessEvent();
-  const events = data?.data ?? [];
+  const events = useMemo(() => data?.data ?? [], [data]);
   const total = data?.total ?? 0;
 
   // Derive unique sources/types for filter dropdowns

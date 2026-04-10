@@ -796,7 +796,7 @@ export function registerCommands(app: App): void {
   const dmThreadMap = new Map<string, { threadTs: string; lastActivity: number }>();
   const THREAD_WINDOW_MS = 30 * 60 * 1000; // 30 minutes
 
-  function getOrCreateThread(channel: string, messageTs: string): string {
+  function _getOrCreateThread(channel: string, messageTs: string): string {
     const existing = dmThreadMap.get(channel);
     const now = Date.now();
 

@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Bot, CheckCircle, XCircle, Wrench } from "lucide-react";
+import { Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const ROLE_COLORS: Record<string, string> = {
