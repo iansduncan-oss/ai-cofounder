@@ -1039,6 +1039,12 @@ export interface ProductivityStats {
   }[];
 }
 
+export interface ProductivityWeeklySummary {
+  summary: string;
+  stats: ProductivityStats;
+  entryCount: number;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

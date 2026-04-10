@@ -7,6 +7,9 @@ import {
   getProductivityStats,
   deleteProductivityLog,
 } from "@ai-cofounder/db";
+import { createLogger } from "@ai-cofounder/shared";
+
+const logger = createLogger("productivity-routes");
 
 const PlannedItem = Type.Object({
   text: Type.String(),
@@ -100,6 +103,65 @@ export async function productivityRoutes(app: FastifyInstance): Promise<void> {
     const userId = (request.user as { sub: string }).sub;
     const { days } = request.query as { days?: string };
     return getProductivityStats(app.db, userId, days ? Number(days) : 30);
+  });
+
+  // GET /api/productivity/weekly — LLM-generated weekly reflection
+  app.get("/weekly", async (request) => {
+    const userId = (request.user as { sub: string }).sub;
+    const stats = await getProductivityStats(app.db, userId, 7);
+    const logs = await listProductivityLogs(app.db, userId, { limit: 7 });
+
+    // Build a compact data summary for the LLM
+    const entries = logs.data.map((l) => {
+      const items = (l.plannedItems as { text: string; completed: boolean }[] | null) ?? [];
+      const done = items.filter((i) => i.completed).map((i) => i.text);
+      const missed = items.filter((i) => !i.completed).map((i) => i.text);
+      return {
+        date: l.date,
+        mood: l.mood,
+        energy: l.energyLevel,
+        completion: l.completionScore,
+        done,
+        missed,
+        highlights: l.highlights,
+        blockers: l.blockers,
+      };
+    });
+
+    const prompt = [
+      "Generate a weekly productivity reflection based on the last 7 days of data.",
+      "Tone: Jarvis from Iron Man — composed, British, measured. Address the user as 'sir'.",
+      "Structure: (1) one-line overall summary, (2) wins and patterns, (3) areas to watch, (4) one actionable suggestion for next week.",
+      "Keep it under 400 words. Use markdown.",
+      "",
+      `**Stats:** ${stats.totalDays} days tracked, ${stats.avgCompletion}% avg completion, ${stats.avgEnergy}/5 avg energy, current streak: ${stats.currentStreak} day(s)`,
+      `**Mood distribution:** ${JSON.stringify(stats.moodCounts)}`,
+      "",
+      "**Daily entries:**",
+      JSON.stringify(entries, null, 2),
+    ].join("\n");
+
+    try {
+      const response = await app.llmRegistry.complete("simple", {
+        system:
+          "You are Jarvis, a composed British AI assistant helping the user reflect on their week. " +
+          "Be insightful, honest, and constructive. No exclamation marks.",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 1024,
+      });
+      const text = response.content
+        .filter((b): b is { type: "text"; text: string } => b.type === "text")
+        .map((b) => b.text)
+        .join("\n");
+      return { summary: text, stats, entryCount: entries.length };
+    } catch (err) {
+      logger.warn({ err }, "weekly summary LLM call failed");
+      return {
+        summary: `**Weekly Summary (${entries.length} days)**\nAvg completion: ${stats.avgCompletion}%\nCurrent streak: ${stats.currentStreak} day(s)`,
+        stats,
+        entryCount: entries.length,
+      };
+    }
   });
 
   // DELETE /api/productivity/:id — delete a log

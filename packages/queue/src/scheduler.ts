@@ -237,6 +237,22 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled daily follow-up reminders");
 
+  // ── Productivity check-in nudge (daily at 10 AM, 1h after briefing) ──
+
+  const nudgeHour = (briefingHour + 1) % 24;
+  await monitoringQueue.upsertJobScheduler(
+    "productivity-nudge",
+    {
+      pattern: `0 ${nudgeHour} * * *`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "productivity-nudge",
+      data: { check: "productivity_nudge" } satisfies MonitoringJob,
+    },
+  );
+  logger.info({ hour: nudgeHour, tz: briefingTimezone }, "Scheduled daily productivity nudge");
+
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
   const meetingPrepQueue = getMeetingPrepQueue();

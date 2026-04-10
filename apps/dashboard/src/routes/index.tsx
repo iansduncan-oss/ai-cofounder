@@ -132,6 +132,9 @@ const RegisterPage = lazy(() =>
 const ProductivityPage = lazy(() =>
   import("./productivity").then((m) => ({ default: m.ProductivityPage })),
 );
+const ProductivityHistoryPage = lazy(() =>
+  import("./productivity-history").then((m) => ({ default: m.ProductivityHistoryPage })),
+);
 
 export const router = createBrowserRouter([
   {
@@ -190,6 +193,7 @@ export const router = createBrowserRouter([
       { path: "self-healing", element: <SelfHealingPage /> },
       { path: "workspaces", element: <WorkspacesPage /> },
       { path: "productivity", element: <ProductivityPage /> },
+      { path: "productivity/history", element: <ProductivityHistoryPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

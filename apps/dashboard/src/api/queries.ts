@@ -590,3 +590,12 @@ export function useProductivityHistory(opts?: { limit?: number; from?: string; t
     queryFn: () => apiClient.getProductivityHistory(opts),
   });
 }
+
+export function useProductivityWeekly(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.productivity.weekly,
+    queryFn: () => apiClient.getProductivityWeekly(),
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes — LLM call is expensive
+  });
+}

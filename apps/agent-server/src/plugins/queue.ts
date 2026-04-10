@@ -134,6 +134,30 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "productivity_nudge": {
+          const { getPrimaryAdminUserId, getProductivityLog } = await import("@ai-cofounder/db");
+          const adminUserId = await getPrimaryAdminUserId(app.db);
+          if (!adminUserId) break;
+          const today = new Date().toISOString().slice(0, 10);
+          const existing = await getProductivityLog(app.db, adminUserId, today);
+          // Skip if already checked in today
+          if (existing && (existing.plannedItems as unknown[] | null)?.length) {
+            logger.info({ date: today }, "productivity nudge skipped — user already checked in");
+            break;
+          }
+          const { getNotificationQueue } = await import("@ai-cofounder/queue");
+          const notifQueue = getNotificationQueue();
+          await notifQueue.add("productivity-nudge", {
+            channel: "all",
+            type: "info",
+            title: "Daily Check-in",
+            message:
+              "Good morning, sir. What are you planning to tackle today? " +
+              "Reply here with your plan, or visit the dashboard: /dashboard/productivity",
+          });
+          logger.info({ date: today }, "productivity nudge sent");
+          break;
+        }
         case "discord_hourly_digest": {
           try {
             const { DiscordDigestService } = await import("../services/discord-digest.js");

@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router";
 import {
   Flame,
   Plus,
@@ -13,6 +14,7 @@ import {
   Moon,
   CloudRain,
   SmilePlus,
+  History,
 } from "lucide-react";
 import { useProductivityToday, useProductivityStats } from "@/api/queries";
 import { useUpsertProductivity } from "@/api/mutations";
@@ -111,6 +113,13 @@ export function ProductivityPage() {
             <span className="text-sm font-bold text-amber-600">{streakDays}</span>
             <span className="text-xs text-muted-foreground">day streak</span>
           </div>
+          <Link
+            to="/dashboard/productivity/history"
+            className="flex items-center gap-1.5 rounded-md border bg-card px-3 py-1.5 text-sm font-medium hover:bg-accent"
+          >
+            <History className="h-4 w-4" />
+            History
+          </Link>
         </div>
       </div>
 

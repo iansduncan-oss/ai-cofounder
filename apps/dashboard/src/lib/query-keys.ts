@@ -194,6 +194,7 @@ export const queryKeys = {
     today: ["productivity", "today"] as const,
     history: (params?: string) => ["productivity", "history", params ?? ""] as const,
     stats: (days?: number) => ["productivity", "stats", days ?? 30] as const,
+    weekly: ["productivity", "weekly"] as const,
   },
   knowledge: {
     all: ["knowledge"] as const,

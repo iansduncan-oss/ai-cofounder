@@ -100,6 +100,7 @@ export type {
   ProductivityLog,
   UpsertProductivityInput,
   ProductivityStats,
+  ProductivityWeeklySummary,
   ThinkingTrace,
   ReflectionType,
   ReflectionLesson,

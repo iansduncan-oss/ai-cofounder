@@ -83,6 +83,7 @@ import type {
   ProductivityLog,
   UpsertProductivityInput,
   ProductivityStats,
+  ProductivityWeeklySummary,
   GlobalSearchResults,
   DeployCircuitBreakerStatus,
   ThinkingTrace,
@@ -1479,6 +1480,10 @@ export class ApiClient {
   getProductivityStats(days?: number) {
     const q = days ? `?days=${days}` : "";
     return this.request<ProductivityStats>("GET", `/api/productivity/stats${q}`);
+  }
+
+  getProductivityWeekly() {
+    return this.request<ProductivityWeeklySummary>("GET", "/api/productivity/weekly");
   }
 
   deleteProductivityLog(id: string) {
