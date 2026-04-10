@@ -9,9 +9,17 @@ import {
 } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 import { generateDailyPlan } from "../services/auto-planner.js";
-import { syncProductivityPlan } from "../services/plan-sync.js";
+import { syncProductivityPlan, PlanSyncScheduler } from "../services/plan-sync.js";
 
 const logger = createLogger("productivity-routes");
+
+declare module "fastify" {
+  interface FastifyInstance {
+    /** Debounced sync scheduler. Call `app.planSync.schedule()` after any work completion
+     *  to trigger a plan sync ~15s later (multiple calls collapse into one). */
+    planSync: PlanSyncScheduler;
+  }
+}
 
 const PlannedItem = Type.Object({
   text: Type.String(),
@@ -36,6 +44,61 @@ const UpsertBody = Type.Object({
 type UpsertBody = Static<typeof UpsertBody>;
 
 export async function productivityRoutes(app: FastifyInstance): Promise<void> {
+  // Install debounced sync scheduler (lazy singleton per-app)
+  if (!app.planSync) {
+    const scheduler = new PlanSyncScheduler(async () => {
+      try {
+        const result = await syncProductivityPlan(app.db, app.llmRegistry, { lookbackMinutes: 15 });
+        if (result.skipped) return;
+        const changed = result.autoCompleted.length > 0 || result.itemsAdded.length > 0;
+        if (changed) {
+          app.wsBroadcast?.("productivity");
+        }
+
+        // Dynamic replanning: if the plan is empty or nearly done and there's time left, auto-generate more
+        if (result.needsReplan) {
+          logger.info({ date: result.date }, "plan complete — auto-generating top-up");
+          const replan = await generateDailyPlan(app.db, app.llmRegistry, { merge: true });
+          if (!replan.skipped && replan.plannedItems.length > 0) {
+            app.wsBroadcast?.("productivity");
+          }
+        }
+
+        // Only notify if sync explicitly marked it shouldNotify (cooldown respected) AND something meaningful happened
+        if (changed && result.shouldNotify) {
+          const { getNotificationQueue } = await import("@ai-cofounder/queue");
+          const parts: string[] = [];
+          if (result.autoCompleted.length > 0) {
+            parts.push(`**${result.autoCompleted.length} auto-completed:**`);
+            for (const c of result.autoCompleted.slice(0, 3)) {
+              parts.push(`  [x] ${c.itemText}`);
+            }
+          }
+          if (result.itemsAdded.length > 0) {
+            parts.push(`**${result.itemsAdded.length} added:**`);
+            for (const a of result.itemsAdded.slice(0, 3)) {
+              parts.push(`  - ${a.text}`);
+            }
+          }
+          if (result.completionScore != null) {
+            parts.push(`\n_Completion: ${result.completionScore}%_`);
+          }
+          await getNotificationQueue().add("productivity-sync", {
+            channel: "all",
+            type: "info",
+            title: "Plan updated",
+            message: parts.join("\n"),
+          });
+        }
+      } catch (err) {
+        logger.warn({ err }, "debounced plan sync failed");
+      }
+    }, 15_000);
+
+    app.decorate("planSync", scheduler);
+    app.addHook("onClose", async () => scheduler.cancel());
+  }
+
   // PUT /api/productivity — upsert today's log (check-in or reflection)
   app.put<{ Body: UpsertBody }>("/", { schema: { body: UpsertBody } }, async (request) => {
     const userId = (request.user as { sub: string }).sub;
@@ -117,6 +180,41 @@ export async function productivityRoutes(app: FastifyInstance): Promise<void> {
     const result = await generateDailyPlan(app.db, app.llmRegistry, { force, merge });
     app.wsBroadcast?.("productivity");
     return result;
+  });
+
+  // GET /api/productivity/next — return the next incomplete plan item with context.
+  // If the plan is empty or all done, auto-generates a plan (merge mode).
+  app.get("/next", async (request) => {
+    const userId = (request.user as { sub: string }).sub;
+    const today = new Date().toISOString().slice(0, 10);
+    let log = await getProductivityLog(app.db, userId, today);
+
+    const pending = (log?.plannedItems as Array<{ text: string; completed: boolean }> | null ?? []).filter((i) => !i.completed);
+
+    if (pending.length === 0) {
+      // Auto-replan on the fly
+      logger.info({ date: today }, "no pending items — auto-generating plan for /next");
+      const replan = await generateDailyPlan(app.db, app.llmRegistry, { merge: true });
+      if (!replan.skipped && replan.plannedItems.length > 0) {
+        log = await getProductivityLog(app.db, userId, today);
+      }
+    }
+
+    const updatedPending = (log?.plannedItems as Array<{ text: string; completed: boolean }> | null ?? []).filter((i) => !i.completed);
+    const next = updatedPending[0] ?? null;
+    const totalItems = (log?.plannedItems as Array<unknown> | null ?? []).length;
+    const completedCount = totalItems - updatedPending.length;
+
+    return {
+      date: today,
+      next,
+      remaining: updatedPending.length,
+      total: totalItems,
+      completed: completedCount,
+      completionScore: log?.completionScore ?? null,
+      streakDays: log?.streakDays ?? 0,
+      allDone: updatedPending.length === 0 && totalItems > 0,
+    };
   });
 
   // POST /api/productivity/sync — auto-mark completed items and top up with new urgent work

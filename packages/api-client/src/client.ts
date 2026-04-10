@@ -86,6 +86,7 @@ import type {
   ProductivityWeeklySummary,
   AutoPlanResult,
   PlanSyncResult,
+  NextTaskResult,
   CodebaseInsight,
   CodebaseScanResult,
   InsightCategory,
@@ -1499,6 +1500,10 @@ export class ApiClient {
 
   syncProductivityPlan(opts?: { lookbackMinutes?: number; topUp?: boolean }) {
     return this.request<PlanSyncResult>("POST", "/api/productivity/sync", opts ?? {});
+  }
+
+  getProductivityNext() {
+    return this.request<NextTaskResult>("GET", "/api/productivity/next");
   }
 
   /* ── Codebase Insights ── */

@@ -591,6 +591,15 @@ export function useProductivityHistory(opts?: { limit?: number; from?: string; t
   });
 }
 
+export function useProductivityNext() {
+  return useQuery({
+    queryKey: ["productivity", "next"] as const,
+    queryFn: () => apiClient.getProductivityNext(),
+    // Don't refetch on every render — live-update via WS productivity channel
+    staleTime: 30_000,
+  });
+}
+
 export function useProductivityWeekly(enabled = true) {
   return useQuery({
     queryKey: queryKeys.productivity.weekly,

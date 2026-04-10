@@ -28,6 +28,7 @@ export {
   handleAudit,
   handleReflect,
   handleStreak,
+  handleNext,
   truncate,
 } from "./handlers.js";
 

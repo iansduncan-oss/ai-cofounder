@@ -25,8 +25,61 @@ export interface SyncResult {
   autoCompleted: Array<{ itemText: string; reason: string }>;
   itemsAdded: Array<{ text: string; reason: string }>;
   completionScore: number | null;
+  /** True if the plan is now empty or nearly empty — caller should consider auto-replanning. */
+  needsReplan?: boolean;
+  /** True if a user notification is allowed (cooldown has elapsed AND something meaningful changed). */
+  shouldNotify?: boolean;
   skipped?: boolean;
   reason?: string;
+}
+
+/**
+ * Debounced trigger for plan sync. Call `schedule()` from any code path that
+ * just completed work (task complete, follow-up done, commit, etc.) and a
+ * sync will run after a short quiet period. Multiple calls collapse into one.
+ */
+export class PlanSyncScheduler {
+  private timer: NodeJS.Timeout | null = null;
+  private running = false;
+  private onTick: () => Promise<void>;
+  private readonly debounceMs: number;
+
+  constructor(onTick: () => Promise<void>, debounceMs = 15_000) {
+    this.onTick = onTick;
+    this.debounceMs = debounceMs;
+  }
+
+  schedule(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+    }
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.fire().catch((err) => {
+        logger.warn({ err }, "debounced plan sync failed");
+      });
+    }, this.debounceMs);
+    // Don't keep the process alive for this
+    this.timer.unref?.();
+  }
+
+  /** Cancel any pending sync. */
+  cancel(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  private async fire(): Promise<void> {
+    if (this.running) return; // already running; its completion will pick up any new state
+    this.running = true;
+    try {
+      await this.onTick();
+    } finally {
+      this.running = false;
+    }
+  }
 }
 
 /** Token overlap scoring for fuzzy matching. 0..1. */
@@ -81,6 +134,21 @@ export interface PlanSyncOptions {
   lookbackMinutes?: number;
   /** Also add new urgent items (overdue follow-ups, high-severity insights) to today's plan. Default true. */
   topUp?: boolean;
+}
+
+/** Minimum gap between user-facing sync notifications (ms). */
+const NOTIFICATION_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Check if enough time has passed since the last sync notification to send another.
+ * Also records the current time if allowed.
+ */
+export function shouldSendSyncNotification(metadata: Record<string, unknown> | null | undefined): boolean {
+  const last = metadata?.lastSyncNotificationAt;
+  if (typeof last !== "string") return true;
+  const lastTime = new Date(last).getTime();
+  if (Number.isNaN(lastTime)) return true;
+  return Date.now() - lastTime >= NOTIFICATION_COOLDOWN_MS;
 }
 
 /**
@@ -211,11 +279,14 @@ export async function syncProductivityPlan(
 
   // Nothing changed → early exit, don't write
   if (autoCompleted.length === 0 && itemsAdded.length === 0) {
+    const done = currentItems.filter((i) => i.completed).length;
+    const remaining = currentItems.length - done;
     return {
       date: today,
       autoCompleted: [],
       itemsAdded: [],
       completionScore: log.completionScore ?? null,
+      needsReplan: remaining === 0 || (remaining <= 1 && currentItems.length >= 3),
     };
   }
 
@@ -223,16 +294,30 @@ export async function syncProductivityPlan(
   const done = currentItems.filter((i) => i.completed).length;
   const completionScore = currentItems.length > 0 ? Math.round((done / currentItems.length) * 100) : 0;
 
+  // Decide whether to notify — only if something meaningful changed AND cooldown has elapsed
+  const prevMeta = (log.metadata as Record<string, unknown> | null) ?? {};
+  const shouldNotify = shouldSendSyncNotification(prevMeta);
+  const newMeta: Record<string, unknown> = { ...prevMeta };
+  if (shouldNotify) {
+    newMeta.lastSyncNotificationAt = new Date().toISOString();
+  }
+
   await upsertProductivityLog(db, {
     userId: adminUserId,
     date: today,
     plannedItems: currentItems,
     completionScore,
     streakDays: log.streakDays,
+    metadata: newMeta,
   });
 
+  // Does the plan need a top-up? Empty or one item left with hours to go.
+  const remaining = currentItems.length - done;
+  const hoursLeftInDay = 18 - new Date().getHours(); // EOD = 6 PM
+  const needsReplan = (remaining === 0 || (remaining <= 1 && currentItems.length >= 3)) && hoursLeftInDay >= 2;
+
   logger.info(
-    { date: today, autoCompleted: autoCompleted.length, itemsAdded: itemsAdded.length, completionScore },
+    { date: today, autoCompleted: autoCompleted.length, itemsAdded: itemsAdded.length, completionScore, needsReplan, shouldNotify },
     "plan sync complete",
   );
 
@@ -241,5 +326,7 @@ export async function syncProductivityPlan(
     autoCompleted,
     itemsAdded,
     completionScore,
+    needsReplan,
+    shouldNotify,
   };
 }

@@ -28,6 +28,7 @@ import {
   handleAudit,
   handleReflect,
   handleStreak,
+  handleNext,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -203,6 +204,11 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
     case "audit": {
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, await handleAudit(client));
+      return;
+    }
+    case "next": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleNext(client));
       return;
     }
     case "reflect": {

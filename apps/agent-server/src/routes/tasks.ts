@@ -106,6 +106,7 @@ export const taskRoutes: FastifyPluginAsync = async (app) => {
       const task = await completeTask(app.db, request.params.id, request.body.result);
       if (!task) return reply.status(404).send({ error: "Task not found" });
       app.wsBroadcast?.("tasks");
+      app.planSync?.schedule();
       return task;
     },
   );

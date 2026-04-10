@@ -1061,8 +1061,21 @@ export interface PlanSyncResult {
   autoCompleted: Array<{ itemText: string; reason: string }>;
   itemsAdded: Array<{ text: string; reason: string }>;
   completionScore: number | null;
+  needsReplan?: boolean;
+  shouldNotify?: boolean;
   skipped?: boolean;
   reason?: string;
+}
+
+export interface NextTaskResult {
+  date: string;
+  next: PlannedItem | null;
+  remaining: number;
+  total: number;
+  completed: number;
+  completionScore: number | null;
+  streakDays: number;
+  allDone: boolean;
 }
 
 /* ── Codebase Insights ── */

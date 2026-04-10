@@ -80,6 +80,9 @@ export async function followUpRoutes(app: FastifyInstance): Promise<void> {
     });
     if (!row) return reply.status(404).send({ error: "Follow-up not found" });
     app.wsBroadcast?.("follow-ups");
+    if (status === "done") {
+      app.planSync?.schedule();
+    }
     return row;
   });
 

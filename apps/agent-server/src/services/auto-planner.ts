@@ -110,14 +110,29 @@ async function gatherContext(db: Db, adminUserId: string): Promise<GatheredConte
 
 function buildPlanPrompt(ctx: GatheredContext): string {
   const lines: string[] = [];
-  lines.push("Generate a focused daily plan of 3-5 specific tasks for today.");
+  const now = new Date();
+  const hour = now.getHours();
+  const hoursUntilEod = Math.max(0, 18 - hour); // EOD = 6 PM
+  const timeOfDay = hour < 11 ? "early morning" : hour < 14 ? "mid-day" : hour < 17 ? "afternoon" : "late afternoon/evening";
+
+  // Scale task count by time remaining. Early morning: 4-5, mid-day: 3-4, afternoon: 2-3, late: 1-2
+  let targetCount: string;
+  if (hoursUntilEod >= 7) targetCount = "4-5";
+  else if (hoursUntilEod >= 4) targetCount = "3-4";
+  else if (hoursUntilEod >= 2) targetCount = "2-3";
+  else targetCount = "1-2";
+
+  lines.push(`Generate a focused daily plan of ${targetCount} specific tasks for today.`);
+  lines.push(`Current time: ${timeOfDay} (${hour}:00). Hours until end of workday: ${hoursUntilEod}.`);
   lines.push("");
   lines.push("Rules:");
   lines.push("- Each task must be specific and finishable in under 2 hours");
   lines.push('- NO vague items like "work on X" — use verbs like Ship, Review, Draft, Fix');
-  lines.push("- If the user has many meetings, pick fewer tasks (aim for 3 on heavy meeting days)");
+  lines.push("- Scale to the time remaining: fewer, smaller tasks when fewer hours are left");
+  lines.push("- If the user has many meetings, pick fewer tasks (aim for the lower end of the range)");
   lines.push("- Prioritize overdue follow-ups and critical/high priority goal work");
   lines.push("- Respect yesterday's blockers — if a task was blocked, suggest a different angle or an unblocking action");
+  lines.push(`- If it's ${timeOfDay}, bias toward tasks that can be completed in ${hoursUntilEod} hour(s) or less`);
   lines.push("");
   lines.push("Output a JSON object exactly like this, nothing else:");
   lines.push('{"items": ["Task 1", "Task 2", "Task 3"], "reasoning": "One sentence explaining priorities"}');

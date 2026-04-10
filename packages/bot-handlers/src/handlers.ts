@@ -827,6 +827,33 @@ export async function handleAutoPlan(
 }
 
 /**
+ * /next — show the next incomplete task with context. Auto-replans if plan is empty.
+ */
+export async function handleNext(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const result = await client.getProductivityNext();
+    if (!result.next) {
+      return {
+        type: "info",
+        message: result.allDone
+          ? `**All done for today.** ${result.completed}/${result.total} complete. Streak: ${result.streakDays} day(s). _Use \`/reflect\` to log highlights._`
+          : `_No plan for today yet. Use \`/plan\` or \`/autoplan\` to get started._`,
+      };
+    }
+    const progress = result.total > 0 ? `${result.completed}/${result.total}` : "0/0";
+    return {
+      type: "info",
+      message:
+        `**Next up:**\n` +
+        `  → ${result.next.text}\n\n` +
+        `_Progress: ${progress}${result.completionScore != null ? ` (${result.completionScore}%)` : ""} · ${result.remaining} remaining · streak: ${result.streakDays} day(s)_`,
+    };
+  } catch (err) {
+    return { type: "error", message: `Failed to fetch next task: ${(err as Error).message}` };
+  }
+}
+
+/**
  * /streak — show current streak and today's progress.
  */
 export async function handleStreak(client: ApiClient): Promise<HandlerResult> {

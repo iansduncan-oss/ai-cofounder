@@ -23,8 +23,9 @@ import {
   X as XIcon,
   CheckCheck,
   ArrowDownToLine,
+  ChevronRight,
 } from "lucide-react";
-import { useProductivityToday, useProductivityStats, useProductivityWeekly, useCodebaseInsights } from "@/api/queries";
+import { useProductivityToday, useProductivityStats, useProductivityWeekly, useCodebaseInsights, useProductivityNext } from "@/api/queries";
 import { useUpsertProductivity, useAutoPlanProductivity, useScanCodebase, useUpdateInsightStatus, useSyncProductivityPlan } from "@/api/mutations";
 import type { PlannedItem, ProductivityMood, CodebaseInsight } from "@ai-cofounder/api-client";
 
@@ -52,6 +53,7 @@ export function ProductivityPage() {
   const syncPlan = useSyncProductivityPlan();
   const updateInsight = useUpdateInsightStatus();
   const { data: insightsData } = useCodebaseInsights("open");
+  const { data: nextUp } = useProductivityNext();
 
   const [showWeekly, setShowWeekly] = useState(false);
   const {
@@ -162,6 +164,58 @@ export function ProductivityPage() {
             <p className="text-xs text-muted-foreground">Current Streak</p>
             <p className="text-2xl font-bold">{stats.currentStreak}</p>
           </div>
+        </div>
+      )}
+
+      {/* Next up — single-focus spotlight for the next pending task */}
+      {nextUp && nextUp.next && !nextUp.allDone && (
+        <div className="rounded-lg border-2 border-primary/30 bg-primary/5 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <ChevronRight className="h-4 w-4 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-wide text-primary">Next up</span>
+                <span className="text-xs text-muted-foreground">
+                  {nextUp.completed}/{nextUp.total} complete
+                  {nextUp.completionScore != null && ` (${nextUp.completionScore}%)`}
+                </span>
+              </div>
+              <p className="text-base font-semibold">{nextUp.next.text}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {nextUp.remaining} remaining · streak: {nextUp.streakDays} day(s)
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                // Mark the next item complete inline
+                const updated = plannedItems.map((item, i) =>
+                  i === plannedItems.findIndex((p) => !p.completed && p.text === nextUp.next?.text)
+                    ? { ...item, completed: true }
+                    : item,
+                );
+                upsert.mutate({ date: today, plannedItems: updated });
+              }}
+              className="ml-4 flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              <Check className="h-4 w-4" /> Mark done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* All-done celebration */}
+      {nextUp && nextUp.allDone && (
+        <div className="rounded-lg border-2 border-emerald-500/30 bg-emerald-500/5 p-4 text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Check className="h-4 w-4 text-emerald-600" />
+            <span className="text-xs font-semibold uppercase tracking-wide text-emerald-600">All done</span>
+          </div>
+          <p className="text-sm">
+            {nextUp.completed}/{nextUp.total} complete today. Streak: {nextUp.streakDays} day(s).
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use the <span className="font-mono">Add suggestions</span> button to pull in more work, or end the day with a reflection.
+          </p>
         </div>
       )}
 
