@@ -8,8 +8,9 @@ At the **start** of each session:
 1. Read `.claude/primer.md` for context from the previous session
 2. Read `.claude/git-state.md` for current repository state (includes staleness warnings and session metadata)
 3. Read `.claude/commit-log.md` for recent commit history
-4. If git-state.md has **staleness warnings**, mention them proactively to the user
-5. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
+4. Read `.claude/agent-memories.md` if it exists — auto-generated memory snapshot from Jarvis's DB (memory bridge v2). Describes the user, durable project context, and technical gotchas. Refresh it with `npm run memory-bridge:sync` whenever you suspect it's stale. If the file is missing, the agent-server may not be running; skip and note it to the user.
+5. If git-state.md has **staleness warnings**, mention them proactively to the user
+6. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
 
 At the **end** of each session (**MANDATORY** — always do this before the session ends):
 1. Completely rewrite `.claude/primer.md` with all sections below

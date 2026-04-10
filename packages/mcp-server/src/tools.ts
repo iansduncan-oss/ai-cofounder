@@ -793,6 +793,32 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     },
   );
 
+  // ── Memory Bridge (v2) ──
+
+  server.tool(
+    "sync_memory_bridge",
+    "Return the current Jarvis memory snapshot as markdown. Use at the start of a session to load durable context, or when the user asks 'what do you remember about X'. Ranks by importance + recency and groups by category.",
+    {
+      limit: z.number().optional().describe("Max memories to include (default 40)"),
+      perCategoryLimit: z.number().optional().describe("Max memories per category (default 8)"),
+    },
+    async ({ limit, perCategoryLimit }) => {
+      try {
+        const snapshot = await client.getMemoryBridgeSnapshot({ limit, perCategoryLimit });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `_Snapshot: ${snapshot.includedCount} included, ${snapshot.excludedCount} excluded, generated ${snapshot.generatedAt}_\n\n${snapshot.markdown}`,
+            },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
   // ── Memory Management ──
 
   server.tool(

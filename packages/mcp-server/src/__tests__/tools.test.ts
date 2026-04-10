@@ -49,6 +49,7 @@ function createMockClient(): ApiClient {
     getVaultFile: vi.fn(),
     searchVault: vi.fn(),
     deleteMemory: vi.fn(),
+    getMemoryBridgeSnapshot: vi.fn(),
   } as unknown as ApiClient;
 }
 
@@ -82,6 +83,7 @@ describe("MCP tools registration", () => {
       "read_vault_file",
       "vault_search",
       "delete_memory",
+      "sync_memory_bridge",
       "get_provider_health",
       "rag_search",
     ];
@@ -509,6 +511,22 @@ describe("MCP tools registration", () => {
     const result = await tools.get("delete_memory")!.handler({ memoryId: "mem-1" });
     expect(client.deleteMemory).toHaveBeenCalledWith("mem-1");
     expect(result.content[0].text).toContain("Memory mem-1 deleted");
+  });
+
+  it("sync_memory_bridge calls getMemoryBridgeSnapshot and includes counts", async () => {
+    (client.getMemoryBridgeSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
+      markdown: "# Jarvis Memory Snapshot\n\n## Projects\n\n- **proj** — Shipped v2",
+      includedCount: 1,
+      excludedCount: 0,
+      generatedAt: "2026-04-09T12:00:00.000Z",
+      userId: "u-1",
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("sync_memory_bridge")!.handler({ limit: 20, perCategoryLimit: 5 });
+    expect(client.getMemoryBridgeSnapshot).toHaveBeenCalledWith({ limit: 20, perCategoryLimit: 5 });
+    expect(result.content[0].text).toContain("Snapshot: 1 included");
+    expect(result.content[0].text).toContain("Jarvis Memory Snapshot");
+    expect(result.content[0].text).toContain("proj");
   });
 
   it("handles errors gracefully", async () => {

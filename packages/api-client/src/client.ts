@@ -476,6 +476,23 @@ export class ApiClient {
     }>("GET", `/api/vault/search?${params}`);
   }
 
+  /* ── Memory Bridge (v2) ── */
+
+  getMemoryBridgeSnapshot(opts?: { userId?: string; limit?: number; perCategoryLimit?: number }) {
+    const params = new URLSearchParams();
+    if (opts?.userId) params.set("userId", opts.userId);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.perCategoryLimit != null) params.set("perCategoryLimit", String(opts.perCategoryLimit));
+    const qs = params.toString();
+    return this.request<{
+      markdown: string;
+      includedCount: number;
+      excludedCount: number;
+      generatedAt: string;
+      userId: string;
+    }>("GET", `/api/bridge/snapshot${qs ? `?${qs}` : ""}`);
+  }
+
   /* ── Milestones ── */
 
   createMilestone(data: {
