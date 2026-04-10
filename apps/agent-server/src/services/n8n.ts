@@ -52,17 +52,12 @@ export function createN8nService(): N8nService {
       }
 
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
         const response = await fetch(webhookUrl, {
           method: "POST",
           headers,
           body: JSON.stringify(payload),
-          signal: controller.signal,
+          signal: AbortSignal.timeout(timeoutMs),
         });
-
-        clearTimeout(timeout);
 
         const statusCode = response.status;
         let data: unknown;
@@ -103,15 +98,10 @@ export function createN8nService(): N8nService {
 
         const url = `${baseUrl}/api/v1/executions${params.toString() ? `?${params.toString()}` : ""}`;
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 10000);
-
         const response = await fetch(url, {
           headers: { "X-N8N-API-KEY": apiKey },
-          signal: controller.signal,
+          signal: AbortSignal.timeout(10000),
         });
-
-        clearTimeout(timeout);
 
         if (!response.ok) {
           logger.error({ status: response.status }, "n8n listExecutions request failed");

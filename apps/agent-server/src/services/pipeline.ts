@@ -133,9 +133,9 @@ export class PipelineExecutor {
     const anyCompleted = stageResults.some((r) => r.status === "completed");
 
     if (allCompleted) {
-      await updateGoalStatus(this.db, goalId, "completed").catch(() => {});
+      await updateGoalStatus(this.db, goalId, "completed").catch((err) => logger.warn({ err }, "goal status update failed"));
     } else if (!anyCompleted) {
-      await updateGoalStatus(this.db, goalId, "cancelled").catch(() => {});
+      await updateGoalStatus(this.db, goalId, "cancelled").catch((err) => logger.warn({ err }, "goal status update failed"));
     }
 
     const pipelineStatus = allCompleted ? "completed" : anyCompleted ? "partial" : "failed";
@@ -147,7 +147,7 @@ export class PipelineExecutor {
         .sendBriefing(
           `**Pipeline ${pipelineId}** ${pipelineStatus}: ${completedStages}/${stages.length} stages completed`,
         )
-        .catch(() => {});
+        .catch((err) => logger.warn({ err }, "pipeline event write failed"));
     }
 
     // Write journal entry for content_pipeline
@@ -163,7 +163,7 @@ export class PipelineExecutor {
           stageResults: stageResults.map((r) => ({ agent: r.agent, status: r.status })),
           templateName: (context as Record<string, unknown>).templateName,
         },
-      }).catch(() => {});
+      }).catch((err) => logger.warn({ err }, "pipeline event write failed"));
     }
 
     // Auto-trigger n8n workflow for templates that specify one

@@ -199,7 +199,7 @@ export class SubagentRunner {
               success,
               errorMessage: success ? undefined : "tool returned error",
               requestId: params.parentRequestId,
-            }).catch(() => {});
+            }).catch((err) => logger.warn({ err }, "subagent journal entry failed"));
 
             await this.publishProgress(params.subagentRunId, {
               subagentRunId: params.subagentRunId,

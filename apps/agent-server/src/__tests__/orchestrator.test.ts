@@ -396,8 +396,9 @@ describe("Orchestrator", () => {
       const orchestrator = new Orchestrator({ registry, db: {} as any });
       const result = await orchestrator.run("do something weird");
 
-      // Should not crash, should return a response
-      expect(result.response).toBeDefined();
+      // Should not crash, should return a response with the text content from the second LLM call
+      expect(result.response).toBe("Sorry, that tool doesn't exist");
+      expect(mockComplete).toHaveBeenCalledTimes(2);
     });
   });
 

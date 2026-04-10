@@ -243,9 +243,10 @@ describe("executeWithTierCheck", () => {
       { db: mockDb, autonomyTierService: service },
       mockContext,
     );
-    // search_web returns results or handles gracefully
-    expect(result).toBeDefined();
-    // No approval should have been created
+    // search_web returns results or handles gracefully — it should NOT be blocked as red-tier
+    expect(result).not.toHaveProperty("error", expect.stringContaining("red tier"));
+    expect(typeof result).toBe("object");
+    // No approval should have been created (green tier bypasses approval)
     expect(mockCreateApproval).not.toHaveBeenCalled();
   });
 

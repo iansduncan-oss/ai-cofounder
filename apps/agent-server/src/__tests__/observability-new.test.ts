@@ -221,7 +221,8 @@ describe("Request Tracing", () => {
     });
     await app.close();
 
-    expect(res.headers["x-request-id"]).toBeDefined();
+    expect(typeof res.headers["x-request-id"]).toBe("string");
+    expect((res.headers["x-request-id"] as string).length).toBeGreaterThan(0);
   });
 });
 

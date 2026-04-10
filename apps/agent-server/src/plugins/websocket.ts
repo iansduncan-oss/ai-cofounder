@@ -71,7 +71,8 @@ export const websocketPlugin = fp(async (app) => {
   // Each WebSocket connection adds a close listener to the WS server. Under load
   // (or in tests with many connections) this exceeds the default limit of 10.
   if (app.websocketServer) {
-    app.websocketServer.setMaxListeners(0);
+    // Set a generous but bounded limit instead of disabling the leak warning entirely
+    app.websocketServer.setMaxListeners(200);
   }
 
   // Heartbeat: ping every 30s, drop dead connections after 10s grace

@@ -78,7 +78,7 @@ export class DeployCircuitBreakerService {
         `Resume manually via \`POST /api/deploys/circuit-breaker/resume\` or the dashboard.`,
       ].filter(Boolean).join("\n");
 
-      await this.notificationService.sendBriefing(message).catch(() => {});
+      await this.notificationService.sendBriefing(message).catch((err) => logger.warn({ err }, "circuit breaker notification failed"));
     }
   }
 
@@ -106,7 +106,7 @@ export class DeployCircuitBreakerService {
 
     await this.notificationService.sendBriefing(
       `**Deploy Circuit Breaker Resumed**\nAuto-deploys have been re-enabled${resumedBy ? ` by ${resumedBy}` : ""}.`,
-    ).catch(() => {});
+    ).catch((err) => logger.warn({ err }, "circuit breaker event write failed"));
   }
 
   async getStatus(): Promise<CircuitBreakerStatus> {

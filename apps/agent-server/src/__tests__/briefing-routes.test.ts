@@ -273,7 +273,8 @@ describe("Briefing routes", () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.sent).toBe(true);
-      expect(body.briefing).toBeDefined();
+      expect(typeof body.briefing).toBe("string");
+      expect(body.briefing.length).toBeGreaterThan(0);
     });
 
     it("includes cost data in briefing data", async () => {

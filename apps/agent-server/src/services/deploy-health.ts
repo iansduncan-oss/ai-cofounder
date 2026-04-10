@@ -84,7 +84,7 @@ export class DeployHealthService {
 
       await this.notificationService.sendBriefing(
         `✅ Deploy \`${commitSha.slice(0, 7)}\` verified healthy. All services passing health checks.`,
-      ).catch(() => {});
+      ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
     } else {
       logger.warn({ deploymentId, checks }, "deploy health check failed");
       await this.handleDeployFailure(deploymentId, commitSha, previousSha, checks);
@@ -128,7 +128,7 @@ export class DeployHealthService {
         logger.info({ deploymentId }, "deploy recovered after remediation");
         await this.notificationService.sendBriefing(
           `🔧 Deploy \`${commitSha.slice(0, 7)}\` recovered after remediation.`,
-        ).catch(() => {});
+        ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
         return;
       }
     }
@@ -174,7 +174,7 @@ export class DeployHealthService {
       rootCause,
     ].join("\n");
 
-    await this.notificationService.sendBriefing(message).catch(() => {});
+    await this.notificationService.sendBriefing(message).catch((err) => logger.warn({ err }, "deploy health notification failed"));
   }
 
   /**
@@ -244,7 +244,7 @@ export class DeployHealthService {
     } else if (soakStatus === "degraded") {
       await this.notificationService.sendBriefing(
         `⚠️ Deploy \`${commitSha.slice(0, 7)}\` soak test shows degradation: ${failedChecks.length} failed checks, avg latency ${Math.round(avgLatency)}ms${hasElevatedRestarts ? ", container restarts detected" : ""}.`,
-      ).catch(() => {});
+      ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
     }
   }
 

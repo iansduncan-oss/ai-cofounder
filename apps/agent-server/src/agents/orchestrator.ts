@@ -449,7 +449,7 @@ export class Orchestrator {
             requestId: this.requestId,
             round,
             content: block.thinking,
-          }).catch(() => {}); // fire-and-forget
+          }).catch((err) => this.logger.warn({ err }, "thinking trace save failed")); // fire-and-forget
         }
         continue; // Filter out thinking blocks
       }
@@ -469,7 +469,7 @@ export class Orchestrator {
               requestId: this.requestId,
               round,
               content: tb,
-            }).catch(() => {});
+            }).catch((err) => this.logger.warn({ err }, "thinking trace save failed"));
           }
         }
         const stripped = block.text.replace(thinkingRegex, "").trim();
@@ -1211,7 +1211,7 @@ export class Orchestrator {
       taskId: "ad-hoc",
       reason: `Destructive tool "${toolName}" needs your approval before it can execute.`,
       requestedBy: "orchestrator",
-    }).catch(() => {});
+    }).catch((err) => this.logger.warn({ err }, "approval notification failed"));
 
     return {
       approved: false,
@@ -1310,7 +1310,7 @@ export class Orchestrator {
           taskId: input.task_id,
           reason: input.reason,
           requestedBy: "orchestrator",
-        }).catch(() => {});
+        }).catch((err) => this.logger.warn({ err }, "approval notification failed"));
         return {
           approvalId: approval.id,
           status: "pending",

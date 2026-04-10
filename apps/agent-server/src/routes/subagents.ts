@@ -132,7 +132,7 @@ export async function subagentRoutes(app: FastifyInstance): Promise<void> {
         if (cleanedUp) return;
         cleanedUp = true;
         app.agentEvents.off(channel, onMessage);
-        app.unsubscribeSubagent(subagentRunId).catch(() => {});
+        app.unsubscribeSubagent(subagentRunId).catch((err) => logger.warn({ err }, "subagent unsubscribe failed"));
         if (!reply.raw.writableEnded) reply.raw.end();
       };
 
