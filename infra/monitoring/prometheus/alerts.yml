@@ -212,3 +212,95 @@ groups:
         annotations:
           summary: "High HTTP latency on agent-server"
           description: "p99 HTTP latency is {{ $value | humanize }}s (threshold: 5s)."
+
+  - name: budget
+    rules:
+      - alert: DailyBudgetExhausted
+        expr: llm_daily_cost_usd{job="agent-server"} >= llm_daily_budget_usd{job="agent-server"}
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Daily LLM budget exhausted"
+          description: "Daily LLM spending ({{ $value | humanize }}USD) has reached the configured budget. Further LLM calls will be rejected."
+
+      - alert: DailyBudgetWarning
+        expr: llm_daily_cost_usd{job="agent-server"} / llm_daily_budget_usd{job="agent-server"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Daily LLM budget at 80%"
+          description: "Daily LLM spending is above 80% of budget ({{ $value | humanizePercentage }})."
+
+      - alert: WeeklyBudgetWarning
+        expr: llm_weekly_cost_usd{job="agent-server"} / llm_weekly_budget_usd{job="agent-server"} > 0.8
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Weekly LLM budget at 80%"
+          description: "Weekly LLM spending is above 80% of budget ({{ $value | humanizePercentage }})."
+
+  - name: security
+    rules:
+      - alert: HighIpBanRate
+        expr: rate(security_ip_bans_total{job="agent-server"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Elevated IP ban rate — possible attack"
+          description: "IPs are being banned at {{ $value | humanize }} per second over the last 5 minutes. Possible scanner/attack activity."
+
+      - alert: HoneypotSpike
+        expr: rate(security_honeypot_hits_total{job="agent-server"}[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High honeypot traffic — possible reconnaissance"
+          description: "Honeypot paths are being hit at {{ $value | humanize }} requests/sec — scanners are probing the server."
+
+  - name: circuit-breakers
+    rules:
+      - alert: LlmCircuitBreakerOpen
+        expr: llm_circuit_breaker_state{job="agent-server"} == 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} circuit breaker is OPEN"
+          description: "Provider {{ $labels.provider }} has had too many consecutive failures — circuit breaker is tripped. Traffic is falling back to other providers."
+
+      - alert: DeployCircuitBreakerPaused
+        expr: deploy_circuit_breaker_paused{job="agent-server"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deploy circuit breaker is PAUSED"
+          description: "Deployments are paused due to consecutive failures. Manual intervention required to resume."
+
+  - name: sandbox
+    rules:
+      - alert: SandboxHighFailureRate
+        expr: |
+          sum(rate(sandbox_executions_total{status="failure", job="agent-server"}[10m]))
+          / sum(rate(sandbox_executions_total{job="agent-server"}[10m]))
+          > 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sandbox code execution failure rate high"
+          description: "Sandbox executions are failing at {{ $value | humanizePercentage }} over 10 minutes (threshold: 30%)."
+
+      - alert: SandboxOomKills
+        expr: rate(sandbox_oom_kills_total{job="agent-server"}[10m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Sandbox containers hitting OOM"
+          description: "Sandbox containers are being OOM-killed at {{ $value | humanize }} per second — agent code is exceeding memory limits."
