@@ -340,6 +340,8 @@ export function mockDbModule() {
     deleteFollowUp: vi.fn().mockResolvedValue(null),
     listDueFollowUps: vi.fn().mockResolvedValue([]),
     markFollowUpReminderSent: vi.fn().mockResolvedValue(undefined),
+    listRecentlyCompletedTasks: vi.fn().mockResolvedValue([]),
+    listRecentlyCompletedFollowUps: vi.fn().mockResolvedValue([]),
     followUps: {},
     // Productivity tracker
     upsertProductivityLog: vi.fn().mockResolvedValue({ id: "pl-1", date: "2025-01-01", streakDays: 1, plannedItems: [], completionScore: null, mood: null, energyLevel: null }),

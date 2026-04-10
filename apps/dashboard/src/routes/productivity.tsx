@@ -22,9 +22,10 @@ import {
   AlertTriangle,
   X as XIcon,
   CheckCheck,
+  ArrowDownToLine,
 } from "lucide-react";
 import { useProductivityToday, useProductivityStats, useProductivityWeekly, useCodebaseInsights } from "@/api/queries";
-import { useUpsertProductivity, useAutoPlanProductivity, useScanCodebase, useUpdateInsightStatus } from "@/api/mutations";
+import { useUpsertProductivity, useAutoPlanProductivity, useScanCodebase, useUpdateInsightStatus, useSyncProductivityPlan } from "@/api/mutations";
 import type { PlannedItem, ProductivityMood, CodebaseInsight } from "@ai-cofounder/api-client";
 
 const MOOD_OPTIONS: { value: ProductivityMood; icon: typeof Smile; label: string; color: string }[] = [
@@ -48,6 +49,7 @@ export function ProductivityPage() {
   const upsert = useUpsertProductivity();
   const autoPlan = useAutoPlanProductivity();
   const scanCodebase = useScanCodebase();
+  const syncPlan = useSyncProductivityPlan();
   const updateInsight = useUpdateInsightStatus();
   const { data: insightsData } = useCodebaseInsights("open");
 
@@ -325,15 +327,28 @@ export function ProductivityPage() {
                   </span>
                 )}
               </div>
-              <button
-                onClick={() => autoPlan.mutate({ merge: totalCount > 0 })}
-                disabled={autoPlan.isPending}
-                className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
-                title={totalCount > 0 ? "Add AI-suggested items to existing plan" : "Let Jarvis plan my day"}
-              >
-                <Wand2 className={`h-3.5 w-3.5 ${autoPlan.isPending ? "animate-pulse" : ""}`} />
-                {totalCount > 0 ? "Add suggestions" : "Auto-plan my day"}
-              </button>
+              <div className="flex items-center gap-1">
+                {totalCount > 0 && (
+                  <button
+                    onClick={() => syncPlan.mutate({ lookbackMinutes: 240, topUp: true })}
+                    disabled={syncPlan.isPending}
+                    className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                    title="Auto-mark completed items and add new urgent work"
+                  >
+                    <ArrowDownToLine className={`h-3.5 w-3.5 ${syncPlan.isPending ? "animate-pulse" : ""}`} />
+                    Sync
+                  </button>
+                )}
+                <button
+                  onClick={() => autoPlan.mutate({ merge: totalCount > 0 })}
+                  disabled={autoPlan.isPending}
+                  className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                  title={totalCount > 0 ? "Add AI-suggested items to existing plan" : "Let Jarvis plan my day"}
+                >
+                  <Wand2 className={`h-3.5 w-3.5 ${autoPlan.isPending ? "animate-pulse" : ""}`} />
+                  {totalCount > 0 ? "Add suggestions" : "Auto-plan my day"}
+                </button>
+              </div>
             </div>
 
             {/* Progress bar */}
@@ -370,6 +385,14 @@ export function ProductivityPage() {
                   >
                     {item.text}
                   </span>
+                  {item.completedBy && (
+                    <span
+                      className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-600"
+                      title={`Auto-marked via ${item.completedBy}`}
+                    >
+                      Auto
+                    </span>
+                  )}
                   <button
                     onClick={() => removeItem(idx)}
                     className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"

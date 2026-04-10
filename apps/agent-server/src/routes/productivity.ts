@@ -9,6 +9,7 @@ import {
 } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
 import { generateDailyPlan } from "../services/auto-planner.js";
+import { syncProductivityPlan } from "../services/plan-sync.js";
 
 const logger = createLogger("productivity-routes");
 
@@ -115,6 +116,18 @@ export async function productivityRoutes(app: FastifyInstance): Promise<void> {
     const { force, merge } = (request.body ?? {}) as { force?: boolean; merge?: boolean };
     const result = await generateDailyPlan(app.db, app.llmRegistry, { force, merge });
     app.wsBroadcast?.("productivity");
+    return result;
+  });
+
+  // POST /api/productivity/sync — auto-mark completed items and top up with new urgent work
+  // Body: { lookbackMinutes?: number, topUp?: boolean }
+  app.post("/sync", async (request) => {
+    const { lookbackMinutes, topUp } = (request.body ?? {}) as {
+      lookbackMinutes?: number;
+      topUp?: boolean;
+    };
+    const result = await syncProductivityPlan(app.db, app.llmRegistry, { lookbackMinutes, topUp });
+    if (!result.skipped) app.wsBroadcast?.("productivity");
     return result;
   });
 

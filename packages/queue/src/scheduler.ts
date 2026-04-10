@@ -265,6 +265,19 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled codebase scan every 4 hours");
 
+  // ── Productivity plan sync (every 15 minutes) ──
+  // Auto-marks completed items and tops up plan with new urgent work
+
+  await monitoringQueue.upsertJobScheduler(
+    "productivity-sync",
+    { every: 15 * 60 * 1000 },
+    {
+      name: "productivity-sync",
+      data: { check: "productivity_sync" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled productivity plan sync every 15 minutes");
+
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
   const meetingPrepQueue = getMeetingPrepQueue();

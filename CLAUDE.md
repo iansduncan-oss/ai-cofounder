@@ -169,6 +169,19 @@ vi.mock("@ai-cofounder/llm", () => {
 
 **Critical**: `getProviderHealth = vi.fn().mockReturnValue([])` is required in MockLlmRegistry. Import the module AFTER mocks are set up using dynamic `await import()`.
 
+## Productivity Tracker (auto-loop)
+
+- **DB tables** — `productivity_logs` (one row per user per day: plannedItems, mood, energyLevel, completionScore, streakDays, reflection notes), `codebase_insights` (dedupe'd open/resolved/dismissed issues with severity ordering)
+- **AutoPlannerService** (`apps/agent-server/src/services/auto-planner.ts`) — reads active goals, pending tasks, overdue follow-ups, calendar events, yesterday's blockers, and top codebase insights; LLM generates 3-5 tasks for today with a deterministic fallback
+- **CodebaseScannerService** (`apps/agent-server/src/services/codebase-scanner.ts`) — runs every 4h via monitoring queue; scans git log for recent commits, TODO/FIXME in changed files, open GitHub PRs (age → severity), failing CI, recurring failure patterns, then LLM-synthesizes 0-5 higher-level suggestions
+- **PlanSyncService** (`apps/agent-server/src/services/plan-sync.ts`) — runs every 15 min; fuzzy-matches recently completed goal tasks and follow-ups against today's `plannedItems` and auto-marks them done (with `completedBy` trace), then tops up the plan with new overdue follow-ups and high-severity insights
+- **Morning nudge job** — at `BRIEFING_HOUR+1`, calls `generateDailyPlan()` then DMs the user via Slack/Discord with the ready-made plan; skipped if user manually checked in
+- **Orchestrator tool** — `log_productivity` lets Jarvis log check-ins from chat
+- **REST endpoints** — `GET/PUT/DELETE /api/productivity`, `POST /api/productivity/auto-plan`, `POST /api/productivity/sync`, `GET /api/productivity/weekly` (LLM-generated 7-day reflection), `POST /api/codebase/scan`, `GET/PATCH /api/codebase/insights`
+- **Discord slash commands** — `/plan`, `/autoplan`, `/audit`, `/reflect`, `/streak`
+- **Dashboard** — `/dashboard/productivity` (plan editor, mood/energy, weekly reflection panel, codebase insights panel, Sync/Auto-plan/Rescan buttons), `/dashboard/productivity/history`
+- **Setup** — `npm run productivity:setup` runs prerequisites check, starts Docker, `db:push`, builds shared packages, and prints next steps
+
 ## Milestones
 
 Multi-step planning via `milestones` table. Goals can be linked to milestones via `goals.milestone_id`. Routes: `POST/GET/PATCH/DELETE /api/milestones`, `GET /:id/progress`, `POST /:id/goals`.

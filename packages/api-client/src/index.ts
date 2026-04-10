@@ -102,6 +102,7 @@ export type {
   ProductivityStats,
   ProductivityWeeklySummary,
   AutoPlanResult,
+  PlanSyncResult,
   InsightCategory,
   InsightSeverity,
   InsightStatus,

@@ -996,6 +996,9 @@ export type ProductivityMood = "great" | "good" | "okay" | "rough" | "terrible";
 export interface PlannedItem {
   text: string;
   completed: boolean;
+  /** When set, this item was auto-completed by the plan-sync service. */
+  completedBy?: string;
+  completedAt?: string;
 }
 
 export interface ProductivityLog {
@@ -1049,6 +1052,15 @@ export interface AutoPlanResult {
   date: string;
   plannedItems: PlannedItem[];
   reasoning?: string;
+  skipped?: boolean;
+  reason?: string;
+}
+
+export interface PlanSyncResult {
+  date: string;
+  autoCompleted: Array<{ itemText: string; reason: string }>;
+  itemsAdded: Array<{ text: string; reason: string }>;
+  completionScore: number | null;
   skipped?: boolean;
   reason?: string;
 }

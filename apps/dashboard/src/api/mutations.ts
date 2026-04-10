@@ -778,6 +778,28 @@ export function useAutoPlanProductivity() {
   });
 }
 
+export function useSyncProductivityPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { lookbackMinutes?: number; topUp?: boolean }) =>
+      apiClient.syncProductivityPlan(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+      if (result.skipped) {
+        toast.info(result.reason ?? "Nothing to sync");
+      } else if (result.autoCompleted.length === 0 && result.itemsAdded.length === 0) {
+        toast.info("Plan is already in sync");
+      } else {
+        const parts: string[] = [];
+        if (result.autoCompleted.length > 0) parts.push(`${result.autoCompleted.length} completed`);
+        if (result.itemsAdded.length > 0) parts.push(`${result.itemsAdded.length} added`);
+        toast.success(`Synced: ${parts.join(", ")}`);
+      }
+    },
+    onError: (err) => { toast.error(`Sync failed: ${err.message}`); },
+  });
+}
+
 /* ── Codebase ── */
 
 export function useScanCodebase() {

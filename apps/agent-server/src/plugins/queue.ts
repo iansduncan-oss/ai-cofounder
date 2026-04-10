@@ -146,6 +146,46 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "productivity_sync": {
+          try {
+            const { syncProductivityPlan } = await import("../services/plan-sync.js");
+            const result = await syncProductivityPlan(app.db, app.llmRegistry, { lookbackMinutes: 20 });
+            if (!result.skipped && (result.autoCompleted.length > 0 || result.itemsAdded.length > 0)) {
+              logger.info(result, "plan sync updated plan");
+              app.wsBroadcast?.("productivity");
+
+              // Send a brief notification if something meaningful happened
+              if (result.autoCompleted.length > 0 || result.itemsAdded.length > 0) {
+                const { getNotificationQueue } = await import("@ai-cofounder/queue");
+                const parts: string[] = [];
+                if (result.autoCompleted.length > 0) {
+                  parts.push(`**${result.autoCompleted.length} item(s) auto-completed:**`);
+                  for (const c of result.autoCompleted.slice(0, 3)) {
+                    parts.push(`  [x] ${c.itemText}`);
+                  }
+                }
+                if (result.itemsAdded.length > 0) {
+                  parts.push(`**${result.itemsAdded.length} item(s) added to today's plan:**`);
+                  for (const a of result.itemsAdded.slice(0, 3)) {
+                    parts.push(`  - ${a.text}`);
+                  }
+                }
+                if (result.completionScore != null) {
+                  parts.push(`\n_Completion: ${result.completionScore}%_`);
+                }
+                await getNotificationQueue().add("productivity-sync", {
+                  channel: "all",
+                  type: "info",
+                  title: "Plan updated",
+                  message: parts.join("\n"),
+                });
+              }
+            }
+          } catch (err) {
+            logger.warn({ err }, "plan sync failed");
+          }
+          break;
+        }
         case "productivity_nudge": {
           const { getPrimaryAdminUserId, getProductivityLog } = await import("@ai-cofounder/db");
           const adminUserId = await getPrimaryAdminUserId(app.db);

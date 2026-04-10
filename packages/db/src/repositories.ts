@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, ilike, or, sql, lte, isNull, isNotNull, inArray, gt } from "drizzle-orm";
+import { eq, and, desc, asc, ilike, or, sql, lte, gte, isNull, isNotNull, inArray, gt } from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 
@@ -543,6 +543,32 @@ export async function listPendingTasks(db: Db, limit = 50, workspaceId?: string)
     .from(tasks)
     .where(and(...conditions))
     .orderBy(asc(tasks.createdAt))
+    .limit(limit);
+}
+
+/** List tasks completed since a given timestamp (for plan-sync). */
+export async function listRecentlyCompletedTasks(db: Db, since: Date, limit = 50) {
+  return db
+    .select()
+    .from(tasks)
+    .where(and(
+      eq(tasks.status, "completed"),
+      gte(tasks.updatedAt, since),
+    ))
+    .orderBy(desc(tasks.updatedAt))
+    .limit(limit);
+}
+
+/** List follow-ups marked done since a given timestamp (for plan-sync). */
+export async function listRecentlyCompletedFollowUps(db: Db, since: Date, limit = 50) {
+  return db
+    .select()
+    .from(followUps)
+    .where(and(
+      eq(followUps.status, "done"),
+      gte(followUps.updatedAt, since),
+    ))
+    .orderBy(desc(followUps.updatedAt))
     .limit(limit);
 }
 
