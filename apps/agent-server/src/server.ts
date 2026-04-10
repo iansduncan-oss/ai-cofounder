@@ -11,12 +11,7 @@ import {
   LlmRegistry,
   AnthropicProvider,
   GroqProvider,
-  OpenRouterProvider,
-  GeminiProvider,
   OllamaProvider,
-  TogetherProvider,
-  CerebrasProvider,
-  HuggingFaceProvider,
   createEmbeddingService,
   type EmbeddingService,
   type CompletionEvent,
@@ -96,7 +91,10 @@ import { FailurePatternService } from "./services/failure-patterns.js";
 import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
-/** Create and configure the LLM registry with all available providers */
+/** Create and configure the LLM registry with providers used in DEFAULT_ROUTES.
+ *  Only Anthropic, Groq, and Ollama are registered — other providers (OpenRouter,
+ *  Gemini, Together, Cerebras, HuggingFace) are not in any route and would just
+ *  add noise to health checks and stats. Re-add them here when they're added to routes. */
 export function createLlmRegistry(): LlmRegistry {
   const registry = new LlmRegistry();
 
@@ -107,12 +105,7 @@ export function createLlmRegistry(): LlmRegistry {
     ),
   );
   registry.register(new GroqProvider(optionalEnv("GROQ_API_KEY", "")));
-  registry.register(new OpenRouterProvider(optionalEnv("OPENROUTER_API_KEY", "")));
-  registry.register(new GeminiProvider(optionalEnv("GEMINI_API_KEY", "")));
   registry.register(new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")));
-  registry.register(new TogetherProvider(optionalEnv("TOGETHER_API_KEY", "")));
-  registry.register(new CerebrasProvider(optionalEnv("CEREBRAS_API_KEY", "")));
-  registry.register(new HuggingFaceProvider(optionalEnv("HF_API_KEY", "")));
 
   return registry;
 }
