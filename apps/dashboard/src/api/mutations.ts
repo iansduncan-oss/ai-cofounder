@@ -760,3 +760,20 @@ export function useUpsertProductivity() {
     onError: (err) => { toast.error(`Failed to save: ${err.message}`); },
   });
 }
+
+export function useAutoPlanProductivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { force?: boolean; merge?: boolean }) =>
+      apiClient.autoGenerateProductivityPlan(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+      if (result.skipped) {
+        toast.info(result.reason ?? "Plan already exists");
+      } else {
+        toast.success(`Generated ${result.plannedItems.length} task(s)`);
+      }
+    },
+    onError: (err) => { toast.error(`Failed to auto-plan: ${err.message}`); },
+  });
+}

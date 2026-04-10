@@ -21,6 +21,7 @@ import { followupsCommand } from "./followups.js";
 import { searchCommand } from "./search.js";
 import { analyticsCommand } from "./analytics.js";
 import { planCommand } from "./plan.js";
+import { autoplanCommand } from "./autoplan.js";
 import { reflectCommand } from "./reflect.js";
 import { streakCommand } from "./streak.js";
 
@@ -44,6 +45,7 @@ const commands = [
   searchCommand.toJSON(),
   analyticsCommand.toJSON(),
   planCommand.toJSON(),
+  autoplanCommand.toJSON(),
   reflectCommand.toJSON(),
   streakCommand.toJSON(),
   helpCommand.toJSON(),

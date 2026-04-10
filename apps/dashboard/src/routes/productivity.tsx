@@ -17,9 +17,10 @@ import {
   History,
   Sparkles,
   RefreshCw,
+  Wand2,
 } from "lucide-react";
 import { useProductivityToday, useProductivityStats, useProductivityWeekly } from "@/api/queries";
-import { useUpsertProductivity } from "@/api/mutations";
+import { useUpsertProductivity, useAutoPlanProductivity } from "@/api/mutations";
 import type { PlannedItem, ProductivityMood } from "@ai-cofounder/api-client";
 
 const MOOD_OPTIONS: { value: ProductivityMood; icon: typeof Smile; label: string; color: string }[] = [
@@ -41,6 +42,7 @@ export function ProductivityPage() {
   const { data: todayLog, isLoading: loadingToday } = useProductivityToday();
   const { data: stats, isLoading: loadingStats } = useProductivityStats(30);
   const upsert = useUpsertProductivity();
+  const autoPlan = useAutoPlanProductivity();
 
   const [showWeekly, setShowWeekly] = useState(false);
   const {
@@ -202,13 +204,24 @@ export function ProductivityPage() {
           {/* Today's Plan */}
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold">Today's Plan</h2>
-              {totalCount > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  {completedCount}/{totalCount} done
-                  {completionScore != null && ` (${completionScore}%)`}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold">Today's Plan</h2>
+                {totalCount > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {completedCount}/{totalCount} done
+                    {completionScore != null && ` (${completionScore}%)`}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => autoPlan.mutate({ merge: totalCount > 0 })}
+                disabled={autoPlan.isPending}
+                className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+                title={totalCount > 0 ? "Add AI-suggested items to existing plan" : "Let Jarvis plan my day"}
+              >
+                <Wand2 className={`h-3.5 w-3.5 ${autoPlan.isPending ? "animate-pulse" : ""}`} />
+                {totalCount > 0 ? "Add suggestions" : "Auto-plan my day"}
+              </button>
             </div>
 
             {/* Progress bar */}

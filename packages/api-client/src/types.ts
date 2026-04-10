@@ -1045,6 +1045,14 @@ export interface ProductivityWeeklySummary {
   entryCount: number;
 }
 
+export interface AutoPlanResult {
+  date: string;
+  plannedItems: PlannedItem[];
+  reasoning?: string;
+  skipped?: boolean;
+  reason?: string;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

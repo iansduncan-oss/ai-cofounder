@@ -24,6 +24,7 @@ import {
   handleSearch,
   handleAnalytics,
   handlePlan,
+  handleAutoPlan,
   handleReflect,
   handleStreak,
   checkCooldown,
@@ -189,6 +190,13 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       const energy = interaction.options.getInteger("energy") ?? undefined;
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, await handlePlan(client, tasks, mood, energy));
+      return;
+    }
+    case "autoplan": {
+      const force = interaction.options.getBoolean("force") ?? undefined;
+      const merge = interaction.options.getBoolean("merge") ?? undefined;
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleAutoPlan(client, { force, merge }));
       return;
     }
     case "reflect": {

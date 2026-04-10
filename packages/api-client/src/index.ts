@@ -101,6 +101,7 @@ export type {
   UpsertProductivityInput,
   ProductivityStats,
   ProductivityWeeklySummary,
+  AutoPlanResult,
   ThinkingTrace,
   ReflectionType,
   ReflectionLesson,

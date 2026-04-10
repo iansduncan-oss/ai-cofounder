@@ -84,6 +84,7 @@ import type {
   UpsertProductivityInput,
   ProductivityStats,
   ProductivityWeeklySummary,
+  AutoPlanResult,
   GlobalSearchResults,
   DeployCircuitBreakerStatus,
   ThinkingTrace,
@@ -1484,6 +1485,10 @@ export class ApiClient {
 
   getProductivityWeekly() {
     return this.request<ProductivityWeeklySummary>("GET", "/api/productivity/weekly");
+  }
+
+  autoGenerateProductivityPlan(opts?: { force?: boolean; merge?: boolean }) {
+    return this.request<AutoPlanResult>("POST", "/api/productivity/auto-plan", opts ?? {});
   }
 
   deleteProductivityLog(id: string) {

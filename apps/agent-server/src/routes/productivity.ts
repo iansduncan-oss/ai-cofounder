@@ -8,6 +8,7 @@ import {
   deleteProductivityLog,
 } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
+import { generateDailyPlan } from "../services/auto-planner.js";
 
 const logger = createLogger("productivity-routes");
 
@@ -103,6 +104,18 @@ export async function productivityRoutes(app: FastifyInstance): Promise<void> {
     const userId = (request.user as { sub: string }).sub;
     const { days } = request.query as { days?: string };
     return getProductivityStats(app.db, userId, days ? Number(days) : 30);
+  });
+
+  // POST /api/productivity/auto-plan — generate today's plan from goals/tasks/follow-ups
+  // Body: { force?: boolean, merge?: boolean }
+  //   force=true: overwrite existing plan for today
+  //   merge=true: append new items to existing plan (dedupe by text)
+  //   default: skip if plan already exists
+  app.post("/auto-plan", async (request) => {
+    const { force, merge } = (request.body ?? {}) as { force?: boolean; merge?: boolean };
+    const result = await generateDailyPlan(app.db, app.llmRegistry, { force, merge });
+    app.wsBroadcast?.("productivity");
+    return result;
   });
 
   // GET /api/productivity/weekly — LLM-generated weekly reflection

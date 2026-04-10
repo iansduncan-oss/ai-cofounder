@@ -766,6 +766,34 @@ export async function handleReflect(
 }
 
 /**
+ * /autoplan — have Jarvis generate today's plan from active goals/tasks/follow-ups.
+ */
+export async function handleAutoPlan(
+  client: ApiClient,
+  opts?: { force?: boolean; merge?: boolean },
+): Promise<HandlerResult> {
+  try {
+    const result = await client.autoGenerateProductivityPlan(opts);
+    if (result.skipped) {
+      return {
+        type: "info",
+        message: `**Auto-plan skipped.** ${result.reason ?? "Plan already exists."}\n\nUse \`/autoplan force:true\` to overwrite, or \`/autoplan merge:true\` to append suggestions.`,
+      };
+    }
+    const itemLines = result.plannedItems
+      .map((i, idx) => `  ${idx + 1}. ${i.text}`)
+      .join("\n");
+    const reasoning = result.reasoning ? `\n\n_${result.reasoning}_` : "";
+    return {
+      type: "info",
+      message: `**Plan generated for ${result.date}:**\n${itemLines}${reasoning}\n\nTick items off at /dashboard/productivity or use \`/streak\` to check progress.`,
+    };
+  } catch (err) {
+    return { type: "error", message: `Failed to auto-plan: ${(err as Error).message}` };
+  }
+}
+
+/**
  * /streak — show current streak and today's progress.
  */
 export async function handleStreak(client: ApiClient): Promise<HandlerResult> {
