@@ -236,7 +236,11 @@ describe("AutonomousExecutorService.executeGoal", () => {
     expect(workspaceService.gitAdd).toHaveBeenCalledWith("my-repo", ["."]);
     expect(workspaceService.gitCommit).toHaveBeenCalledWith("my-repo", expect.stringContaining("[goal:goal-abc]"));
     expect(result.progress.status).toBe("completed");
-    expect(result.actions).toBeDefined();
+    expect(Array.isArray(result.actions)).toBe(true);
+    const actionTypes = result.actions.map((a) => a.type);
+    expect(actionTypes).toContain("git_branch");
+    expect(actionTypes).toContain("git_add");
+    expect(actionTypes).toContain("git_commit");
   });
 
   it("skips git ops when workspace not provided", async () => {

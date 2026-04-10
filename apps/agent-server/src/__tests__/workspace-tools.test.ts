@@ -82,7 +82,8 @@ describe("Filesystem Tool Definitions", () => {
     });
 
     it("has optional path parameter", () => {
-      expect(LIST_DIRECTORY_TOOL.input_schema.properties.path).toBeDefined();
+      expect(LIST_DIRECTORY_TOOL.input_schema.properties.path.type).toBe("string");
+      expect(LIST_DIRECTORY_TOOL.input_schema.required).not.toContain("path");
     });
   });
 });

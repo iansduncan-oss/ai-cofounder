@@ -147,7 +147,9 @@ describe("decision extraction", () => {
       alternatives: ["MongoDB", "SQLite"],
       conversationId: "conv-1",
     });
-    expect(saveData.metadata.extractedAt).toBeDefined();
+    expect(typeof saveData.metadata.extractedAt).toBe("string");
+    expect(() => new Date(saveData.metadata.extractedAt).toISOString()).not.toThrow();
+    expect(saveData.metadata.extractedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it("skips extraction for short responses (< 100 chars)", async () => {
