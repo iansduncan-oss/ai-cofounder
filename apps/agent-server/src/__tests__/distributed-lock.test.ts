@@ -62,15 +62,16 @@ describe("DistributedLockService", () => {
       expect(token1).not.toBe(token2);
     });
 
-    it("token format includes timestamp", async () => {
+    it("token is a well-formed UUID", async () => {
       redis.set.mockResolvedValue("OK");
-      const before = Date.now();
       const token = await service.acquire("my-lock", 5000);
-      const after = Date.now();
-      // Token format is "{timestamp}-{random}"
-      const ts = parseInt(token!.split("-")[0], 10);
-      expect(ts).toBeGreaterThanOrEqual(before);
-      expect(ts).toBeLessThanOrEqual(after);
+      // Implementation uses crypto.randomUUID() — a v4 UUID (8-4-4-4-12 hex).
+      // The prior assertion that the prefix was a timestamp worked by
+      // accident: parseInt succeeded only when the first hex segment
+      // happened to start with a digit. Replaced with a real format check.
+      expect(token).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
     });
   });
 
