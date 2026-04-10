@@ -448,6 +448,51 @@ export class ApiClient {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
   }
 
+  /* ── Vault ── */
+
+  listVaultDailyNotes() {
+    return this.request<{ dates: string[] }>("GET", "/api/vault/daily");
+  }
+
+  getVaultDailyNote(date: string) {
+    return this.request<{ date: string; content: string }>("GET", `/api/vault/daily/${date}`);
+  }
+
+  listVaultFiles(section: string) {
+    return this.request<{ section: string; files: string[] }>("GET", `/api/vault/${section}`);
+  }
+
+  getVaultFile(section: string, slug: string) {
+    return this.request<{ section: string; slug: string; content: string }>("GET", `/api/vault/${section}/${slug}`);
+  }
+
+  searchVault(query: string, opts?: { section?: "all" | "daily" | "projects" | "decisions" | "people"; limit?: number }) {
+    const params = new URLSearchParams({ q: query });
+    if (opts?.section) params.set("section", opts.section);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    return this.request<{
+      query: string;
+      matches: Array<{ section: string; slug: string; line: number; snippet: string }>;
+    }>("GET", `/api/vault/search?${params}`);
+  }
+
+  /* ── Memory Bridge (v2) ── */
+
+  getMemoryBridgeSnapshot(opts?: { userId?: string; limit?: number; perCategoryLimit?: number }) {
+    const params = new URLSearchParams();
+    if (opts?.userId) params.set("userId", opts.userId);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.perCategoryLimit != null) params.set("perCategoryLimit", String(opts.perCategoryLimit));
+    const qs = params.toString();
+    return this.request<{
+      markdown: string;
+      includedCount: number;
+      excludedCount: number;
+      generatedAt: string;
+      userId: string;
+    }>("GET", `/api/bridge/snapshot${qs ? `?${qs}` : ""}`);
+  }
+
   /* ── Milestones ── */
 
   createMilestone(data: {

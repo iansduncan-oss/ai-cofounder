@@ -20,7 +20,7 @@ export interface MonitoringJob {
 }
 
 export interface BriefingJob {
-  type: "morning" | "evening" | "on_demand";
+  type: "morning" | "evening" | "weekly" | "on_demand";
   userId?: string;
   deliveryChannels?: ("slack" | "discord" | "voice" | "dashboard")[];
 }

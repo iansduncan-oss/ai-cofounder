@@ -67,9 +67,8 @@ describe("LlmRegistry", () => {
 
       const result = registry.resolveProvider("conversation");
       expect(result).not.toBeNull();
-      // conversation route: ollama first (Ollama-only routing)
-      expect(result!.provider.name).toBe("ollama");
-      expect(result!.model).toBe("llama3.2:3b");
+      // conversation route: anthropic → groq → ollama; anthropic not registered, groq is first available
+      expect(result!.provider.name).toBe("groq");
     });
 
     it("skips unavailable providers", () => {
@@ -102,9 +101,10 @@ describe("LlmRegistry", () => {
         messages: [{ role: "user", content: "hello" }],
       });
 
+      // conversation: anthropic → groq → ollama; only ollama registered
       expect(ollama.complete).toHaveBeenCalledWith({
         messages: [{ role: "user", content: "hello" }],
-        model: "llama3.2:3b",
+        model: "llama3.1:8b",
       });
       expect(result.provider).toBe("ollama");
     });
@@ -165,23 +165,23 @@ describe("LlmRegistry", () => {
       registry.register(mockProvider("ollama", true));
       registry.register(mockProvider("groq", true));
 
-      // simple: groq first (llama-3.1-8b-instant)
+      // simple: groq → ollama; groq is first available
       const simple = await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
       expect(simple.provider).toBe("groq");
 
-      // research: ollama first (llama3.2:3b)
+      // research: anthropic → groq → ollama; groq is first available (no anthropic registered)
       const research = await registry.complete("research", {
         messages: [{ role: "user", content: "search" }],
       });
-      expect(research.provider).toBe("ollama");
+      expect(research.provider).toBe("groq");
 
-      // planning: ollama first (llama3.2:3b)
+      // planning: groq → anthropic → ollama; groq is first available
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("ollama");
+      expect(planning.provider).toBe("groq");
     });
   });
 

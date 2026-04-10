@@ -489,6 +489,25 @@ export class NotificationService {
     await Promise.allSettled([slackPromise, discordPromise]);
   }
 
+  /** Surface proactive system insights — degraded agents, repeated failures, open circuit breakers */
+  async notifySystemInsights(insights: string[]): Promise<void> {
+    if (insights.length === 0) return;
+
+    const list = insights.map((i) => `- ${i}`).join("\n");
+    const text = `Sir, I've noticed some patterns worth your attention:\n\n${list}`;
+
+    await this.sendSlackPreferred(text, [
+      {
+        type: "header",
+        text: { type: "plain_text", text: "System Intelligence Report, Sir" },
+      },
+      {
+        type: "section",
+        text: { type: "mrkdwn", text },
+      },
+    ]);
+  }
+
   /** Send a daily briefing — prefers DM for personal delivery */
   async sendBriefing(text: string): Promise<void> {
     const blocks = [

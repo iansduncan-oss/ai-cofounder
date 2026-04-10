@@ -116,21 +116,18 @@ export interface RoutingOptions {
  * Each task category maps to an ordered list of (provider, model) pairs.
  * The registry tries each in order, falling back on provider unavailability or error.
  */
-/**
- * Cost-optimized routing: free/cheap providers first, Anthropic as fallback.
- * Groq and OpenRouter free tiers handle most work. Gemini for research.
- * Anthropic Sonnet only when free providers fail. Opus removed from defaults.
- */
-// Optimized routing: Anthropic primary (best quality + tool use), Groq for cheap tasks,
-// Ollama 8B as always-available free fallback. Other cloud providers disabled until topped up.
+// Cost-optimized routing: Groq primary (Anthropic credits at $0), Anthropic as
+// quality fallback (auto-recovers when credits are topped up via health check),
+// Ollama as always-available free last resort.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
   planning: [
+    { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "ollama", model: "llama3.1:8b" },
   ],
   conversation: [
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "ollama", model: "llama3.1:8b" },
   ],
   simple: [
@@ -138,11 +135,12 @@ const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
     { provider: "ollama", model: "llama3.1:8b" },
   ],
   research: [
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "groq", model: "llama-3.3-70b-versatile" },
+    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "ollama", model: "llama3.1:8b" },
   ],
   code: [
+    { provider: "groq", model: "llama-3.3-70b-versatile" },
     { provider: "anthropic", model: "claude-sonnet-4-20250514" },
     { provider: "ollama", model: "llama3.1:8b" },
   ],

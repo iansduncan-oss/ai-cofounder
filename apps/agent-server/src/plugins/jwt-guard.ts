@@ -4,6 +4,7 @@ import { goalRoutes } from "../routes/goals.js";
 import { taskRoutes } from "../routes/tasks.js";
 import { approvalRoutes } from "../routes/approvals.js";
 import { memoryRoutes } from "../routes/memories.js";
+import { bridgeRoutes } from "../routes/bridge.js";
 import { userRoutes } from "../routes/users.js";
 import { promptRoutes } from "../routes/prompts.js";
 import { n8nRoutes } from "../routes/n8n.js";
@@ -146,6 +147,7 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(taskRoutes, { prefix: "/api/tasks" });
   app.register(approvalRoutes, { prefix: "/api/approvals" });
   app.register(memoryRoutes, { prefix: "/api/memories" });
+  app.register(bridgeRoutes, { prefix: "/api/bridge" });
   app.register(userRoutes, { prefix: "/api/users" });
   app.register(promptRoutes, { prefix: "/api/prompts" });
   app.register(n8nRoutes, { prefix: "/api/n8n" });

@@ -1,0 +1,18 @@
+{
+  "name": "Jarvis Voice",
+  "short_name": "Jarvis",
+  "description": "Voice interface for Jarvis AI assistant",
+  "start_url": "/voice/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#7c3aed",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%230a0a0f' stroke='%237c3aed' stroke-width='4'/><circle cx='50' cy='50' r='20' fill='%237c3aed' opacity='0.3'/><circle cx='50' cy='50' r='8' fill='%237c3aed'/></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

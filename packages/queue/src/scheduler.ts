@@ -88,6 +88,27 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled evening briefing at 18:00");
 
+  // ── Weekly summary briefing (Monday at briefingHour) ──
+
+  await briefingQueue.upsertJobScheduler(
+    "weekly-summary",
+    {
+      pattern: `0 ${briefingHour} * * 1`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "weekly-summary",
+      data: {
+        type: "weekly" as const,
+        deliveryChannels: ["slack", "discord"],
+      } satisfies BriefingJob,
+    },
+  );
+  logger.info(
+    { hour: briefingHour, tz: briefingTimezone },
+    "Scheduled weekly summary (Mondays)",
+  );
+
   // ── Weekly reflection pattern extraction (Sunday 3 AM) ──
 
   const reflectionQueue = getReflectionQueue();

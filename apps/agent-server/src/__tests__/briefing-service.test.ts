@@ -15,6 +15,7 @@ const mockGetUsageSummary = vi.fn().mockResolvedValue({ totalCostUsd: 0, request
 const mockListEnabledSchedules = vi.fn();
 const mockListRecentWorkSessions = vi.fn();
 const mockListPendingApprovals = vi.fn();
+const mockGetBriefingCache = vi.fn();
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
@@ -30,6 +31,7 @@ vi.mock("@ai-cofounder/db", () => ({
   listEnabledSchedules: (...args: unknown[]) => mockListEnabledSchedules(...args),
   listRecentWorkSessions: (...args: unknown[]) => mockListRecentWorkSessions(...args),
   listPendingApprovals: (...args: unknown[]) => mockListPendingApprovals(...args),
+  getBriefingCache: (...args: unknown[]) => mockGetBriefingCache(...args),
 }));
 
 vi.mock("ioredis", () => {
@@ -49,7 +51,7 @@ vi.mock("ioredis", () => {
   return { default: MockRedis };
 });
 
-const { gatherBriefingData, formatBriefing, sendDailyBriefing } = await import("../services/briefing.js");
+const { gatherBriefingData, formatBriefing, sendDailyBriefing, generateWeeklySummary, sendWeeklySummary } = await import("../services/briefing.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -161,6 +163,86 @@ describe("Briefing service", () => {
       // Should truncate to 100 chars
       expect(text).not.toContain("A".repeat(200));
       expect(text).toContain("A".repeat(100));
+    });
+  });
+
+  describe("generateWeeklySummary", () => {
+    it("returns a placeholder message when no briefings are cached", async () => {
+      mockGetBriefingCache.mockResolvedValue(null);
+      const db = {} as any;
+      const text = await generateWeeklySummary(db);
+      expect(text).toContain("No daily briefings were recorded");
+      expect(mockGetBriefingCache).toHaveBeenCalledTimes(7);
+    });
+
+    it("concatenates the past week of briefings without an LLM", async () => {
+      mockGetBriefingCache
+        .mockResolvedValueOnce({ briefingText: "Day 0 briefing" })
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ briefingText: "Day 2 briefing" })
+        .mockResolvedValue(null);
+
+      const db = {} as any;
+      const text = await generateWeeklySummary(db);
+      expect(text).toContain("# Weekly Summary");
+      expect(text).toContain("Day 0 briefing");
+      expect(text).toContain("Day 2 briefing");
+      expect(text).toContain("past 2 day");
+    });
+
+    it("runs cached briefings through an LLM when registry is provided", async () => {
+      mockGetBriefingCache
+        .mockResolvedValueOnce({ briefingText: "Yesterday: deploy went well" })
+        .mockResolvedValue(null);
+
+      const mockComplete = vi.fn().mockResolvedValue({
+        content: [{ type: "text", text: "## The Week in Review\n\nAll smooth, sir." }],
+      });
+      const llmRegistry = { complete: mockComplete } as any;
+
+      const db = {} as any;
+      const text = await generateWeeklySummary(db, llmRegistry);
+
+      expect(mockComplete).toHaveBeenCalledWith(
+        "simple",
+        expect.objectContaining({
+          max_tokens: 1200,
+          system: expect.stringContaining("weekly summary"),
+        }),
+      );
+      expect(text).toContain("The Week in Review");
+      expect(text).toContain("All smooth, sir.");
+    });
+
+    it("falls back to concatenation when LLM call throws", async () => {
+      mockGetBriefingCache
+        .mockResolvedValueOnce({ briefingText: "Fallback day" })
+        .mockResolvedValue(null);
+
+      const llmRegistry = {
+        complete: vi.fn().mockRejectedValue(new Error("boom")),
+      } as any;
+
+      const db = {} as any;
+      const text = await generateWeeklySummary(db, llmRegistry);
+      expect(text).toContain("# Weekly Summary");
+      expect(text).toContain("Fallback day");
+    });
+  });
+
+  describe("sendWeeklySummary", () => {
+    it("sends the generated summary through the notification service", async () => {
+      mockGetBriefingCache
+        .mockResolvedValueOnce({ briefingText: "Latest day" })
+        .mockResolvedValue(null);
+
+      const mockSendBriefing = vi.fn().mockResolvedValue(undefined);
+      const notificationService = { sendBriefing: mockSendBriefing } as any;
+
+      const db = {} as any;
+      const text = await sendWeeklySummary(db, notificationService);
+      expect(mockSendBriefing).toHaveBeenCalledWith(text);
+      expect(text).toContain("Latest day");
     });
   });
 

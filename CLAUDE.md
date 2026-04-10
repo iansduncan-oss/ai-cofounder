@@ -8,8 +8,9 @@ At the **start** of each session:
 1. Read `.claude/primer.md` for context from the previous session
 2. Read `.claude/git-state.md` for current repository state (includes staleness warnings and session metadata)
 3. Read `.claude/commit-log.md` for recent commit history
-4. If git-state.md has **staleness warnings**, mention them proactively to the user
-5. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
+4. Read `.claude/agent-memories.md` if it exists — auto-generated memory snapshot from Jarvis's DB (memory bridge v2). Describes the user, durable project context, and technical gotchas. Refresh it with `npm run memory-bridge:sync` whenever you suspect it's stale. If the file is missing, the agent-server may not be running; skip and note it to the user.
+5. If git-state.md has **staleness warnings**, mention them proactively to the user
+6. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
 
 At the **end** of each session (**MANDATORY** — always do this before the session ends):
 1. Completely rewrite `.claude/primer.md` with all sections below
@@ -46,7 +47,7 @@ AI Cofounder — a multi-agent system built as a Turborepo monorepo. Orchestrate
 - **packages/rag** — RAG pipeline for document retrieval
 - **packages/shared** — Shared types, pino logger (`createLogger`), env config helpers (`requireEnv`, `optionalEnv`)
 - **packages/test-utils** — Shared test fixtures (mockSharedModule, mockLlmModule, mockDbModule)
-- **packages/mcp-server** — MCP server wrapping ApiClient (39 tools for Claude Code integration)
+- **packages/mcp-server** — MCP server wrapping ApiClient (42 tools for Claude Code integration)
 
 ## Commands
 
@@ -186,7 +187,7 @@ Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path trav
 
 ## Claude Code Enhancements
 
-**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (39 tools wrapping ApiClient)
+**MCP servers** (5 in `.mcp.json`): `postgres` (direct DB), `docker`, `redis`, `bullmq`, `ai-cofounder` (42 tools wrapping ApiClient)
 
 **Skills** (5 in `~/.claude/skills/`): `ai-cofounder-deploy`, `ai-cofounder-test`, `ai-cofounder-db`, `ai-cofounder-monitor`, `ai-cofounder-logs`
 

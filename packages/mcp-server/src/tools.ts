@@ -702,4 +702,142 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       }
     },
   );
+
+  // ── Vault Tools ──
+
+  server.tool(
+    "read_vault_daily",
+    "Read a Jarvis daily note from the Obsidian vault. Returns goals, journal entries, and memories for that day.",
+    {
+      date: z.string().optional().describe("Date in YYYY-MM-DD format (defaults to today)"),
+    },
+    async ({ date }) => {
+      try {
+        const d = date ?? new Date().toISOString().slice(0, 10);
+        const data = await client.getVaultDailyNote(d);
+        return { content: [{ type: "text" as const, text: data.content }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "list_vault_notes",
+    "List available daily notes or files in a vault section (projects, decisions, people)",
+    {
+      section: z.enum(["daily", "projects", "decisions", "people"]).describe("Vault section to list"),
+    },
+    async ({ section }) => {
+      try {
+        if (section === "daily") {
+          const data = await client.listVaultDailyNotes();
+          return { content: [{ type: "text" as const, text: `Daily notes: ${data.dates.join(", ") || "(none)"}` }] };
+        }
+        const data = await client.listVaultFiles(section);
+        return { content: [{ type: "text" as const, text: `${section}: ${data.files.join(", ") || "(none)"}` }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "read_vault_file",
+    "Read a specific file from the Jarvis vault (project notes, decision records, etc.)",
+    {
+      section: z.enum(["projects", "decisions", "people"]).describe("Vault section"),
+      slug: z.string().describe("File slug (filename without .md extension)"),
+    },
+    async ({ section, slug }) => {
+      try {
+        const data = await client.getVaultFile(section, slug);
+        return { content: [{ type: "text" as const, text: data.content }] };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  server.tool(
+    "vault_search",
+    "Search across the Jarvis vault (daily notes, projects, decisions, people) for a keyword. Returns matching snippets with file location.",
+    {
+      query: z.string().describe("Search term (case-insensitive substring match)"),
+      section: z
+        .enum(["all", "daily", "projects", "decisions", "people"])
+        .optional()
+        .describe("Vault section to scope the search (default: all)"),
+      limit: z.number().optional().describe("Max matches to return (default: 10)"),
+    },
+    async ({ query, section, limit }) => {
+      try {
+        const data = await client.searchVault(query, { section, limit });
+        if (data.matches.length === 0) {
+          return { content: [{ type: "text" as const, text: `No matches for "${query}".` }] };
+        }
+        const lines = data.matches.map(
+          (m) => `• ${m.section}/${m.slug} (line ${m.line})\n\`\`\`\n${m.snippet}\n\`\`\``,
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Found ${data.matches.length} match(es) for "${query}":\n\n${lines.join("\n\n")}`,
+            },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  // ── Memory Bridge (v2) ──
+
+  server.tool(
+    "sync_memory_bridge",
+    "Return the current Jarvis memory snapshot as markdown. Use at the start of a session to load durable context, or when the user asks 'what do you remember about X'. Ranks by importance + recency and groups by category.",
+    {
+      limit: z.number().optional().describe("Max memories to include (default 40)"),
+      perCategoryLimit: z.number().optional().describe("Max memories per category (default 8)"),
+    },
+    async ({ limit, perCategoryLimit }) => {
+      try {
+        const snapshot = await client.getMemoryBridgeSnapshot({ limit, perCategoryLimit });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `_Snapshot: ${snapshot.includedCount} included, ${snapshot.excludedCount} excluded, generated ${snapshot.generatedAt}_\n\n${snapshot.markdown}`,
+            },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  // ── Memory Management ──
+
+  server.tool(
+    "delete_memory",
+    "Delete a memory from the Jarvis knowledge base by ID. Use with care — this is permanent.",
+    {
+      memoryId: z.string().describe("The memory ID to delete"),
+    },
+    async ({ memoryId }) => {
+      try {
+        const result = await client.deleteMemory(memoryId);
+        return {
+          content: [
+            { type: "text" as const, text: `Memory ${result.id} deleted (ok=${result.deleted}).` },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
 }
