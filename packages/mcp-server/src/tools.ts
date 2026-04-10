@@ -758,4 +758,60 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       }
     },
   );
+
+  server.tool(
+    "vault_search",
+    "Search across the Jarvis vault (daily notes, projects, decisions, people) for a keyword. Returns matching snippets with file location.",
+    {
+      query: z.string().describe("Search term (case-insensitive substring match)"),
+      section: z
+        .enum(["all", "daily", "projects", "decisions", "people"])
+        .optional()
+        .describe("Vault section to scope the search (default: all)"),
+      limit: z.number().optional().describe("Max matches to return (default: 10)"),
+    },
+    async ({ query, section, limit }) => {
+      try {
+        const data = await client.searchVault(query, { section, limit });
+        if (data.matches.length === 0) {
+          return { content: [{ type: "text" as const, text: `No matches for "${query}".` }] };
+        }
+        const lines = data.matches.map(
+          (m) => `• ${m.section}/${m.slug} (line ${m.line})\n\`\`\`\n${m.snippet}\n\`\`\``,
+        );
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Found ${data.matches.length} match(es) for "${query}":\n\n${lines.join("\n\n")}`,
+            },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
+
+  // ── Memory Management ──
+
+  server.tool(
+    "delete_memory",
+    "Delete a memory from the Jarvis knowledge base by ID. Use with care — this is permanent.",
+    {
+      memoryId: z.string().describe("The memory ID to delete"),
+    },
+    async ({ memoryId }) => {
+      try {
+        const result = await client.deleteMemory(memoryId);
+        return {
+          content: [
+            { type: "text" as const, text: `Memory ${result.id} deleted (ok=${result.deleted}).` },
+          ],
+        };
+      } catch (e) {
+        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+      }
+    },
+  );
 }

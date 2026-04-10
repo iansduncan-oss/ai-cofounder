@@ -43,6 +43,12 @@ function createMockClient(): ApiClient {
     exportConversation: vi.fn(),
     listReflections: vi.fn(),
     listJournalEntries: vi.fn(),
+    listVaultDailyNotes: vi.fn(),
+    getVaultDailyNote: vi.fn(),
+    listVaultFiles: vi.fn(),
+    getVaultFile: vi.fn(),
+    searchVault: vi.fn(),
+    deleteMemory: vi.fn(),
   } as unknown as ApiClient;
 }
 
@@ -74,6 +80,8 @@ describe("MCP tools registration", () => {
       "read_vault_daily",
       "list_vault_notes",
       "read_vault_file",
+      "vault_search",
+      "delete_memory",
       "get_provider_health",
       "rag_search",
     ];
@@ -470,6 +478,37 @@ describe("MCP tools registration", () => {
     const tools = getRegisteredTools(server);
     const result = await tools.get("list_journal_entries")!.handler({});
     expect(result.content[0].text).toContain("Deploy v2 done");
+  });
+
+  it("vault_search calls searchVault and formats matches", async () => {
+    (client.searchVault as ReturnType<typeof vi.fn>).mockResolvedValue({
+      query: "deploy",
+      matches: [
+        { section: "decisions", slug: "2026-04-01-pick-vps", line: 5, snippet: "deploy to hetzner\nvia docker" },
+        { section: "projects", slug: "launch", line: 12, snippet: "initial deploy done" },
+      ],
+    });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("vault_search")!.handler({ query: "deploy", limit: 5 });
+    expect(client.searchVault).toHaveBeenCalledWith("deploy", { section: undefined, limit: 5 });
+    expect(result.content[0].text).toContain("Found 2 match(es)");
+    expect(result.content[0].text).toContain("decisions/2026-04-01-pick-vps");
+    expect(result.content[0].text).toContain("deploy to hetzner");
+  });
+
+  it("vault_search returns a friendly message when there are no matches", async () => {
+    (client.searchVault as ReturnType<typeof vi.fn>).mockResolvedValue({ query: "xyzzy", matches: [] });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("vault_search")!.handler({ query: "xyzzy" });
+    expect(result.content[0].text).toContain('No matches for "xyzzy"');
+  });
+
+  it("delete_memory calls deleteMemory", async () => {
+    (client.deleteMemory as ReturnType<typeof vi.fn>).mockResolvedValue({ deleted: true, id: "mem-1" });
+    const tools = getRegisteredTools(server);
+    const result = await tools.get("delete_memory")!.handler({ memoryId: "mem-1" });
+    expect(client.deleteMemory).toHaveBeenCalledWith("mem-1");
+    expect(result.content[0].text).toContain("Memory mem-1 deleted");
   });
 
   it("handles errors gracefully", async () => {

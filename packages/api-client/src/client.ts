@@ -466,6 +466,16 @@ export class ApiClient {
     return this.request<{ section: string; slug: string; content: string }>("GET", `/api/vault/${section}/${slug}`);
   }
 
+  searchVault(query: string, opts?: { section?: "all" | "daily" | "projects" | "decisions" | "people"; limit?: number }) {
+    const params = new URLSearchParams({ q: query });
+    if (opts?.section) params.set("section", opts.section);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    return this.request<{
+      query: string;
+      matches: Array<{ section: string; slug: string; line: number; snippet: string }>;
+    }>("GET", `/api/vault/search?${params}`);
+  }
+
   /* ── Milestones ── */
 
   createMilestone(data: {

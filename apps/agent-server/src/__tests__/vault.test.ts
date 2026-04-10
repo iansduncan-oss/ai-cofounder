@@ -261,4 +261,61 @@ describe("vault routes", () => {
       expect(res.statusCode).toBe(404);
     });
   });
+
+  describe("GET /api/vault/search", () => {
+    beforeAll(async () => {
+      // Seed searchable content across sections
+      await writeFile(
+        join(vaultDir, "projects", "search-target.md"),
+        "# Search Target\n\nThis file mentions deploy pipeline.\nSecond line has no match.\n",
+        "utf-8",
+      );
+      await writeFile(
+        join(vaultDir, "decisions", "2026-04-09-deploy.md"),
+        "# Decision\n\nWe chose to deploy nightly.\n",
+        "utf-8",
+      );
+    });
+
+    it("returns 400 when the query is missing", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/vault/search" });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("returns matches across sections by default", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy" });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as {
+        query: string;
+        matches: Array<{ section: string; slug: string; line: number; snippet: string }>;
+      };
+      expect(body.query).toBe("deploy");
+      expect(body.matches.length).toBeGreaterThanOrEqual(2);
+      const sections = new Set(body.matches.map((m) => m.section));
+      expect(sections.has("projects")).toBe(true);
+      expect(sections.has("decisions")).toBe(true);
+      for (const m of body.matches) {
+        expect(m.snippet.toLowerCase()).toContain("deploy");
+      }
+    });
+
+    it("scopes results when section parameter is provided", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy&section=decisions" });
+      expect(res.statusCode).toBe(200);
+      const body = res.json() as { matches: Array<{ section: string }> };
+      expect(body.matches.length).toBeGreaterThan(0);
+      for (const m of body.matches) expect(m.section).toBe("decisions");
+    });
+
+    it("rejects an invalid section", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy&section=secrets" });
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("caps results at the supplied limit", async () => {
+      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy&limit=1" });
+      expect(res.statusCode).toBe(200);
+      expect((res.json() as { matches: unknown[] }).matches).toHaveLength(1);
+    });
+  });
 });

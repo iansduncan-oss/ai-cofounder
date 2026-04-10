@@ -10,6 +10,7 @@ import {
   listPendingApprovals,
   listFailurePatterns,
   upsertBriefingCache,
+  getBriefingCache,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -541,6 +542,83 @@ export async function generateEveningWrapUp(registry: LlmRegistry, data: Briefin
     logger.warn({ err }, "LLM evening wrap-up generation failed");
     return "Good evening, sir. I was unable to generate a full summary, but all critical systems are operational.";
   }
+}
+
+/**
+ * Build a weekly summary from the last 7 days of cached daily briefings.
+ * Falls back to a static message if no briefings are cached. When an
+ * LlmRegistry is supplied, runs the aggregated text through an LLM for a
+ * narrative rollup; otherwise returns the concatenated briefings directly.
+ */
+export async function generateWeeklySummary(
+  db: Db,
+  llmRegistry?: LlmRegistry,
+): Promise<string> {
+  const dates: string[] = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  const cached = await Promise.all(dates.map((date) => getBriefingCache(db, date)));
+  const entries = cached
+    .map((row, i) => ({ date: dates[i], text: row?.briefingText ?? null }))
+    .filter((e): e is { date: string; text: string } => Boolean(e.text));
+
+  if (entries.length === 0) {
+    return "Good morning, sir. No daily briefings were recorded in the past week — nothing to summarise.";
+  }
+
+  const combined = entries
+    .map((e) => `### ${e.date}\n\n${e.text}`)
+    .join("\n\n---\n\n");
+
+  if (!llmRegistry) {
+    return `# Weekly Summary\n\nThe past ${entries.length} day(s) of briefings:\n\n${combined}`;
+  }
+
+  try {
+    const response = await llmRegistry.complete("simple", {
+      system:
+        "You are Jarvis, a personal AI assistant with dry British wit. " +
+        "Roll up the past week of daily briefings into a single, concise weekly summary. " +
+        "Address the user as 'sir'. Use markdown. Highlight themes, trends, and open threads. " +
+        "Keep it under 800 words and avoid repeating identical items.",
+      messages: [
+        {
+          role: "user",
+          content:
+            `Summarise the week. Source briefings (most recent first):\n\n${combined}\n\n` +
+            "Output sections: **The Week in Review**, **Open Threads**, **Recommended Focus for Next Week**.",
+        },
+      ],
+      max_tokens: 1200,
+    });
+
+    const text = response.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+
+    return text || `# Weekly Summary\n\n${combined}`;
+  } catch (err) {
+    logger.warn({ err }, "LLM weekly summary generation failed, returning concatenated briefings");
+    return `# Weekly Summary\n\n${combined}`;
+  }
+}
+
+/** Send a weekly summary via the notification pipeline. */
+export async function sendWeeklySummary(
+  db: Db,
+  notificationService: NotificationService,
+  llmRegistry?: LlmRegistry,
+): Promise<string> {
+  const text = await generateWeeklySummary(db, llmRegistry);
+  await notificationService.sendBriefing(text);
+  logger.info("weekly summary sent");
+  return text;
 }
 
 /** Send evening wind-down briefing */

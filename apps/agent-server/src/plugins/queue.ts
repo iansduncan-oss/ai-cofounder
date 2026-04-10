@@ -210,6 +210,14 @@ export const queuePlugin = fp(async (app) => {
     briefing: async (job) => {
       const { type } = job.data;
       logger.info({ jobId: job.id, type }, "Generating briefing");
+
+      if (type === "weekly") {
+        const { sendWeeklySummary } = await import("../services/briefing.js");
+        await sendWeeklySummary(app.db, app.notificationService, app.llmRegistry);
+        app.agentEvents.emit("ws:briefing_complete");
+        return;
+      }
+
       const { sendDailyBriefing } = await import("../services/briefing.js");
       const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
       const adminUserId = await getPrimaryAdminUserId(app.db);

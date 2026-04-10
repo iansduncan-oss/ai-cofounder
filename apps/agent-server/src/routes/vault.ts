@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { optionalEnv } from "@ai-cofounder/shared";
 
@@ -25,7 +25,98 @@ interface VaultFileResponse {
   content: string;
 }
 
+interface VaultSearchMatch {
+  section: string;
+  slug: string;
+  line: number;
+  snippet: string;
+}
+
+interface VaultSearchResponse {
+  query: string;
+  matches: VaultSearchMatch[];
+}
+
+const VALID_SEARCH_SECTIONS = ["all", "daily", "projects", "decisions", "people"] as const;
+type VaultSearchSection = (typeof VALID_SEARCH_SECTIONS)[number];
+
+async function searchVaultFiles(
+  query: string,
+  section: VaultSearchSection,
+  limit: number,
+): Promise<VaultSearchMatch[]> {
+  const needle = query.toLowerCase();
+  const sectionsToScan: Exclude<VaultSearchSection, "all">[] =
+    section === "all" ? ["daily", "projects", "decisions", "people"] : [section];
+
+  const matches: VaultSearchMatch[] = [];
+  for (const sec of sectionsToScan) {
+    const dir = join(VAULT_DIR, sec);
+    let files: string[];
+    try {
+      files = await readdir(dir);
+    } catch {
+      continue;
+    }
+    for (const file of files) {
+      if (!file.endsWith(".md")) continue;
+      const slug = file.replace(/\.md$/, "");
+      const filePath = join(dir, file);
+      try {
+        const fileStat = await stat(filePath);
+        if (!fileStat.isFile()) continue;
+      } catch {
+        continue;
+      }
+      let content: string;
+      try {
+        content = await readFile(filePath, "utf-8");
+      } catch {
+        continue;
+      }
+      const lines = content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        if (!lines[i].toLowerCase().includes(needle)) continue;
+        const start = Math.max(0, i - 1);
+        const end = Math.min(lines.length, i + 2);
+        matches.push({
+          section: sec,
+          slug,
+          line: i + 1,
+          snippet: lines.slice(start, end).join("\n"),
+        });
+        if (matches.length >= limit) return matches;
+      }
+    }
+  }
+  return matches;
+}
+
 export const vaultRoutes: FastifyPluginAsync = async (app) => {
+  // GET /api/vault/search?q=...&section=...&limit=... — search across vault files
+  app.get<{
+    Querystring: { q?: string; section?: string; limit?: string };
+    Reply: VaultSearchResponse | { error: string };
+  }>(
+    "/search",
+    { schema: { tags: ["vault"] } },
+    async (request, reply) => {
+      const q = (request.query.q ?? "").trim();
+      if (!q) {
+        return reply.status(400).send({ error: "Query parameter 'q' is required" });
+      }
+      const sectionParam = (request.query.section ?? "all") as VaultSearchSection;
+      if (!VALID_SEARCH_SECTIONS.includes(sectionParam)) {
+        return reply.status(400).send({
+          error: `section must be one of: ${VALID_SEARCH_SECTIONS.join(", ")}`,
+        });
+      }
+      const limit = Math.max(1, Math.min(100, Number(request.query.limit ?? 10)));
+      const matches = await searchVaultFiles(q, sectionParam, limit);
+      return { query: q, matches };
+    },
+  );
+
   // GET /api/vault/daily/:date — read a daily note (YYYY-MM-DD)
   app.get<{ Params: { date: string }; Reply: VaultDailyResponse | { error: string } }>(
     "/daily/:date",
