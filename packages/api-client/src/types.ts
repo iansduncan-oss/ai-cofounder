@@ -1053,6 +1053,38 @@ export interface AutoPlanResult {
   reason?: string;
 }
 
+/* ── Codebase Insights ── */
+
+export type InsightCategory = "fix" | "improve" | "add" | "review" | "followup" | "security" | "other";
+export type InsightSeverity = "low" | "medium" | "high" | "critical";
+export type InsightStatus = "open" | "dismissed" | "resolved";
+
+export interface CodebaseInsight {
+  id: string;
+  fingerprint: string;
+  category: InsightCategory;
+  severity: InsightSeverity;
+  title: string;
+  description?: string | null;
+  suggestedAction?: string | null;
+  reference?: string | null;
+  source: string;
+  status: InsightStatus;
+  hitCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  resolvedAt?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CodebaseScanResult {
+  insightsCreated: number;
+  insightsRefreshed: number;
+  signalsGathered: number;
+  prunedCount: number;
+  durationMs: number;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

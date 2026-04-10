@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, SubagentRunStatus, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput, UpsertProductivityInput } from "@ai-cofounder/api-client";
+import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, SubagentRunStatus, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput, UpsertProductivityInput, InsightStatus } from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -775,5 +775,31 @@ export function useAutoPlanProductivity() {
       }
     },
     onError: (err) => { toast.error(`Failed to auto-plan: ${err.message}`); },
+  });
+}
+
+/* ── Codebase ── */
+
+export function useScanCodebase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { synthesize?: boolean }) => apiClient.scanCodebase(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codebase.all });
+      toast.success(`Scan complete: ${result.insightsCreated} new, ${result.insightsRefreshed} refreshed`);
+    },
+    onError: (err) => { toast.error(`Scan failed: ${err.message}`); },
+  });
+}
+
+export function useUpdateInsightStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: InsightStatus }) =>
+      apiClient.updateCodebaseInsightStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codebase.all });
+    },
+    onError: (err) => { toast.error(`Failed to update: ${err.message}`); },
   });
 }

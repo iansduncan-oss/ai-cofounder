@@ -18,10 +18,14 @@ import {
   Sparkles,
   RefreshCw,
   Wand2,
+  Search,
+  AlertTriangle,
+  X as XIcon,
+  CheckCheck,
 } from "lucide-react";
-import { useProductivityToday, useProductivityStats, useProductivityWeekly } from "@/api/queries";
-import { useUpsertProductivity, useAutoPlanProductivity } from "@/api/mutations";
-import type { PlannedItem, ProductivityMood } from "@ai-cofounder/api-client";
+import { useProductivityToday, useProductivityStats, useProductivityWeekly, useCodebaseInsights } from "@/api/queries";
+import { useUpsertProductivity, useAutoPlanProductivity, useScanCodebase, useUpdateInsightStatus } from "@/api/mutations";
+import type { PlannedItem, ProductivityMood, CodebaseInsight } from "@ai-cofounder/api-client";
 
 const MOOD_OPTIONS: { value: ProductivityMood; icon: typeof Smile; label: string; color: string }[] = [
   { value: "great", icon: SmilePlus, label: "Great", color: "text-emerald-500" },
@@ -43,6 +47,9 @@ export function ProductivityPage() {
   const { data: stats, isLoading: loadingStats } = useProductivityStats(30);
   const upsert = useUpsertProductivity();
   const autoPlan = useAutoPlanProductivity();
+  const scanCodebase = useScanCodebase();
+  const updateInsight = useUpdateInsightStatus();
+  const { data: insightsData } = useCodebaseInsights("open");
 
   const [showWeekly, setShowWeekly] = useState(false);
   const {
@@ -153,6 +160,111 @@ export function ProductivityPage() {
             <p className="text-xs text-muted-foreground">Current Streak</p>
             <p className="text-2xl font-bold">{stats.currentStreak}</p>
           </div>
+        </div>
+      )}
+
+      {/* Codebase Insights (auto-scanned every 4h) */}
+      {insightsData && insightsData.data.length > 0 && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Search className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold">Codebase Insights</h2>
+              <span className="text-xs text-muted-foreground">— auto-discovered from your recent work</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary">
+                {insightsData.data.length}
+              </span>
+            </div>
+            <button
+              onClick={() => scanCodebase.mutate({ synthesize: true })}
+              disabled={scanCodebase.isPending}
+              className="flex items-center gap-1 rounded-md border bg-background px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+              title="Run a fresh scan"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${scanCodebase.isPending ? "animate-spin" : ""}`} />
+              Rescan
+            </button>
+          </div>
+          <div className="space-y-2">
+            {insightsData.data.slice(0, 6).map((insight: CodebaseInsight) => (
+              <div
+                key={insight.id}
+                className="flex items-start justify-between gap-3 rounded-md border bg-background/50 p-3 text-sm"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                        insight.severity === "critical"
+                          ? "bg-red-500/20 text-red-600"
+                          : insight.severity === "high"
+                            ? "bg-orange-500/20 text-orange-600"
+                            : insight.severity === "medium"
+                              ? "bg-amber-500/20 text-amber-600"
+                              : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {insight.category}
+                    </span>
+                    {insight.severity === "critical" || insight.severity === "high" ? (
+                      <AlertTriangle className="h-3 w-3 text-orange-500" />
+                    ) : null}
+                    <span className="text-xs text-muted-foreground">via {insight.source}</span>
+                  </div>
+                  <p className="text-sm font-medium truncate">{insight.title}</p>
+                  {insight.suggestedAction && (
+                    <p className="mt-0.5 text-xs text-muted-foreground truncate">
+                      {insight.suggestedAction}
+                    </p>
+                  )}
+                  {insight.reference && (
+                    <p className="mt-0.5 text-xs text-muted-foreground font-mono truncate">
+                      {insight.reference}
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    onClick={() => updateInsight.mutate({ id: insight.id, status: "resolved" })}
+                    className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-emerald-600"
+                    title="Mark resolved"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    onClick={() => updateInsight.mutate({ id: insight.id, status: "dismissed" })}
+                    className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                    title="Dismiss"
+                  >
+                    <XIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {insightsData.data.length > 6 && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              _Showing 6 of {insightsData.data.length}. Run `/autoplan` to pull these into today's plan._
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* If no insights yet, show a scan prompt */}
+      {insightsData && insightsData.data.length === 0 && (
+        <div className="rounded-lg border border-dashed bg-card/50 p-4 text-center">
+          <Search className="mx-auto h-5 w-5 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground mb-2">
+            No codebase insights yet. Let Jarvis scan your recent work for things to fix, improve, or add.
+          </p>
+          <button
+            onClick={() => scanCodebase.mutate({ synthesize: true })}
+            disabled={scanCodebase.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            <Search className="h-3.5 w-3.5" />
+            {scanCodebase.isPending ? "Scanning..." : "Run first scan"}
+          </button>
         </div>
       )}
 

@@ -599,3 +599,19 @@ export function useProductivityWeekly(enabled = true) {
     staleTime: 5 * 60 * 1000, // 5 minutes — LLM call is expensive
   });
 }
+
+/* ── Codebase Insights ── */
+
+export function useCodebaseInsights(status: "open" | "dismissed" | "resolved" = "open") {
+  return useQuery({
+    queryKey: queryKeys.codebase.insights(status),
+    queryFn: () => apiClient.listCodebaseInsights({ status, limit: 20 }),
+  });
+}
+
+export function useCodebaseInsightsCount() {
+  return useQuery({
+    queryKey: queryKeys.codebase.count,
+    queryFn: () => apiClient.getCodebaseInsightsCount(),
+  });
+}

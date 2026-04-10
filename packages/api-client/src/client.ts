@@ -85,6 +85,11 @@ import type {
   ProductivityStats,
   ProductivityWeeklySummary,
   AutoPlanResult,
+  CodebaseInsight,
+  CodebaseScanResult,
+  InsightCategory,
+  InsightSeverity,
+  InsightStatus,
   GlobalSearchResults,
   DeployCircuitBreakerStatus,
   ThinkingTrace,
@@ -1489,6 +1494,37 @@ export class ApiClient {
 
   autoGenerateProductivityPlan(opts?: { force?: boolean; merge?: boolean }) {
     return this.request<AutoPlanResult>("POST", "/api/productivity/auto-plan", opts ?? {});
+  }
+
+  /* ── Codebase Insights ── */
+
+  scanCodebase(opts?: { synthesize?: boolean; repoDir?: string }) {
+    return this.request<CodebaseScanResult>("POST", "/api/codebase/scan", opts ?? {});
+  }
+
+  listCodebaseInsights(opts?: {
+    status?: InsightStatus;
+    category?: InsightCategory;
+    severity?: InsightSeverity;
+    limit?: number;
+    offset?: number;
+  }) {
+    const params = new URLSearchParams();
+    if (opts?.status) params.set("status", opts.status);
+    if (opts?.category) params.set("category", opts.category);
+    if (opts?.severity) params.set("severity", opts.severity);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.offset != null) params.set("offset", String(opts.offset));
+    const q = params.toString();
+    return this.request<{ data: CodebaseInsight[]; total: number }>("GET", `/api/codebase/insights${q ? `?${q}` : ""}`);
+  }
+
+  getCodebaseInsightsCount() {
+    return this.request<{ open: number }>("GET", "/api/codebase/insights/count");
+  }
+
+  updateCodebaseInsightStatus(id: string, status: InsightStatus) {
+    return this.request<CodebaseInsight>("PATCH", `/api/codebase/insights/${id}/status`, { status });
   }
 
   deleteProductivityLog(id: string) {

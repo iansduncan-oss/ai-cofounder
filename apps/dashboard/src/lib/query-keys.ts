@@ -196,6 +196,11 @@ export const queryKeys = {
     stats: (days?: number) => ["productivity", "stats", days ?? 30] as const,
     weekly: ["productivity", "weekly"] as const,
   },
+  codebase: {
+    all: ["codebase"] as const,
+    insights: (status?: string) => ["codebase", "insights", status ?? "open"] as const,
+    count: ["codebase", "count"] as const,
+  },
   knowledge: {
     all: ["knowledge"] as const,
     status: ["knowledge", "status"] as const,

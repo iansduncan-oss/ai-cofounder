@@ -349,6 +349,13 @@ export function mockDbModule() {
     getProductivityStats: vi.fn().mockResolvedValue({ totalDays: 0, avgCompletion: 0, avgEnergy: 0, moodCounts: {}, currentStreak: 0, history: [] }),
     deleteProductivityLog: vi.fn().mockResolvedValue(null),
     productivityLogs: {},
+    // Codebase insights
+    upsertCodebaseInsight: vi.fn().mockResolvedValue({ id: "ci-1", fingerprint: "fp", status: "open", category: "fix", severity: "medium", title: "test", hitCount: 1 }),
+    listCodebaseInsights: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+    updateCodebaseInsightStatus: vi.fn().mockResolvedValue(null),
+    pruneStaleCodebaseInsights: vi.fn().mockResolvedValue(0),
+    countCodebaseInsights: vi.fn().mockResolvedValue(0),
+    codebaseInsights: {},
     // Thinking traces
     saveThinkingTrace: vi.fn().mockResolvedValue({ id: "tt-1", conversationId: "conv-1", round: 0, content: "test" }),
     getThinkingTraces: vi.fn().mockResolvedValue([]),

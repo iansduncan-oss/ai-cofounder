@@ -253,6 +253,18 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info({ hour: nudgeHour, tz: briefingTimezone }, "Scheduled daily productivity nudge");
 
+  // ── Codebase scan (every 4 hours) — discovers things to fix/improve/add ──
+
+  await monitoringQueue.upsertJobScheduler(
+    "codebase-scan",
+    { every: 4 * 60 * 60 * 1000 },
+    {
+      name: "codebase-scan",
+      data: { check: "codebase_scan" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled codebase scan every 4 hours");
+
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
   const meetingPrepQueue = getMeetingPrepQueue();

@@ -766,6 +766,39 @@ export async function handleReflect(
 }
 
 /**
+ * /audit — scan the codebase and return a summary of top findings.
+ */
+export async function handleAudit(client: ApiClient): Promise<HandlerResult> {
+  try {
+    const scanResult = await client.scanCodebase({ synthesize: true });
+    const listing = await client.listCodebaseInsights({ status: "open", limit: 8 });
+
+    const lines = [
+      `**Codebase scan complete** in ${(scanResult.durationMs / 1000).toFixed(1)}s`,
+      `- ${scanResult.insightsCreated} new / ${scanResult.insightsRefreshed} refreshed / ${scanResult.prunedCount} pruned`,
+    ];
+
+    if (listing.data.length === 0) {
+      lines.push("\n_No open insights. Everything looks clean._");
+    } else {
+      lines.push(`\n**Top ${listing.data.length} open insights:**`);
+      for (const insight of listing.data) {
+        const sev = insight.severity.toUpperCase();
+        lines.push(`  - [${sev}/${insight.category}] ${insight.title}`);
+        if (insight.suggestedAction) {
+          lines.push(`    _→ ${insight.suggestedAction.slice(0, 120)}_`);
+        }
+      }
+      lines.push("\nUse `/autoplan` to pull these into today's plan, or open /dashboard/productivity.");
+    }
+
+    return { type: "info", message: lines.join("\n") };
+  } catch (err) {
+    return { type: "error", message: `Audit failed: ${(err as Error).message}` };
+  }
+}
+
+/**
  * /autoplan — have Jarvis generate today's plan from active goals/tasks/follow-ups.
  */
 export async function handleAutoPlan(

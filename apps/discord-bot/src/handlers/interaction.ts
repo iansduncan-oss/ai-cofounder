@@ -25,6 +25,7 @@ import {
   handleAnalytics,
   handlePlan,
   handleAutoPlan,
+  handleAudit,
   handleReflect,
   handleStreak,
   checkCooldown,
@@ -197,6 +198,11 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       const merge = interaction.options.getBoolean("merge") ?? undefined;
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, await handleAutoPlan(client, { force, merge }));
+      return;
+    }
+    case "audit": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleAudit(client));
       return;
     }
     case "reflect": {

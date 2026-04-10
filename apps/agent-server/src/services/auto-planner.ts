@@ -7,6 +7,7 @@ import {
   getProductivityLog,
   upsertProductivityLog,
   getPrimaryAdminUserId,
+  listCodebaseInsights,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 
@@ -31,15 +32,17 @@ interface GatheredContext {
   overdueFollowUps: Array<{ title: string; dueDate: Date | null }>;
   upcomingFollowUps: Array<{ title: string; dueDate: Date | null }>;
   todayEvents: Array<{ summary: string; start: string; end: string }>;
+  codebaseInsights: Array<{ category: string; severity: string; title: string; suggestedAction?: string | null }>;
   yesterdayBlockers?: string;
   yesterdayCompletion?: number | null;
 }
 
 async function gatherContext(db: Db, adminUserId: string): Promise<GatheredContext> {
-  const [activeGoals, pendingTasks, allFollowUps] = await Promise.all([
+  const [activeGoals, pendingTasks, allFollowUps, insightList] = await Promise.all([
     listActiveGoals(db),
     listPendingTasks(db, 15),
     listFollowUps(db, { status: "pending", limit: 30 }),
+    listCodebaseInsights(db, { status: "open", limit: 10 }),
   ]);
 
   const now = new Date();
@@ -94,6 +97,12 @@ async function gatherContext(db: Db, adminUserId: string): Promise<GatheredConte
     overdueFollowUps,
     upcomingFollowUps,
     todayEvents,
+    codebaseInsights: insightList.data.slice(0, 8).map((i) => ({
+      category: i.category,
+      severity: i.severity,
+      title: i.title,
+      suggestedAction: i.suggestedAction,
+    })),
     yesterdayBlockers: yLog?.blockers ?? undefined,
     yesterdayCompletion: yLog?.completionScore ?? null,
   };
@@ -154,6 +163,15 @@ function buildPlanPrompt(ctx: GatheredContext): string {
       const goalTag = t.goalTitle ? ` [from: ${t.goalTitle}]` : "";
       lines.push(`  - "${t.title}"${goalTag}`);
     }
+  }
+
+  if (ctx.codebaseInsights.length > 0) {
+    lines.push(`\nCodebase insights from the last automated scan (fix/improve/add opportunities):`);
+    for (const i of ctx.codebaseInsights) {
+      const action = i.suggestedAction ? ` — ${i.suggestedAction}` : "";
+      lines.push(`  - [${i.category}/${i.severity}] ${i.title}${action}`);
+    }
+    lines.push("Note: prioritize high-severity fixes and overdue reviews over low-severity cleanups.");
   }
 
   if (ctx.yesterdayBlockers) {
@@ -232,7 +250,8 @@ export async function generateDailyPlan(
     ctx.activeGoals.length +
     ctx.pendingTasks.length +
     ctx.overdueFollowUps.length +
-    ctx.upcomingFollowUps.length;
+    ctx.upcomingFollowUps.length +
+    ctx.codebaseInsights.length;
   if (totalSignals === 0) {
     logger.info("no signals available for auto-plan");
     return {
@@ -276,6 +295,12 @@ export async function generateDailyPlan(
   if (items.length === 0) {
     const fallback: string[] = [];
     for (const f of ctx.overdueFollowUps.slice(0, 2)) fallback.push(`Handle: ${f.title}`);
+    // Pull top codebase insights (severity is already sort-ordered in the query)
+    for (const insight of ctx.codebaseInsights.slice(0, 2)) {
+      if (insight.severity === "high" || insight.severity === "critical") {
+        fallback.push(insight.suggestedAction ?? insight.title);
+      }
+    }
     for (const t of ctx.pendingTasks.slice(0, 3)) fallback.push(t.title);
     if (fallback.length === 0 && ctx.activeGoals.length > 0) {
       fallback.push(`Make progress on: ${ctx.activeGoals[0].title}`);

@@ -134,6 +134,18 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "codebase_scan": {
+          const { CodebaseScannerService } = await import("../services/codebase-scanner.js");
+          const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService);
+          try {
+            const result = await scanner.scan({ synthesize: true });
+            logger.info(result, "scheduled codebase scan complete");
+            app.agentEvents.emit("ws:codebase_updated");
+          } catch (err) {
+            logger.warn({ err }, "scheduled codebase scan failed");
+          }
+          break;
+        }
         case "productivity_nudge": {
           const { getPrimaryAdminUserId, getProductivityLog } = await import("@ai-cofounder/db");
           const adminUserId = await getPrimaryAdminUserId(app.db);

@@ -25,6 +25,7 @@ export {
   handleAnalytics,
   handlePlan,
   handleAutoPlan,
+  handleAudit,
   handleReflect,
   handleStreak,
   truncate,
