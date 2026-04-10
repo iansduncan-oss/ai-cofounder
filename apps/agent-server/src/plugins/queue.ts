@@ -10,6 +10,7 @@ import {
   type WorkerProcessors,
 } from "@ai-cofounder/queue";
 import { notifyCiFailures, fireN8nActionWebhook } from "../helpers/queue-processors.js";
+import { setGithubOpenPrs, recordDiscordTriageResult } from "./observability.js";
 import type { DiscordTriageService, buildDiscordAlertBlocks } from "../services/discord-triage.js";
 type BuildDiscordAlertBlocksFn = typeof buildDiscordAlertBlocks;
 
@@ -61,6 +62,7 @@ export const queuePlugin = fp(async (app) => {
         }
         case "github_prs": {
           const prResults = await app.monitoringService.checkGitHubPRs();
+          setGithubOpenPrs(prResults.length);
           logger.debug({ openPRs: prResults.length }, "GitHub PR check complete");
           break;
         }
@@ -426,6 +428,13 @@ export const queuePlugin = fp(async (app) => {
       const triageService = cachedTriageService;
       const buildDiscordAlertBlocks = cachedBuildDiscordAlertBlocks;
       const result = await triageService.triageBatch({ channelName, messages });
+
+      // Record every classification to Prometheus, regardless of filtering downstream.
+      recordDiscordTriageResult({
+        category: result.category,
+        urgency: result.urgency,
+        actionable: result.actionable,
+      });
 
       const minConfidence = parseFloat(optionalEnv("DISCORD_WATCHER_MIN_CONFIDENCE", "0.6"));
       if (!result.actionable || result.confidence < minConfidence) {

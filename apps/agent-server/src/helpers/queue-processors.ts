@@ -2,6 +2,7 @@ import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import type { GitHubCIStatus } from "../services/monitoring.js";
 import type { TriageResult } from "../services/discord-triage.js";
 import type { DiscordTriageMessage } from "@ai-cofounder/queue";
+import { recordGithubCiFailure } from "../plugins/observability.js";
 
 const logger = createLogger("queue-processors");
 
@@ -19,6 +20,12 @@ export async function notifyCiFailures(
   ciResults: GitHubCIStatus[],
 ): Promise<number> {
   const ciFailures = ciResults.filter((ci) => ci.status === "failure");
+
+  // Publish Prometheus metrics for EVERY failure, even if notification is skipped.
+  for (const ci of ciFailures) {
+    recordGithubCiFailure(ci.repo, ci.branch);
+  }
+
   if (ciFailures.length === 0) return 0;
 
   const lines = ciFailures.map(
