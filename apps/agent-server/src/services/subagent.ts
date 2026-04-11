@@ -10,13 +10,13 @@ import type {
 } from "@ai-cofounder/llm";
 import type { Db } from "@ai-cofounder/db";
 import { createLogger } from "@ai-cofounder/shared";
-import {
-  recallMemories,
-  searchMemoriesByVector,
-  updateSubagentRunStatus,
-} from "@ai-cofounder/db";
+import { recallMemories, searchMemoriesByVector, updateSubagentRunStatus } from "@ai-cofounder/db";
 import type { RedisPubSub, SubagentProgressEvent } from "@ai-cofounder/queue";
-import { buildSharedToolList, executeSharedTool, type ToolExecutorContext } from "../agents/tool-executor.js";
+import {
+  buildSharedToolList,
+  executeSharedTool,
+  type ToolExecutorContext,
+} from "../agents/tool-executor.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
 import { recordToolMetrics, recordSubagentMetrics } from "../plugins/observability.js";
 import { recordToolExecution } from "@ai-cofounder/db";
@@ -124,9 +124,7 @@ export class SubagentRunner {
         EXCLUDED_TOOLS,
       );
 
-      const messages: LlmMessage[] = [
-        { role: "user", content: params.instruction },
-      ];
+      const messages: LlmMessage[] = [{ role: "user", content: params.instruction }];
 
       // Initial LLM call
       let response = await this.registry.complete("code", {
@@ -164,26 +162,34 @@ export class SubagentRunner {
             let result: unknown;
 
             try {
-              result = await executeSharedTool(block, {
-                db: this.db,
-                embeddingService: this.embeddingService,
-                n8nService: this.n8nService,
-                sandboxService: this.sandboxService,
-                workspaceService: this.workspaceService,
-                messagingService: this.messagingService,
-              }, {
-                conversationId: params.conversationId ?? params.subagentRunId,
-                userId: params.userId,
-                agentRole: "subagent",
-                agentRunId: params.subagentRunId,
-                goalId: params.goalId,
-              } as ToolExecutorContext);
+              result = await executeSharedTool(
+                block,
+                {
+                  db: this.db,
+                  embeddingService: this.embeddingService,
+                  n8nService: this.n8nService,
+                  sandboxService: this.sandboxService,
+                  workspaceService: this.workspaceService,
+                  messagingService: this.messagingService,
+                },
+                {
+                  conversationId: params.conversationId ?? params.subagentRunId,
+                  userId: params.userId,
+                  agentRole: "subagent",
+                  agentRunId: params.subagentRunId,
+                  goalId: params.goalId,
+                } as ToolExecutorContext,
+              );
 
               // null means unknown tool
               if (result === null) {
                 result = { error: `Unknown tool: ${block.name}` };
                 success = false;
-              } else if (result && typeof result === "object" && "error" in (result as Record<string, unknown>)) {
+              } else if (
+                result &&
+                typeof result === "object" &&
+                "error" in (result as Record<string, unknown>)
+              ) {
                 success = false;
               }
             } catch (err) {
@@ -199,7 +205,7 @@ export class SubagentRunner {
               success,
               errorMessage: success ? undefined : "tool returned error",
               requestId: params.parentRequestId,
-            }).catch(() => {});
+            }).catch((err) => logger.warn({ err }, "subagent journal entry failed"));
 
             await this.publishProgress(params.subagentRunId, {
               subagentRunId: params.subagentRunId,
@@ -265,7 +271,15 @@ export class SubagentRunner {
         "subagent run completed",
       );
 
-      return { output, model: modelName, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }, toolsUsed, rounds: round, durationMs };
+      return {
+        output,
+        model: modelName,
+        provider: providerName,
+        usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+        toolsUsed,
+        rounds: round,
+        durationMs,
+      };
     } catch (err) {
       const durationMs = Date.now() - startTime;
       const errorMsg = err instanceof Error ? err.message : String(err);
@@ -297,14 +311,22 @@ export class SubagentRunner {
     if (!userId) return "";
     try {
       const userMemories = await recallMemories(this.db, userId, { limit: 10 });
-      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
+      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> =
+        [];
 
       if (this.embeddingService) {
         try {
           const queryEmbedding = await this.embeddingService.embed(query);
           const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
-          relevantMemories = vectorResults.map((m) => ({ id: m.id, category: m.category, key: m.key, content: m.content }));
-        } catch { /* non-fatal */ }
+          relevantMemories = vectorResults.map((m) => ({
+            id: m.id,
+            category: m.category,
+            key: m.key,
+            content: m.content,
+          }));
+        } catch {
+          /* non-fatal */
+        }
       }
 
       const seenIds = new Set(relevantMemories.map((m) => m.id));
@@ -345,7 +367,10 @@ You have full access to tools for file operations, code execution, git, web sear
 - Focus solely on your assigned task.${memoryContext ? `\n\n## Context\n${memoryContext}` : ""}`;
   }
 
-  private async publishProgress(subagentRunId: string, event: SubagentProgressEvent): Promise<void> {
+  private async publishProgress(
+    subagentRunId: string,
+    event: SubagentProgressEvent,
+  ): Promise<void> {
     if (!this.redisPubSub) return;
     try {
       await this.redisPubSub.publishSubagent(subagentRunId, event);

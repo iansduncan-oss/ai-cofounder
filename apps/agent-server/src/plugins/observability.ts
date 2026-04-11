@@ -168,12 +168,84 @@ const sandboxOrphanCleanupsTotal = new client.Counter({
   help: "Total orphaned sandbox containers cleaned up",
 });
 
+// --- Goal Throughput Metrics ---
+
+const goalsActive = new client.Gauge({
+  name: "goals_active",
+  help: "Number of goals in active status right now",
+});
+
+const goalsCompleted24h = new client.Gauge({
+  name: "goals_completed_24h",
+  help: "Goals that entered 'completed' in the last 24 hours",
+});
+
+const goalsFailed24h = new client.Gauge({
+  name: "goals_failed_24h",
+  help: "Goals that entered 'failed' in the last 24 hours",
+});
+
+// --- GitHub Integration Metrics ---
+
+const githubCiFailuresTotal = new client.Counter({
+  name: "github_ci_failures_total",
+  help: "CI failure events surfaced by the monitoring job",
+  labelNames: ["repo", "branch"] as const,
+});
+
+const githubOpenPrs = new client.Gauge({
+  name: "github_open_prs",
+  help: "Open pull requests across monitored repos",
+});
+
+// --- Discord Triage Metrics ---
+
+const discordTriageResultsTotal = new client.Counter({
+  name: "discord_triage_results_total",
+  help: "Discord triage classifications emitted by the watcher",
+  labelNames: ["category", "urgency", "actionable"] as const,
+});
+
 // --- Backup Metrics ---
 
 export const backupLastSuccessTimestamp = new client.Gauge({
   name: "backup_last_success_timestamp",
   help: "Unix timestamp of last successful backup",
 });
+
+/** Increment CI failure counter; called once per failing run surfaced. */
+export function recordGithubCiFailure(repo: string, branch: string): void {
+  githubCiFailuresTotal.inc({ repo, branch });
+}
+
+/** Update the current count of open PRs across monitored repos. */
+export function setGithubOpenPrs(count: number): void {
+  githubOpenPrs.set(count);
+}
+
+/** Record a Discord triage classification result. */
+export function recordDiscordTriageResult(data: {
+  category: string;
+  urgency: string;
+  actionable: boolean;
+}): void {
+  discordTriageResultsTotal.inc({
+    category: data.category,
+    urgency: data.urgency,
+    actionable: String(data.actionable),
+  });
+}
+
+/** Set the three goal-throughput gauges. Expects pre-computed counts. */
+export function setGoalThroughputMetrics(data: {
+  active: number;
+  completed24h: number;
+  failed24h: number;
+}): void {
+  goalsActive.set(data.active);
+  goalsCompleted24h.set(data.completed24h);
+  goalsFailed24h.set(data.failed24h);
+}
 
 export function recordBackupSuccess() {
   backupLastSuccessTimestamp.set(Date.now() / 1000);
@@ -185,7 +257,13 @@ export function recordSandboxMetrics(data: {
   oomKilled: boolean;
   timedOut: boolean;
 }) {
-  const status = data.oomKilled ? "oom" : data.timedOut ? "timeout" : data.success ? "success" : "error";
+  const status = data.oomKilled
+    ? "oom"
+    : data.timedOut
+      ? "timeout"
+      : data.success
+        ? "success"
+        : "error";
   sandboxExecutionsTotal.inc({ language: data.language, status });
   if (data.oomKilled) {
     sandboxOomKillsTotal.inc({ language: data.language });
@@ -232,8 +310,14 @@ export function recordLlmMetrics(data: {
   const labels = { provider: data.provider, model: data.model, task_category: data.taskCategory };
   llmRequestDuration.observe(labels, data.durationMs / 1000);
   llmRequestsTotal.inc({ ...labels, status: data.success ? "success" : "error" });
-  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "input" }, data.inputTokens);
-  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "output" }, data.outputTokens);
+  llmTokensTotal.inc(
+    { provider: data.provider, model: data.model, direction: "input" },
+    data.inputTokens,
+  );
+  llmTokensTotal.inc(
+    { provider: data.provider, model: data.model, direction: "output" },
+    data.outputTokens,
+  );
   if (data.estimatedCostMicros) {
     llmCostMicros.inc({ provider: data.provider, model: data.model }, data.estimatedCostMicros);
   }
@@ -263,6 +347,35 @@ function startProcessMetrics() {
   const interval = setInterval(update, 15_000);
   interval.unref();
   return interval;
+}
+
+/**
+ * Pull the current goal throughput state from the DB and publish it on
+ * the Prometheus gauges. Called on a timer from the plugin's onReady
+ * hook. Swallows errors — if the DB is down, the gauges keep their
+ * previous values rather than zeroing out.
+ */
+async function updateGoalThroughputMetrics(app: FastifyInstance): Promise<void> {
+  try {
+    const { listActiveGoals, listRecentlyCompletedGoals, sql } = await import("@ai-cofounder/db");
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [active, completedRecent, failedRowsResult] = await Promise.all([
+      listActiveGoals(app.db),
+      listRecentlyCompletedGoals(app.db, since),
+      app.db.execute(
+        sql`select count(*)::int as count from goals where status = 'failed' and updated_at >= ${since.toISOString()} and deleted_at is null`,
+      ),
+    ]);
+    const failedRows = failedRowsResult as unknown as Array<{ count: number }>;
+    const failed24h = failedRows[0]?.count ?? 0;
+    setGoalThroughputMetrics({
+      active: active.length,
+      completed24h: completedRecent.length,
+      failed24h,
+    });
+  } catch {
+    // DB unavailable — leave gauges at their last known values.
+  }
 }
 
 // Track previous completed/failed counts for counter increments
@@ -356,6 +469,14 @@ export const observabilityPlugin = fp(async (app: FastifyInstance) => {
       queueInterval.unref();
       intervals.push(queueInterval);
     }
+
+    // Goal throughput gauges — refreshed every 60s
+    updateGoalThroughputMetrics(app);
+    const goalInterval = setInterval(() => {
+      updateGoalThroughputMetrics(app);
+    }, 60_000);
+    goalInterval.unref();
+    intervals.push(goalInterval);
   });
 
   // Track request start time and record metrics on response

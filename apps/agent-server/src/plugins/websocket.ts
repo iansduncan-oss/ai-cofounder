@@ -9,10 +9,23 @@ const logger = createLogger("websocket-plugin");
 
 /** Valid channel names — kept inline to avoid vitest mock issues with imported constants */
 const VALID_CHANNELS = new Set<string>([
-  "tasks", "approvals", "monitoring", "queue", "health",
-  "tools", "pipelines", "briefing", "goals", "deploys",
-  "patterns", "context", "journal", "usage",
-  "follow-ups", "conversations", "work-sessions",
+  "tasks",
+  "approvals",
+  "monitoring",
+  "queue",
+  "health",
+  "tools",
+  "pipelines",
+  "briefing",
+  "goals",
+  "deploys",
+  "patterns",
+  "context",
+  "journal",
+  "usage",
+  "follow-ups",
+  "conversations",
+  "work-sessions",
 ]);
 
 /** Per-connection state */
@@ -71,7 +84,8 @@ export const websocketPlugin = fp(async (app) => {
   // Each WebSocket connection adds a close listener to the WS server. Under load
   // (or in tests with many connections) this exceeds the default limit of 10.
   if (app.websocketServer) {
-    app.websocketServer.setMaxListeners(0);
+    // Set a generous but bounded limit instead of disabling the leak warning entirely
+    app.websocketServer.setMaxListeners(200);
   }
 
   // Heartbeat: ping every 30s, drop dead connections after 10s grace
@@ -104,7 +118,9 @@ export const websocketPlugin = fp(async (app) => {
       try {
         const event = JSON.parse(rawMsg) as Record<string, unknown>;
         broadcastGoalEvent(goalId, event);
-      } catch { /* ignore parse errors */ }
+      } catch {
+        /* ignore parse errors */
+      }
     };
     app.agentEvents.on(goalChannel(goalId), listener);
     goalListeners.set(goalId, { listener, refCount: 1 });
@@ -151,7 +167,10 @@ export const websocketPlugin = fp(async (app) => {
   // Bridge: listen to app.agentEvents for goal events → forward to WS clients
   app.agentEvents.on("ws:goal_event", (payload: string) => {
     try {
-      const { goalId, data } = JSON.parse(payload) as { goalId: string; data: Record<string, unknown> };
+      const { goalId, data } = JSON.parse(payload) as {
+        goalId: string;
+        data: Record<string, unknown>;
+      };
       broadcastGoalEvent(goalId, data);
     } catch (err) {
       logger.warn({ err }, "failed to parse ws:goal_event");
@@ -281,4 +300,9 @@ export const websocketPlugin = fp(async (app) => {
 });
 
 // Export for testing
-export { clients as _wsClients, goalListeners as _goalListeners, broadcastInvalidation, broadcastGoalEvent };
+export {
+  clients as _wsClients,
+  goalListeners as _goalListeners,
+  broadcastInvalidation,
+  broadcastGoalEvent,
+};

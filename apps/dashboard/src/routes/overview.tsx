@@ -1,4 +1,11 @@
-import { useHealth, usePendingApprovals, usePendingTasks, useUsage, useProviderHealth, useGoalAnalytics } from "@/api/queries";
+import {
+  useHealth,
+  usePendingApprovals,
+  usePendingTasks,
+  useUsage,
+  useProviderHealth,
+  useGoalAnalytics,
+} from "@/api/queries";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -6,14 +13,26 @@ import { CardSkeleton } from "@/components/common/loading-skeleton";
 import { TaskStatusBadge } from "@/components/common/status-badge";
 import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { Target, ShieldCheck, Zap, Activity, AlertTriangle, CheckCircle, XCircle, Clock } from "lucide-react";
+import {
+  Target,
+  ShieldCheck,
+  Zap,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+} from "lucide-react";
 import { Link } from "react-router";
 
 export function OverviewPage() {
   usePageTitle("Overview");
 
   const { data: health } = useHealth();
-  const { data: approvals, isLoading: approvalsLoading, error: approvalsError } = usePendingApprovals();
+  const {
+    data: approvals,
+    isLoading: approvalsLoading,
+    error: approvalsError,
+  } = usePendingApprovals();
   const { data: pendingTasks, isLoading: tasksLoading, error: tasksError } = usePendingTasks();
   const { data: usage, isLoading: usageLoading } = useUsage("today");
   const { data: providerHealthData } = useProviderHealth();
@@ -39,10 +58,7 @@ export function OverviewPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Overview"
-        description="System summary at a glance"
-      />
+      <PageHeader title="Overview" description="System summary at a glance" />
 
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -56,18 +72,12 @@ export function OverviewPage() {
           <Link to="/dashboard/goals">
             <Card className="transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Pending Tasks
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Pending Tasks</CardTitle>
                 <Target className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {pendingTasks?.length ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Awaiting execution
-                </p>
+                <div className="text-2xl font-bold">{pendingTasks?.length ?? 0}</div>
+                <p className="text-xs text-muted-foreground">Awaiting execution</p>
               </CardContent>
             </Card>
           </Link>
@@ -75,35 +85,25 @@ export function OverviewPage() {
           <Link to="/dashboard/approvals">
             <Card className="transition-all hover:shadow-md hover:-translate-y-0.5 cursor-pointer">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Pending Approvals
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Pending Approvals</CardTitle>
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {approvals?.length ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Require action
-                </p>
+                <div className="text-2xl font-bold">{approvals?.length ?? 0}</div>
+                <p className="text-xs text-muted-foreground">Require action</p>
               </CardContent>
             </Card>
           </Link>
 
           <Card className="transition-all hover:shadow-md hover:-translate-y-0.5">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                Today&apos;s Tokens
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Today&apos;s Tokens</CardTitle>
               <Zap className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
                 {usage
-                  ? Math.round(
-                      (usage.totalInputTokens + usage.totalOutputTokens) / 1000,
-                    ) + "k"
+                  ? Math.round((usage.totalInputTokens + usage.totalOutputTokens) / 1000) + "k"
                   : "0"}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -114,9 +114,7 @@ export function OverviewPage() {
 
           <Card className="transition-all hover:shadow-md hover:-translate-y-0.5">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                System Status
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">System Status</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -124,9 +122,7 @@ export function OverviewPage() {
                 {health?.status === "ok" ? "Healthy" : "Degraded"}
               </div>
               <p className="text-xs text-muted-foreground">
-                {health
-                  ? `Up ${Math.floor(health.uptime / 3600)}h`
-                  : "Checking..."}
+                {health ? `Up ${Math.floor(health.uptime / 3600)}h` : "Checking..."}
               </p>
             </CardContent>
           </Card>

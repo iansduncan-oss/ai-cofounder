@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { screen, within, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "./test-utils";
 
 // ── Shared mocks ────────────────────────────────────────
@@ -322,10 +322,7 @@ describe("Keyboard Navigation", () => {
       const user = userEvent.setup();
       renderWithProviders(<ChatPage />);
 
-      const tabs = await tabsToReach(
-        user,
-        (el) => el?.tagName === "TEXTAREA",
-      );
+      const tabs = await tabsToReach(user, (el) => el?.tagName === "TEXTAREA");
       expect(tabs).toBeGreaterThan(0);
     });
 
@@ -398,15 +395,12 @@ describe("Keyboard Navigation", () => {
         initialEntries: ["/dashboard/goals"],
       });
 
-      const tabs = await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      const tabs = await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
       expect(tabs).toBeGreaterThan(0);
     });
 
     it("goal list links are keyboard-navigable", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalsPage />, {
         initialEntries: ["/dashboard/goals"],
       });
@@ -423,7 +417,7 @@ describe("Keyboard Navigation", () => {
     });
 
     it("filter selects are reachable via Tab", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalsPage />, {
         initialEntries: ["/dashboard/goals"],
       });
@@ -442,10 +436,7 @@ describe("Keyboard Navigation", () => {
       });
 
       // Tab to the New Goal button
-      await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
 
       // Press Enter to open dialog
       await user.keyboard("{Enter}");
@@ -462,10 +453,7 @@ describe("Keyboard Navigation", () => {
       });
 
       // Tab to the New Goal button
-      await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
 
       // Press Space to activate
       await user.keyboard(" ");
@@ -480,7 +468,7 @@ describe("Keyboard Navigation", () => {
 
   describe("GoalDetailPage keyboard interaction", () => {
     it("all action buttons are reachable via Tab", async () => {
-      const user = userEvent.setup();
+      const _user = userEvent.setup();
       renderWithProviders(<GoalDetailPage />, {
         initialEntries: ["/dashboard/goals/goal-1"],
       });

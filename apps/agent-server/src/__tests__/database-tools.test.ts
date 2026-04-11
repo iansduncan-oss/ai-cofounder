@@ -1,132 +1,331 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@ai-cofounder/shared", () => ({
-  createLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
-  optionalEnv: (_name: string, defaultValue: string) => defaultValue,
+// Mock drizzle-orm
+const mockExecute = vi.fn();
+vi.mock("drizzle-orm", () => ({
+  sql: {
+    raw: (s: string) => ({ queryChunks: [s] }),
+  },
 }));
 
-const { QUERY_DATABASE_TOOL, executeQueryDatabase } = await import(
-  "../agents/tools/database-tools.js"
-);
+const { executeQueryDatabase } = await import("../agents/tools/database-tools.js");
 
-describe("QUERY_DATABASE_TOOL definition", () => {
-  it("has correct name", () => {
-    expect(QUERY_DATABASE_TOOL.name).toBe("query_database");
-  });
-
-  it("requires sql field", () => {
-    expect(QUERY_DATABASE_TOOL.input_schema.required).toContain("sql");
-  });
-
-  it("has description", () => {
-    expect(QUERY_DATABASE_TOOL.description).toBeTruthy();
-  });
-});
+function createMockDb() {
+  return { execute: mockExecute } as any;
+}
 
 describe("executeQueryDatabase", () => {
-  const mockExecute = vi.fn();
-  const mockDb = { execute: mockExecute } as any;
-
-  it("rejects DROP statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "DROP TABLE goals");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExecute.mockResolvedValue([{ id: 1, name: "test" }]);
   });
 
-  it("rejects DELETE statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "DELETE FROM goals WHERE id = '1'");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
+  // ── Allowlist: valid read-only queries ────────────────────
 
-  it("rejects INSERT statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "INSERT INTO goals (title) VALUES ('x')");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
+  describe("allows read-only queries", () => {
+    it("allows SELECT", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      expect(result).toHaveProperty("rows");
+      expect(mockExecute).toHaveBeenCalled();
+    });
 
-  it("rejects UPDATE statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "UPDATE goals SET title = 'x'");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
+    it("allows select (lowercase)", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "select id from users");
+      expect(result).toHaveProperty("rows");
+    });
 
-  it("rejects ALTER statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "ALTER TABLE goals ADD COLUMN foo text");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
+    it("allows WITH (CTE)", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "WITH active AS (SELECT * FROM users WHERE active = true) SELECT * FROM active",
+      );
+      expect(result).toHaveProperty("rows");
+    });
 
-  it("rejects TRUNCATE statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "TRUNCATE goals");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
+    it("allows EXPLAIN", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "EXPLAIN SELECT * FROM users");
+      expect(result).toHaveProperty("rows");
+    });
 
-  it("rejects CREATE statements", async () => {
-    const result = await executeQueryDatabase(mockDb, "CREATE TABLE foo (id int)");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
-
-  it("rejects case-insensitive write keywords", async () => {
-    const result = await executeQueryDatabase(mockDb, "drop TABLE goals");
-    expect(result).toEqual({ error: expect.stringContaining("read-only") });
-  });
-
-  it("allows SELECT queries", async () => {
-    mockExecute.mockResolvedValueOnce([{ count: 5 }]);
-    const result = await executeQueryDatabase(mockDb, "SELECT count(*) FROM goals");
-    expect(result).toEqual({ rows: [{ count: 5 }], rowCount: 1, truncated: false });
-  });
-
-  it("allows WITH (CTE) queries", async () => {
-    mockExecute.mockResolvedValueOnce([{ id: "1" }]);
-    const result = await executeQueryDatabase(
-      mockDb,
-      "WITH recent AS (SELECT * FROM goals) SELECT * FROM recent",
-    );
-    expect(result).toEqual({ rows: [{ id: "1" }], rowCount: 1, truncated: false });
-  });
-
-  it("allows EXPLAIN queries", async () => {
-    mockExecute.mockResolvedValueOnce([{ "QUERY PLAN": "Seq Scan" }]);
-    const result = await executeQueryDatabase(mockDb, "EXPLAIN SELECT * FROM goals");
-    expect(result).toEqual({
-      rows: [{ "QUERY PLAN": "Seq Scan" }],
-      rowCount: 1,
-      truncated: false,
+    it("allows EXPLAIN ANALYZE", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "EXPLAIN ANALYZE SELECT * FROM users",
+      );
+      expect(result).toHaveProperty("rows");
     });
   });
 
-  it("appends LIMIT when not present", async () => {
-    mockExecute.mockResolvedValueOnce([]);
-    await executeQueryDatabase(mockDb, "SELECT * FROM goals");
-    const calledSql = mockExecute.mock.calls[0][0];
-    expect(calledSql.queryChunks?.[0]?.value?.[0] ?? String(calledSql)).toContain("LIMIT");
+  // ── Allowlist: rejects write operations ───────────────────
+
+  describe("rejects write operations", () => {
+    it("rejects DELETE", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "DELETE FROM users WHERE id = 1");
+      expect(result).toEqual({
+        error: "Only read-only queries (SELECT, WITH, EXPLAIN) are allowed.",
+      });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects INSERT", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "INSERT INTO users (name) VALUES ('evil')",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects UPDATE", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "UPDATE users SET admin = true WHERE id = 1",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects DROP TABLE", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "DROP TABLE users");
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects TRUNCATE", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "TRUNCATE users");
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects ALTER TABLE", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "ALTER TABLE users ADD COLUMN evil text",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects CREATE TABLE", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "CREATE TABLE evil (id int)");
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
   });
 
-  it("does not double-append LIMIT when already present", async () => {
-    mockExecute.mockResolvedValueOnce([]);
-    await executeQueryDatabase(mockDb, "SELECT * FROM goals LIMIT 10");
-    const calledSql = mockExecute.mock.calls[0][0];
-    const sqlStr = calledSql.queryChunks?.[0]?.value?.[0] ?? String(calledSql);
-    const limitCount = (sqlStr.match(/LIMIT/gi) || []).length;
-    expect(limitCount).toBe(1);
+  // ── Comment-based bypass attempts ─────────────────────────
+
+  describe("blocks comment-based bypass attempts", () => {
+    it("rejects DELETE hidden after -- comment", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "-- innocent looking query\nDELETE FROM users",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects DELETE hidden after /* */ comment", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "/* just a comment */ DELETE FROM users",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects DELETE hidden after nested comments", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "-- first comment\n/* second comment */ DROP TABLE users",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("allows SELECT after stripping comments", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "-- this is a comment\nSELECT * FROM users",
+      );
+      expect(result).toHaveProperty("rows");
+    });
+
+    it("allows SELECT after block comment", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "/* debug query */ SELECT count(*) FROM users",
+      );
+      expect(result).toHaveProperty("rows");
+    });
+
+    it("handles unclosed block comment (becomes empty string)", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "/* this comment never closes DELETE FROM users",
+      );
+      // Unclosed comment results in empty string → not a valid read-only prefix
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("handles comment-only input", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "-- just a comment");
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
   });
 
-  it("caps rows at 100", async () => {
-    const largeResult = Array.from({ length: 150 }, (_, i) => ({ id: i }));
-    mockExecute.mockResolvedValueOnce(largeResult);
-    const result = await executeQueryDatabase(mockDb, "SELECT * FROM goals LIMIT 200");
-    expect("rows" in result && result.rows.length).toBe(100);
-    expect("truncated" in result && result.truncated).toBe(true);
+  // ── Multi-statement injection ─────────────────────────────
+
+  describe("blocks multi-statement injection", () => {
+    it("rejects SELECT; DELETE piggyback", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "SELECT 1; DELETE FROM users");
+      expect(result).toEqual({
+        error: "Multiple SQL statements are not allowed.",
+      });
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("rejects SELECT; DROP piggyback", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "SELECT * FROM users; DROP TABLE users",
+      );
+      expect(result).toHaveProperty("error");
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("allows trailing semicolons (common in SQL editors)", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users;");
+      expect(result).toHaveProperty("rows");
+    });
+
+    it("allows trailing semicolons with whitespace", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users;  \n  ");
+      expect(result).toHaveProperty("rows");
+    });
+
+    it("allows semicolons inside string literals", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        "SELECT * FROM users WHERE name = 'foo;bar'",
+      );
+      expect(result).toHaveProperty("rows");
+    });
+
+    it("allows semicolons inside double-quoted identifiers", async () => {
+      const result = await executeQueryDatabase(
+        createMockDb(),
+        'SELECT * FROM users WHERE "col;name" = 1',
+      );
+      expect(result).toHaveProperty("rows");
+    });
   });
 
-  it("returns error on query failure", async () => {
-    mockExecute.mockRejectedValueOnce(new Error("relation does not exist"));
-    const result = await executeQueryDatabase(mockDb, "SELECT * FROM nonexistent");
-    expect(result).toEqual({ error: expect.stringContaining("relation does not exist") });
+  // ── LIMIT handling ────────────────────────────────────────
+
+  describe("LIMIT handling", () => {
+    it("appends LIMIT when not present", async () => {
+      await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      const arg = mockExecute.mock.calls[0][0];
+      expect(arg.queryChunks[0]).toContain("LIMIT 100");
+    });
+
+    it("respects user-provided limit (capped at 100)", async () => {
+      await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 50);
+      const arg = mockExecute.mock.calls[0][0];
+      expect(arg.queryChunks[0]).toContain("LIMIT 50");
+    });
+
+    it("caps limit to 100 when user requests more", async () => {
+      await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 500);
+      const arg = mockExecute.mock.calls[0][0];
+      expect(arg.queryChunks[0]).toContain("LIMIT 100");
+    });
+
+    it("enforces minimum limit of 1", async () => {
+      await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 0);
+      const arg = mockExecute.mock.calls[0][0];
+      expect(arg.queryChunks[0]).toContain("LIMIT 1");
+    });
+
+    it("does not append LIMIT if already present", async () => {
+      await executeQueryDatabase(createMockDb(), "SELECT * FROM users LIMIT 10");
+      const arg = mockExecute.mock.calls[0][0];
+      // Should not have double LIMIT
+      const limitCount = (arg.queryChunks[0].match(/LIMIT/gi) || []).length;
+      expect(limitCount).toBe(1);
+    });
   });
 
-  it("strips trailing semicolons", async () => {
-    mockExecute.mockResolvedValueOnce([]);
-    await executeQueryDatabase(mockDb, "SELECT 1;;");
-    const calledSql = mockExecute.mock.calls[0][0];
-    const sqlStr = calledSql.queryChunks?.[0]?.value?.[0] ?? String(calledSql);
-    expect(sqlStr).not.toMatch(/;;/);
+  // ── Result handling ───────────────────────────────────────
+
+  describe("result handling", () => {
+    it("returns rows from array result", async () => {
+      mockExecute.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      expect(result).toEqual({
+        rows: [{ id: 1 }, { id: 2 }],
+        rowCount: 2,
+        truncated: false,
+      });
+    });
+
+    it("returns rows from { rows: [...] } result format", async () => {
+      mockExecute.mockResolvedValue({ rows: [{ id: 1 }] });
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      expect(result).toEqual({
+        rows: [{ id: 1 }],
+        rowCount: 1,
+        truncated: false,
+      });
+    });
+
+    it("truncates results beyond 100 rows", async () => {
+      const bigResult = Array.from({ length: 150 }, (_, i) => ({ id: i }));
+      mockExecute.mockResolvedValue(bigResult);
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users LIMIT 200");
+      expect(result).toHaveProperty("rows");
+      if ("rows" in result) {
+        expect(result.rows).toHaveLength(100);
+        expect(result.truncated).toBe(true);
+      }
+    });
+
+    it("handles DB errors gracefully", async () => {
+      mockExecute.mockRejectedValue(new Error('relation "users" does not exist'));
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      expect(result).toEqual({
+        error: 'Query failed: relation "users" does not exist',
+      });
+    });
+
+    it("handles non-Error throws", async () => {
+      mockExecute.mockRejectedValue("connection timeout");
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
+      expect(result).toEqual({
+        error: "Query failed: connection timeout",
+      });
+    });
+  });
+
+  // ── Edge cases ────────────────────────────────────────────
+
+  describe("edge cases", () => {
+    it("rejects empty input", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "");
+      expect(result).toHaveProperty("error");
+    });
+
+    it("rejects whitespace-only input", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "   \n  ");
+      expect(result).toHaveProperty("error");
+    });
+
+    it("handles leading whitespace before SELECT", async () => {
+      const result = await executeQueryDatabase(createMockDb(), "   \n  SELECT * FROM users");
+      expect(result).toHaveProperty("rows");
+    });
   });
 });

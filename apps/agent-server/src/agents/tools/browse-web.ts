@@ -11,16 +11,28 @@ export function isPrivateIp(ip: string): boolean {
     ip.startsWith("127.") ||
     ip.startsWith("10.") ||
     ip.startsWith("192.168.") ||
-    ip.startsWith("172.16.") || ip.startsWith("172.17.") || ip.startsWith("172.18.") ||
-    ip.startsWith("172.19.") || ip.startsWith("172.20.") || ip.startsWith("172.21.") ||
-    ip.startsWith("172.22.") || ip.startsWith("172.23.") || ip.startsWith("172.24.") ||
-    ip.startsWith("172.25.") || ip.startsWith("172.26.") || ip.startsWith("172.27.") ||
-    ip.startsWith("172.28.") || ip.startsWith("172.29.") || ip.startsWith("172.30.") ||
+    ip.startsWith("172.16.") ||
+    ip.startsWith("172.17.") ||
+    ip.startsWith("172.18.") ||
+    ip.startsWith("172.19.") ||
+    ip.startsWith("172.20.") ||
+    ip.startsWith("172.21.") ||
+    ip.startsWith("172.22.") ||
+    ip.startsWith("172.23.") ||
+    ip.startsWith("172.24.") ||
+    ip.startsWith("172.25.") ||
+    ip.startsWith("172.26.") ||
+    ip.startsWith("172.27.") ||
+    ip.startsWith("172.28.") ||
+    ip.startsWith("172.29.") ||
+    ip.startsWith("172.30.") ||
     ip.startsWith("172.31.") ||
     ip.startsWith("169.254.") ||
     ip === "0.0.0.0" ||
     ip === "::1" ||
-    ip.startsWith("fc") || ip.startsWith("fd") || ip.startsWith("fe80")
+    ip.startsWith("fc") ||
+    ip.startsWith("fd") ||
+    ip.startsWith("fe80")
   );
 }
 
@@ -68,8 +80,10 @@ export async function executeBrowseWeb(
       return { error: "Only HTTPS URLs are allowed" };
     }
     // Resolve hostname and check for private IPs (prevents DNS rebinding)
+    let resolvedIp: string;
     try {
       const { address } = await lookup(parsedUrl.hostname);
+      resolvedIp = address;
       if (isPrivateIp(address)) {
         logger.warn({ url, resolvedIp: address }, "SSRF: blocked private IP");
         return { error: "URL resolves to a private/internal IP address" };
@@ -78,10 +92,16 @@ export async function executeBrowseWeb(
       return { error: `Could not resolve hostname: ${parsedUrl.hostname}` };
     }
 
-    const response = await fetch(url, {
+    // Build a URL using the resolved IP to prevent DNS rebinding (TOCTOU)
+    // Keep the original Host header so the server responds correctly
+    const resolvedUrl = new URL(url);
+    resolvedUrl.hostname = resolvedIp;
+
+    const response = await fetch(resolvedUrl.toString(), {
       headers: {
         "User-Agent": "AI-Cofounder-Bot/1.0",
         Accept: "text/html,application/xhtml+xml,text/plain",
+        Host: parsedUrl.host,
       },
       redirect: "manual",
       signal: AbortSignal.timeout(15_000),

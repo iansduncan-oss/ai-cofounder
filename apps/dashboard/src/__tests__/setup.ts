@@ -89,7 +89,7 @@ HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue({
   rect: vi.fn(),
   clip: vi.fn(),
   canvas: { width: 0, height: 0 },
-}) as any;
+}) as unknown as CanvasRenderingContext2D;
 
 // Clean up between tests
 afterEach(() => {

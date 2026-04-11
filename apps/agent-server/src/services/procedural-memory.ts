@@ -44,12 +44,18 @@ export class ProceduralMemoryService {
     const completedTasks = tasks.filter((t) => t.status === "completed");
 
     if (completedTasks.length < 2) {
-      logger.debug({ goalId, taskCount: completedTasks.length }, "Too few completed tasks for procedure");
+      logger.debug(
+        { goalId, taskCount: completedTasks.length },
+        "Too few completed tasks for procedure",
+      );
       return null;
     }
 
     const taskSummary = completedTasks
-      .map((t, i) => `${i + 1}. [${t.assignedAgent}] ${t.title}${t.output ? `: ${String(t.output).slice(0, 200)}` : ""}`)
+      .map(
+        (t, i) =>
+          `${i + 1}. [${t.assignedAgent}] ${t.title}${t.output ? `: ${String(t.output).slice(0, 200)}` : ""}`,
+      )
       .join("\n");
 
     try {
@@ -80,9 +86,7 @@ Return ONLY valid JSON:
         .filter((b): b is { type: "text"; text: string } => b.type === "text")
         .map((b) => b.text)
         .join("");
-      const parsed = JSON.parse(
-        textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}",
-      );
+      const parsed = JSON.parse(textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 
       if (!parsed.triggerPattern || !parsed.steps?.length) {
         logger.warn({ goalId }, "LLM returned incomplete procedure");
@@ -96,13 +100,13 @@ Return ONLY valid JSON:
         logger.warn("Failed to embed trigger pattern");
       }
 
-      const sanitizedSteps = (parsed.steps as Array<{ description: string; agent?: string; details?: string }>).map(
-        (s) => ({
-          ...s,
-          description: sanitizeMemoryContent(s.description),
-          details: s.details ? sanitizeMemoryContent(s.details) : s.details,
-        }),
-      );
+      const sanitizedSteps = (
+        parsed.steps as Array<{ description: string; agent?: string; details?: string }>
+      ).map((s) => ({
+        ...s,
+        description: sanitizeMemoryContent(s.description),
+        details: s.details ? sanitizeMemoryContent(s.details) : s.details,
+      }));
 
       const procedure = await createProceduralMemory(this.db, {
         triggerPattern: sanitizeMemoryContent(parsed.triggerPattern),
@@ -161,9 +165,7 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
         .filter((b): b is { type: "text"; text: string } => b.type === "text")
         .map((b) => b.text)
         .join("");
-      const parsed = JSON.parse(
-        textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}",
-      );
+      const parsed = JSON.parse(textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 
       if (!parsed.triggerPattern || !parsed.steps?.length) {
         logger.warn("LLM returned incomplete lesson from session");
@@ -177,19 +179,20 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
         logger.warn("Failed to embed session lesson trigger pattern");
       }
 
-      const sanitizedSessionSteps = (parsed.steps as Array<{ description: string; details?: string }>).map(
-        (s) => ({
-          ...s,
-          description: sanitizeMemoryContent(s.description),
-          details: s.details ? sanitizeMemoryContent(s.details) : s.details,
-        }),
-      );
+      const sanitizedSessionSteps = (
+        parsed.steps as Array<{ description: string; details?: string }>
+      ).map((s) => ({
+        ...s,
+        description: sanitizeMemoryContent(s.description),
+        details: s.details ? sanitizeMemoryContent(s.details) : s.details,
+      }));
 
       const procedure = await createProceduralMemory(this.db, {
         triggerPattern: sanitizeMemoryContent(parsed.triggerPattern),
         steps: sanitizedSessionSteps,
         preconditions: (parsed.preconditions ?? []).map((p: string) => sanitizeMemoryContent(p)),
         tags: [...(parsed.tags ?? []), "session-lesson"],
+        embedding,
       });
 
       logger.info({ procedureId: procedure.id }, "Learned lesson from autonomous session");
@@ -206,13 +209,15 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
   async findMatchingProcedures(
     taskDescription: string,
     limit = 3,
-  ): Promise<Array<{
-    id: string;
-    triggerPattern: string;
-    steps: unknown[];
-    successCount: number;
-    failureCount: number;
-  }>> {
+  ): Promise<
+    Array<{
+      id: string;
+      triggerPattern: string;
+      steps: unknown[];
+      successCount: number;
+      failureCount: number;
+    }>
+  > {
     let queryEmbedding: number[];
     try {
       queryEmbedding = await this.embed(taskDescription);
@@ -221,12 +226,7 @@ Focus on actionable insights: what worked, what to avoid, what to do differently
       return [];
     }
 
-    const results = await searchProceduralMemoriesByVector(
-      this.db,
-      queryEmbedding,
-      limit,
-      0.3,
-    );
+    const results = await searchProceduralMemoriesByVector(this.db, queryEmbedding, limit, 0.3);
 
     return results.map((r) => ({
       id: r.id,

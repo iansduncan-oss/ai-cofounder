@@ -153,10 +153,7 @@ describe("Provider Health History", () => {
     await app.close();
 
     expect(res.statusCode).toBe(200);
-    expect(mockGetProviderHealthHistory).toHaveBeenCalledWith(
-      expect.anything(),
-      "anthropic",
-    );
+    expect(mockGetProviderHealthHistory).toHaveBeenCalledWith(expect.anything(), "anthropic");
   });
 });
 
@@ -221,7 +218,8 @@ describe("Request Tracing", () => {
     });
     await app.close();
 
-    expect(res.headers["x-request-id"]).toBeDefined();
+    expect(typeof res.headers["x-request-id"]).toBe("string");
+    expect((res.headers["x-request-id"] as string).length).toBeGreaterThan(0);
   });
 });
 
@@ -254,9 +252,7 @@ describe("Observability — Route Exclusions", () => {
     const durationLines = body
       .split("\n")
       .filter((l: string) => l.startsWith("http_request_duration_avg_ms{"));
-    const metricsRouteDuration = durationLines.find((l: string) =>
-      l.includes('route="/metrics"'),
-    );
+    const metricsRouteDuration = durationLines.find((l: string) => l.includes('route="/metrics"'));
     expect(metricsRouteDuration).toBeUndefined();
   });
 

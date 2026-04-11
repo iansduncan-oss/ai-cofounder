@@ -11,12 +11,7 @@ import {
   LlmRegistry,
   AnthropicProvider,
   GroqProvider,
-  OpenRouterProvider,
-  GeminiProvider,
   OllamaProvider,
-  TogetherProvider,
-  CerebrasProvider,
-  HuggingFaceProvider,
   createEmbeddingService,
   type EmbeddingService,
   type CompletionEvent,
@@ -31,6 +26,7 @@ import { healthRoutes } from "./routes/health.js";
 import { channelRoutes } from "./routes/channels.js";
 import { webhookRoutes } from "./routes/webhooks.js";
 import { voiceRoutes } from "./routes/voice.js";
+import { vaultRoutes } from "./routes/vault.js";
 import { deployWebhookRoute } from "./routes/deploys.js";
 import { recapRoutes } from "./routes/recap.js";
 import { discordWatcherRoutes } from "./routes/discord-watcher.js";
@@ -46,10 +42,7 @@ import { createWorkspaceService, type WorkspaceService } from "./services/worksp
 import { createBrowserService, type BrowserService } from "./services/browser.js";
 import { createDiscordService } from "./services/discord.js";
 import { createVpsCommandService } from "./services/vps-command.js";
-import {
-  createNotificationService,
-  type NotificationService,
-} from "./services/notifications.js";
+import { createNotificationService, type NotificationService } from "./services/notifications.js";
 import { createSandboxService, type SandboxService } from "@ai-cofounder/sandbox";
 import {
   upsertProviderHealth,
@@ -69,16 +62,39 @@ import Redis from "ioredis";
 
 /** All known tool names — seeded at green tier on first server start */
 const DEFAULT_TOOLS = [
-  "save_memory", "recall_memories", "search_web", "browse_web",
-  "trigger_workflow", "list_workflows",
-  "create_schedule", "list_schedules", "delete_schedule",
+  "save_memory",
+  "recall_memories",
+  "search_web",
+  "browse_web",
+  "trigger_workflow",
+  "list_workflows",
+  "create_schedule",
+  "list_schedules",
+  "delete_schedule",
   "execute_code",
-  "read_file", "write_file", "list_directory", "delete_file", "delete_directory",
-  "git_clone", "git_status", "git_diff", "git_add", "git_commit", "git_pull",
-  "git_log", "git_branch", "git_checkout", "git_push",
-  "run_tests", "create_pr",
-  "send_message", "check_messages", "broadcast_update",
-  "create_plan", "create_milestone", "request_approval",
+  "read_file",
+  "write_file",
+  "list_directory",
+  "delete_file",
+  "delete_directory",
+  "git_clone",
+  "git_status",
+  "git_diff",
+  "git_add",
+  "git_commit",
+  "git_pull",
+  "git_log",
+  "git_branch",
+  "git_checkout",
+  "git_push",
+  "run_tests",
+  "create_pr",
+  "send_message",
+  "check_messages",
+  "broadcast_update",
+  "create_plan",
+  "create_milestone",
+  "request_approval",
   "browser_action",
   "create_follow_up",
   "log_productivity",
@@ -96,7 +112,10 @@ import { FailurePatternService } from "./services/failure-patterns.js";
 import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
 import type { RedisPubSub } from "@ai-cofounder/queue";
 
-/** Create and configure the LLM registry with all available providers */
+/** Create and configure the LLM registry with providers used in DEFAULT_ROUTES.
+ *  Only Anthropic, Groq, and Ollama are registered — other providers (OpenRouter,
+ *  Gemini, Together, Cerebras, HuggingFace) are not in any route and would just
+ *  add noise to health checks and stats. Re-add them here when they're added to routes. */
 export function createLlmRegistry(): LlmRegistry {
   const registry = new LlmRegistry();
 
@@ -107,12 +126,9 @@ export function createLlmRegistry(): LlmRegistry {
     ),
   );
   registry.register(new GroqProvider(optionalEnv("GROQ_API_KEY", "")));
-  registry.register(new OpenRouterProvider(optionalEnv("OPENROUTER_API_KEY", "")));
-  registry.register(new GeminiProvider(optionalEnv("GEMINI_API_KEY", "")));
-  registry.register(new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")));
-  registry.register(new TogetherProvider(optionalEnv("TOGETHER_API_KEY", "")));
-  registry.register(new CerebrasProvider(optionalEnv("CEREBRAS_API_KEY", "")));
-  registry.register(new HuggingFaceProvider(optionalEnv("HF_API_KEY", "")));
+  registry.register(
+    new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")),
+  );
 
   return registry;
 }
@@ -143,17 +159,18 @@ export function buildServer(registry?: LlmRegistry) {
       conversationId: event.metadata?.conversationId as string | undefined,
       metadata: event.metadata,
       workspaceId: (event.metadata?.workspaceId as string) ?? "",
-    }).then(() => {
-      app.agentEvents?.emit("ws:usage_change");
-    }).catch(() => {
-      // Usage tracking failures are non-fatal
-    });
+    })
+      .then(() => {
+        app.agentEvents?.emit("ws:usage_change");
+      })
+      .catch(() => {
+        // Usage tracking failures are non-fatal
+      });
   };
 
   // Request tracing: generate x-request-id if not present, attach to logger context
   app.addHook("onRequest", async (request, reply) => {
-    const requestId =
-      (request.headers["x-request-id"] as string) ?? crypto.randomUUID();
+    const requestId = (request.headers["x-request-id"] as string) ?? crypto.randomUUID();
     (request as unknown as Record<string, unknown>).requestId = requestId;
     reply.header("x-request-id", requestId);
     logger.info({ method: request.method, url: request.url, requestId }, "request");
@@ -164,10 +181,12 @@ export function buildServer(registry?: LlmRegistry) {
   const allowedOrigins = optionalEnv("CORS_ORIGINS", "").split(",").filter(Boolean);
   const isProduction = process.env.NODE_ENV === "production";
   if (isProduction && allowedOrigins.length === 0) {
-    logger.warn("CORS_ORIGINS is not set in production — CORS will be restrictive (same-origin only)");
+    logger.warn(
+      "CORS_ORIGINS is not set in production — CORS will be restrictive (same-origin only)",
+    );
   }
   app.register(cors, {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : (isProduction ? false : true),
+    origin: allowedOrigins.length > 0 ? allowedOrigins : isProduction ? false : true,
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
   });
@@ -228,6 +247,8 @@ export function buildServer(registry?: LlmRegistry) {
         { name: "patterns", description: "User pattern management" },
         { name: "gmail", description: "Gmail integration" },
         { name: "calendar", description: "Google Calendar integration" },
+        { name: "briefing", description: "Daily briefing generation" },
+        { name: "thinking", description: "LLM reasoning trace inspection" },
       ],
     },
   });
@@ -339,7 +360,9 @@ export function buildServer(registry?: LlmRegistry) {
   app.addHook("onReady", async () => {
     // Wire messaging service now that db is available
     // redisPubSub is optional — wired via pubsubPlugin decorator if available
-    const redisPubSub = (app as unknown as Record<string, unknown>).redisPubSub as RedisPubSub | undefined;
+    const redisPubSub = (app as unknown as Record<string, unknown>).redisPubSub as
+      | RedisPubSub
+      | undefined;
     app.messagingService = new AgentMessagingService(app.db, redisPubSub);
     logger.info("agent messaging service initialized");
 
@@ -511,6 +534,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(channelRoutes, { prefix: "/api/channels" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
+  app.register(vaultRoutes, { prefix: "/api/vault" });
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
   app.register(recapRoutes, { prefix: "/api/recap" }); // Public: token-protected via RECAP_TOKEN
   app.register(discordWatcherRoutes, { prefix: "/api/discord-watcher" }); // Internal: API_SECRET bearer auth from Discord bot

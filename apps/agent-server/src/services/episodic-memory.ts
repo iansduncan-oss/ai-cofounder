@@ -41,7 +41,10 @@ export class EpisodicMemoryService {
   async createEpisode(conversationId: string): Promise<{ id: string; summary: string } | null> {
     const messages = await getConversationMessages(this.db, conversationId, 50);
     if (messages.length < 3) {
-      logger.debug({ conversationId, messageCount: messages.length }, "Too few messages for episode");
+      logger.debug(
+        { conversationId, messageCount: messages.length },
+        "Too few messages for episode",
+      );
       return null;
     }
 
@@ -75,9 +78,7 @@ ${transcript.slice(0, 3000)}`,
         .filter((b): b is { type: "text"; text: string } => b.type === "text")
         .map((b) => b.text)
         .join("");
-      const parsed = JSON.parse(
-        textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}",
-      );
+      const parsed = JSON.parse(textContent.match(/\{[\s\S]*\}/)?.[0] ?? "{}");
 
       if (!parsed.summary) {
         logger.warn({ conversationId }, "LLM returned no summary for episode");
@@ -100,7 +101,9 @@ ${transcript.slice(0, 3000)}`,
         keyDecisions: (parsed.keyDecisions ?? []).map((d: string) => sanitizeMemoryContent(d)),
         toolsUsed: parsed.toolsUsed ?? [],
         goalsWorkedOn: (parsed.goalsWorkedOn ?? []).map((g: string) => sanitizeMemoryContent(g)),
-        emotionalContext: parsed.emotionalContext ? sanitizeMemoryContent(parsed.emotionalContext) : undefined,
+        emotionalContext: parsed.emotionalContext
+          ? sanitizeMemoryContent(parsed.emotionalContext)
+          : undefined,
         importance: typeof parsed.importance === "number" ? parsed.importance : 0.5,
         embedding,
         workspaceId: conv?.workspaceId ?? "",
@@ -160,7 +163,9 @@ ${transcript.slice(0, 3000)}`,
 
     // Touch accessed episodes to update access count
     for (const ep of results) {
-      touchEpisodicMemory(this.db, ep.id).catch(() => {});
+      touchEpisodicMemory(this.db, ep.id).catch((err) =>
+        logger.warn({ err }, "episodic memory touch failed"),
+      );
     }
 
     return results.map(({ finalScore: _, ...rest }) => rest);

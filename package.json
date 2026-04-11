@@ -25,7 +25,18 @@
     "db:studio": "npm run db:studio -w @ai-cofounder/db",
     "db:seed": "npm run db:seed -w @ai-cofounder/db",
     "productivity:setup": "bash scripts/setup-productivity.sh",
-    "deploy:dry-run": "gh workflow run deploy.yml -f dry_run=true"
+    "deploy:dry-run": "gh workflow run deploy.yml -f dry_run=true",
+    "memory-bridge:sync": "tsx scripts/sync-memory-bridge.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --max-warnings=0",
+      "prettier --write"
+    ],
+    "*.{js,jsx,json,md,yml,yaml}": [
+      "prettier --write"
+    ]
   },
   "packageManager": "npm@11.6.2",
   "devDependencies": {
@@ -33,6 +44,9 @@
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tsx": "^4.21.0",

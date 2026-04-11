@@ -134,6 +134,9 @@ export function ChatPanel() {
       }
     }
     prevStreaming.current = stream.isStreaming;
+    // Intentionally only watches stream.isStreaming transitions; including
+    // stream/tts would re-run on every render and duplicate finalization.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   // Stream error
@@ -142,6 +145,8 @@ export function ChatPanel() {
       setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${stream.error}` }]);
       stream.reset();
     }
+    // Only re-run when error changes; stream is a stable object from the hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.error]);
 
   // Speech transcript
@@ -151,6 +156,8 @@ export function ChatPanel() {
       lastTranscript.current = speech.transcript;
       handleSend(speech.transcript);
     }
+    // handleSend is intentionally not a dep to avoid re-firing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speech.isListening, speech.transcript]);
 
   const ringState: RingState = useMemo(() => {
@@ -160,7 +167,13 @@ export function ChatPanel() {
     if (stream.isStreaming && stream.accumulatedText) return "streaming";
     if (stream.isStreaming) return "thinking";
     return "idle";
-  }, [speech.error, tts.isSpeaking, speech.isListening, stream.isStreaming, stream.accumulatedText]);
+  }, [
+    speech.error,
+    tts.isSpeaking,
+    speech.isListening,
+    stream.isStreaming,
+    stream.accumulatedText,
+  ]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -189,16 +202,24 @@ export function ChatPanel() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") { e.preventDefault(); handleNewChat(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
       if (e.key === "Escape" && stream.isStreaming) stream.cancel();
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+    // handleNewChat / stream.cancel are stable; only rebind on isStreaming changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isStreaming]);
 
   const handleNewChat = () => {
@@ -219,7 +240,10 @@ export function ChatPanel() {
 
   const handleMicClick = () => {
     if (speech.isListening) speech.stopListening();
-    else { tts.stop(); speech.startListening(); }
+    else {
+      tts.stop();
+      speech.startListening();
+    }
   };
 
   const lastAssistantIndex = useMemo(() => {
@@ -259,7 +283,8 @@ export function ChatPanel() {
               {msg.plan && <PlanCard plan={msg.plan} />}
               {msg.model && (
                 <p className="mt-1 text-[10px] opacity-50">
-                  {msg.model}{msg.provider && ` via ${msg.provider}`}
+                  {msg.model}
+                  {msg.provider && ` via ${msg.provider}`}
                 </p>
               )}
             </div>
@@ -272,11 +297,18 @@ export function ChatPanel() {
         ];
         if (i === lastAssistantIndex && msg.suggestions?.length && !stream.isStreaming) {
           elements.push(
-            <SuggestionChips key={`s-${i}`} suggestions={msg.suggestions} onSelect={handleSuggestionSelect} />,
+            <SuggestionChips
+              key={`s-${i}`}
+              suggestions={msg.suggestions}
+              onSelect={handleSuggestionSelect}
+            />,
           );
         }
         return elements;
       }),
+    // handleSuggestionSelect is stable within render and omitted intentionally
+    // to avoid re-rendering the full message list on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [messages, lastAssistantIndex, stream.isStreaming],
   );
 
@@ -332,7 +364,12 @@ export function ChatPanel() {
             </Button>
           )}
           {speech.isSupported && (
-            <Button variant="ghost" size="icon-sm" onClick={() => setVoiceMode(true)} title="Voice mode">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setVoiceMode(true)}
+              title="Voice mode"
+            >
               <Expand className="h-3 w-3" />
             </Button>
           )}
@@ -345,11 +382,7 @@ export function ChatPanel() {
       </div>
 
       {/* Messages */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto min-h-0"
-        onScroll={handleScroll}
-      >
+      <div ref={containerRef} className="flex-1 overflow-y-auto min-h-0" onScroll={handleScroll}>
         {messages.length === 0 && !stream.isStreaming ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center max-w-xs px-4">
@@ -420,7 +453,11 @@ export function ChatPanel() {
             <Button
               variant="ghost"
               size="icon-sm"
-              className={speech.isListening ? "bg-purple-500 text-white hover:bg-purple-600" : "text-muted-foreground"}
+              className={
+                speech.isListening
+                  ? "bg-purple-500 text-white hover:bg-purple-600"
+                  : "text-muted-foreground"
+              }
               onClick={handleMicClick}
               disabled={stream.isStreaming}
             >
@@ -434,7 +471,11 @@ export function ChatPanel() {
             size="icon-sm"
             className="rounded-full"
           >
-            {stream.isStreaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            {stream.isStreaming ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
       </div>

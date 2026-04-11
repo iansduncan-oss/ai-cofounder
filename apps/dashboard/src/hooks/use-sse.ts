@@ -19,6 +19,9 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
   const abortRef = useRef<AbortController | null>(null);
   const retryCountRef = useRef(0);
   const goalIdRef = useRef(goalId);
+  // Keep options in a ref so callbacks don't re-create on every render
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   goalIdRef.current = goalId;
 
@@ -50,7 +53,7 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
 
       try {
         const stream = apiClient.streamExecute(id, {
-          userId: options.userId,
+          userId: optionsRef.current.userId,
           signal: controller.signal,
         });
 
@@ -62,19 +65,18 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
 
           const data = event.data;
           setEvents((prev) => [...prev, data]);
-          options.onMessage?.(data);
+          optionsRef.current.onMessage?.(data);
 
           const status = (data as Record<string, unknown>).status;
           if (status === "completed" || status === "failed") {
             clearTimeout(timeout);
             setIsConnected(false);
-            options.onComplete?.();
+            optionsRef.current.onComplete?.();
             if (status === "completed") {
               toast.success("Execution completed");
             } else {
               toast.error(
-                ((data as Record<string, unknown>).error as string) ||
-                  "Execution failed",
+                ((data as Record<string, unknown>).error as string) || "Execution failed",
               );
             }
             return;
@@ -92,22 +94,16 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
 
         if (retryCountRef.current < maxRetries && goalIdRef.current) {
           retryCountRef.current++;
-          const delay = Math.min(
-            1000 * Math.pow(2, retryCountRef.current - 1),
-            8000,
-          );
+          const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 8000);
           toast.error(`Connection lost, retrying in ${delay / 1000}s...`);
           setTimeout(() => {
             if (goalIdRef.current) connect(goalIdRef.current);
           }, delay);
         } else {
-          const message =
-            err instanceof Error ? err.message : "Connection lost";
+          const message = err instanceof Error ? err.message : "Connection lost";
           setError(message);
           toast.error("SSE connection failed after retries");
-          options.onError?.(
-            err instanceof Error ? err : new Error(message),
-          );
+          optionsRef.current.onError?.(err instanceof Error ? err : new Error(message));
         }
       }
     },
@@ -122,7 +118,7 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
     return () => {
       disconnect();
     };
-  }, [goalId]);
+  }, [goalId, connect, disconnect]);
 
   const reset = useCallback(() => {
     disconnect();

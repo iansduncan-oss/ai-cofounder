@@ -9,6 +9,10 @@ import {
   closeAllQueues,
   type WorkerProcessors,
 } from "@ai-cofounder/queue";
+import { notifyCiFailures, fireN8nActionWebhook } from "../helpers/queue-processors.js";
+import { setGithubOpenPrs, recordDiscordTriageResult } from "./observability.js";
+import type { DiscordTriageService, buildDiscordAlertBlocks } from "../services/discord-triage.js";
+type BuildDiscordAlertBlocksFn = typeof buildDiscordAlertBlocks;
 
 const logger = createLogger("queue-plugin");
 
@@ -23,6 +27,11 @@ export const queuePlugin = fp(async (app) => {
   getRedisConnection(redisUrl);
   logger.info("Queue system initialized");
 
+  // Cached per-plugin instance; discord-triage jobs can fire many times per
+  // minute during active discussions, so we avoid re-instantiating per job.
+  let cachedTriageService: DiscordTriageService | null = null;
+  let cachedBuildDiscordAlertBlocks: BuildDiscordAlertBlocksFn | null = null;
+
   // NOTE: agentTask processor is NOT registered here.
   // Agent task processing is handled exclusively by the worker process (worker.ts).
   // This prevents the HTTP server from blocking on long-running agent tasks.
@@ -35,6 +44,7 @@ export const queuePlugin = fp(async (app) => {
       switch (check) {
         case "github_ci": {
           const ciResults = await app.monitoringService.checkGitHubCI();
+
           // Feed CI results to self-heal service for failure tracking (SCHED-04)
           if (app.ciSelfHealService) {
             for (const ci of ciResults) {
@@ -45,11 +55,17 @@ export const queuePlugin = fp(async (app) => {
               }
             }
           }
+
+          // Notify user of CI failures via Slack
+          await notifyCiFailures(app.notificationService, ciResults);
           break;
         }
-        case "github_prs":
-          await app.monitoringService.checkGitHubPRs();
+        case "github_prs": {
+          const prResults = await app.monitoringService.checkGitHubPRs();
+          setGithubOpenPrs(prResults.length);
+          logger.debug({ openPRs: prResults.length }, "GitHub PR check complete");
           break;
+        }
         case "vps_health":
         case "vps_containers":
           await app.monitoringService.checkVPSHealth();
@@ -75,7 +91,12 @@ export const queuePlugin = fp(async (app) => {
           const { listExpiredPendingApprovals, resolveApproval } = await import("@ai-cofounder/db");
           const expired = await listExpiredPendingApprovals(app.db);
           for (const approval of expired) {
-            await resolveApproval(app.db, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
+            await resolveApproval(
+              app.db,
+              approval.id,
+              "rejected",
+              "Auto-denied: approval timeout exceeded",
+            );
           }
           if (expired.length > 0) {
             logger.info({ count: expired.length }, "Auto-denied expired pending approvals");
@@ -137,8 +158,17 @@ export const queuePlugin = fp(async (app) => {
         case "codebase_scan": {
           const { CodebaseScannerService } = await import("../services/codebase-scanner.js");
           const { ProactiveEngine } = await import("../services/proactive-engine.js");
-          const proactiveEngine = new ProactiveEngine(app.db, app.llmRegistry, app.notificationService);
-          const scanner = new CodebaseScannerService(app.db, app.llmRegistry, app.monitoringService, proactiveEngine);
+          const proactiveEngine = new ProactiveEngine(
+            app.db,
+            app.llmRegistry,
+            app.notificationService,
+          );
+          const scanner = new CodebaseScannerService(
+            app.db,
+            app.llmRegistry,
+            app.monitoringService,
+            proactiveEngine,
+          );
           try {
             const result = await scanner.scan({ synthesize: true });
             logger.info(result, "scheduled codebase scan complete");
@@ -165,8 +195,13 @@ export const queuePlugin = fp(async (app) => {
         case "productivity_sync": {
           try {
             const { syncProductivityPlan } = await import("../services/plan-sync.js");
-            const result = await syncProductivityPlan(app.db, app.llmRegistry, { lookbackMinutes: 20 });
-            if (!result.skipped && (result.autoCompleted.length > 0 || result.itemsAdded.length > 0)) {
+            const result = await syncProductivityPlan(app.db, app.llmRegistry, {
+              lookbackMinutes: 20,
+            });
+            if (
+              !result.skipped &&
+              (result.autoCompleted.length > 0 || result.itemsAdded.length > 0)
+            ) {
               logger.info(result, "plan sync updated plan");
               app.wsBroadcast?.("productivity");
 
@@ -213,7 +248,10 @@ export const queuePlugin = fp(async (app) => {
           const existingItems = (existing?.plannedItems as unknown[] | null) ?? [];
           const existingMeta = (existing?.metadata ?? {}) as { autoGenerated?: boolean };
           if (existingItems.length > 0 && !existingMeta.autoGenerated) {
-            logger.info({ date: today }, "productivity nudge skipped — user already checked in manually");
+            logger.info(
+              { date: today },
+              "productivity nudge skipped — user already checked in manually",
+            );
             break;
           }
 
@@ -247,7 +285,10 @@ export const queuePlugin = fp(async (app) => {
             title: "Daily Check-in",
             message,
           });
-          logger.info({ date: today, autoPlanned: planResult.plannedItems.length }, "productivity nudge sent");
+          logger.info(
+            { date: today, autoPlanned: planResult.plannedItems.length },
+            "productivity nudge sent",
+          );
           break;
         }
         case "discord_hourly_digest": {
@@ -268,22 +309,37 @@ export const queuePlugin = fp(async (app) => {
         case "self_healing_check": {
           if (app.selfHealingService) {
             const report = app.selfHealingService.generateReport();
-            const unhealthyAgents = report.healthScores.filter((h) => h.score < 50 && (h.recentSuccesses + h.recentFailures) >= 5);
+            const unhealthyAgents = report.healthScores.filter(
+              (h) => h.score < 50 && h.recentSuccesses + h.recentFailures >= 5,
+            );
             const openBreakers = report.activeCircuitBreakers;
 
-            if (unhealthyAgents.length > 0 || openBreakers.length > 0) {
-              const lines = ["**Self-Healing Alert**"];
-              for (const agent of unhealthyAgents) {
-                lines.push(`- Agent "${agent.agentRole}" health: ${agent.score}% (${agent.recentFailures} failures / ${agent.recentSuccesses + agent.recentFailures} recent)`);
+            const insights: string[] = [];
+            for (const agent of unhealthyAgents) {
+              insights.push(
+                `Agent **${agent.agentRole}** health: ${agent.score}% (${agent.recentFailures} failures / ${agent.recentSuccesses + agent.recentFailures} recent)`,
+              );
+            }
+            for (const cb of openBreakers) {
+              insights.push(
+                `Circuit breaker **${cb.state.status.toUpperCase()}** for "${cb.agentRole}" (${cb.state.failureCount} failures)`,
+              );
+            }
+            for (const pattern of report.systematicFailures.slice(0, 3)) {
+              insights.push(
+                `Repeated failure: **${pattern.key}** occurred ${pattern.count}x in 24h — "${pattern.samples[0]?.slice(0, 100) ?? "unknown"}"`,
+              );
+            }
+            if (report.recommendations.length > 0 && insights.length === 0) {
+              // Include recommendations only if no specific insights already captured
+              for (const rec of report.recommendations.slice(0, 2)) {
+                insights.push(rec);
               }
-              for (const cb of openBreakers) {
-                lines.push(`- Circuit breaker ${cb.state.status.toUpperCase()} for "${cb.agentRole}" (${cb.state.failureCount} failures)`);
-              }
-              if (report.systematicFailures.length > 0) {
-                lines.push(`- ${report.systematicFailures.length} systematic failure pattern(s) detected`);
-              }
-              await app.notificationService.sendBriefing(lines.join("\n"));
-              logger.warn({ unhealthy: unhealthyAgents.length, openBreakers: openBreakers.length }, "self-healing alert sent");
+            }
+
+            if (insights.length > 0) {
+              await app.notificationService.notifySystemInsights(insights);
+              logger.warn({ insights: insights.length }, "system intelligence report sent");
             }
           }
           break;
@@ -305,10 +361,24 @@ export const queuePlugin = fp(async (app) => {
     briefing: async (job) => {
       const { type } = job.data;
       logger.info({ jobId: job.id, type }, "Generating briefing");
+
+      if (type === "weekly") {
+        const { sendWeeklySummary } = await import("../services/briefing.js");
+        await sendWeeklySummary(app.db, app.notificationService, app.llmRegistry);
+        app.agentEvents.emit("ws:briefing_complete");
+        return;
+      }
+
       const { sendDailyBriefing } = await import("../services/briefing.js");
       const { getPrimaryAdminUserId } = await import("@ai-cofounder/db");
       const adminUserId = await getPrimaryAdminUserId(app.db);
-      await sendDailyBriefing(app.db, app.notificationService, app.llmRegistry, adminUserId ?? undefined);
+      await sendDailyBriefing(
+        app.db,
+        app.notificationService,
+        app.llmRegistry,
+        adminUserId ?? undefined,
+        app.monitoringService,
+      );
 
       // Write daily vault note alongside briefing
       try {
@@ -331,8 +401,8 @@ export const queuePlugin = fp(async (app) => {
         app.notificationService,
         app.embeddingService,
         app.sandboxService,
-        app.journalService,   // journal integration
-        app.n8nService,       // n8n post-pipeline trigger
+        app.journalService, // journal integration
+        app.n8nService, // n8n post-pipeline trigger
       );
       await executor.execute(job.data);
       app.agentEvents.emit("ws:pipeline_complete");
@@ -385,7 +455,8 @@ export const queuePlugin = fp(async (app) => {
           break;
         }
         case "consolidate_memories": {
-          const { MemoryConsolidationService } = await import("../services/memory-consolidation.js");
+          const { MemoryConsolidationService } =
+            await import("../services/memory-consolidation.js");
           const svc = new MemoryConsolidationService(app.db, app.llmRegistry, app.embeddingService);
           const result = await svc.consolidate();
           logger.info(result, "memory consolidation complete");
@@ -428,7 +499,10 @@ export const queuePlugin = fp(async (app) => {
 
     deployVerification: async (job) => {
       const { deploymentId, commitSha, previousSha } = job.data;
-      logger.info({ jobId: job.id, deploymentId, commitSha: commitSha?.slice(0, 7), jobName: job.name }, "Running deploy verification");
+      logger.info(
+        { jobId: job.id, deploymentId, commitSha: commitSha?.slice(0, 7), jobName: job.name },
+        "Running deploy verification",
+      );
       const { DeployHealthService } = await import("../services/deploy-health.js");
       const deployHealthService = new DeployHealthService(
         app.db,
@@ -439,23 +513,17 @@ export const queuePlugin = fp(async (app) => {
       );
 
       if (job.name === "analyze-failure") {
-        await deployHealthService.handleDeployFailure(
-          deploymentId,
-          commitSha,
-          previousSha,
-        );
+        await deployHealthService.handleDeployFailure(deploymentId, commitSha, previousSha);
         // Record failure in circuit breaker
         if (app.deployCircuitBreakerService) {
-          await app.deployCircuitBreakerService.recordFailure(commitSha, job.data.errorLog).catch((err: unknown) => {
-            logger.warn({ err }, "circuit breaker failure recording failed");
-          });
+          await app.deployCircuitBreakerService
+            .recordFailure(commitSha, job.data.errorLog)
+            .catch((err: unknown) => {
+              logger.warn({ err }, "circuit breaker failure recording failed");
+            });
         }
       } else if (job.name === "soak-check") {
-        await deployHealthService.startSoakMonitoring(
-          deploymentId,
-          commitSha,
-          previousSha,
-        );
+        await deployHealthService.startSoakMonitoring(deploymentId, commitSha, previousSha);
       } else {
         await deployHealthService.verifyDeployment(deploymentId, commitSha, previousSha);
 
@@ -498,16 +566,31 @@ export const queuePlugin = fp(async (app) => {
 
     discordTriage: async (job) => {
       const { channelId, channelName, messages, batchedAt } = job.data;
-      logger.info({ jobId: job.id, channelName, messageCount: messages.length }, "Triaging discord batch");
+      logger.info(
+        { jobId: job.id, channelName, messageCount: messages.length },
+        "Triaging discord batch",
+      );
 
       if (optionalEnv("DISCORD_WATCHER_ENABLED", "false") !== "true") {
         logger.debug("discord watcher disabled, skipping triage");
         return;
       }
 
-      const { DiscordTriageService, buildDiscordAlertBlocks } = await import("../services/discord-triage.js");
-      const triageService = new DiscordTriageService(app.llmRegistry);
+      if (!cachedTriageService || !cachedBuildDiscordAlertBlocks) {
+        const mod = await import("../services/discord-triage.js");
+        cachedTriageService = new mod.DiscordTriageService(app.llmRegistry);
+        cachedBuildDiscordAlertBlocks = mod.buildDiscordAlertBlocks;
+      }
+      const triageService = cachedTriageService;
+      const buildDiscordAlertBlocks = cachedBuildDiscordAlertBlocks;
       const result = await triageService.triageBatch({ channelName, messages });
+
+      // Record every classification to Prometheus, regardless of filtering downstream.
+      recordDiscordTriageResult({
+        category: result.category,
+        urgency: result.urgency,
+        actionable: result.actionable,
+      });
 
       const minConfidence = parseFloat(optionalEnv("DISCORD_WATCHER_MIN_CONFIDENCE", "0.6"));
       if (!result.actionable || result.confidence < minConfidence) {
@@ -521,14 +604,19 @@ export const queuePlugin = fp(async (app) => {
       // Deduplication: skip if we've seen a similar alert recently (6h window)
       try {
         const crypto = await import("node:crypto");
-        const dedupeKey = `discord-triage-seen:${crypto.createHash("sha256")
+        const dedupeKey = `discord-triage-seen:${crypto
+          .createHash("sha256")
           .update(`${channelId}:${result.category}:${result.summary.toLowerCase().slice(0, 100)}`)
-          .digest("hex").slice(0, 16)}`;
+          .digest("hex")
+          .slice(0, 16)}`;
         const { getDiscordTriageQueue } = await import("@ai-cofounder/queue");
         const client = await getDiscordTriageQueue().client;
         const wasNew = await client.set(dedupeKey, "1", "EX", 21600, "NX");
         if (!wasNew) {
-          logger.debug({ channelName, category: result.category }, "duplicate triage result suppressed");
+          logger.debug(
+            { channelName, category: result.category },
+            "duplicate triage result suppressed",
+          );
           return;
         }
       } catch {
@@ -536,7 +624,12 @@ export const queuePlugin = fp(async (app) => {
       }
 
       logger.info(
-        { channelName, category: result.category, urgency: result.urgency, summary: result.summary },
+        {
+          channelName,
+          category: result.category,
+          urgency: result.urgency,
+          summary: result.summary,
+        },
         "actionable discord messages detected",
       );
 
@@ -551,9 +644,10 @@ export const queuePlugin = fp(async (app) => {
         const [eh, em] = quietEnd.split(":").map(Number);
         const startMin = sh * 60 + (sm || 0);
         const endMin = eh * 60 + (em || 0);
-        const isQuiet = startMin > endMin
-          ? current >= startMin || current < endMin
-          : current >= startMin && current < endMin;
+        const isQuiet =
+          startMin > endMin
+            ? current >= startMin || current < endMin
+            : current >= startMin && current < endMin;
         if (isQuiet && effectiveUrgency !== "high") {
           effectiveUrgency = "low";
         }
@@ -614,48 +708,20 @@ export const queuePlugin = fp(async (app) => {
             urgency: result.urgency,
             timestamp: batchedAt,
           });
-          logger.info({ channelName, urgency: effectiveUrgency, bucket }, "triage item accumulated for digest");
+          logger.info(
+            { channelName, urgency: effectiveUrgency, bucket },
+            "triage item accumulated for digest",
+          );
         } catch (err) {
           // Fallback: if digest service unavailable, send immediately
           logger.warn({ err }, "digest accumulation failed, sending immediately");
           const blocks = buildDiscordAlertBlocks(result, channelName, messages);
-          await app.notificationService.sendSlackPreferred(
-            `Discord: ${result.summary}`,
-            blocks,
-          );
+          await app.notificationService.sendSlackPreferred(`Discord: ${result.summary}`, blocks);
         }
       }
 
       // Trigger n8n webhook if a mapping exists for this category
-      try {
-        const webhooksJson = optionalEnv("N8N_ACTION_WEBHOOKS", "");
-        if (webhooksJson) {
-          const webhooks: Record<string, string> = JSON.parse(webhooksJson);
-          const webhookUrl = webhooks[result.category];
-          if (webhookUrl) {
-            const relevantText = messages
-              .filter((m) => result.relevantMessageIds.includes(m.messageId))
-              .map((m) => `${m.authorName}: ${m.content.slice(0, 300)}`)
-              .join("\n");
-            await fetch(webhookUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                category: result.category,
-                summary: result.summary,
-                suggestedAction: result.suggestedAction,
-                urgency: result.urgency,
-                channelName,
-                messages: relevantText,
-                batchedAt,
-              }),
-            });
-            logger.info({ category: result.category, webhookUrl }, "n8n action webhook triggered");
-          }
-        }
-      } catch (err) {
-        logger.warn({ err, category: result.category }, "n8n action webhook failed (non-fatal)");
-      }
+      await fireN8nActionWebhook({ result, messages, channelName, batchedAt });
     },
 
     ragIngestion: async (job) => {
@@ -727,11 +793,14 @@ export const queuePlugin = fp(async (app) => {
           const { ingestFiles, shouldSkipFile } = await import("@ai-cofounder/rag");
           const entries = await app.workspaceService.listDirectory(sourceId);
           const filePaths = entries.filter((e) => e.type === "file").map((e) => e.name);
-          const fileContents = await Promise.all(
-            filePaths
-              .filter((f) => !shouldSkipFile(f))
-              .slice(0, 500) // limit to 500 files per ingestion
-              .map(async (f) => {
+          // Read files with bounded concurrency to avoid overwhelming I/O
+          const filesToRead = filePaths.filter((f) => !shouldSkipFile(f)).slice(0, 500);
+          const CONCURRENCY = 20;
+          const fileContents: ({ path: string; content: string } | null)[] = [];
+          for (let i = 0; i < filesToRead.length; i += CONCURRENCY) {
+            const batch = filesToRead.slice(i, i + CONCURRENCY);
+            const results = await Promise.all(
+              batch.map(async (f) => {
                 try {
                   const content = await app.workspaceService!.readFile(`${sourceId}/${f}`);
                   return { path: f, content };
@@ -739,11 +808,19 @@ export const queuePlugin = fp(async (app) => {
                   return null;
                 }
               }),
+            );
+            fileContents.push(...results);
+          }
+          const validFiles = fileContents.filter(
+            (f): f is { path: string; content: string } => f !== null,
           );
-          const validFiles = fileContents.filter((f): f is { path: string; content: string } => f !== null);
+          if (!app.embeddingService) {
+            logger.warn("RAG repo ingestion skipped — no embedding service");
+            return;
+          }
           await ingestFiles(
             app.db,
-            app.embeddingService!.embed.bind(app.embeddingService!),
+            app.embeddingService.embed.bind(app.embeddingService),
             "git",
             sourceId,
             validFiles,
@@ -762,13 +839,20 @@ export const queuePlugin = fp(async (app) => {
     briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
     briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
     monitoringIntervalMinutes: 5,
-    autonomousSessionIntervalMinutes: Number(optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30")),
+    autonomousSessionIntervalMinutes: Number(
+      optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30"),
+    ),
   });
 
   // Seed YouTube Shorts pipeline template (idempotent)
   setImmediate(async () => {
     try {
-      const { getPipelineTemplateByName, createPipelineTemplate, getN8nWorkflowByName, createN8nWorkflow } = await import("@ai-cofounder/db");
+      const {
+        getPipelineTemplateByName,
+        createPipelineTemplate,
+        getN8nWorkflowByName,
+        createN8nWorkflow,
+      } = await import("@ai-cofounder/db");
 
       // Seed pipeline template
       const existing = await getPipelineTemplateByName(app.db, "youtube-shorts");
@@ -777,8 +861,18 @@ export const queuePlugin = fp(async (app) => {
           name: "youtube-shorts",
           description: "Generate a YouTube Shorts script and trigger n8n publishing workflow",
           stages: [
-            { agent: "researcher", prompt: "Research trending topics and generate a YouTube Shorts script (60 seconds max). Output: title, hook, script, hashtags.", dependsOnPrevious: false },
-            { agent: "reviewer", prompt: "Review the YouTube Shorts script for quality, hook strength, and SEO. Suggest improvements.", dependsOnPrevious: true },
+            {
+              agent: "researcher",
+              prompt:
+                "Research trending topics and generate a YouTube Shorts script (60 seconds max). Output: title, hook, script, hashtags.",
+              dependsOnPrevious: false,
+            },
+            {
+              agent: "reviewer",
+              prompt:
+                "Review the YouTube Shorts script for quality, hook strength, and SEO. Suggest improvements.",
+              dependsOnPrevious: true,
+            },
           ],
           defaultContext: { templateName: "youtube-shorts", n8nWorkflow: "youtube-shorts-publish" },
         });
@@ -791,7 +885,8 @@ export const queuePlugin = fp(async (app) => {
         const n8nBaseUrl = optionalEnv("N8N_BASE_URL", "http://localhost:5678");
         await createN8nWorkflow(app.db, {
           name: "youtube-shorts-publish",
-          description: "YouTube Shorts publishing workflow — triggered after content pipeline generates script",
+          description:
+            "YouTube Shorts publishing workflow — triggered after content pipeline generates script",
           webhookUrl: `${n8nBaseUrl}/webhook/youtube-shorts-publish`,
           direction: "outbound",
           inputSchema: { pipelineId: "string", goalId: "string", output: "string" },

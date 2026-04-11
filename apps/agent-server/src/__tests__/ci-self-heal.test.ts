@@ -39,10 +39,7 @@ const mockNotificationService = {
 };
 
 function makeService(): CiSelfHealService {
-  return new CiSelfHealService(
-    mockRedis as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-    mockNotificationService as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-  );
+  return new CiSelfHealService(mockRedis as any, mockNotificationService as any);
 }
 
 describe("CiSelfHealService", () => {
@@ -143,7 +140,11 @@ describe("CiSelfHealService", () => {
 
   it("recordFailure skips autonomous/ branches", async () => {
     const svc = makeService();
-    await svc.recordFailure("owner/repo", "autonomous/fix-123", "https://github.com/actions/runs/1");
+    await svc.recordFailure(
+      "owner/repo",
+      "autonomous/fix-123",
+      "https://github.com/actions/runs/1",
+    );
 
     // Redis should not be accessed at all
     expect(mockRedisGet).not.toHaveBeenCalled();
@@ -153,7 +154,11 @@ describe("CiSelfHealService", () => {
 
   it("recordFailure skips dependabot/ branches", async () => {
     const svc = makeService();
-    await svc.recordFailure("owner/repo", "dependabot/npm_and_yarn/lodash-4.17.21", "https://github.com/actions/runs/1");
+    await svc.recordFailure(
+      "owner/repo",
+      "dependabot/npm_and_yarn/lodash-4.17.21",
+      "https://github.com/actions/runs/1",
+    );
 
     // Redis should not be accessed at all
     expect(mockRedisGet).not.toHaveBeenCalled();
@@ -235,7 +240,9 @@ describe("CiSelfHealService", () => {
     await svc.recordFailure("owner/myrepo", "main", "https://github.com/actions/runs/2");
 
     expect(mockEnqueueAutonomousSession).toHaveBeenCalledTimes(1);
-    const [job] = mockEnqueueAutonomousSession.mock.calls[0] as [{ trigger: string; prompt: string }];
+    const [job] = mockEnqueueAutonomousSession.mock.calls[0] as [
+      { trigger: string; prompt: string },
+    ];
     expect(job.trigger).toBe("ci-heal");
     expect(job.prompt).toContain("owner/myrepo");
     expect(job.prompt).toContain("main");

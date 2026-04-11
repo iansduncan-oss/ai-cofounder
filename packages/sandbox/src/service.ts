@@ -1,12 +1,7 @@
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createLogger } from "@ai-cofounder/shared";
-import type {
-  ExecutionRequest,
-  ExecutionResult,
-  SandboxConfig,
-  SandboxLanguage,
-} from "./types.js";
+import type { ExecutionRequest, ExecutionResult, SandboxConfig, SandboxLanguage } from "./types.js";
 
 const logger = createLogger("sandbox");
 
@@ -17,9 +12,18 @@ const DOCKER_IMAGES: Record<SandboxLanguage, string> = {
   bash: "alpine:3.20",
 };
 
+/** Validate dependency names to prevent shell injection via crafted package names */
+const SAFE_DEP_PATTERN = /^(@[a-z0-9._-]+\/)?[a-z0-9._-]+(@[a-z0-9._^~>=<|-]+)?$/i;
+
+function sanitizeDeps(deps: string[] | undefined): string[] {
+  if (!deps?.length) return [];
+  return deps.filter((d) => SAFE_DEP_PATTERN.test(d));
+}
+
 const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[]) => string[]> = {
   typescript: (code, deps) => {
-    const install = deps?.length ? `npm install --no-save ${deps.join(" ")} && ` : "";
+    const safeDeps = sanitizeDeps(deps);
+    const install = safeDeps.length ? `npm install --no-save ${safeDeps.join(" ")} && ` : "";
     return [
       "sh",
       "-c",
@@ -27,14 +31,24 @@ const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[])
     ];
   },
   javascript: (code, deps) => {
-    if (deps?.length) {
-      return ["sh", "-c", `npm install --no-save ${deps.join(" ")} && node -e ${JSON.stringify(code)}`];
+    const safeDeps = sanitizeDeps(deps);
+    if (safeDeps.length) {
+      return [
+        "sh",
+        "-c",
+        `npm install --no-save ${safeDeps.join(" ")} && node -e ${JSON.stringify(code)}`,
+      ];
     }
     return ["node", "-e", code];
   },
   python: (code, deps) => {
-    if (deps?.length) {
-      return ["sh", "-c", `pip install --quiet ${deps.join(" ")} && python3 -c ${JSON.stringify(code)}`];
+    const safeDeps = sanitizeDeps(deps);
+    if (safeDeps.length) {
+      return [
+        "sh",
+        "-c",
+        `pip install --quiet ${safeDeps.join(" ")} && python3 -c ${JSON.stringify(code)}`,
+      ];
     }
     return ["python3", "-c", code];
   },
@@ -84,9 +98,7 @@ export class SandboxService {
 
   private cacheKey(request: ExecutionRequest): string {
     const deps = request.dependencies?.sort().join(",") ?? "";
-    return createHash("sha256")
-      .update(`${request.language}:${request.code}:${deps}`)
-      .digest("hex");
+    return createHash("sha256").update(`${request.language}:${request.code}:${deps}`).digest("hex");
   }
 
   private getCached(key: string): CacheEntry | undefined {
@@ -136,8 +148,10 @@ export class SandboxService {
         "docker",
         [
           "ps",
-          "--filter", "label=ai-cofounder.managed=true",
-          "--format", "{{.ID}}\t{{.CreatedAt}}",
+          "--filter",
+          "label=ai-cofounder.managed=true",
+          "--format",
+          "{{.ID}}\t{{.CreatedAt}}",
           "--no-trunc",
         ],
         { timeout: 10_000, encoding: "utf-8" },
@@ -193,7 +207,10 @@ export class SandboxService {
     const cacheKey = this.cacheKey(request);
     const cached = this.getCached(cacheKey);
     if (cached) {
-      logger.info({ language: request.language, cacheKey: cacheKey.slice(0, 12) }, "sandbox cache hit");
+      logger.info(
+        { language: request.language, cacheKey: cacheKey.slice(0, 12) },
+        "sandbox cache hit",
+      );
       return {
         stdout: cached.stdout,
         stderr: cached.stderr,
@@ -219,9 +236,12 @@ export class SandboxService {
       "--name",
       containerName,
       // Labels for identification and cleanup
-      "--label", "ai-cofounder.managed=true",
-      "--label", `ai-cofounder.language=${request.language}`,
-      "--label", `ai-cofounder.task-id=${request.taskId ?? ""}`,
+      "--label",
+      "ai-cofounder.managed=true",
+      "--label",
+      `ai-cofounder.language=${request.language}`,
+      "--label",
+      `ai-cofounder.task-id=${request.taskId ?? ""}`,
       // Allow network only when dependencies need installing
       ...(hasDeps ? [] : ["--network=none"]),
       ...(hasDeps ? [] : ["--read-only"]),
@@ -266,7 +286,7 @@ export class SandboxService {
             exitCode =
               typeof (error as NodeJS.ErrnoException).code === "number"
                 ? ((error as NodeJS.ErrnoException).code as unknown as number)
-                : (error as unknown as { status?: number }).status ?? 1;
+                : ((error as unknown as { status?: number }).status ?? 1);
           }
 
           // OOM kill: Docker sends SIGKILL (exit 137) when memory limit exceeded
@@ -295,7 +315,10 @@ export class SandboxService {
           const result: ExecutionResult = {
             stdout: truncate(stdout, 10_000),
             stderr: oomKilled
-              ? truncate(`OOM: Container killed — exceeded ${this.config.memoryLimit} memory limit.\n${stderr}`, 10_000)
+              ? truncate(
+                  `OOM: Container killed — exceeded ${this.config.memoryLimit} memory limit.\n${stderr}`,
+                  10_000,
+                )
               : truncate(stderr, 10_000),
             exitCode,
             durationMs,

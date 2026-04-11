@@ -59,10 +59,15 @@ export async function generateSuggestions(
         });
         if (patterns.length > 0) {
           for (const p of patterns) {
-            incrementPatternHitCount(db, p.id).catch(() => {});
+            incrementPatternHitCount(db, p.id).catch((err) =>
+              logger.warn({ err }, "pattern hit count increment failed"),
+            );
           }
           const patternDescs = patterns
-            .map((p) => `- ${p.description} → suggested: "${p.suggestedAction}" (confidence: ${p.confidence}%)`)
+            .map(
+              (p) =>
+                `- ${p.description} → suggested: "${p.suggestedAction}" (confidence: ${p.confidence}%)`,
+            )
             .join("\n");
           patternContext = `\n\nThe user has these known behavioral patterns that match the current time:\n${patternDescs}\nConsider these patterns when suggesting next actions. Pattern-based suggestions should be prioritized if relevant.`;
         }

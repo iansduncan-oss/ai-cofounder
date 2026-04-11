@@ -66,7 +66,10 @@ export class DeployCircuitBreakerService {
       failureWindowStart: windowStart,
     });
 
-    logger.info({ commitSha: commitSha.slice(0, 7), failureCount, shouldPause }, "deploy failure recorded");
+    logger.info(
+      { commitSha: commitSha.slice(0, 7), failureCount, shouldPause },
+      "deploy failure recorded",
+    );
 
     if (shouldPause) {
       const message = [
@@ -76,9 +79,13 @@ export class DeployCircuitBreakerService {
         errorSummary ? `Error: ${errorSummary}` : "",
         ``,
         `Resume manually via \`POST /api/deploys/circuit-breaker/resume\` or the dashboard.`,
-      ].filter(Boolean).join("\n");
+      ]
+        .filter(Boolean)
+        .join("\n");
 
-      await this.notificationService.sendBriefing(message).catch(() => {});
+      await this.notificationService
+        .sendBriefing(message)
+        .catch((err) => logger.warn({ err }, "circuit breaker notification failed"));
     }
   }
 
@@ -104,9 +111,11 @@ export class DeployCircuitBreakerService {
     await resetCircuitBreaker(this.db, resumedBy);
     logger.info({ resumedBy }, "circuit breaker resumed");
 
-    await this.notificationService.sendBriefing(
-      `**Deploy Circuit Breaker Resumed**\nAuto-deploys have been re-enabled${resumedBy ? ` by ${resumedBy}` : ""}.`,
-    ).catch(() => {});
+    await this.notificationService
+      .sendBriefing(
+        `**Deploy Circuit Breaker Resumed**\nAuto-deploys have been re-enabled${resumedBy ? ` by ${resumedBy}` : ""}.`,
+      )
+      .catch((err) => logger.warn({ err }, "circuit breaker event write failed"));
   }
 
   async getStatus(): Promise<CircuitBreakerStatus> {

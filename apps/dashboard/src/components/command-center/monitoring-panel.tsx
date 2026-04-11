@@ -18,14 +18,10 @@ import {
   AlertTriangle,
   Cpu,
   Layers,
-  Shield,
   CheckCircle,
   XCircle,
   CircleDot,
-  GitBranch,
   GitPullRequest,
-  Wrench,
-  Server,
   Volume2,
   Loader2,
   Square,
@@ -55,8 +51,14 @@ function BriefingSection({ text }: { text: string }) {
   const blobUrlRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
-    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
-    if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
   }, []);
 
   useEffect(() => cleanup, [cleanup]);
@@ -68,14 +70,23 @@ function BriefingSection({ text }: { text: string }) {
       const url = URL.createObjectURL(blob);
       blobUrlRef.current = url;
       const audio = new Audio(url);
-      audio.onended = () => { setAudioState("idle"); cleanup(); };
+      audio.onended = () => {
+        setAudioState("idle");
+        cleanup();
+      };
       audioRef.current = audio;
       await audio.play();
       setAudioState("playing");
-    } catch { setAudioState("idle"); cleanup(); }
+    } catch {
+      setAudioState("idle");
+      cleanup();
+    }
   }, [cleanup]);
 
-  const handleStop = useCallback(() => { cleanup(); setAudioState("idle"); }, [cleanup]);
+  const handleStop = useCallback(() => {
+    cleanup();
+    setAudioState("idle");
+  }, [cleanup]);
 
   return (
     <div className="border-t px-3 py-2">
@@ -84,7 +95,10 @@ function BriefingSection({ text }: { text: string }) {
           <FileText className="h-3 w-3" /> Briefing
         </span>
         {audioState === "idle" && (
-          <button onClick={handlePlay} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+          <button
+            onClick={handlePlay}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+          >
             <Volume2 className="h-3 w-3" /> Play
           </button>
         )}
@@ -94,7 +108,10 @@ function BriefingSection({ text }: { text: string }) {
           </span>
         )}
         {audioState === "playing" && (
-          <button onClick={handleStop} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground">
+          <button
+            onClick={handleStop}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground"
+          >
             <Square className="h-3 w-3" /> Stop
           </button>
         )}
@@ -185,7 +202,13 @@ export function MonitoringPanel() {
               monitoring.alerts.map((alert, i) => (
                 <div key={i} className="flex items-start gap-2 rounded-md border p-2 text-xs">
                   <Badge
-                    variant={alert.severity === "critical" ? "destructive" : alert.severity === "warning" ? "warning" : "secondary"}
+                    variant={
+                      alert.severity === "critical"
+                        ? "destructive"
+                        : alert.severity === "warning"
+                          ? "warning"
+                          : "secondary"
+                    }
                     className="shrink-0 text-[9px]"
                   >
                     {alert.severity}
@@ -213,7 +236,9 @@ export function MonitoringPanel() {
                   {errorSummary?.totalErrors} errors in 24h
                 </p>
                 {errorSummary?.errors?.slice(0, 3).map((e, i) => (
-                  <p key={i} className="text-[10px] text-muted-foreground">{e.toolName}: {e.count}x</p>
+                  <p key={i} className="text-[10px] text-muted-foreground">
+                    {e.toolName}: {e.count}x
+                  </p>
                 ))}
               </div>
             )}
@@ -225,12 +250,16 @@ export function MonitoringPanel() {
             {monitoring?.github ? (
               <>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">CI</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                    CI
+                  </p>
                   {monitoring.github.ciStatus.length > 0 ? (
                     <div className="space-y-1">
                       {monitoring.github.ciStatus.map((ci, i) => (
                         <div key={i} className="flex items-center justify-between text-xs">
-                          <span className="truncate">{ci.repo.split("/").pop()} / {ci.branch}</span>
+                          <span className="truncate">
+                            {ci.repo.split("/").pop()} / {ci.branch}
+                          </span>
                           {ci.status === "success" ? (
                             <CheckCircle className="h-3 w-3 text-emerald-500 shrink-0" />
                           ) : ci.status === "failure" ? (
@@ -241,23 +270,33 @@ export function MonitoringPanel() {
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-[10px] text-muted-foreground">No CI data</p>}
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">No CI data</p>
+                  )}
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Open PRs</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                    Open PRs
+                  </p>
                   {monitoring.github.openPRs.length > 0 ? (
                     <div className="space-y-1">
                       {monitoring.github.openPRs.slice(0, 5).map((pr, i) => (
                         <div key={i} className="flex items-center gap-1.5 text-xs">
                           <GitPullRequest className="h-3 w-3 shrink-0 text-muted-foreground" />
-                          <span className="truncate">#{pr.number} {pr.title}</span>
+                          <span className="truncate">
+                            #{pr.number} {pr.title}
+                          </span>
                         </div>
                       ))}
                     </div>
-                  ) : <p className="text-[10px] text-muted-foreground">No open PRs</p>}
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">No open PRs</p>
+                  )}
                 </div>
               </>
-            ) : <p className="text-xs text-muted-foreground">Not configured</p>}
+            ) : (
+              <p className="text-xs text-muted-foreground">Not configured</p>
+            )}
           </div>
         )}
 
@@ -276,7 +315,9 @@ export function MonitoringPanel() {
                   </div>
                   <div className="text-xs">
                     <p className="text-[10px] text-muted-foreground">Load</p>
-                    <p className="font-metric font-bold">{monitoring.vps.cpuLoadAvg.map((l) => l.toFixed(1)).join(" / ")}</p>
+                    <p className="font-metric font-bold">
+                      {monitoring.vps.cpuLoadAvg.map((l) => l.toFixed(1)).join(" / ")}
+                    </p>
                   </div>
                   <div className="text-xs">
                     <p className="text-[10px] text-muted-foreground">Uptime</p>
@@ -285,12 +326,17 @@ export function MonitoringPanel() {
                 </div>
                 {monitoring.vps.containers && monitoring.vps.containers.length > 0 && (
                   <div>
-                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Containers</p>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                      Containers
+                    </p>
                     <div className="space-y-1">
                       {monitoring.vps.containers.map((c, i) => (
                         <div key={i} className="flex items-center justify-between text-xs">
                           <span className="truncate">{c.name}</span>
-                          <Badge variant={c.status.includes("Up") ? "success" : "destructive"} className="text-[9px]">
+                          <Badge
+                            variant={c.status.includes("Up") ? "success" : "destructive"}
+                            className="text-[9px]"
+                          >
                             {c.health ?? c.status.split(" ")[0]}
                           </Badge>
                         </div>
@@ -299,7 +345,9 @@ export function MonitoringPanel() {
                   </div>
                 )}
               </>
-            ) : <p className="text-xs text-muted-foreground">Not monitored</p>}
+            ) : (
+              <p className="text-xs text-muted-foreground">Not monitored</p>
+            )}
           </div>
         )}
 
@@ -317,7 +365,9 @@ export function MonitoringPanel() {
                   </div>
                 </div>
               ))
-            ) : <p className="text-xs text-muted-foreground">Queue system not active</p>}
+            ) : (
+              <p className="text-xs text-muted-foreground">Queue system not active</p>
+            )}
           </div>
         )}
 
@@ -333,21 +383,29 @@ export function MonitoringPanel() {
                     </div>
                     <div className="flex gap-2 text-[10px] text-muted-foreground">
                       <span>{Math.round(p.avgLatencyMs)}ms</span>
-                      <span>{p.successCount}/{p.totalRequests}</span>
+                      <span>
+                        {p.successCount}/{p.totalRequests}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
-            ) : <p className="text-xs text-muted-foreground">No providers</p>}
+            ) : (
+              <p className="text-xs text-muted-foreground">No providers</p>
+            )}
             {/* Tool stats */}
             {toolStats?.tools && toolStats.tools.length > 0 && (
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">Top Tools</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
+                  Top Tools
+                </p>
                 <div className="space-y-1">
                   {toolStats.tools.slice(0, 6).map((t, i) => (
                     <div key={i} className="flex items-center justify-between text-xs">
                       <span className="truncate">{t.toolName}</span>
-                      <span className="text-[10px] text-muted-foreground">{Math.round(t.avgDurationMs)}ms · {t.totalExecutions}x</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {Math.round(t.avgDurationMs)}ms · {t.totalExecutions}x
+                      </span>
                     </div>
                   ))}
                 </div>

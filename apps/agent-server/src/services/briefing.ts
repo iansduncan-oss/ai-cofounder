@@ -8,7 +8,9 @@ import {
   listEnabledSchedules,
   listRecentlyCompletedGoals,
   listPendingApprovals,
+  listFailurePatterns,
   upsertBriefingCache,
+  getBriefingCache,
   getProductivityLog,
   getPrimaryAdminUserId,
   listDueFollowUps,
@@ -31,7 +33,13 @@ export interface BriefingData {
   todayEvents?: Array<{ summary: string; start: string; end: string; attendeeCount: number }>;
   unreadEmailCount?: number;
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
-  discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
+  discordActivity?: Array<{
+    channelName: string;
+    summary: string;
+    category: string;
+    urgency: string;
+    suggestedAction: string;
+  }>;
   productivity?: {
     todayPlan: Array<{ text: string; completed: boolean }>;
     streakDays: number;
@@ -40,6 +48,15 @@ export interface BriefingData {
     energyLevel: number | null;
   };
   overdueFollowUps?: Array<{ id: string; title: string; dueDate: Date | null }>;
+  systemInsights?: string[];
+  githubCi?: Array<{ repo: string; status: string; conclusion: string | null; url: string }>;
+  githubPrs?: Array<{
+    repo: string;
+    number: number;
+    title: string;
+    author: string;
+    isDraft: boolean;
+  }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -49,18 +66,29 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
 
-  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, adminUserId, dueFollowUps] =
-    await Promise.all([
-      listActiveGoals(db),
-      listRecentlyCompletedGoals(db, yesterday),
-      countTasksByStatus(db),
-      getUsageSummary(db, { since: yesterday }),
-      listEnabledSchedules(db),
-      listRecentWorkSessions(db, 5),
-      listPendingApprovals(db),
-      getPrimaryAdminUserId(db),
-      listDueFollowUps(db),
-    ]);
+  const [
+    activeGoals,
+    completedGoals,
+    taskCounts,
+    usage,
+    schedules,
+    sessions,
+    pendingApprovals,
+    adminUserId,
+    dueFollowUps,
+    failurePatternRows,
+  ] = await Promise.all([
+    listActiveGoals(db),
+    listRecentlyCompletedGoals(db, yesterday),
+    countTasksByStatus(db),
+    getUsageSummary(db, { since: yesterday }),
+    listEnabledSchedules(db),
+    listRecentWorkSessions(db, 5),
+    listPendingApprovals(db),
+    getPrimaryAdminUserId(db),
+    listDueFollowUps(db),
+    listFailurePatterns(db, 5),
+  ]);
 
   // Fetch today's productivity log if admin user exists
   let productivity: BriefingData["productivity"];
@@ -82,10 +110,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   const goalsWithStaleness = activeGoals.map((g) => ({
     title: g.title,
     priority: g.priority,
-    progress:
-      g.taskCount > 0
-        ? `${g.completedTaskCount}/${g.taskCount} tasks`
-        : "no tasks yet",
+    progress: g.taskCount > 0 ? `${g.completedTaskCount}/${g.taskCount} tasks` : "no tasks yet",
     hoursStale: Math.round((now - g.updatedAt.getTime()) / (60 * 60 * 1000)),
   }));
 
@@ -110,6 +135,12 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
     productivity,
     overdueFollowUps: dueFollowUps.map((f) => ({ id: f.id, title: f.title, dueDate: f.dueDate })),
+    systemInsights: failurePatternRows
+      .filter((p) => p.frequency >= 3)
+      .map(
+        (p) =>
+          `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`,
+      ),
   };
 }
 
@@ -153,7 +184,10 @@ export async function enrichWithGoogle(
       })),
     };
   } catch (err) {
-    logger.warn({ err }, "Google enrichment failed — briefing will proceed without calendar/email data");
+    logger.warn(
+      { err },
+      "Google enrichment failed — briefing will proceed without calendar/email data",
+    );
     return null;
   }
 }
@@ -163,7 +197,9 @@ export function formatBriefing(data: BriefingData): string {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  lines.push(`**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`);
+  lines.push(
+    `**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`,
+  );
   lines.push("");
 
   // Productivity check-in (if logged today)
@@ -246,7 +282,9 @@ export function formatBriefing(data: BriefingData): string {
 
   // Pending approvals
   if (data.pendingApprovalCount > 0) {
-    lines.push(`**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`);
+    lines.push(
+      `**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`,
+    );
     lines.push("");
   }
 
@@ -281,15 +319,55 @@ export function formatBriefing(data: BriefingData): string {
 
   // Stale goals
   if (data.staleGoalCount > 0) {
-    lines.push(`**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`);
+    lines.push(
+      `**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`,
+    );
+    lines.push("");
+  }
+
+  // GitHub CI / PR status
+  if (data.githubCi && data.githubCi.length > 0) {
+    const failing = data.githubCi.filter((c) => c.status === "failure");
+    const passing = data.githubCi.filter((c) => c.status === "success");
+    if (failing.length > 0) {
+      lines.push(`**CI Failures (${failing.length}):**`);
+      for (const ci of failing) {
+        lines.push(`  - ${ci.repo}: ${ci.conclusion ?? "failed"}`);
+      }
+      lines.push("");
+    }
+    if (passing.length > 0) {
+      lines.push(`**CI Passing:** ${passing.map((c) => c.repo).join(", ")}`);
+      lines.push("");
+    }
+  }
+
+  if (data.githubPrs && data.githubPrs.length > 0) {
+    lines.push(`**Open PRs (${data.githubPrs.length}):**`);
+    for (const pr of data.githubPrs.slice(0, 5)) {
+      const draft = pr.isDraft ? " [draft]" : "";
+      lines.push(`  - ${pr.repo}#${pr.number}: ${pr.title} (${pr.author})${draft}`);
+    }
+    lines.push("");
+  }
+
+  // System insights (repeated failures)
+  if (data.systemInsights && data.systemInsights.length > 0) {
+    lines.push(`**System Patterns (${data.systemInsights.length}):**`);
+    for (const insight of data.systemInsights) {
+      lines.push(`  - ${insight}`);
+    }
     lines.push("");
   }
 
   // Costs
-  const costStr = data.costsSinceYesterday.totalCostUsd < 0.01
-    ? "< $0.01"
-    : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
-  lines.push(`**LLM Costs (24h):** ${costStr} across ${data.costsSinceYesterday.requestCount} requests`);
+  const costStr =
+    data.costsSinceYesterday.totalCostUsd < 0.01
+      ? "< $0.01"
+      : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
+  lines.push(
+    `**LLM Costs (24h):** ${costStr} across ${data.costsSinceYesterday.requestCount} requests`,
+  );
   lines.push("");
 
   // Upcoming schedules
@@ -317,7 +395,9 @@ export function formatBriefing(data: BriefingData): string {
 /** Build a prompt for the LLM to generate a narrative briefing */
 function buildBriefingPrompt(data: BriefingData): string {
   const lines: string[] = [];
-  lines.push("Generate a concise morning briefing. You are Jarvis, a composed British AI assistant. Address the user as 'sir'. Be direct, measured, and useful. No exclamation marks.");
+  lines.push(
+    "Generate a concise morning briefing. You are Jarvis, a composed British AI assistant. Address the user as 'sir'. Be direct, measured, and useful. No exclamation marks.",
+  );
   lines.push("Use markdown (bold, bullet points). Keep it under 1500 characters.");
   lines.push("");
 
@@ -355,14 +435,19 @@ function buildBriefingPrompt(data: BriefingData): string {
 
   if (data.staleGoalCount > 0) {
     lines.push("");
-    lines.push(`${data.staleGoalCount} goal(s) haven't been touched in ${STALE_THRESHOLD_HOURS}h+.`);
+    lines.push(
+      `${data.staleGoalCount} goal(s) haven't been touched in ${STALE_THRESHOLD_HOURS}h+.`,
+    );
   }
 
-  const costStr = data.costsSinceYesterday.totalCostUsd < 0.01
-    ? "< $0.01"
-    : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
+  const costStr =
+    data.costsSinceYesterday.totalCostUsd < 0.01
+      ? "< $0.01"
+      : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
   lines.push("");
-  lines.push(`LLM costs (24h): ${costStr} across ${data.costsSinceYesterday.requestCount} requests`);
+  lines.push(
+    `LLM costs (24h): ${costStr} across ${data.costsSinceYesterday.requestCount} requests`,
+  );
 
   if (data.todayEvents && data.todayEvents.length > 0) {
     lines.push("");
@@ -409,7 +494,10 @@ function buildBriefingPrompt(data: BriefingData): string {
 }
 
 /** Generate a briefing using LLM, falling back to static format on error */
-export async function generateLlmBriefing(registry: LlmRegistry, data: BriefingData): Promise<string> {
+export async function generateLlmBriefing(
+  registry: LlmRegistry,
+  data: BriefingData,
+): Promise<string> {
   try {
     const response = await registry.complete("simple", {
       system:
@@ -437,6 +525,14 @@ export async function sendDailyBriefing(
   notificationService: NotificationService,
   llmRegistry?: LlmRegistry,
   adminUserId?: string,
+  monitoringService?: {
+    checkGitHubCI(): Promise<
+      Array<{ repo: string; status: string; conclusion: string | null; url: string }>
+    >;
+    checkGitHubPRs(): Promise<
+      Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>
+    >;
+  },
 ): Promise<string> {
   // Auto-generate today's plan BEFORE gathering briefing data so the plan
   // shows up in the message. Uses merge mode so a manual check-in is preserved.
@@ -460,6 +556,20 @@ export async function sendDailyBriefing(
       } catch (err) {
         logger.warn({ err, id: fu.id }, "mark reminder-sent failed (non-fatal)");
       }
+    }
+  }
+
+  // Enrich with GitHub CI + PR data
+  if (monitoringService) {
+    try {
+      const [ciStatus, openPRs] = await Promise.all([
+        monitoringService.checkGitHubCI(),
+        monitoringService.checkGitHubPRs(),
+      ]);
+      if (ciStatus.length > 0) data.githubCi = ciStatus;
+      if (openPRs.length > 0) data.githubPrs = openPRs;
+    } catch {
+      // GitHub data unavailable — skip
     }
   }
 
@@ -489,9 +599,7 @@ export async function sendDailyBriefing(
     // Discord digest unavailable — skip
   }
 
-  const text = llmRegistry
-    ? await generateLlmBriefing(llmRegistry, data)
-    : formatBriefing(data);
+  const text = llmRegistry ? await generateLlmBriefing(llmRegistry, data) : formatBriefing(data);
 
   await notificationService.sendBriefing(text);
   logger.info("daily briefing sent");
@@ -508,7 +616,9 @@ export async function sendDailyBriefing(
 /** Build prompt for evening wind-down summary */
 function buildEveningPrompt(data: BriefingData): string {
   const lines: string[] = [];
-  lines.push("Generate a concise evening wrap-up. You are Jarvis. Address the user as 'sir'. Be warm but measured. No exclamation marks.");
+  lines.push(
+    "Generate a concise evening wrap-up. You are Jarvis. Address the user as 'sir'. Be warm but measured. No exclamation marks.",
+  );
   lines.push("Use markdown (bold, bullet points). Keep it under 1000 characters.");
   lines.push("");
 
@@ -546,10 +656,17 @@ function buildEveningPrompt(data: BriefingData): string {
     const done = p.todayPlan.filter((i) => i.completed).length;
     const total = p.todayPlan.length;
     lines.push("");
-    lines.push(`Today's plan: ${done}/${total} complete (${p.completionScore ?? 0}%), streak: ${p.streakDays} day(s)`);
+    lines.push(
+      `Today's plan: ${done}/${total} complete (${p.completionScore ?? 0}%), streak: ${p.streakDays} day(s)`,
+    );
     const remaining = p.todayPlan.filter((i) => !i.completed);
     if (remaining.length > 0) {
-      lines.push(`Items left: ${remaining.slice(0, 3).map((i) => `"${i.text}"`).join(", ")}${remaining.length > 3 ? `, +${remaining.length - 3} more` : ""}`);
+      lines.push(
+        `Items left: ${remaining
+          .slice(0, 3)
+          .map((i) => `"${i.text}"`)
+          .join(", ")}${remaining.length > 3 ? `, +${remaining.length - 3} more` : ""}`,
+      );
     }
   }
 
@@ -567,7 +684,10 @@ function buildEveningPrompt(data: BriefingData): string {
 }
 
 /** Generate an evening wrap-up briefing using LLM */
-export async function generateEveningWrapUp(registry: LlmRegistry, data: BriefingData): Promise<string> {
+export async function generateEveningWrapUp(
+  registry: LlmRegistry,
+  data: BriefingData,
+): Promise<string> {
   try {
     const response = await registry.complete("simple", {
       system:
@@ -588,6 +708,78 @@ export async function generateEveningWrapUp(registry: LlmRegistry, data: Briefin
     logger.warn({ err }, "LLM evening wrap-up generation failed");
     return "Good evening, sir. I was unable to generate a full summary, but all critical systems are operational.";
   }
+}
+
+/**
+ * Build a weekly summary from the last 7 days of cached daily briefings.
+ * Falls back to a static message if no briefings are cached. When an
+ * LlmRegistry is supplied, runs the aggregated text through an LLM for a
+ * narrative rollup; otherwise returns the concatenated briefings directly.
+ */
+export async function generateWeeklySummary(db: Db, llmRegistry?: LlmRegistry): Promise<string> {
+  const dates: string[] = [];
+  const today = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  const cached = await Promise.all(dates.map((date) => getBriefingCache(db, date)));
+  const entries = cached
+    .map((row, i) => ({ date: dates[i], text: row?.briefingText ?? null }))
+    .filter((e): e is { date: string; text: string } => Boolean(e.text));
+
+  if (entries.length === 0) {
+    return "Good morning, sir. No daily briefings were recorded in the past week — nothing to summarise.";
+  }
+
+  const combined = entries.map((e) => `### ${e.date}\n\n${e.text}`).join("\n\n---\n\n");
+
+  if (!llmRegistry) {
+    return `# Weekly Summary\n\nThe past ${entries.length} day(s) of briefings:\n\n${combined}`;
+  }
+
+  try {
+    const response = await llmRegistry.complete("simple", {
+      system:
+        "You are Jarvis, a personal AI assistant with dry British wit. " +
+        "Roll up the past week of daily briefings into a single, concise weekly summary. " +
+        "Address the user as 'sir'. Use markdown. Highlight themes, trends, and open threads. " +
+        "Keep it under 800 words and avoid repeating identical items.",
+      messages: [
+        {
+          role: "user",
+          content:
+            `Summarise the week. Source briefings (most recent first):\n\n${combined}\n\n` +
+            "Output sections: **The Week in Review**, **Open Threads**, **Recommended Focus for Next Week**.",
+        },
+      ],
+      max_tokens: 1200,
+    });
+
+    const text = response.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("\n");
+
+    return text || `# Weekly Summary\n\n${combined}`;
+  } catch (err) {
+    logger.warn({ err }, "LLM weekly summary generation failed, returning concatenated briefings");
+    return `# Weekly Summary\n\n${combined}`;
+  }
+}
+
+/** Send a weekly summary via the notification pipeline. */
+export async function sendWeeklySummary(
+  db: Db,
+  notificationService: NotificationService,
+  llmRegistry?: LlmRegistry,
+): Promise<string> {
+  const text = await generateWeeklySummary(db, llmRegistry);
+  await notificationService.sendBriefing(text);
+  logger.info("weekly summary sent");
+  return text;
 }
 
 /** Send evening wind-down briefing */

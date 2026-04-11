@@ -44,10 +44,13 @@ import {
   listProjectDependencies,
   getRegisteredProjectById,
 } from "@ai-cofounder/db";
-import { executeSharedTool, type ToolExecutorServices, type ToolExecutorContext } from "../agents/tool-executor.js";
+import {
+  executeSharedTool,
+  type ToolExecutorServices,
+  type ToolExecutorContext,
+} from "../agents/tool-executor.js";
 
 describe("project tools", () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockDb = {} as any;
 
   const mockProjectRegistryService = {
@@ -66,8 +69,21 @@ describe("project tools", () => {
       cpuLoadAvg: [0.5, 0.6, 0.7],
       uptime: "up 3 days",
       containers: [
-        { name: "ai-cofounder", status: "Up 2 hours (healthy)", health: "healthy", uptime: "Up 2 hours" },
-        { name: "postgres", status: "Up 3 days (healthy)", health: "healthy", uptime: "Up 3 days", cpuPercent: 1.2, memUsage: "256MiB / 1GiB", memPercent: 25.0 },
+        {
+          name: "ai-cofounder",
+          status: "Up 2 hours (healthy)",
+          health: "healthy",
+          uptime: "Up 2 hours",
+        },
+        {
+          name: "postgres",
+          status: "Up 3 days (healthy)",
+          health: "healthy",
+          uptime: "Up 3 days",
+          cpuPercent: 1.2,
+          memUsage: "256MiB / 1GiB",
+          memPercent: 25.0,
+        },
       ],
     }),
     isVPSConfigured: vi.fn().mockReturnValue(true),
@@ -78,8 +94,10 @@ describe("project tools", () => {
 
   const baseServices: ToolExecutorServices = {
     db: mockDb,
-    projectRegistryService: mockProjectRegistryService as unknown as ToolExecutorServices["projectRegistryService"],
-    monitoringService: mockMonitoringService as unknown as ToolExecutorServices["monitoringService"],
+    projectRegistryService:
+      mockProjectRegistryService as unknown as ToolExecutorServices["projectRegistryService"],
+    monitoringService:
+      mockMonitoringService as unknown as ToolExecutorServices["monitoringService"],
   };
 
   const baseContext: ToolExecutorContext = {
@@ -110,7 +128,7 @@ describe("project tools", () => {
       updatedAt: new Date(),
     });
     vi.mocked(getRegisteredProjectByName).mockResolvedValue(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     vi.mocked(updateConversationMetadata).mockResolvedValue({ id: "conv-123" } as any);
     vi.mocked(listProjectDependencies).mockResolvedValue([]);
     vi.mocked(getRegisteredProjectById).mockResolvedValue(null);
@@ -208,11 +226,9 @@ describe("project tools", () => {
       );
 
       expect(getRegisteredProjectByName).toHaveBeenCalledWith(mockDb, "AI Cofounder");
-      expect(updateConversationMetadata).toHaveBeenCalledWith(
-        mockDb,
-        "conv-123",
-        { activeProjectId: "proj-1" },
-      );
+      expect(updateConversationMetadata).toHaveBeenCalledWith(mockDb, "conv-123", {
+        activeProjectId: "proj-1",
+      });
       const r = result as Record<string, unknown>;
       expect(r.switched).toBe(true);
       expect(r.projectId).toBe("proj-1");
@@ -221,7 +237,13 @@ describe("project tools", () => {
     it("returns error when project is not found", async () => {
       vi.mocked(getRegisteredProjectByName).mockResolvedValue(null);
       mockProjectRegistryService.listProjects.mockReturnValue([
-        { id: "p2", name: "Other Project", slug: "other", language: "python", workspacePath: "/tmp/other" },
+        {
+          id: "p2",
+          name: "Other Project",
+          slug: "other",
+          language: "python",
+          workspacePath: "/tmp/other",
+        },
       ]);
 
       const result = await executeSharedTool(

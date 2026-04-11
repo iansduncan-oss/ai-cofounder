@@ -7,7 +7,9 @@ beforeAll(() => {
 });
 
 // --- DB mocks ---
-const mockGetGoal = vi.fn().mockResolvedValue({ id: "goal-abc12345", title: "Add user authentication" });
+const mockGetGoal = vi
+  .fn()
+  .mockResolvedValue({ id: "goal-abc12345", title: "Add user authentication" });
 const mockGetCostByGoal = vi.fn().mockResolvedValue({
   totalCostUsd: 0.025,
   totalInputTokens: 5000,
@@ -62,7 +64,8 @@ vi.mock("../agents/tools/github-tools.js", () => ({
 }));
 
 // --- Dynamic imports after mocks ---
-const { buildConventionalCommit, AutonomousExecutorService } = await import("../services/autonomous-executor.js");
+const { buildConventionalCommit, AutonomousExecutorService } =
+  await import("../services/autonomous-executor.js");
 const { LlmRegistry } = await import("@ai-cofounder/llm");
 
 beforeEach(() => {
@@ -125,7 +128,8 @@ describe("buildConventionalCommit", () => {
   });
 
   it("truncates description to fit 72-char limit", () => {
-    const longDesc = "implement a very complex user authentication system with OAuth2 and session management support";
+    const longDesc =
+      "implement a very complex user authentication system with OAuth2 and session management support";
     const msg = buildConventionalCommit({
       type: "feat",
       description: longDesc,
@@ -140,7 +144,8 @@ describe("buildConventionalCommit", () => {
     const msg = buildConventionalCommit({
       type: "refactor",
       scope: "auth-module",
-      description: "restructure the entire authentication module for better maintainability and testability",
+      description:
+        "restructure the entire authentication module for better maintainability and testability",
       goalId: "abc12345-0000-0000-0000-000000000000",
     });
     expect(msg.length).toBeLessThanOrEqual(72);
@@ -170,40 +175,60 @@ describe("AutonomousExecutorService.executeGoal", () => {
     totalTasks: 2,
     completedTasks: 2,
     tasks: [
-      { id: "task-1", title: "Create auth route", agent: "coder", status: "completed", output: "Route created" },
-      { id: "task-2", title: "Write tests", agent: "coder", status: "completed", output: "Tests written" },
+      {
+        id: "task-1",
+        title: "Create auth route",
+        agent: "coder",
+        status: "completed",
+        output: "Route created",
+      },
+      {
+        id: "task-2",
+        title: "Write tests",
+        agent: "coder",
+        status: "completed",
+        output: "Tests written",
+      },
     ],
   };
 
   function createMockDispatcher(progress = sampleProgress) {
     return {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, onProgress?: (...args: unknown[]) => unknown) => {
-        // Simulate progress events
-        if (onProgress) {
-          await onProgress({
-            goalId: "goal-abc12345",
-            goalTitle: "Add user authentication",
-            taskId: "task-1",
-            taskTitle: "Create auth route",
-            agent: "coder",
-            status: "started" as const,
-            completedTasks: 0,
-            totalTasks: 2,
-          });
-          await onProgress({
-            goalId: "goal-abc12345",
-            goalTitle: "Add user authentication",
-            taskId: "task-1",
-            taskTitle: "Create auth route",
-            agent: "coder",
-            status: "completed" as const,
-            completedTasks: 1,
-            totalTasks: 2,
-            output: "Route created",
-          });
-        }
-        return progress;
-      }),
+      runGoal: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _goalId: string,
+            _userId: string | undefined,
+            onProgress?: (...args: unknown[]) => unknown,
+          ) => {
+            // Simulate progress events
+            if (onProgress) {
+              await onProgress({
+                goalId: "goal-abc12345",
+                goalTitle: "Add user authentication",
+                taskId: "task-1",
+                taskTitle: "Create auth route",
+                agent: "coder",
+                status: "started" as const,
+                completedTasks: 0,
+                totalTasks: 2,
+              });
+              await onProgress({
+                goalId: "goal-abc12345",
+                goalTitle: "Add user authentication",
+                taskId: "task-1",
+                taskTitle: "Create auth route",
+                agent: "coder",
+                status: "completed" as const,
+                completedTasks: 1,
+                totalTasks: 2,
+                output: "Route created",
+              });
+            }
+            return progress;
+          },
+        ),
     };
   }
 
@@ -212,7 +237,9 @@ describe("AutonomousExecutorService.executeGoal", () => {
       gitCheckout: vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
       gitStatus: vi.fn().mockResolvedValue({ stdout: statusOutput, stderr: "", exitCode: 0 }),
       gitAdd: vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
-      gitCommit: vi.fn().mockResolvedValue({ stdout: "[main abc1234] feat: ...", stderr: "", exitCode: 0 }),
+      gitCommit: vi
+        .fn()
+        .mockResolvedValue({ stdout: "[main abc1234] feat: ...", stderr: "", exitCode: 0 }),
       gitPush: vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
     };
   }
@@ -223,7 +250,12 @@ describe("AutonomousExecutorService.executeGoal", () => {
     const registry = new LlmRegistry();
     const db = {} as any;
 
-    const executor = new AutonomousExecutorService(dispatcher as any, workspaceService as any, db, registry);
+    const executor = new AutonomousExecutorService(
+      dispatcher as any,
+      workspaceService as any,
+      db,
+      registry,
+    );
     const result = await executor.executeGoal({
       goalId: "goal-abc12345",
       userId: "user-1",
@@ -231,12 +263,27 @@ describe("AutonomousExecutorService.executeGoal", () => {
       repoDir: "my-repo",
     });
 
-    expect(dispatcher.runGoal).toHaveBeenCalledWith("goal-abc12345", "user-1", expect.any(Function));
-    expect(workspaceService.gitCheckout).toHaveBeenCalledWith("my-repo", "autonomous/goal-abc", true);
+    expect(dispatcher.runGoal).toHaveBeenCalledWith(
+      "goal-abc12345",
+      "user-1",
+      expect.any(Function),
+    );
+    expect(workspaceService.gitCheckout).toHaveBeenCalledWith(
+      "my-repo",
+      "autonomous/goal-abc",
+      true,
+    );
     expect(workspaceService.gitAdd).toHaveBeenCalledWith("my-repo", ["."]);
-    expect(workspaceService.gitCommit).toHaveBeenCalledWith("my-repo", expect.stringContaining("[goal:goal-abc]"));
+    expect(workspaceService.gitCommit).toHaveBeenCalledWith(
+      "my-repo",
+      expect.stringContaining("[goal:goal-abc]"),
+    );
     expect(result.progress.status).toBe("completed");
-    expect(result.actions).toBeDefined();
+    expect(Array.isArray(result.actions)).toBe(true);
+    const actionTypes = result.actions.map((a) => a.type);
+    expect(actionTypes).toContain("git_branch");
+    expect(actionTypes).toContain("git_add");
+    expect(actionTypes).toContain("git_commit");
   });
 
   it("skips git ops when workspace not provided", async () => {
@@ -263,7 +310,12 @@ describe("AutonomousExecutorService.executeGoal", () => {
     const registry = new LlmRegistry();
     const db = {} as any;
 
-    const executor = new AutonomousExecutorService(dispatcher as any, workspaceService as any, db, registry);
+    const executor = new AutonomousExecutorService(
+      dispatcher as any,
+      workspaceService as any,
+      db,
+      registry,
+    );
     await executor.executeGoal({
       goalId: "goal-abc12345",
       workSessionId: "ws-1",
@@ -299,7 +351,12 @@ describe("AutonomousExecutorService.executeGoal", () => {
     const registry = new LlmRegistry();
     const db = {} as any;
 
-    const executor = new AutonomousExecutorService(dispatcher as any, workspaceService as any, db, registry);
+    const executor = new AutonomousExecutorService(
+      dispatcher as any,
+      workspaceService as any,
+      db,
+      registry,
+    );
     await executor.executeGoal({
       goalId: "goal-abc12345",
       workSessionId: "ws-1",
@@ -324,8 +381,20 @@ describe("generatePrDescription", () => {
     totalTasks: 2,
     completedTasks: 2,
     tasks: [
-      { id: "task-1", title: "Create auth route", agent: "coder", status: "completed", output: "Route created" },
-      { id: "task-2", title: "Write tests", agent: "coder", status: "completed", output: "Tests written" },
+      {
+        id: "task-1",
+        title: "Create auth route",
+        agent: "coder",
+        status: "completed",
+        output: "Route created",
+      },
+      {
+        id: "task-2",
+        title: "Write tests",
+        agent: "coder",
+        status: "completed",
+        output: "Tests written",
+      },
     ],
   };
 
@@ -357,7 +426,10 @@ describe("generatePrDescription", () => {
     const db = {} as any;
 
     const executor = new AutonomousExecutorService(dispatcher as any, undefined, db, registry);
-    const result = await executor.generatePrDescription("Add user authentication", sampleProgress as any);
+    const result = await executor.generatePrDescription(
+      "Add user authentication",
+      sampleProgress as any,
+    );
 
     expect(result).toContain("## Summary");
     expect(result).toContain("*Autonomously generated by AI Cofounder*");
@@ -397,29 +469,37 @@ describe("TokenBudgetExceededError", () => {
     });
 
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
-        if (cb) {
-          await cb({
-            goalId: "goal-abc12345",
-            goalTitle: "Heavy workload",
-            taskId: "task-1",
-            taskTitle: "Expensive task",
-            agent: "coder",
-            status: "completed" as const,
-            completedTasks: 1,
-            totalTasks: 2,
-            output: "Done",
-          });
-        }
-        return {
-          goalId: "goal-abc12345",
-          goalTitle: "Heavy workload",
-          status: "completed",
-          totalTasks: 2,
-          completedTasks: 2,
-          tasks: [],
-        };
-      }),
+      runGoal: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _goalId: string,
+            _userId: string | undefined,
+            cb?: (...args: unknown[]) => unknown,
+          ) => {
+            if (cb) {
+              await cb({
+                goalId: "goal-abc12345",
+                goalTitle: "Heavy workload",
+                taskId: "task-1",
+                taskTitle: "Expensive task",
+                agent: "coder",
+                status: "completed" as const,
+                completedTasks: 1,
+                totalTasks: 2,
+                output: "Done",
+              });
+            }
+            return {
+              goalId: "goal-abc12345",
+              goalTitle: "Heavy workload",
+              status: "completed",
+              totalTasks: 2,
+              completedTasks: 2,
+              tasks: [],
+            };
+          },
+        ),
     };
     const registry = new LlmRegistry();
     const db = {} as any;
@@ -462,29 +542,37 @@ describe("TokenBudgetExceededError", () => {
     });
 
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
-        if (cb) {
-          await cb({
-            goalId: "goal-abc12345",
-            goalTitle: "Normal workload",
-            taskId: "task-1",
-            taskTitle: "Simple task",
-            agent: "coder",
-            status: "completed" as const,
-            completedTasks: 1,
-            totalTasks: 1,
-            output: "Done",
-          });
-        }
-        return {
-          goalId: "goal-abc12345",
-          goalTitle: "Normal workload",
-          status: "completed",
-          totalTasks: 1,
-          completedTasks: 1,
-          tasks: [],
-        };
-      }),
+      runGoal: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _goalId: string,
+            _userId: string | undefined,
+            cb?: (...args: unknown[]) => unknown,
+          ) => {
+            if (cb) {
+              await cb({
+                goalId: "goal-abc12345",
+                goalTitle: "Normal workload",
+                taskId: "task-1",
+                taskTitle: "Simple task",
+                agent: "coder",
+                status: "completed" as const,
+                completedTasks: 1,
+                totalTasks: 1,
+                output: "Done",
+              });
+            }
+            return {
+              goalId: "goal-abc12345",
+              goalTitle: "Normal workload",
+              status: "completed",
+              totalTasks: 1,
+              completedTasks: 1,
+              tasks: [],
+            };
+          },
+        ),
     };
     const registry = new LlmRegistry();
     const db = {} as any;
@@ -541,7 +629,15 @@ describe("Work log structure (TERM-05)", () => {
     status: "completed",
     totalTasks: 1,
     completedTasks: 1,
-    tasks: [{ id: "task-1", title: "Create auth route", agent: "coder", status: "completed", output: "Route created" }],
+    tasks: [
+      {
+        id: "task-1",
+        title: "Create auth route",
+        agent: "coder",
+        status: "completed",
+        output: "Route created",
+      },
+    ],
   };
 
   it("actions array contains typed entries for each git operation", async () => {
@@ -552,12 +648,19 @@ describe("Work log structure (TERM-05)", () => {
       gitCheckout: vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
       gitStatus: vi.fn().mockResolvedValue({ stdout: " M src/auth.ts", stderr: "", exitCode: 0 }),
       gitAdd: vi.fn().mockResolvedValue({ stdout: "", stderr: "", exitCode: 0 }),
-      gitCommit: vi.fn().mockResolvedValue({ stdout: "[main abc1234] feat: ...", stderr: "", exitCode: 0 }),
+      gitCommit: vi
+        .fn()
+        .mockResolvedValue({ stdout: "[main abc1234] feat: ...", stderr: "", exitCode: 0 }),
     };
     const registry = new LlmRegistry();
     const db = {} as any;
 
-    const executor = new AutonomousExecutorService(dispatcher as any, workspaceService as any, db, registry);
+    const executor = new AutonomousExecutorService(
+      dispatcher as any,
+      workspaceService as any,
+      db,
+      registry,
+    );
     const result = await executor.executeGoal({
       goalId: "goal-abc12345",
       workSessionId: "ws-1",
@@ -601,21 +704,29 @@ describe("Work log structure (TERM-05)", () => {
       void event;
     });
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
-        if (cb) {
-          await cb({
-            goalId: "goal-abc12345",
-            goalTitle: "Add user authentication",
-            taskId: "task-1",
-            taskTitle: "Create auth route",
-            agent: "coder",
-            status: "started" as const,
-            completedTasks: 0,
-            totalTasks: 1,
-          });
-        }
-        return sampleProgress;
-      }),
+      runGoal: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _goalId: string,
+            _userId: string | undefined,
+            cb?: (...args: unknown[]) => unknown,
+          ) => {
+            if (cb) {
+              await cb({
+                goalId: "goal-abc12345",
+                goalTitle: "Add user authentication",
+                taskId: "task-1",
+                taskTitle: "Create auth route",
+                agent: "coder",
+                status: "started" as const,
+                completedTasks: 0,
+                totalTasks: 1,
+              });
+            }
+            return sampleProgress;
+          },
+        ),
     };
     const registry = new LlmRegistry();
     const db = {} as any;
@@ -638,22 +749,30 @@ describe("Work log structure (TERM-05)", () => {
   it("output in task_progress actions is truncated to 500 chars", async () => {
     const longOutput = "x".repeat(600);
     const dispatcher = {
-      runGoal: vi.fn().mockImplementation(async (_goalId: string, _userId: string | undefined, cb?: (...args: unknown[]) => unknown) => {
-        if (cb) {
-          await cb({
-            goalId: "goal-abc12345",
-            goalTitle: "Add user authentication",
-            taskId: "task-1",
-            taskTitle: "Create auth route",
-            agent: "coder",
-            status: "completed" as const,
-            completedTasks: 1,
-            totalTasks: 1,
-            output: longOutput,
-          });
-        }
-        return sampleProgress;
-      }),
+      runGoal: vi
+        .fn()
+        .mockImplementation(
+          async (
+            _goalId: string,
+            _userId: string | undefined,
+            cb?: (...args: unknown[]) => unknown,
+          ) => {
+            if (cb) {
+              await cb({
+                goalId: "goal-abc12345",
+                goalTitle: "Add user authentication",
+                taskId: "task-1",
+                taskTitle: "Create auth route",
+                agent: "coder",
+                status: "completed" as const,
+                completedTasks: 1,
+                totalTasks: 1,
+                output: longOutput,
+              });
+            }
+            return sampleProgress;
+          },
+        ),
     };
     const registry = new LlmRegistry();
     const db = {} as any;

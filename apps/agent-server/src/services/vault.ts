@@ -15,6 +15,27 @@ const VAULT_DIR = optionalEnv("VAULT_DIR", "/opt/jarvis-vault");
 
 const DIRS = ["daily", "projects", "decisions", "people"] as const;
 
+/** Shape of an active goal row as consumed by daily-note rendering. */
+interface VaultGoalSummary {
+  title: string;
+  status: string;
+  priority: string;
+}
+
+/** Shape of a journal entry row as consumed by daily-note rendering. */
+interface VaultJournalEntry {
+  entryType: string;
+  title: string;
+  summary: string | null;
+}
+
+/** Shape of a memory row as consumed by daily-note rendering. */
+interface VaultMemoryEntry {
+  category: string;
+  key: string;
+  content: string;
+}
+
 export async function ensureVaultStructure(): Promise<void> {
   for (const dir of DIRS) {
     await mkdir(join(VAULT_DIR, dir), { recursive: true });
@@ -23,7 +44,9 @@ export async function ensureVaultStructure(): Promise<void> {
 }
 
 function todayStr(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: optionalEnv("BRIEFING_TIMEZONE", "America/Los_Angeles") });
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: optionalEnv("BRIEFING_TIMEZONE", "America/Los_Angeles"),
+  });
 }
 
 export async function writeDailyNote(db: Db): Promise<string> {
@@ -46,17 +69,21 @@ export async function writeDailyNote(db: Db): Promise<string> {
     "",
     "## Active Goals",
     ...(goals.length
-      ? goals.map((g: { title: string; status: string; priority: string }) => `- **${g.title}** (${g.status}, ${g.priority})`)
+      ? (goals as VaultGoalSummary[]).map((g) => `- **${g.title}** (${g.status}, ${g.priority})`)
       : ["_No active goals_"]),
     "",
     "## Journal",
     ...(journalEntries.length
-      ? journalEntries.slice(0, 10).map((e: { entryType: string; title: string; summary: string | null }) => `- [${e.entryType}] ${e.title}${e.summary ? `: ${e.summary}` : ""}`)
+      ? (journalEntries.slice(0, 10) as VaultJournalEntry[]).map(
+          (e) => `- [${e.entryType}] ${e.title}${e.summary ? `: ${e.summary}` : ""}`,
+        )
       : ["_No entries today_"]),
     "",
     "## Recent Memories",
     ...(memories.length
-      ? memories.slice(0, 5).map((m: { category: string; key: string; content: string }) => `- [${m.category}] **${m.key}**: ${m.content.slice(0, 200)}`)
+      ? (memories.slice(0, 5) as VaultMemoryEntry[]).map(
+          (m) => `- [${m.category}] **${m.key}**: ${m.content.slice(0, 200)}`,
+        )
       : ["_No recent memories_"]),
     "",
   ];
@@ -70,8 +97,16 @@ export async function writeDailyNote(db: Db): Promise<string> {
   return filePath;
 }
 
-export async function writeProjectNote(db: Db, goalId: string, title: string, summary: string): Promise<string> {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+export async function writeProjectNote(
+  db: Db,
+  goalId: string,
+  title: string,
+  summary: string,
+): Promise<string> {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 50);
   const filePath = join(VAULT_DIR, "projects", `${slug}.md`);
 
   let existing = "";
@@ -82,9 +117,7 @@ export async function writeProjectNote(db: Db, goalId: string, title: string, su
   }
 
   const entry = `\n## ${todayStr()}\n\n${summary}\n`;
-  const content = existing
-    ? existing + entry
-    : `# ${title}\n\nGoal ID: ${goalId}\n${entry}`;
+  const content = existing ? existing + entry : `# ${title}\n\nGoal ID: ${goalId}\n${entry}`;
 
   await mkdir(join(VAULT_DIR, "projects"), { recursive: true });
   await writeFile(filePath, content, "utf-8");
@@ -94,7 +127,10 @@ export async function writeProjectNote(db: Db, goalId: string, title: string, su
 
 export async function writeDecisionNote(topic: string, content: string): Promise<string> {
   const date = todayStr();
-  const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+  const slug = topic
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 50);
   const filePath = join(VAULT_DIR, "decisions", `${date}-${slug}.md`);
 
   const md = `# Decision: ${topic}\n\n**Date:** ${date}\n\n${content}\n`;

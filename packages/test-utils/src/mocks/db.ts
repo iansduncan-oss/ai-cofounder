@@ -34,13 +34,19 @@ export function mockDbModule() {
     getWorkspaceBySlug: vi.fn().mockResolvedValue(null),
     listWorkspacesByOwner: vi.fn().mockResolvedValue([]),
     getDefaultWorkspace: vi.fn().mockResolvedValue(null),
-    getSystemDefaultWorkspace: vi.fn().mockResolvedValue({ id: "ws-default", slug: "default", isDefault: true }),
+    getSystemDefaultWorkspace: vi
+      .fn()
+      .mockResolvedValue({ id: "ws-default", slug: "default", isDefault: true }),
     updateWorkspace: vi.fn().mockResolvedValue({}),
     deleteWorkspace: vi.fn().mockResolvedValue(null),
-    ensureDefaultWorkspace: vi.fn().mockResolvedValue({ id: "ws-1", slug: "default", isDefault: true }),
+    ensureDefaultWorkspace: vi
+      .fn()
+      .mockResolvedValue({ id: "ws-1", slug: "default", isDefault: true }),
     // Channel conversations
     getChannelConversation: vi.fn().mockResolvedValue(null),
-    upsertChannelConversation: vi.fn().mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),
+    upsertChannelConversation: vi
+      .fn()
+      .mockResolvedValue({ channelId: "ch-1", conversationId: "conv-1" }),
     deleteChannelConversation: vi.fn().mockResolvedValue(undefined),
     // Goals
     createGoal: vi.fn().mockResolvedValue({ id: "goal-1", title: "Test Goal" }),
@@ -108,8 +114,25 @@ export function mockDbModule() {
     recordLlmUsage: vi.fn().mockResolvedValue(undefined),
     getTodayTokenTotal: vi.fn().mockResolvedValue(0),
     getTodayTokenUsage: vi.fn().mockResolvedValue(0),
-    getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
-    getCostByGoal: vi.fn().mockResolvedValue({ totalCostUsd: 0, totalInputTokens: 0, totalOutputTokens: 0, requestCount: 0 }),
+    getUsageSummary: vi
+      .fn()
+      .mockResolvedValue({
+        totalCostUsd: 0,
+        requestCount: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        byProvider: {},
+        byModel: {},
+        byAgent: {},
+      }),
+    getCostByGoal: vi
+      .fn()
+      .mockResolvedValue({
+        totalCostUsd: 0,
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        requestCount: 0,
+      }),
     getTopExpensiveGoals: vi.fn().mockResolvedValue([]),
     getCostByDay: vi.fn().mockResolvedValue([]),
     // Schedules
@@ -246,7 +269,18 @@ export function mockDbModule() {
     getTriggeredPatterns: vi.fn().mockResolvedValue([]),
     incrementPatternAcceptCount: vi.fn().mockResolvedValue({ id: "up-1" }),
     incrementPatternHitCount: vi.fn().mockResolvedValue({ id: "up-1", hitCount: 1 }),
-    getPatternAnalytics: vi.fn().mockResolvedValue({ totalPatterns: 0, activePatterns: 0, totalHits: 0, totalAccepts: 0, overallAcceptRate: 0, avgConfidence: 0, byType: {}, patterns: [] }),
+    getPatternAnalytics: vi
+      .fn()
+      .mockResolvedValue({
+        totalPatterns: 0,
+        activePatterns: 0,
+        totalHits: 0,
+        totalAccepts: 0,
+        overallAcceptRate: 0,
+        avgConfidence: 0,
+        byType: {},
+        patterns: [],
+      }),
     getActionHeatmap: vi.fn().mockResolvedValue([]),
     getRecentUserActionSummary: vi.fn().mockResolvedValue([]),
     getLastUserMessageTimestamp: vi.fn().mockResolvedValue(null),
@@ -254,14 +288,33 @@ export function mockDbModule() {
     listPatterns: vi.fn().mockResolvedValue([]),
     togglePatternActive: vi.fn().mockResolvedValue({ id: "up-1", isActive: true }),
     deletePattern: vi.fn().mockResolvedValue(true),
-    createPattern: vi.fn().mockResolvedValue({ id: "up-new", patternType: "recurring_action", description: "Test", suggestedAction: "Do something", triggerCondition: {}, confidence: 50, hitCount: 0, acceptCount: 0, isActive: true }),
+    createPattern: vi
+      .fn()
+      .mockResolvedValue({
+        id: "up-new",
+        patternType: "recurring_action",
+        description: "Test",
+        suggestedAction: "Do something",
+        triggerCondition: {},
+        confidence: 50,
+        hitCount: 0,
+        acceptCount: 0,
+        isActive: true,
+      }),
     updatePattern: vi.fn().mockResolvedValue({ id: "up-1", description: "Updated" }),
     adjustPatternConfidence: vi.fn().mockResolvedValue({ id: "up-1", confidence: 55 }),
     deactivateLowConfidencePatterns: vi.fn().mockResolvedValue(0),
     userActions: {},
     userPatterns: {},
     // Deployments
-    createDeployment: vi.fn().mockResolvedValue({ id: "deploy-1", commitSha: "abc1234", shortSha: "abc1234", status: "started" }),
+    createDeployment: vi
+      .fn()
+      .mockResolvedValue({
+        id: "deploy-1",
+        commitSha: "abc1234",
+        shortSha: "abc1234",
+        status: "started",
+      }),
     updateDeploymentStatus: vi.fn().mockResolvedValue({ id: "deploy-1" }),
     getLatestDeployment: vi.fn().mockResolvedValue(null),
     listDeployments: vi.fn().mockResolvedValue([]),
@@ -270,13 +323,19 @@ export function mockDbModule() {
     // Tool tier config
     listToolTierConfigs: vi.fn().mockResolvedValue([]),
     getToolTierConfig: vi.fn().mockResolvedValue(null),
-    upsertToolTierConfig: vi.fn().mockResolvedValue({ id: "ttc-1", toolName: "test_tool", tier: "green" }),
+    upsertToolTierConfig: vi
+      .fn()
+      .mockResolvedValue({ id: "ttc-1", toolName: "test_tool", tier: "green" }),
     listExpiredPendingApprovals: vi.fn().mockResolvedValue([]),
     toolTierConfig: {},
     // Deploy circuit breaker
     getDeployCircuitBreaker: vi.fn().mockResolvedValue(null),
-    upsertDeployCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
-    resetCircuitBreaker: vi.fn().mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
+    upsertDeployCircuitBreaker: vi
+      .fn()
+      .mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
+    resetCircuitBreaker: vi
+      .fn()
+      .mockResolvedValue({ id: "cb-1", isPaused: false, failureCount: 0 }),
     getRecentFailedDeployments: vi.fn().mockResolvedValue([]),
     updateDeploymentSoakStatus: vi.fn().mockResolvedValue({ id: "deploy-1" }),
     deployCircuitBreaker: {},
@@ -284,12 +343,21 @@ export function mockDbModule() {
     getUserTimezone: vi.fn().mockResolvedValue(null),
     setUserTimezone: vi.fn().mockResolvedValue({ id: "user-1" }),
     // Session engagement
-    upsertSessionEngagement: vi.fn().mockResolvedValue({ id: "se-1", messageCount: 0, complexityScore: 50, energyLevel: "normal" }),
+    upsertSessionEngagement: vi
+      .fn()
+      .mockResolvedValue({
+        id: "se-1",
+        messageCount: 0,
+        complexityScore: 50,
+        energyLevel: "normal",
+      }),
     getLatestSessionEngagement: vi.fn().mockResolvedValue(null),
     getSessionEngagementHistory: vi.fn().mockResolvedValue([]),
     sessionEngagement: {},
     // Journal entries
-    createJournalEntry: vi.fn().mockResolvedValue({ id: "je-1", entryType: "work_session", title: "Test" }),
+    createJournalEntry: vi
+      .fn()
+      .mockResolvedValue({ id: "je-1", entryType: "work_session", title: "Test" }),
     getJournalEntry: vi.fn().mockResolvedValue(null),
     listJournalEntries: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     listWorkSessionsFiltered: vi.fn().mockResolvedValue({ data: [], total: 0 }),
@@ -297,19 +365,35 @@ export function mockDbModule() {
     cancelWorkSession: vi.fn().mockResolvedValue(null),
     journalEntries: {},
     // Registered projects
-    createRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", name: "test-project", slug: "test-project", workspacePath: "/tmp/test" }),
+    createRegisteredProject: vi
+      .fn()
+      .mockResolvedValue({
+        id: "proj-1",
+        name: "test-project",
+        slug: "test-project",
+        workspacePath: "/tmp/test",
+      }),
     listRegisteredProjects: vi.fn().mockResolvedValue([]),
     getRegisteredProjectByName: vi.fn().mockResolvedValue(null),
     getRegisteredProjectById: vi.fn().mockResolvedValue(null),
     updateRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
     deleteRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", isActive: false }),
-    createProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1", sourceProjectId: "proj-1", targetProjectId: "proj-2", dependencyType: "uses" }),
+    createProjectDependency: vi
+      .fn()
+      .mockResolvedValue({
+        id: "dep-1",
+        sourceProjectId: "proj-1",
+        targetProjectId: "proj-2",
+        dependencyType: "uses",
+      }),
     listProjectDependencies: vi.fn().mockResolvedValue([]),
     deleteProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1" }),
     registeredProjects: {},
     projectDependencies: {},
     // Pipeline templates
-    createPipelineTemplate: vi.fn().mockResolvedValue({ id: "pt-1", name: "test-template", isActive: true }),
+    createPipelineTemplate: vi
+      .fn()
+      .mockResolvedValue({ id: "pt-1", name: "test-template", isActive: true }),
     getPipelineTemplate: vi.fn().mockResolvedValue(null),
     getPipelineTemplateByName: vi.fn().mockResolvedValue(null),
     listPipelineTemplates: vi.fn().mockResolvedValue([]),
@@ -333,7 +417,9 @@ export function mockDbModule() {
     markMeetingPrepNotified: vi.fn().mockResolvedValue(undefined),
     meetingPreps: {},
     // Follow-ups
-    createFollowUp: vi.fn().mockResolvedValue({ id: "fu-1", title: "Test follow-up", status: "pending" }),
+    createFollowUp: vi
+      .fn()
+      .mockResolvedValue({ id: "fu-1", title: "Test follow-up", status: "pending" }),
     getFollowUp: vi.fn().mockResolvedValue(null),
     listFollowUps: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     updateFollowUp: vi.fn().mockResolvedValue(null),
@@ -344,22 +430,53 @@ export function mockDbModule() {
     listRecentlyCompletedFollowUps: vi.fn().mockResolvedValue([]),
     followUps: {},
     // Productivity tracker
-    upsertProductivityLog: vi.fn().mockResolvedValue({ id: "pl-1", date: "2025-01-01", streakDays: 1, plannedItems: [], completionScore: null, mood: null, energyLevel: null }),
+    upsertProductivityLog: vi
+      .fn()
+      .mockResolvedValue({
+        id: "pl-1",
+        date: "2025-01-01",
+        streakDays: 1,
+        plannedItems: [],
+        completionScore: null,
+        mood: null,
+        energyLevel: null,
+      }),
     getProductivityLog: vi.fn().mockResolvedValue(null),
     listProductivityLogs: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     getProductivityStreak: vi.fn().mockResolvedValue(0),
-    getProductivityStats: vi.fn().mockResolvedValue({ totalDays: 0, avgCompletion: 0, avgEnergy: 0, moodCounts: {}, currentStreak: 0, history: [] }),
+    getProductivityStats: vi
+      .fn()
+      .mockResolvedValue({
+        totalDays: 0,
+        avgCompletion: 0,
+        avgEnergy: 0,
+        moodCounts: {},
+        currentStreak: 0,
+        history: [],
+      }),
     deleteProductivityLog: vi.fn().mockResolvedValue(null),
     productivityLogs: {},
     // Codebase insights
-    upsertCodebaseInsight: vi.fn().mockResolvedValue({ id: "ci-1", fingerprint: "fp", status: "open", category: "fix", severity: "medium", title: "test", hitCount: 1 }),
+    upsertCodebaseInsight: vi
+      .fn()
+      .mockResolvedValue({
+        id: "ci-1",
+        fingerprint: "fp",
+        status: "open",
+        category: "fix",
+        severity: "medium",
+        title: "test",
+        hitCount: 1,
+      }),
     listCodebaseInsights: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     updateCodebaseInsightStatus: vi.fn().mockResolvedValue(null),
     pruneStaleCodebaseInsights: vi.fn().mockResolvedValue(0),
     countCodebaseInsights: vi.fn().mockResolvedValue(0),
     codebaseInsights: {},
     // Thinking traces
-    saveThinkingTrace: vi.fn().mockResolvedValue({ id: "tt-1", conversationId: "conv-1", round: 0, content: "test" }),
+    saveThinkingTrace: vi
+      .fn()
+      .mockResolvedValue({ id: "tt-1", conversationId: "conv-1", round: 0, content: "test" }),
     getThinkingTraces: vi.fn().mockResolvedValue([]),
     thinkingTraces: {},
     // Tool efficacy
@@ -383,13 +500,22 @@ export function mockDbModule() {
     countActiveMemories: vi.fn().mockResolvedValue(0),
     findSimilarMemories: vi.fn().mockResolvedValue([]),
     // Failure patterns
-    upsertFailurePattern: vi.fn().mockResolvedValue({ id: "fp-1", toolName: "test_tool", errorCategory: "error", frequency: 1 }),
+    upsertFailurePattern: vi
+      .fn()
+      .mockResolvedValue({
+        id: "fp-1",
+        toolName: "test_tool",
+        errorCategory: "error",
+        frequency: 1,
+      }),
     listFailurePatterns: vi.fn().mockResolvedValue([]),
     getFailurePatternsForTool: vi.fn().mockResolvedValue([]),
     incrementFailureFrequency: vi.fn().mockResolvedValue(undefined),
     failurePatterns: {},
     // Global search
-    globalSearch: vi.fn().mockResolvedValue({ goals: [], tasks: [], conversations: [], memories: [] }),
+    globalSearch: vi
+      .fn()
+      .mockResolvedValue({ goals: [], tasks: [], conversations: [], memories: [] }),
     // Missing event mocks
     getEventById: vi.fn().mockResolvedValue(null),
     resetEventProcessed: vi.fn().mockResolvedValue(undefined),
@@ -410,109 +536,4 @@ export function mockDbModule() {
     inArray: vi.fn((...args: unknown[]) => ({ op: "inArray", args })),
     gt: vi.fn((...args: unknown[]) => ({ op: "gt", args })),
   };
-}
-
-/**
- * Creates controllable db mocks with external vi.fn() references.
- * Returns both the mock fns (for test assertions) and the module factory.
- *
- * Usage:
- * ```
- * const { mocks, moduleFactory } = createControllableDbMocks();
- * vi.mock("@ai-cofounder/db", moduleFactory);
- * // In test: mocks.createGoal.mockResolvedValueOnce(...)
- * ```
- */
-export function createControllableDbMocks() {
-  const mocks = {
-    createDb: vi.fn().mockReturnValue({}),
-    findOrCreateUser: vi.fn().mockResolvedValue({ id: "user-1" }),
-    createConversation: vi.fn().mockResolvedValue({ id: "conv-1" }),
-    getConversation: vi.fn(),
-    getConversationMessages: vi.fn().mockResolvedValue([]),
-    createMessage: vi.fn().mockResolvedValue({ id: "msg-1" }),
-    createGoal: vi.fn().mockResolvedValue({ id: "goal-1", title: "Test Goal" }),
-    getGoal: vi.fn(),
-    listGoalsByConversation: vi.fn().mockResolvedValue([]),
-    listActiveGoals: vi.fn().mockResolvedValue([]),
-    updateGoalStatus: vi.fn().mockResolvedValue({}),
-    createTask: vi.fn().mockResolvedValue({ id: "task-1" }),
-    getTask: vi.fn(),
-    listTasksByGoal: vi.fn().mockResolvedValue([]),
-    listPendingTasks: vi.fn().mockResolvedValue([]),
-    assignTask: vi.fn(),
-    startTask: vi.fn(),
-    completeTask: vi.fn().mockResolvedValue({}),
-    failTask: vi.fn().mockResolvedValue({}),
-    blockTask: vi.fn().mockResolvedValue({}),
-    updateTaskDependencies: vi.fn().mockResolvedValue({}),
-    createApproval: vi.fn().mockResolvedValue({ id: "approval-1" }),
-    getApproval: vi.fn(),
-    listPendingApprovals: vi.fn().mockResolvedValue([]),
-    listPendingApprovalsForTasks: vi.fn().mockResolvedValue([]),
-    listApprovalsByTask: vi.fn().mockResolvedValue([]),
-    resolveApproval: vi.fn(),
-    saveMemory: vi.fn().mockResolvedValue({ key: "test", category: "other" }),
-    recallMemories: vi.fn().mockResolvedValue([]),
-    searchMemoriesByVector: vi.fn().mockResolvedValue([]),
-    listMemoriesByUser: vi.fn().mockResolvedValue([]),
-    deleteMemory: vi.fn(),
-    touchMemory: vi.fn(),
-    getActivePrompt: vi.fn().mockResolvedValue(null),
-    getChannelConversation: vi.fn(),
-    upsertChannelConversation: vi.fn(),
-    deleteChannelConversation: vi.fn(),
-    findUserByPlatform: vi.fn().mockResolvedValue(null),
-    getN8nWorkflowByName: vi.fn(),
-    listN8nWorkflows: vi.fn().mockResolvedValue([]),
-    recordLlmUsage: vi.fn(),
-    getTodayTokenUsage: vi.fn().mockResolvedValue(0),
-    getUsageSummary: vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} }),
-    createMilestone: vi.fn().mockResolvedValue({ id: "ms-1" }),
-    getMilestone: vi.fn(),
-    listMilestonesByConversation: vi.fn().mockResolvedValue([]),
-    updateMilestoneStatus: vi.fn(),
-    getMilestoneProgress: vi.fn().mockResolvedValue({ total: 0, completed: 0 }),
-    assignGoalToMilestone: vi.fn(),
-    deleteMilestone: vi.fn(),
-    upsertProviderHealth: vi.fn(),
-    getProviderHealthRecords: vi.fn().mockResolvedValue([]),
-    recordToolExecution: vi.fn().mockResolvedValue({ id: "te-1" }),
-    getToolStats: vi.fn().mockResolvedValue([]),
-    listDueSchedules: vi.fn().mockResolvedValue([]),
-    listEnabledSchedules: vi.fn().mockResolvedValue([]),
-    updateScheduleLastRun: vi.fn(),
-    listEvents: vi.fn().mockResolvedValue([]),
-    countEvents: vi.fn().mockResolvedValue(0),
-    markEventProcessed: vi.fn(),
-    listUnprocessedEvents: vi.fn().mockResolvedValue([]),
-    createWorkSession: vi.fn().mockResolvedValue({ id: "ws-1" }),
-    completeWorkSession: vi.fn(),
-    listRecentWorkSessions: vi.fn().mockResolvedValue([]),
-    searchMessages: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    listConversationsByUser: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    listDecisions: vi.fn().mockResolvedValue({ data: [], total: 0 }),
-    listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
-    countTasksByStatus: vi.fn().mockResolvedValue({}),
-    decayAllMemoryImportance: vi.fn(),
-    goals: {},
-    channelConversations: {},
-    prompts: {},
-    tasks: {},
-    memories: {},
-  };
-
-  const moduleFactory = () => {
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(mocks)) {
-      if (typeof value === "function") {
-        result[key] = (...args: unknown[]) => (value as (...a: unknown[]) => unknown)(...args);
-      } else {
-        result[key] = value;
-      }
-    }
-    return result;
-  };
-
-  return { mocks, moduleFactory };
 }

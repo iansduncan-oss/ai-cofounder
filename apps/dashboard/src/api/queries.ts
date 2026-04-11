@@ -7,6 +7,9 @@ export function useHealth() {
   return useQuery({
     queryKey: queryKeys.health.status,
     queryFn: () => apiClient.health(),
+    // Health should be fresh — refetch every 15s
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -14,6 +17,9 @@ export function useProviderHealth() {
   return useQuery({
     queryKey: queryKeys.health.providers,
     queryFn: () => apiClient.providerHealth(),
+    // Provider health changes when circuit breakers trip — keep reasonably fresh
+    staleTime: 15_000,
+    refetchInterval: 30_000,
   });
 }
 
@@ -69,6 +75,9 @@ export function usePendingTasks() {
   return useQuery({
     queryKey: queryKeys.tasks.pending,
     queryFn: () => apiClient.listPendingTasks(),
+    // Pending tasks change as agents execute — keep fresh
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -76,6 +85,9 @@ export function usePendingApprovals() {
   return useQuery({
     queryKey: queryKeys.approvals.pending,
     queryFn: () => apiClient.listPendingApprovals(),
+    // Approvals are time-sensitive — user needs to see them immediately
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 }
 
@@ -97,6 +109,8 @@ export function useBudgetStatus() {
   return useQuery({
     queryKey: queryKeys.usage.budget,
     queryFn: () => apiClient.getBudgetStatus(),
+    // Budget should be fresh — user needs to know when approaching limits
+    staleTime: 10_000,
     refetchInterval: 60_000, // sync with budget check interval
   });
 }
@@ -255,6 +269,8 @@ export function useListPersonas() {
   return useQuery({
     queryKey: queryKeys.persona.list,
     queryFn: () => apiClient.listPersonas(),
+    // Personas rarely change — 5 minute staleTime
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -373,7 +389,11 @@ export function useGmailUnreadCount() {
   });
 }
 
-export function useCalendarEvents(params?: { timeMin?: string; timeMax?: string; maxResults?: number }) {
+export function useCalendarEvents(params?: {
+  timeMin?: string;
+  timeMax?: string;
+  maxResults?: number;
+}) {
   return useQuery({
     queryKey: [...queryKeys.calendar.events, params ?? "default"] as const,
     queryFn: () => apiClient.listCalendarEvents(params),

@@ -4,6 +4,7 @@ import { goalRoutes } from "../routes/goals.js";
 import { taskRoutes } from "../routes/tasks.js";
 import { approvalRoutes } from "../routes/approvals.js";
 import { memoryRoutes } from "../routes/memories.js";
+import { bridgeRoutes } from "../routes/bridge.js";
 import { userRoutes } from "../routes/users.js";
 import { promptRoutes } from "../routes/prompts.js";
 import { n8nRoutes } from "../routes/n8n.js";
@@ -54,13 +55,20 @@ import type { AdminRole } from "../plugins/rbac.js";
 function isLoopbackOrDocker(request: FastifyRequest): boolean {
   const socketIp = request.socket.remoteAddress ?? "";
   const isExemptSocket =
-    socketIp === "127.0.0.1" || socketIp === "::1" || socketIp === "::ffff:127.0.0.1" ||
-    (socketIp.startsWith("172.") && (() => { const s = parseInt(socketIp.split(".")[1], 10); return s >= 16 && s <= 31; })());
+    socketIp === "127.0.0.1" ||
+    socketIp === "::1" ||
+    socketIp === "::ffff:127.0.0.1" ||
+    (socketIp.startsWith("172.") &&
+      (() => {
+        const s = parseInt(socketIp.split(".")[1], 10);
+        return s >= 16 && s <= 31;
+      })());
   if (!isExemptSocket) return false;
   // When behind a proxy, also check the forwarded IP
   const clientIp = request.ip;
   if (clientIp !== socketIp) {
-    if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1") return true;
+    if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1")
+      return true;
     if (clientIp.startsWith("172.")) {
       const s = parseInt(clientIp.split(".")[1], 10);
       if (s >= 16 && s <= 31) return true;
@@ -91,7 +99,9 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
 
     if (typeof request.jwtVerify !== "function") {
       if (process.env.NODE_ENV === "production") {
-        reply.code(503).send({ error: "Authentication not configured — JWT_SECRET is required in production" });
+        reply
+          .code(503)
+          .send({ error: "Authentication not configured — JWT_SECRET is required in production" });
         return;
       }
       // In dev, allow through when JWT_SECRET not set for easier local testing
@@ -148,6 +158,7 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(taskRoutes, { prefix: "/api/tasks" });
   app.register(approvalRoutes, { prefix: "/api/approvals" });
   app.register(memoryRoutes, { prefix: "/api/memories" });
+  app.register(bridgeRoutes, { prefix: "/api/bridge" });
   app.register(userRoutes, { prefix: "/api/users" });
   app.register(promptRoutes, { prefix: "/api/prompts" });
   app.register(n8nRoutes, { prefix: "/api/n8n" });

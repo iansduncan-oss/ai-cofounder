@@ -1,0 +1,128 @@
+name: ai-cofounder-authentik
+services:
+  # Authentik has its own Postgres and Redis so an ai-cofounder outage
+  # can never lock you out of your own SSO. Both are private to this
+  # compose project — no host port exposure.
+  authentik-postgres:
+    image: postgres:16-alpine
+    container_name: authentik-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?AUTHENTIK_POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: authentik
+    volumes:
+      - authentik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik -d authentik"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    networks:
+      - authentik_internal
+
+  authentik-redis:
+    image: redis:7-alpine
+    container_name: authentik-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    volumes:
+      - authentik_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    mem_limit: 128m
+    networks:
+      - authentik_internal
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2025.2.1
+    container_name: authentik-server
+    restart: unless-stopped
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?AUTHENTIK_SECRET_KEY must be set — generate with "openssl rand -base64 60"}
+      # Trust the reverse proxy headers set by NPM
+      AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS: 172.16.0.0/12,10.0.0.0/8
+      # Bootstrap credentials are used ONLY if the DB is empty. Once
+      # you've logged in and created your real admin, rotate these out
+      # (or delete them) and restart.
+      AUTHENTIK_BOOTSTRAP_EMAIL: ${AUTHENTIK_BOOTSTRAP_EMAIL:-ian@aviontechs.com}
+      AUTHENTIK_BOOTSTRAP_PASSWORD: ${AUTHENTIK_BOOTSTRAP_PASSWORD:?AUTHENTIK_BOOTSTRAP_PASSWORD must be set for first boot}
+      AUTHENTIK_BOOTSTRAP_TOKEN: ${AUTHENTIK_BOOTSTRAP_TOKEN:-}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      # Email (optional — leave blank to disable email notifications)
+      AUTHENTIK_EMAIL__HOST: ${AUTHENTIK_SMTP_HOST:-}
+      AUTHENTIK_EMAIL__PORT: ${AUTHENTIK_SMTP_PORT:-587}
+      AUTHENTIK_EMAIL__USERNAME: ${AUTHENTIK_SMTP_USER:-}
+      AUTHENTIK_EMAIL__PASSWORD: ${AUTHENTIK_SMTP_PASSWORD:-}
+      AUTHENTIK_EMAIL__USE_TLS: "true"
+      AUTHENTIK_EMAIL__FROM: ${AUTHENTIK_SMTP_FROM:-jarvis@aviontechs.com}
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+      - ./blueprints:/blueprints/local:ro
+    depends_on:
+      authentik-postgres:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "ak", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    mem_limit: 1g
+    ports:
+      # Bind to localhost only — NPM on the host terminates TLS and
+      # forwards to this port via the avion_avion_net bridge.
+      - "127.0.0.1:9000:9000"
+    networks:
+      - authentik_internal
+      - avion_avion_net
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.2.1
+    container_name: authentik-worker
+    restart: unless-stopped
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-postgres
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_POSTGRES_PASSWORD:?}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+    # The worker needs the Docker socket if you plan to run Docker
+    # outposts. It's mounted read-only via a socket proxy in production.
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+      - ./blueprints:/blueprints/local:ro
+    depends_on:
+      authentik-server:
+        condition: service_healthy
+    mem_limit: 512m
+    networks:
+      - authentik_internal
+
+volumes:
+  authentik_postgres_data:
+  authentik_redis_data:
+  authentik_media:
+  authentik_templates:
+
+networks:
+  authentik_internal:
+    driver: bridge
+  avion_avion_net:
+    external: true

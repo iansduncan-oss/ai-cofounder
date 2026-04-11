@@ -6,7 +6,11 @@ import {
   listSubagentRuns,
   updateSubagentRunStatus,
 } from "@ai-cofounder/db";
-import { enqueueSubagentTask, subagentChannel, type SubagentProgressEvent } from "@ai-cofounder/queue";
+import {
+  enqueueSubagentTask,
+  subagentChannel,
+  type SubagentProgressEvent,
+} from "@ai-cofounder/queue";
 
 const logger = createLogger("subagent-routes");
 
@@ -132,7 +136,9 @@ export async function subagentRoutes(app: FastifyInstance): Promise<void> {
         if (cleanedUp) return;
         cleanedUp = true;
         app.agentEvents.off(channel, onMessage);
-        app.unsubscribeSubagent(subagentRunId).catch(() => {});
+        app
+          .unsubscribeSubagent(subagentRunId)
+          .catch((err) => logger.warn({ err }, "subagent unsubscribe failed"));
         if (!reply.raw.writableEnded) reply.raw.end();
       };
 
@@ -140,7 +146,10 @@ export async function subagentRoutes(app: FastifyInstance): Promise<void> {
       app.agentEvents.on(channel, onMessage);
       reply.raw.on("close", cleanup);
 
-      logger.info({ subagentRunId, historyCount: history.length }, "SSE client connected for subagent");
+      logger.info(
+        { subagentRunId, historyCount: history.length },
+        "SSE client connected for subagent",
+      );
     },
   );
 

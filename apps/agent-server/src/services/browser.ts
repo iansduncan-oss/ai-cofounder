@@ -36,7 +36,9 @@ export interface BrowserActionResult {
 /**
  * Validates a URL for SSRF protection: must be HTTPS, must not resolve to private IP.
  */
-async function validateUrl(url: string): Promise<{ valid: true; parsed: URL } | { valid: false; error: string }> {
+async function validateUrl(
+  url: string,
+): Promise<{ valid: true; parsed: URL } | { valid: false; error: string }> {
   let parsed: URL;
   try {
     parsed = new URL(url);
@@ -77,8 +79,9 @@ export class BrowserService {
 
   constructor(options?: { maxContexts?: number; screenshotDir?: string }) {
     this.maxContexts = options?.maxContexts ?? DEFAULT_MAX_CONTEXTS;
-    this.screenshotDir = options?.screenshotDir
-      ?? path.join(optionalEnv("WORKSPACE_DIR", "/tmp/ai-cofounder-workspace"), "_screenshots");
+    this.screenshotDir =
+      options?.screenshotDir ??
+      path.join(optionalEnv("WORKSPACE_DIR", "/tmp/ai-cofounder-workspace"), "_screenshots");
   }
 
   async init(): Promise<void> {
@@ -98,7 +101,10 @@ export class BrowserService {
       logger.info("browser service initialized (Chromium launched)");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      logger.warn({ err: message }, "browser service unavailable — Chromium not found or failed to launch");
+      logger.warn(
+        { err: message },
+        "browser service unavailable — Chromium not found or failed to launch",
+      );
       this.available = false;
     }
   }
@@ -118,7 +124,9 @@ export class BrowserService {
     }
 
     if (this.activeContexts >= this.maxContexts) {
-      return { error: `Browser concurrency limit reached (${this.maxContexts} active contexts). Try again later.` };
+      return {
+        error: `Browser concurrency limit reached (${this.maxContexts} active contexts). Try again later.`,
+      };
     }
 
     // Validate URL if provided
@@ -161,7 +169,10 @@ export class BrowserService {
           const parsed = new URL(requestUrl);
           const { address } = await lookup(parsed.hostname);
           if (isPrivateIp(address)) {
-            logger.warn({ url: requestUrl, resolvedIp: address }, "SSRF: blocked subrequest to private IP");
+            logger.warn(
+              { url: requestUrl, resolvedIp: address },
+              "SSRF: blocked subrequest to private IP",
+            );
             await route.abort("blockedbyclient");
             return;
           }
@@ -190,7 +201,7 @@ export class BrowserService {
     } finally {
       this.activeContexts--;
       if (context) {
-        await context.close().catch(() => {});
+        await context.close().catch((err) => logger.warn({ err }, "browser context close failed"));
       }
     }
   }
@@ -283,7 +294,18 @@ export class BrowserService {
           const text = ((await el.textContent()) ?? "").trim().slice(0, 200);
           const attributes: Record<string, string> = {};
 
-          for (const attr of ["id", "class", "href", "src", "type", "name", "value", "placeholder", "aria-label", "role"]) {
+          for (const attr of [
+            "id",
+            "class",
+            "href",
+            "src",
+            "type",
+            "name",
+            "value",
+            "placeholder",
+            "aria-label",
+            "role",
+          ]) {
             const val = await el.getAttribute(attr);
             if (val) attributes[attr] = val.slice(0, 200);
           }
@@ -304,6 +326,9 @@ export class BrowserService {
   }
 }
 
-export function createBrowserService(options?: { maxContexts?: number; screenshotDir?: string }): BrowserService {
+export function createBrowserService(options?: {
+  maxContexts?: number;
+  screenshotDir?: string;
+}): BrowserService {
   return new BrowserService(options);
 }

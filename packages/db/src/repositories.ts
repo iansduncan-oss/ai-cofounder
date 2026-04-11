@@ -1,4 +1,18 @@
-import { eq, and, desc, asc, ilike, or, sql, lte, gte, isNull, isNotNull, inArray, gt } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  ilike,
+  or,
+  sql,
+  lte,
+  gte,
+  isNull,
+  isNotNull,
+  inArray,
+  gt,
+} from "drizzle-orm";
 import type { Db } from "./client.js";
 import type { AgentRole } from "@ai-cofounder/shared";
 
@@ -117,15 +131,25 @@ export async function deleteChannelConversation(db: Db, channelId: string) {
 
 /* ──────────────── Conversations ──────────────────────────── */
 
-export async function createConversation(db: Db, data: { userId: string; workspaceId?: string; title?: string }) {
-  const [conv] = await db.insert(conversations).values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) }).returning();
+export async function createConversation(
+  db: Db,
+  data: { userId: string; workspaceId?: string; title?: string },
+) {
+  const [conv] = await db
+    .insert(conversations)
+    .values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) })
+    .returning();
   return conv;
 }
 
 export async function getConversation(db: Db, id: string, workspaceId?: string) {
   const conditions = [eq(conversations.id, id), isNull(conversations.deletedAt)];
   if (workspaceId) conditions.push(eq(conversations.workspaceId, workspaceId));
-  const rows = await db.select().from(conversations).where(and(...conditions)).limit(1);
+  const rows = await db
+    .select()
+    .from(conversations)
+    .where(and(...conditions))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -152,17 +176,28 @@ export async function updateConversationTitle(db: Db, id: string, title: string)
 }
 
 export async function deleteConversation(db: Db, id: string) {
-  const [row] = await db.update(conversations).set({ deletedAt: new Date() }).where(and(eq(conversations.id, id), isNull(conversations.deletedAt))).returning();
+  const [row] = await db
+    .update(conversations)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(conversations.id, id), isNull(conversations.deletedAt)))
+    .returning();
   return row ?? null;
 }
 
 export async function restoreConversation(db: Db, id: string) {
-  const [row] = await db.update(conversations).set({ deletedAt: null }).where(eq(conversations.id, id)).returning();
+  const [row] = await db
+    .update(conversations)
+    .set({ deletedAt: null })
+    .where(eq(conversations.id, id))
+    .returning();
   return row ?? null;
 }
 
 export async function purgeDeletedConversations(db: Db, olderThan: Date) {
-  const rows = await db.delete(conversations).where(and(isNotNull(conversations.deletedAt), lte(conversations.deletedAt, olderThan))).returning();
+  const rows = await db
+    .delete(conversations)
+    .where(and(isNotNull(conversations.deletedAt), lte(conversations.deletedAt, olderThan)))
+    .returning();
   return rows.length;
 }
 
@@ -182,7 +217,12 @@ export async function createMessage(
   return msg;
 }
 
-export async function getConversationMessages(db: Db, conversationId: string, limit = 50, offset = 0) {
+export async function getConversationMessages(
+  db: Db,
+  conversationId: string,
+  limit = 50,
+  offset = 0,
+) {
   return db
     .select()
     .from(messages)
@@ -209,14 +249,21 @@ export async function createGoal(
     requiresApproval?: boolean;
   },
 ) {
-  const [goal] = await db.insert(goals).values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) }).returning();
+  const [goal] = await db
+    .insert(goals)
+    .values({ ...data, workspaceId: nullifyEmpty(data.workspaceId) })
+    .returning();
   return goal;
 }
 
 export async function getGoal(db: Db, id: string, workspaceId?: string) {
   const conditions = [eq(goals.id, id), isNull(goals.deletedAt)];
   if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
-  const rows = await db.select().from(goals).where(and(...conditions)).limit(1);
+  const rows = await db
+    .select()
+    .from(goals)
+    .where(and(...conditions))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -241,7 +288,11 @@ export async function listGoalsByConversation(
   return query;
 }
 
-export async function countGoalsByConversation(db: Db, conversationId: string, workspaceId?: string): Promise<number> {
+export async function countGoalsByConversation(
+  db: Db,
+  conversationId: string,
+  workspaceId?: string,
+): Promise<number> {
   const conditions = [eq(goals.conversationId, conversationId), isNull(goals.deletedAt)];
   if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
   const rows = await db
@@ -279,7 +330,11 @@ export async function updateGoalStatus(
 }
 
 export async function deleteGoal(db: Db, id: string) {
-  const [row] = await db.update(goals).set({ deletedAt: new Date() }).where(and(eq(goals.id, id), isNull(goals.deletedAt))).returning();
+  const [row] = await db
+    .update(goals)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(goals.id, id), isNull(goals.deletedAt)))
+    .returning();
   return row ?? null;
 }
 
@@ -289,7 +344,10 @@ export async function restoreGoal(db: Db, id: string) {
 }
 
 export async function purgeDeletedGoals(db: Db, olderThan: Date) {
-  const rows = await db.delete(goals).where(and(isNotNull(goals.deletedAt), lte(goals.deletedAt, olderThan))).returning();
+  const rows = await db
+    .delete(goals)
+    .where(and(isNotNull(goals.deletedAt), lte(goals.deletedAt, olderThan)))
+    .returning();
   return rows.length;
 }
 
@@ -307,15 +365,11 @@ export async function cancelGoal(db: Db, id: string) {
   return goal;
 }
 
-export async function updateGoalMetadata(
-  db: Db,
-  id: string,
-  metadata: Record<string, unknown>,
-) {
+export async function updateGoalMetadata(db: Db, id: string, metadata: Record<string, unknown>) {
   const goal = await getGoal(db, id);
   if (!goal) return null;
 
-  const merged = { ...(goal.metadata as Record<string, unknown> ?? {}), ...metadata };
+  const merged = { ...((goal.metadata as Record<string, unknown>) ?? {}), ...metadata };
   const [updated] = await db
     .update(goals)
     .set({ metadata: merged, updatedAt: new Date() })
@@ -336,29 +390,41 @@ export async function getGoalAnalytics(db: Db, workspaceId?: string) {
 
   const wsClause = workspaceId ? sql` and workspace_id = ${workspaceId}` : sql``;
 
-  const [byStatusRows, byPriorityRows, completionMetrics, trendRows, taskAgentRows] = await Promise.all([
-    // Count by status
-    db.select({
-      status: goals.status,
-      count: sql<number>`count(*)::int`,
-    }).from(goals).where(notDeleted).groupBy(goals.status),
+  const [byStatusRows, byPriorityRows, completionMetrics, trendRows, taskAgentRows] =
+    await Promise.all([
+      // Count by status
+      db
+        .select({
+          status: goals.status,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(goals)
+        .where(notDeleted)
+        .groupBy(goals.status),
 
-    // Count by priority
-    db.select({
-      priority: goals.priority,
-      count: sql<number>`count(*)::int`,
-    }).from(goals).where(notDeleted).groupBy(goals.priority),
+      // Count by priority
+      db
+        .select({
+          priority: goals.priority,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(goals)
+        .where(notDeleted)
+        .groupBy(goals.priority),
 
-    // Completion metrics
-    db.select({
-      total: sql<number>`count(*)::int`,
-      completed: sql<number>`count(case when ${goals.status} = 'completed' then 1 end)::int`,
-      cancelled: sql<number>`count(case when ${goals.status} = 'cancelled' then 1 end)::int`,
-      avgHours: sql<number>`round(extract(epoch from avg(case when ${goals.status} = 'completed' then ${goals.updatedAt} - ${goals.createdAt} end)) / 3600, 1)`,
-    }).from(goals).where(notDeleted),
+      // Completion metrics
+      db
+        .select({
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`count(case when ${goals.status} = 'completed' then 1 end)::int`,
+          cancelled: sql<number>`count(case when ${goals.status} = 'cancelled' then 1 end)::int`,
+          avgHours: sql<number>`round(extract(epoch from avg(case when ${goals.status} = 'completed' then ${goals.updatedAt} - ${goals.createdAt} end)) / 3600, 1)`,
+        })
+        .from(goals)
+        .where(notDeleted),
 
-    // 14-day trend (created vs completed per day)
-    db.execute(sql`
+      // 14-day trend (created vs completed per day)
+      db.execute(sql`
       with days as (
         select generate_series(
           current_date - interval '13 days',
@@ -374,14 +440,18 @@ export async function getGoalAnalytics(db: Db, workspaceId?: string) {
       order by d
     `),
 
-    // Tasks by agent (success/fail breakdown)
-    db.select({
-      agent: tasks.assignedAgent,
-      total: sql<number>`count(*)::int`,
-      completed: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`,
-      failed: sql<number>`count(case when ${tasks.status} = 'failed' then 1 end)::int`,
-    }).from(tasks).where(and(...taskConditions)).groupBy(tasks.assignedAgent),
-  ]);
+      // Tasks by agent (success/fail breakdown)
+      db
+        .select({
+          agent: tasks.assignedAgent,
+          total: sql<number>`count(*)::int`,
+          completed: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`,
+          failed: sql<number>`count(case when ${tasks.status} = 'failed' then 1 end)::int`,
+        })
+        .from(tasks)
+        .where(and(...taskConditions))
+        .groupBy(tasks.assignedAgent),
+    ]);
 
   const byStatus: Record<string, number> = {};
   for (const r of byStatusRows) byStatus[r.status] = r.count;
@@ -400,9 +470,8 @@ export async function getGoalAnalytics(db: Db, workspaceId?: string) {
     (acc, r) => ({ total: acc.total + r.total, completed: acc.completed + r.completed }),
     { total: 0, completed: 0 },
   );
-  const taskSuccessRate = taskTotals.total > 0
-    ? Math.round((taskTotals.completed / taskTotals.total) * 100)
-    : 0;
+  const taskSuccessRate =
+    taskTotals.total > 0 ? Math.round((taskTotals.completed / taskTotals.total) * 100) : 0;
 
   return {
     byStatus,
@@ -410,7 +479,9 @@ export async function getGoalAnalytics(db: Db, workspaceId?: string) {
     completionRate,
     avgCompletionHours: metrics?.avgHours ?? null,
     totalGoals,
-    trend: (trendRows as unknown as Array<{ date: string; created: number; completed: number }>).map((r) => ({
+    trend: (
+      trendRows as unknown as Array<{ date: string; created: number; completed: number }>
+    ).map((r) => ({
       date: r.date,
       created: Number(r.created),
       completed: Number(r.completed),
@@ -452,16 +523,18 @@ export async function getAgentPerformanceStats(db: Db) {
     order by total_tasks desc
   `);
 
-  return (rows as unknown as Array<{
-    agent: string;
-    total_tasks: number;
-    completed_tasks: number;
-    failed_tasks: number;
-    avg_duration_ms: number | null;
-    overall_success_rate: number;
-    recent_completed: number;
-    recent_failed: number;
-  }>).map((r) => {
+  return (
+    rows as unknown as Array<{
+      agent: string;
+      total_tasks: number;
+      completed_tasks: number;
+      failed_tasks: number;
+      avg_duration_ms: number | null;
+      overall_success_rate: number;
+      recent_completed: number;
+      recent_failed: number;
+    }>
+  ).map((r) => {
     const recentTotal = r.recent_completed + r.recent_failed;
     return {
       agent: r.agent,
@@ -486,7 +559,15 @@ export async function createTask(
     workspaceId?: string;
     title: string;
     description?: string;
-    assignedAgent?: "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier";
+    assignedAgent?:
+      | "orchestrator"
+      | "researcher"
+      | "coder"
+      | "reviewer"
+      | "planner"
+      | "debugger"
+      | "doc_writer"
+      | "verifier";
     orderIndex?: number;
     parallelGroup?: number;
     dependsOn?: string[];
@@ -501,7 +582,11 @@ export async function createTask(
 export async function getTask(db: Db, id: string, workspaceId?: string) {
   const conditions = [eq(tasks.id, id)];
   if (workspaceId) conditions.push(eq(tasks.workspaceId, workspaceId));
-  const rows = await db.select().from(tasks).where(and(...conditions)).limit(1);
+  const rows = await db
+    .select()
+    .from(tasks)
+    .where(and(...conditions))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -551,10 +636,7 @@ export async function listRecentlyCompletedTasks(db: Db, since: Date, limit = 50
   return db
     .select()
     .from(tasks)
-    .where(and(
-      eq(tasks.status, "completed"),
-      gte(tasks.updatedAt, since),
-    ))
+    .where(and(eq(tasks.status, "completed"), gte(tasks.updatedAt, since)))
     .orderBy(desc(tasks.updatedAt))
     .limit(limit);
 }
@@ -564,19 +646,12 @@ export async function listRecentlyCompletedFollowUps(db: Db, since: Date, limit 
   return db
     .select()
     .from(followUps)
-    .where(and(
-      eq(followUps.status, "done"),
-      gte(followUps.updatedAt, since),
-    ))
+    .where(and(eq(followUps.status, "done"), gte(followUps.updatedAt, since)))
     .orderBy(desc(followUps.updatedAt))
     .limit(limit);
 }
 
-export async function assignTask(
-  db: Db,
-  id: string,
-  agent: AgentRole,
-) {
+export async function assignTask(db: Db, id: string, agent: AgentRole) {
   const [updated] = await db
     .update(tasks)
     .set({ status: "assigned" as const, assignedAgent: agent, updatedAt: new Date() })
@@ -759,10 +834,9 @@ export async function saveMemory(
     .insert(memories)
     .values({
       ...rest,
+      workspaceId: nullifyEmpty(data.workspaceId),
       importance,
-      ...(rawRole
-        ? { agentRole: rawRole as (typeof memories.agentRole.enumValues)[number] }
-        : {}),
+      ...(rawRole ? { agentRole: rawRole as (typeof memories.agentRole.enumValues)[number] } : {}),
     })
     .returning();
   return created;
@@ -771,7 +845,13 @@ export async function saveMemory(
 export async function recallMemories(
   db: Db,
   userId: string,
-  options?: { category?: string; query?: string; limit?: number; agentRole?: string; scope?: "own" | "all" },
+  options?: {
+    category?: string;
+    query?: string;
+    limit?: number;
+    agentRole?: string;
+    scope?: "own" | "all";
+  },
 ) {
   const limit = options?.limit ?? 20;
   const conditions = [eq(memories.userId, userId)];
@@ -861,7 +941,11 @@ export async function listMemoriesByUser(
   return query;
 }
 
-export async function countMemoriesByUser(db: Db, userId: string, workspaceId?: string): Promise<number> {
+export async function countMemoriesByUser(
+  db: Db,
+  userId: string,
+  workspaceId?: string,
+): Promise<number> {
   const conditions = [eq(memories.userId, userId)];
   if (workspaceId) conditions.push(eq(memories.workspaceId, workspaceId));
   const rows = await db
@@ -979,7 +1063,10 @@ export async function listActiveGoals(db: Db, workspaceId?: string): Promise<Goa
       createdAt: goals.createdAt,
       updatedAt: goals.updatedAt,
       taskCount: sql<number>`count(${tasks.id})::int`.as("task_count"),
-      completedTaskCount: sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`.as("completed_task_count"),
+      completedTaskCount:
+        sql<number>`count(case when ${tasks.status} = 'completed' then 1 end)::int`.as(
+          "completed_task_count",
+        ),
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
@@ -1045,7 +1132,10 @@ export async function listGoalBacklog(db: Db, limit = 5, workspaceId?: string) {
       createdAt: goals.createdAt,
       updatedAt: goals.updatedAt,
       taskCount: sql<number>`count(${tasks.id})::int`.as("task_count"),
-      pendingTaskCount: sql<number>`count(case when ${tasks.status} = 'pending' then 1 end)::int`.as("pending_task_count"),
+      pendingTaskCount:
+        sql<number>`count(case when ${tasks.status} = 'pending' then 1 end)::int`.as(
+          "pending_task_count",
+        ),
     })
     .from(goals)
     .leftJoin(tasks, eq(tasks.goalId, goals.id))
@@ -1185,9 +1275,7 @@ export async function getN8nWorkflowByName(db: Db, name: string) {
 export async function listN8nWorkflows(db: Db, direction?: WorkflowDirection) {
   const conditions = [eq(n8nWorkflows.isActive, true)];
   if (direction) {
-    conditions.push(
-      or(eq(n8nWorkflows.direction, direction), eq(n8nWorkflows.direction, "both"))!,
-    );
+    conditions.push(or(eq(n8nWorkflows.direction, direction), eq(n8nWorkflows.direction, "both"))!);
   }
   return db
     .select()
@@ -1318,9 +1406,15 @@ export async function getCostByGoal(
 }> {
   const rows = await db
     .select({
-      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("total_cost_usd"),
-      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("total_input_tokens"),
-      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("total_output_tokens"),
+      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as(
+        "total_cost_usd",
+      ),
+      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as(
+        "total_input_tokens",
+      ),
+      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as(
+        "total_output_tokens",
+      ),
       requestCount: sql<number>`count(*)::int`.as("request_count"),
     })
     .from(llmUsage)
@@ -1363,9 +1457,15 @@ export async function getTopExpensiveGoals(
     .select({
       goalId: llmUsage.goalId,
       goalTitle: goals.title,
-      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("total_cost_usd"),
-      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("total_input_tokens"),
-      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("total_output_tokens"),
+      totalCostUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as(
+        "total_cost_usd",
+      ),
+      totalInputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as(
+        "total_input_tokens",
+      ),
+      totalOutputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as(
+        "total_output_tokens",
+      ),
       requestCount: sql<number>`count(*)::int`.as("request_count"),
     })
     .from(llmUsage)
@@ -1395,7 +1495,15 @@ export async function getCostByDay(
   since: Date,
   until?: Date,
   workspaceId?: string,
-): Promise<Array<{ date: string; costUsd: number; inputTokens: number; outputTokens: number; requests: number }>> {
+): Promise<
+  Array<{
+    date: string;
+    costUsd: number;
+    inputTokens: number;
+    outputTokens: number;
+    requests: number;
+  }>
+> {
   const conditions = [sql`${llmUsage.createdAt} >= ${since.toISOString()}`];
   if (until) {
     conditions.push(sql`${llmUsage.createdAt} <= ${until.toISOString()}`);
@@ -1409,7 +1517,9 @@ export async function getCostByDay(
       date: sql<string>`date_trunc('day', ${llmUsage.createdAt})::date::text`.as("date"),
       costUsd: sql<number>`coalesce(sum(${llmUsage.estimatedCostUsd}), 0)::bigint`.as("cost_usd"),
       inputTokens: sql<number>`coalesce(sum(${llmUsage.inputTokens}), 0)::int`.as("input_tokens"),
-      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as("output_tokens"),
+      outputTokens: sql<number>`coalesce(sum(${llmUsage.outputTokens}), 0)::int`.as(
+        "output_tokens",
+      ),
       requests: sql<number>`count(*)::int`.as("requests"),
     })
     .from(llmUsage)
@@ -1431,9 +1541,18 @@ export interface UsageSummary {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCostUsd: number; // in dollars
-  byProvider: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
-  byModel: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
-  byAgent: Record<string, { inputTokens: number; outputTokens: number; costUsd: number; requests: number }>;
+  byProvider: Record<
+    string,
+    { inputTokens: number; outputTokens: number; costUsd: number; requests: number }
+  >;
+  byModel: Record<
+    string,
+    { inputTokens: number; outputTokens: number; costUsd: number; requests: number }
+  >;
+  byAgent: Record<
+    string,
+    { inputTokens: number; outputTokens: number; costUsd: number; requests: number }
+  >;
   requestCount: number;
 }
 
@@ -1487,14 +1606,24 @@ export async function getUsageSummary(
     summary.totalCostUsd += costUsd;
 
     // By provider
-    const prov = summary.byProvider[row.provider] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    const prov = (summary.byProvider[row.provider] ??= {
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      requests: 0,
+    });
     prov.inputTokens += row.inputTokens;
     prov.outputTokens += row.outputTokens;
     prov.costUsd += costUsd;
     prov.requests++;
 
     // By model
-    const mod = summary.byModel[row.model] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    const mod = (summary.byModel[row.model] ??= {
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      requests: 0,
+    });
     mod.inputTokens += row.inputTokens;
     mod.outputTokens += row.outputTokens;
     mod.costUsd += costUsd;
@@ -1502,7 +1631,12 @@ export async function getUsageSummary(
 
     // By agent
     const agent = row.agentRole ?? "unknown";
-    const ag = summary.byAgent[agent] ??= { inputTokens: 0, outputTokens: 0, costUsd: 0, requests: 0 };
+    const ag = (summary.byAgent[agent] ??= {
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      requests: 0,
+    });
     ag.inputTokens += row.inputTokens;
     ag.outputTokens += row.outputTokens;
     ag.costUsd += costUsd;
@@ -1542,7 +1676,9 @@ export async function listSchedules(db: Db, userId?: string, workspaceId?: strin
   if (userId) conditions.push(eq(schedules.userId, userId));
   if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
 
-  return db.select().from(schedules)
+  return db
+    .select()
+    .from(schedules)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(schedules.createdAt));
 }
@@ -1551,13 +1687,21 @@ export async function listEnabledSchedules(db: Db, workspaceId?: string) {
   const conditions = [eq(schedules.enabled, true)];
   if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
 
-  return db.select().from(schedules).where(and(...conditions)).orderBy(asc(schedules.nextRunAt));
+  return db
+    .select()
+    .from(schedules)
+    .where(and(...conditions))
+    .orderBy(asc(schedules.nextRunAt));
 }
 
 export async function getSchedule(db: Db, id: string, workspaceId?: string) {
   const conditions = [eq(schedules.id, id)];
   if (workspaceId) conditions.push(eq(schedules.workspaceId, workspaceId));
-  const rows = await db.select().from(schedules).where(and(...conditions)).limit(1);
+  const rows = await db
+    .select()
+    .from(schedules)
+    .where(and(...conditions))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -1620,10 +1764,7 @@ export interface EventFilterOptions {
   processed?: boolean;
 }
 
-export async function listEvents(
-  db: Db,
-  options?: EventFilterOptions,
-) {
+export async function listEvents(db: Db, options?: EventFilterOptions) {
   const conditions = buildEventConditions(options);
 
   let query = db
@@ -1707,11 +1848,7 @@ export async function completeWorkSession(
 }
 
 export async function listRecentWorkSessions(db: Db, limit = 10) {
-  return db
-    .select()
-    .from(workSessions)
-    .orderBy(desc(workSessions.createdAt))
-    .limit(limit);
+  return db.select().from(workSessions).orderBy(desc(workSessions.createdAt)).limit(limit);
 }
 
 /* ────────────────────── Milestones ──────────────────────── */
@@ -1763,7 +1900,11 @@ export async function updateMilestoneStatus(db: Db, id: string, status: Mileston
   };
   if (status === "completed") values.completedAt = new Date();
 
-  const [updated] = await db.update(milestones).set(values).where(eq(milestones.id, id)).returning();
+  const [updated] = await db
+    .update(milestones)
+    .set(values)
+    .where(eq(milestones.id, id))
+    .returning();
   return updated ?? null;
 }
 
@@ -1799,7 +1940,10 @@ export async function assignGoalToMilestone(db: Db, goalId: string, milestoneId:
 
 export async function deleteMilestone(db: Db, id: string) {
   // Unlink non-deleted goals first
-  await db.update(goals).set({ milestoneId: null }).where(and(eq(goals.milestoneId, id), isNull(goals.deletedAt)));
+  await db
+    .update(goals)
+    .set({ milestoneId: null })
+    .where(and(eq(goals.milestoneId, id), isNull(goals.deletedAt)));
   const [deleted] = await db.delete(milestones).where(eq(milestones.id, id)).returning();
   return deleted ?? null;
 }
@@ -1847,9 +1991,7 @@ export async function getRecentConversationSummaries(db: Db, since: Date) {
       createdAt: conversationSummaries.createdAt,
     })
     .from(conversationSummaries)
-    .where(
-      sql`${conversationSummaries.createdAt} >= ${since.toISOString()}`,
-    )
+    .where(sql`${conversationSummaries.createdAt} >= ${since.toISOString()}`)
     .orderBy(desc(conversationSummaries.createdAt));
 }
 
@@ -1978,10 +2120,7 @@ export async function getToolStats(db: Db) {
 
 /* ────────────────── Error Summary ──────────────── */
 
-export async function getErrorSummary(
-  db: Db,
-  options?: { since?: Date; limit?: number },
-) {
+export async function getErrorSummary(db: Db, options?: { since?: Date; limit?: number }) {
   const limit = options?.limit ?? 20;
   const conditions = [eq(toolExecutions.success, false)];
   if (options?.since) {
@@ -2214,12 +2353,7 @@ export async function listDueSchedules(db: Db) {
   return db
     .select()
     .from(schedules)
-    .where(
-      and(
-        eq(schedules.enabled, true),
-        lte(schedules.nextRunAt, new Date()),
-      ),
-    )
+    .where(and(eq(schedules.enabled, true), lte(schedules.nextRunAt, new Date())))
     .orderBy(asc(schedules.nextRunAt));
 }
 
@@ -2257,7 +2391,14 @@ export async function searchChunksByVector(
   const vectorLiteral = `[${embedding.join(",")}]`;
 
   // Build parameterized WHERE clause — never interpolate user input into sql.raw()
-  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  const validSourceTypes: SourceType[] = [
+    "git",
+    "conversation",
+    "slack",
+    "memory",
+    "reflection",
+    "markdown",
+  ];
   let whereClause = sql`embedding IS NOT NULL`;
   if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
     whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
@@ -2290,12 +2431,7 @@ export async function searchChunksByVector(
 export async function deleteChunksBySource(db: Db, sourceType: SourceType, sourceId: string) {
   await db
     .delete(documentChunks)
-    .where(
-      and(
-        eq(documentChunks.sourceType, sourceType),
-        eq(documentChunks.sourceId, sourceId),
-      ),
-    );
+    .where(and(eq(documentChunks.sourceType, sourceType), eq(documentChunks.sourceId, sourceId)));
 }
 
 export async function getChunkCount(db: Db, sourceType?: SourceType): Promise<number> {
@@ -2343,12 +2479,7 @@ export async function getIngestionState(db: Db, sourceType: SourceType, sourceId
   const rows = await db
     .select()
     .from(ingestionState)
-    .where(
-      and(
-        eq(ingestionState.sourceType, sourceType),
-        eq(ingestionState.sourceId, sourceId),
-      ),
-    )
+    .where(and(eq(ingestionState.sourceType, sourceType), eq(ingestionState.sourceId, sourceId)))
     .limit(1);
   return rows[0] ?? null;
 }
@@ -2366,7 +2497,11 @@ export async function listIngestionStates(db: Db, sourceType?: SourceType) {
 
 /* ────────────────── Reflections ──────────────── */
 
-type ReflectionType = "goal_completion" | "failure_analysis" | "pattern_extraction" | "weekly_summary";
+type ReflectionType =
+  | "goal_completion"
+  | "failure_analysis"
+  | "pattern_extraction"
+  | "weekly_summary";
 
 export async function insertReflection(
   db: Db,
@@ -2438,20 +2573,12 @@ export async function getReflectionStats(db: Db) {
 /* ────────────────── Admin Users ──────────────── */
 
 export async function findAdminByEmail(db: Db, email: string) {
-  const rows = await db
-    .select()
-    .from(adminUsers)
-    .where(eq(adminUsers.email, email))
-    .limit(1);
+  const rows = await db.select().from(adminUsers).where(eq(adminUsers.email, email)).limit(1);
   return rows[0] ?? undefined;
 }
 
 export async function findAdminById(db: Db, id: string) {
-  const rows = await db
-    .select()
-    .from(adminUsers)
-    .where(eq(adminUsers.id, id))
-    .limit(1);
+  const rows = await db.select().from(adminUsers).where(eq(adminUsers.id, id)).limit(1);
   return rows[0] ?? undefined;
 }
 
@@ -2464,15 +2591,18 @@ export async function createAdminUser(
 }
 
 export async function countAdminUsers(db: Db): Promise<number> {
-  const rows = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(adminUsers);
+  const rows = await db.select({ count: sql<number>`count(*)::int` }).from(adminUsers);
   return rows[0]?.count ?? 0;
 }
 
 export async function listAdminUsers(db: Db) {
   return db
-    .select({ id: adminUsers.id, email: adminUsers.email, role: adminUsers.role, createdAt: adminUsers.createdAt })
+    .select({
+      id: adminUsers.id,
+      email: adminUsers.email,
+      role: adminUsers.role,
+      createdAt: adminUsers.createdAt,
+    })
     .from(adminUsers)
     .orderBy(adminUsers.createdAt);
 }
@@ -2593,11 +2723,7 @@ export async function updateSubagentRunStatus(
 }
 
 export async function getSubagentRun(db: Db, id: string) {
-  const rows = await db
-    .select()
-    .from(subagentRuns)
-    .where(eq(subagentRuns.id, id))
-    .limit(1);
+  const rows = await db.select().from(subagentRuns).where(eq(subagentRuns.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -2613,8 +2739,15 @@ export async function listSubagentRuns(
 ) {
   const conditions = [];
   if (opts?.goalId) conditions.push(eq(subagentRuns.goalId, opts.goalId));
-  if (opts?.status) conditions.push(eq(subagentRuns.status, opts.status as "queued" | "running" | "completed" | "failed" | "cancelled"));
-  if (opts?.parentRequestId) conditions.push(eq(subagentRuns.parentRequestId, opts.parentRequestId));
+  if (opts?.status)
+    conditions.push(
+      eq(
+        subagentRuns.status,
+        opts.status as "queued" | "running" | "completed" | "failed" | "cancelled",
+      ),
+    );
+  if (opts?.parentRequestId)
+    conditions.push(eq(subagentRuns.parentRequestId, opts.parentRequestId));
 
   const limit = opts?.limit ?? 50;
   const offset = opts?.offset ?? 0;
@@ -2670,12 +2803,36 @@ export async function sendAgentMessage(
   const [created] = await db
     .insert(agentMessages)
     .values({
-      senderRole: data.senderRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent",
+      senderRole: data.senderRole as
+        | "orchestrator"
+        | "researcher"
+        | "coder"
+        | "reviewer"
+        | "planner"
+        | "debugger"
+        | "doc_writer"
+        | "verifier"
+        | "subagent",
       senderRunId: data.senderRunId,
-      targetRole: data.targetRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent" | undefined,
+      targetRole: data.targetRole as
+        | "orchestrator"
+        | "researcher"
+        | "coder"
+        | "reviewer"
+        | "planner"
+        | "debugger"
+        | "doc_writer"
+        | "verifier"
+        | "subagent"
+        | undefined,
       targetRunId: data.targetRunId,
       channel: data.channel,
-      messageType: data.messageType as "request" | "response" | "broadcast" | "notification" | "handoff",
+      messageType: data.messageType as
+        | "request"
+        | "response"
+        | "broadcast"
+        | "notification"
+        | "handoff",
       subject: data.subject,
       body: data.body,
       correlationId: data.correlationId,
@@ -2704,11 +2861,50 @@ export async function getAgentInbox(
   },
 ) {
   const conditions = [];
-  if (opts.targetRole) conditions.push(eq(agentMessages.targetRole, opts.targetRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"));
+  if (opts.targetRole)
+    conditions.push(
+      eq(
+        agentMessages.targetRole,
+        opts.targetRole as
+          | "orchestrator"
+          | "researcher"
+          | "coder"
+          | "reviewer"
+          | "planner"
+          | "debugger"
+          | "doc_writer"
+          | "verifier"
+          | "subagent",
+      ),
+    );
   if (opts.targetRunId) conditions.push(eq(agentMessages.targetRunId, opts.targetRunId));
-  if (opts.status) conditions.push(eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"));
-  if (opts.messageType) conditions.push(eq(agentMessages.messageType, opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff"));
-  if (opts.senderRole) conditions.push(eq(agentMessages.senderRole, opts.senderRole as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"));
+  if (opts.status)
+    conditions.push(
+      eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"),
+    );
+  if (opts.messageType)
+    conditions.push(
+      eq(
+        agentMessages.messageType,
+        opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff",
+      ),
+    );
+  if (opts.senderRole)
+    conditions.push(
+      eq(
+        agentMessages.senderRole,
+        opts.senderRole as
+          | "orchestrator"
+          | "researcher"
+          | "coder"
+          | "reviewer"
+          | "planner"
+          | "debugger"
+          | "doc_writer"
+          | "verifier"
+          | "subagent",
+      ),
+    );
   if (opts.goalId) conditions.push(eq(agentMessages.goalId, opts.goalId));
 
   // Exclude broadcast messages from inbox (those go to channels)
@@ -2809,12 +3005,7 @@ export async function expireStaleMessages(db: Db) {
   const result = await db
     .update(agentMessages)
     .set({ status: "expired" })
-    .where(
-      and(
-        eq(agentMessages.status, "pending"),
-        lte(agentMessages.expiresAt, now),
-      ),
-    )
+    .where(and(eq(agentMessages.status, "pending"), lte(agentMessages.expiresAt, now)))
     .returning({ id: agentMessages.id });
   return result.length;
 }
@@ -2832,14 +3023,48 @@ export async function listAgentMessages(
 ) {
   const conditions = [];
   if (opts?.goalId) conditions.push(eq(agentMessages.goalId, opts.goalId));
-  if (opts?.role) conditions.push(
-    or(
-      eq(agentMessages.senderRole, opts.role as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"),
-      eq(agentMessages.targetRole, opts.role as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner" | "debugger" | "doc_writer" | "verifier" | "subagent"),
-    ),
-  );
-  if (opts?.messageType) conditions.push(eq(agentMessages.messageType, opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff"));
-  if (opts?.status) conditions.push(eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"));
+  if (opts?.role)
+    conditions.push(
+      or(
+        eq(
+          agentMessages.senderRole,
+          opts.role as
+            | "orchestrator"
+            | "researcher"
+            | "coder"
+            | "reviewer"
+            | "planner"
+            | "debugger"
+            | "doc_writer"
+            | "verifier"
+            | "subagent",
+        ),
+        eq(
+          agentMessages.targetRole,
+          opts.role as
+            | "orchestrator"
+            | "researcher"
+            | "coder"
+            | "reviewer"
+            | "planner"
+            | "debugger"
+            | "doc_writer"
+            | "verifier"
+            | "subagent",
+        ),
+      ),
+    );
+  if (opts?.messageType)
+    conditions.push(
+      eq(
+        agentMessages.messageType,
+        opts.messageType as "request" | "response" | "broadcast" | "notification" | "handoff",
+      ),
+    );
+  if (opts?.status)
+    conditions.push(
+      eq(agentMessages.status, opts.status as "pending" | "delivered" | "read" | "expired"),
+    );
 
   const limit = opts?.limit ?? 50;
   const offset = opts?.offset ?? 0;
@@ -2862,11 +3087,7 @@ export async function listAgentMessages(
 }
 
 export async function getAgentMessage(db: Db, id: string) {
-  const rows = await db
-    .select()
-    .from(agentMessages)
-    .where(eq(agentMessages.id, id))
-    .limit(1);
+  const rows = await db.select().from(agentMessages).where(eq(agentMessages.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -2885,7 +3106,14 @@ export async function getAgentMessageStats(db: Db) {
 
 /* ────────────────── User Actions (Pattern Learning) ─────────────── */
 
-type UserActionType = "chat_message" | "goal_created" | "deploy_triggered" | "suggestion_accepted" | "approval_submitted" | "schedule_created" | "tool_executed";
+type UserActionType =
+  | "chat_message"
+  | "goal_created"
+  | "deploy_triggered"
+  | "suggestion_accepted"
+  | "approval_submitted"
+  | "schedule_created"
+  | "tool_executed";
 
 export async function recordUserAction(
   db: Db,
@@ -2901,8 +3129,8 @@ export async function recordUserAction(
   const [row] = await db
     .insert(userActions)
     .values({
-      userId: data.userId,
-      workspaceId: data.workspaceId,
+      userId: nullifyEmpty(data.userId),
+      workspaceId: nullifyEmpty(data.workspaceId),
       actionType: data.actionType,
       actionDetail: data.actionDetail,
       dayOfWeek: now.getDay(),
@@ -2918,15 +3146,17 @@ export async function getUserActionsSince(db: Db, userId: string, since: Date) {
     .select()
     .from(userActions)
     .where(
-      and(
-        eq(userActions.userId, userId),
-        sql`${userActions.createdAt} >= ${since.toISOString()}`,
-      ),
+      and(eq(userActions.userId, userId), sql`${userActions.createdAt} >= ${since.toISOString()}`),
     )
     .orderBy(desc(userActions.createdAt));
 }
 
-export async function getRecentUserActionSummary(db: Db, userId: string, since: Date, workspaceId?: string) {
+export async function getRecentUserActionSummary(
+  db: Db,
+  userId: string,
+  since: Date,
+  workspaceId?: string,
+) {
   const conditions = [
     eq(userActions.userId, userId),
     sql`${userActions.createdAt} >= ${since.toISOString()}`,
@@ -2956,39 +3186,21 @@ export async function getDistinctActionUserIds(db: Db, since: Date) {
   const rows = await db
     .selectDistinct({ userId: userActions.userId })
     .from(userActions)
-    .where(
-      and(
-        sql`${userActions.createdAt} >= ${since}`,
-        sql`${userActions.userId} IS NOT NULL`,
-      ),
-    );
+    .where(and(sql`${userActions.createdAt} >= ${since}`, sql`${userActions.userId} IS NOT NULL`));
   return rows.map((r) => r.userId!);
 }
 
-export async function getUserActionsForAnalysis(
-  db: Db,
-  userId: string,
-  since: Date,
-) {
+export async function getUserActionsForAnalysis(db: Db, userId: string, since: Date) {
   return db
     .select()
     .from(userActions)
-    .where(
-      and(
-        eq(userActions.userId, userId),
-        sql`${userActions.createdAt} >= ${since}`,
-      ),
-    )
+    .where(and(eq(userActions.userId, userId), sql`${userActions.createdAt} >= ${since}`))
     .orderBy(asc(userActions.createdAt));
 }
 
 /* ────────────────── User Patterns ─────────────── */
 
-export async function deactivateLowConfidencePatterns(
-  db: Db,
-  threshold = 15,
-  minHits = 5,
-) {
+export async function deactivateLowConfidencePatterns(db: Db, threshold = 15, minHits = 5) {
   const result = await db
     .update(userPatterns)
     .set({ isActive: false, updatedAt: new Date() })
@@ -3062,10 +3274,7 @@ export async function getActiveUserPatterns(db: Db, userId: string, workspaceId?
   const conditions = [
     or(eq(userPatterns.userId, userId), isNull(userPatterns.userId)),
     eq(userPatterns.isActive, true),
-    or(
-      isNull(userPatterns.expiresAt),
-      sql`${userPatterns.expiresAt} > now()`,
-    ),
+    or(isNull(userPatterns.expiresAt), sql`${userPatterns.expiresAt} > now()`),
   ];
   if (workspaceId) conditions.push(eq(userPatterns.workspaceId, workspaceId));
 
@@ -3132,7 +3341,13 @@ export async function incrementPatternHitCount(db: Db, patternId: string) {
 
 export async function listPatterns(
   db: Db,
-  opts?: { userId?: string; includeInactive?: boolean; limit?: number; offset?: number; workspaceId?: string },
+  opts?: {
+    userId?: string;
+    includeInactive?: boolean;
+    limit?: number;
+    offset?: number;
+    workspaceId?: string;
+  },
 ) {
   const { limit = 50, offset = 0 } = opts ?? {};
   const conditions = [];
@@ -3156,7 +3371,10 @@ export async function listPatterns(
       .orderBy(desc(userPatterns.confidence))
       .limit(limit)
       .offset(offset),
-    db.select({ count: sql<number>`count(*)::int` }).from(userPatterns).where(where),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(userPatterns)
+      .where(where),
   ]);
 
   return { data, total: countResult[0]?.count ?? 0 };
@@ -3261,9 +3479,7 @@ export async function getPatternAnalytics(db: Db, userId?: string, workspaceId?:
   const totalAccepts = patterns.reduce((s, p) => s + p.acceptCount, 0);
   const overallAcceptRate = totalHits > 0 ? (totalAccepts / totalHits) * 100 : 0;
   const avgConfidence =
-    totalPatterns > 0
-      ? patterns.reduce((s, p) => s + p.confidence, 0) / totalPatterns
-      : 0;
+    totalPatterns > 0 ? patterns.reduce((s, p) => s + p.confidence, 0) / totalPatterns : 0;
 
   // Group by type
   const byType: Record<string, number> = {};
@@ -3298,7 +3514,6 @@ export async function getActionHeatmap(db: Db, userId?: string, workspaceId?: st
 
   return rows as unknown as Array<{ day_of_week: number; hour_of_day: number; count: number }>;
 }
-
 
 /* ────────────────── Deployments ─────────────── */
 
@@ -3343,7 +3558,7 @@ export async function updateDeploymentStatus(
   const [row] = await db
     .update(deployments)
     .set({
-      status: data.status as typeof deployments.$inferSelect["status"],
+      status: data.status as (typeof deployments.$inferSelect)["status"],
       healthChecks: data.healthChecks,
       errorLog: data.errorLog,
       rootCauseAnalysis: data.rootCauseAnalysis,
@@ -3357,23 +3572,14 @@ export async function updateDeploymentStatus(
 }
 
 export async function getLatestDeployment(db: Db) {
-  const rows = await db
-    .select()
-    .from(deployments)
-    .orderBy(desc(deployments.startedAt))
-    .limit(1);
+  const rows = await db.select().from(deployments).orderBy(desc(deployments.startedAt)).limit(1);
   return rows[0] ?? null;
 }
 
 export async function listDeployments(db: Db, opts: { limit?: number; offset?: number } = {}) {
   const { limit = 20, offset = 0 } = opts;
   const [data, countResult] = await Promise.all([
-    db
-      .select()
-      .from(deployments)
-      .orderBy(desc(deployments.startedAt))
-      .limit(limit)
-      .offset(offset),
+    db.select().from(deployments).orderBy(desc(deployments.startedAt)).limit(limit).offset(offset),
     db.select({ count: sql<number>`count(*)::int` }).from(deployments),
   ]);
   return { data, total: countResult[0]?.count ?? 0 };
@@ -3392,10 +3598,7 @@ export async function getDeploymentBySha(db: Db, commitSha: string) {
 /* ────────────────── Tool Tier Config ─────────────── */
 
 export async function listToolTierConfigs(db: Db) {
-  return db
-    .select()
-    .from(toolTierConfig)
-    .orderBy(asc(toolTierConfig.toolName));
+  return db.select().from(toolTierConfig).orderBy(asc(toolTierConfig.toolName));
 }
 
 export async function getToolTierConfig(db: Db, toolName: string) {
@@ -3531,11 +3734,7 @@ export async function updateDeploymentSoakStatus(
     gitDiffSummary?: string;
   },
 ) {
-  const [row] = await db
-    .update(deployments)
-    .set(data)
-    .where(eq(deployments.id, id))
-    .returning();
+  const [row] = await db.update(deployments).set(data).where(eq(deployments.id, id)).returning();
   return row;
 }
 
@@ -3603,11 +3802,7 @@ export async function getUserTimezone(db: Db, userId: string) {
 }
 
 export async function setUserTimezone(db: Db, userId: string, timezone: string) {
-  const [row] = await db
-    .update(users)
-    .set({ timezone })
-    .where(eq(users.id, userId))
-    .returning();
+  const [row] = await db.update(users).set({ timezone }).where(eq(users.id, userId)).returning();
   return row;
 }
 
@@ -3623,10 +3818,17 @@ export async function getSessionEngagementHistory(db: Db, userId: string, limit 
 /* ────────────────── Journal Entries ─────────────────────── */
 
 type JournalEntryType =
-  | "goal_started" | "goal_completed" | "goal_failed"
-  | "task_completed" | "task_failed"
-  | "git_commit" | "pr_created"
-  | "reflection" | "work_session" | "subagent_run" | "deployment";
+  | "goal_started"
+  | "goal_completed"
+  | "goal_failed"
+  | "task_completed"
+  | "task_failed"
+  | "git_commit"
+  | "pr_created"
+  | "reflection"
+  | "work_session"
+  | "subagent_run"
+  | "deployment";
 
 export async function createJournalEntry(
   db: Db,
@@ -3658,11 +3860,7 @@ export async function createJournalEntry(
 }
 
 export async function getJournalEntry(db: Db, id: string) {
-  const rows = await db
-    .select()
-    .from(journalEntries)
-    .where(eq(journalEntries.id, id))
-    .limit(1);
+  const rows = await db.select().from(journalEntries).where(eq(journalEntries.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -3890,7 +4088,11 @@ export async function createPipelineTemplate(
 }
 
 export async function getPipelineTemplate(db: Db, id: string) {
-  const rows = await db.select().from(pipelineTemplates).where(eq(pipelineTemplates.id, id)).limit(1);
+  const rows = await db
+    .select()
+    .from(pipelineTemplates)
+    .where(eq(pipelineTemplates.id, id))
+    .limit(1);
   return rows[0] ?? null;
 }
 
@@ -3932,21 +4134,14 @@ export async function updatePipelineTemplate(
 }
 
 export async function deletePipelineTemplate(db: Db, id: string) {
-  const result = await db
-    .delete(pipelineTemplates)
-    .where(eq(pipelineTemplates.id, id))
-    .returning();
+  const result = await db.delete(pipelineTemplates).where(eq(pipelineTemplates.id, id)).returning();
   return result.length > 0;
 }
 
 /* ────────────────── Briefing Cache ─────────────────────── */
 
 export async function getBriefingCache(db: Db, date: string) {
-  const rows = await db
-    .select()
-    .from(briefingCache)
-    .where(eq(briefingCache.date, date))
-    .limit(1);
+  const rows = await db.select().from(briefingCache).where(eq(briefingCache.date, date)).limit(1);
   return rows[0] ?? null;
 }
 
@@ -4034,10 +4229,7 @@ export async function listUnnotifiedMeetingPreps(db: Db) {
 }
 
 export async function markMeetingPrepNotified(db: Db, id: string) {
-  await db
-    .update(meetingPreps)
-    .set({ notified: true })
-    .where(eq(meetingPreps.id, id));
+  await db.update(meetingPreps).set({ notified: true }).where(eq(meetingPreps.id, id));
 }
 
 /* ────────────────────────── Follow-Ups ────────────────────────── */
@@ -4056,7 +4248,7 @@ export async function createFollowUp(
     .insert(followUps)
     .values({
       title: data.title,
-      workspaceId: data.workspaceId,
+      workspaceId: nullifyEmpty(data.workspaceId),
       description: data.description,
       dueDate: data.dueDate,
       source: data.source,
@@ -4078,7 +4270,12 @@ export async function getFollowUp(db: Db, id: string, workspaceId?: string) {
 
 export async function listFollowUps(
   db: Db,
-  opts?: { status?: "pending" | "done" | "dismissed"; limit?: number; offset?: number; workspaceId?: string },
+  opts?: {
+    status?: "pending" | "done" | "dismissed";
+    limit?: number;
+    offset?: number;
+    workspaceId?: string;
+  },
 ) {
   const { status, limit = 50, offset = 0 } = opts ?? {};
   const conditions = status ? [eq(followUps.status, status)] : [];
@@ -4115,10 +4312,7 @@ export async function updateFollowUp(
 }
 
 export async function deleteFollowUp(db: Db, id: string) {
-  const [row] = await db
-    .delete(followUps)
-    .where(eq(followUps.id, id))
-    .returning();
+  const [row] = await db.delete(followUps).where(eq(followUps.id, id)).returning();
   return row ?? null;
 }
 
@@ -4167,11 +4361,7 @@ export async function saveThinkingTrace(
   return rows[0];
 }
 
-export async function getThinkingTraces(
-  db: Db,
-  conversationId: string,
-  requestId?: string,
-) {
+export async function getThinkingTraces(db: Db, conversationId: string, requestId?: string) {
   const conditions = [eq(thinkingTraces.conversationId, conversationId)];
   if (requestId) {
     conditions.push(eq(thinkingTraces.requestId, requestId));
@@ -4214,7 +4404,14 @@ export async function searchChunksByText(
   },
 ) {
   const limit = options?.limit ?? 20;
-  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  const validSourceTypes: SourceType[] = [
+    "git",
+    "conversation",
+    "slack",
+    "memory",
+    "reflection",
+    "markdown",
+  ];
   let whereClause = sql`search_vector IS NOT NULL`;
   if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
     whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
@@ -4262,7 +4459,14 @@ export async function hybridSearchChunks(
   const k = 60; // RRF constant
   const vectorLiteral = `[${embedding.join(",")}]`;
 
-  const validSourceTypes: SourceType[] = ["git", "conversation", "slack", "memory", "reflection", "markdown"];
+  const validSourceTypes: SourceType[] = [
+    "git",
+    "conversation",
+    "slack",
+    "memory",
+    "reflection",
+    "markdown",
+  ];
   let whereClause = sql`embedding IS NOT NULL`;
   if (options?.sourceType && validSourceTypes.includes(options.sourceType)) {
     whereClause = sql`${whereClause} AND source_type = ${options.sourceType}`;
@@ -4473,10 +4677,7 @@ export async function incrementProceduralFailure(db: Db, id: string) {
 /* ────────────────────── Memory Lifecycle ────────────────────── */
 
 export async function archiveMemory(db: Db, id: string) {
-  await db
-    .update(memories)
-    .set({ archivedAt: new Date() })
-    .where(eq(memories.id, id));
+  await db.update(memories).set({ archivedAt: new Date() }).where(eq(memories.id, id));
 }
 
 export async function listMemoriesForDecay(db: Db, userId: string, limit = 500) {
@@ -4572,11 +4773,7 @@ export async function upsertFailurePattern(
 }
 
 export async function listFailurePatterns(db: Db, limit = 50) {
-  return db
-    .select()
-    .from(failurePatterns)
-    .orderBy(desc(failurePatterns.frequency))
-    .limit(limit);
+  return db.select().from(failurePatterns).orderBy(desc(failurePatterns.frequency)).limit(limit);
 }
 
 export async function getFailurePatternsForTool(db: Db, toolName: string, limit = 5) {
@@ -4635,13 +4832,25 @@ export async function upsertProductivityLog(
     .onConflictDoUpdate({
       target: [productivityLogs.userId, productivityLogs.date],
       set: {
-        plannedItems: data.plannedItems !== undefined ? data.plannedItems : sql`${productivityLogs.plannedItems}`,
-        reflectionNotes: data.reflectionNotes !== undefined ? data.reflectionNotes : sql`${productivityLogs.reflectionNotes}`,
+        plannedItems:
+          data.plannedItems !== undefined
+            ? data.plannedItems
+            : sql`${productivityLogs.plannedItems}`,
+        reflectionNotes:
+          data.reflectionNotes !== undefined
+            ? data.reflectionNotes
+            : sql`${productivityLogs.reflectionNotes}`,
         mood: data.mood !== undefined ? data.mood : sql`${productivityLogs.mood}`,
-        energyLevel: data.energyLevel !== undefined ? data.energyLevel : sql`${productivityLogs.energyLevel}`,
-        completionScore: data.completionScore !== undefined ? data.completionScore : sql`${productivityLogs.completionScore}`,
-        streakDays: data.streakDays !== undefined ? data.streakDays : sql`${productivityLogs.streakDays}`,
-        highlights: data.highlights !== undefined ? data.highlights : sql`${productivityLogs.highlights}`,
+        energyLevel:
+          data.energyLevel !== undefined ? data.energyLevel : sql`${productivityLogs.energyLevel}`,
+        completionScore:
+          data.completionScore !== undefined
+            ? data.completionScore
+            : sql`${productivityLogs.completionScore}`,
+        streakDays:
+          data.streakDays !== undefined ? data.streakDays : sql`${productivityLogs.streakDays}`,
+        highlights:
+          data.highlights !== undefined ? data.highlights : sql`${productivityLogs.highlights}`,
         blockers: data.blockers !== undefined ? data.blockers : sql`${productivityLogs.blockers}`,
         metadata: data.metadata !== undefined ? data.metadata : sql`${productivityLogs.metadata}`,
         updatedAt: new Date(),
@@ -4700,19 +4909,18 @@ export async function getProductivityStats(db: Db, userId: string, days = 30) {
   const rows = await db
     .select()
     .from(productivityLogs)
-    .where(and(
-      eq(productivityLogs.userId, userId),
-      sql`${productivityLogs.date} >= ${cutoffStr}`,
-    ))
+    .where(and(eq(productivityLogs.userId, userId), sql`${productivityLogs.date} >= ${cutoffStr}`))
     .orderBy(asc(productivityLogs.date));
 
   const totalDays = rows.length;
-  const avgCompletion = totalDays > 0
-    ? Math.round(rows.reduce((sum, r) => sum + (r.completionScore ?? 0), 0) / totalDays)
-    : 0;
-  const avgEnergy = totalDays > 0
-    ? +(rows.reduce((sum, r) => sum + (r.energyLevel ?? 3), 0) / totalDays).toFixed(1)
-    : 0;
+  const avgCompletion =
+    totalDays > 0
+      ? Math.round(rows.reduce((sum, r) => sum + (r.completionScore ?? 0), 0) / totalDays)
+      : 0;
+  const avgEnergy =
+    totalDays > 0
+      ? +(rows.reduce((sum, r) => sum + (r.energyLevel ?? 3), 0) / totalDays).toFixed(1)
+      : 0;
   const moodCounts: Record<string, number> = {};
   for (const r of rows) {
     if (r.mood) moodCounts[r.mood] = (moodCounts[r.mood] || 0) + 1;
@@ -4734,10 +4942,7 @@ export async function getProductivityStats(db: Db, userId: string, days = 30) {
 }
 
 export async function deleteProductivityLog(db: Db, id: string) {
-  const [row] = await db
-    .delete(productivityLogs)
-    .where(eq(productivityLogs.id, id))
-    .returning();
+  const [row] = await db.delete(productivityLogs).where(eq(productivityLogs.id, id)).returning();
   return row ?? null;
 }
 
@@ -4854,15 +5059,15 @@ export async function pruneStaleCodebaseInsights(db: Db, olderThanDays = 14) {
   cutoff.setDate(cutoff.getDate() - olderThanDays);
   const rows = await db
     .delete(codebaseInsights)
-    .where(and(
-      eq(codebaseInsights.status, "open"),
-      lte(codebaseInsights.lastSeenAt, cutoff),
-    ))
+    .where(and(eq(codebaseInsights.status, "open"), lte(codebaseInsights.lastSeenAt, cutoff)))
     .returning({ id: codebaseInsights.id });
   return rows.length;
 }
 
-export async function countCodebaseInsights(db: Db, status: "open" | "dismissed" | "resolved" = "open") {
+export async function countCodebaseInsights(
+  db: Db,
+  status: "open" | "dismissed" | "resolved" = "open",
+) {
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(codebaseInsights)
@@ -4872,40 +5077,68 @@ export async function countCodebaseInsights(db: Db, status: "open" | "dismissed"
 
 /* ─────���──────────────── Global Search ────────────────────── */
 
-export async function globalSearch(
-  db: Db,
-  query: string,
-  opts?: { limitPerCategory?: number },
-) {
+export async function globalSearch(db: Db, query: string, opts?: { limitPerCategory?: number }) {
   const limit = opts?.limitPerCategory ?? 5;
   const pattern = `%${query}%`;
 
   const [goalRows, taskRows, conversationRows, memoryRows] = await Promise.all([
     db
-      .select({ id: goals.id, title: goals.title, description: goals.description, status: goals.status, createdAt: goals.createdAt })
+      .select({
+        id: goals.id,
+        title: goals.title,
+        description: goals.description,
+        status: goals.status,
+        createdAt: goals.createdAt,
+      })
       .from(goals)
-      .where(and(or(ilike(goals.title, pattern), ilike(goals.description, pattern)), isNull(goals.deletedAt)))
+      .where(
+        and(
+          or(ilike(goals.title, pattern), ilike(goals.description, pattern)),
+          isNull(goals.deletedAt),
+        ),
+      )
       .orderBy(desc(goals.createdAt))
       .limit(limit),
     db
-      .select({ id: tasks.id, title: tasks.title, status: tasks.status, goalId: tasks.goalId, createdAt: tasks.createdAt })
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        goalId: tasks.goalId,
+        createdAt: tasks.createdAt,
+      })
       .from(tasks)
       .where(ilike(tasks.title, pattern))
       .orderBy(desc(tasks.createdAt))
       .limit(limit),
     db
-      .select({ id: conversations.id, title: conversations.title, createdAt: conversations.createdAt })
+      .select({
+        id: conversations.id,
+        title: conversations.title,
+        createdAt: conversations.createdAt,
+      })
       .from(conversations)
       .where(and(ilike(conversations.title, pattern), isNull(conversations.deletedAt)))
       .orderBy(desc(conversations.createdAt))
       .limit(limit),
     db
-      .select({ id: memories.id, key: memories.key, content: memories.content, category: memories.category, createdAt: memories.createdAt })
+      .select({
+        id: memories.id,
+        key: memories.key,
+        content: memories.content,
+        category: memories.category,
+        createdAt: memories.createdAt,
+      })
       .from(memories)
       .where(or(ilike(memories.key, pattern), ilike(memories.content, pattern)))
       .orderBy(desc(memories.createdAt))
       .limit(limit),
   ]);
 
-  return { goals: goalRows, tasks: taskRows, conversations: conversationRows, memories: memoryRows };
+  return {
+    goals: goalRows,
+    tasks: taskRows,
+    conversations: conversationRows,
+    memories: memoryRows,
+  };
 }

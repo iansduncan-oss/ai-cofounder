@@ -199,7 +199,10 @@ export class ApiClient {
         });
         if (!retryRes.ok) {
           const errorBody = await retryRes.json().catch(() => ({ error: retryRes.statusText }));
-          throw new ApiError(retryRes.status, (errorBody as { error?: string }).error ?? retryRes.statusText);
+          throw new ApiError(
+            retryRes.status,
+            (errorBody as { error?: string }).error ?? retryRes.statusText,
+          );
         }
         return retryRes.json() as Promise<T>;
       }
@@ -439,7 +442,10 @@ export class ApiClient {
     return this.request<Approval[]>("GET", `/api/approvals/pending?limit=${limit}`);
   }
 
-  resolveApproval(id: string, data: { status: "approved" | "rejected"; decision: string; decidedBy?: string }) {
+  resolveApproval(
+    id: string,
+    data: { status: "approved" | "rejected"; decision: string; decidedBy?: string },
+  ) {
     return this.request<Approval>("PATCH", `/api/approvals/${id}/resolve`, data);
   }
 
@@ -452,12 +458,71 @@ export class ApiClient {
     return this.request<PaginatedResponse<Memory>>("GET", `/api/memories?${params}`);
   }
 
-  saveMemory(data: { userId: string; category: string; key: string; content: string; source?: string; metadata?: Record<string, unknown> }) {
+  saveMemory(data: {
+    userId: string;
+    category: string;
+    key: string;
+    content: string;
+    source?: string;
+    metadata?: Record<string, unknown>;
+  }) {
     return this.request<Memory>("POST", "/api/memories", data);
   }
 
   deleteMemory(id: string) {
     return this.request<{ deleted: boolean; id: string }>("DELETE", `/api/memories/${id}`);
+  }
+
+  /* ── Vault ── */
+
+  listVaultDailyNotes() {
+    return this.request<{ dates: string[] }>("GET", "/api/vault/daily");
+  }
+
+  getVaultDailyNote(date: string) {
+    return this.request<{ date: string; content: string }>("GET", `/api/vault/daily/${date}`);
+  }
+
+  listVaultFiles(section: string) {
+    return this.request<{ section: string; files: string[] }>("GET", `/api/vault/${section}`);
+  }
+
+  getVaultFile(section: string, slug: string) {
+    return this.request<{ section: string; slug: string; content: string }>(
+      "GET",
+      `/api/vault/${section}/${slug}`,
+    );
+  }
+
+  searchVault(
+    query: string,
+    opts?: { section?: "all" | "daily" | "projects" | "decisions" | "people"; limit?: number },
+  ) {
+    const params = new URLSearchParams({ q: query });
+    if (opts?.section) params.set("section", opts.section);
+    if (opts?.limit) params.set("limit", String(opts.limit));
+    return this.request<{
+      query: string;
+      matches: Array<{ section: string; slug: string; line: number; snippet: string }>;
+    }>("GET", `/api/vault/search?${params}`);
+  }
+
+  /* ── Memory Bridge (v2) ── */
+
+  getMemoryBridgeSnapshot(opts?: { userId?: string; limit?: number; perCategoryLimit?: number }) {
+    const params = new URLSearchParams();
+    if (opts?.userId) params.set("userId", opts.userId);
+    if (opts?.limit != null) params.set("limit", String(opts.limit));
+    if (opts?.perCategoryLimit != null)
+      params.set("perCategoryLimit", String(opts.perCategoryLimit));
+    const qs = params.toString();
+    return this.request<{
+      markdown: string;
+      includedCount: number;
+      excludedCount: number;
+      generatedAt: string;
+      userId: string;
+    }>("GET", `/api/bridge/snapshot${qs ? `?${qs}` : ""}`);
   }
 
   /* ── Milestones ── */
@@ -520,17 +585,25 @@ export class ApiClient {
   /* ── Workspace ── */
 
   listDirectory(path = ".") {
-    return this.request<DirectoryListing>("GET", `/api/workspace/tree?path=${encodeURIComponent(path)}`);
+    return this.request<DirectoryListing>(
+      "GET",
+      `/api/workspace/tree?path=${encodeURIComponent(path)}`,
+    );
   }
 
   readFile(path: string) {
-    return this.request<{ path: string; content: string }>("POST", "/api/workspace/files/read", { path });
+    return this.request<{ path: string; content: string }>("POST", "/api/workspace/files/read", {
+      path,
+    });
   }
 
   /* ── Channels ── */
 
   getChannelConversation(channelId: string) {
-    return this.request<{ conversationId: string; updatedAt?: string }>("GET", `/api/channels/${channelId}/conversation`);
+    return this.request<{ conversationId: string; updatedAt?: string }>(
+      "GET",
+      `/api/channels/${channelId}/conversation`,
+    );
   }
 
   setChannelConversation(channelId: string, conversationId: string, platform: string) {
@@ -602,7 +675,10 @@ export class ApiClient {
     if (params?.limit != null) qs.set("limit", String(params.limit));
     if (params?.since) qs.set("since", params.since);
     const query = qs.toString();
-    return this.request<TopExpensiveGoal[]>("GET", `/api/usage/top-goals${query ? `?${query}` : ""}`);
+    return this.request<TopExpensiveGoal[]>(
+      "GET",
+      `/api/usage/top-goals${query ? `?${query}` : ""}`,
+    );
   }
 
   /* ── Dashboard ── */
@@ -654,13 +730,19 @@ export class ApiClient {
     return this.request<Record<string, unknown>>("GET", `/api/conversations/${id}/export`);
   }
 
-  searchConversations(q: string, options?: { conversationId?: string; role?: string } & PaginationParams) {
+  searchConversations(
+    q: string,
+    options?: { conversationId?: string; role?: string } & PaginationParams,
+  ) {
     const params = new URLSearchParams({ q });
     if (options?.conversationId) params.set("conversationId", options.conversationId);
     if (options?.role) params.set("role", options.role);
     if (options?.limit != null) params.set("limit", String(options.limit));
     if (options?.offset != null) params.set("offset", String(options.offset));
-    return this.request<PaginatedResponse<ConversationMessage>>("GET", `/api/conversations/search?${params}`);
+    return this.request<PaginatedResponse<ConversationMessage>>(
+      "GET",
+      `/api/conversations/search?${params}`,
+    );
   }
 
   /* ── Monitoring ── */
@@ -712,7 +794,12 @@ export class ApiClient {
       timestamp: string;
       hours: number;
       totalErrors: number;
-      errors: Array<{ toolName: string; errorMessage: string | null; count: number; lastSeen: string }>;
+      errors: Array<{
+        toolName: string;
+        errorMessage: string | null;
+        count: number;
+        lastSeen: string;
+      }>;
     }>("GET", `/api/errors/summary?hours=${hours}`);
   }
 
@@ -759,7 +846,9 @@ export class ApiClient {
   }
 
   submitGoalPipeline(goalId: string, context?: Record<string, unknown>) {
-    return this.request<SubmitPipelineResponse>("POST", `/api/pipelines/goal/${goalId}`, { context });
+    return this.request<SubmitPipelineResponse>("POST", `/api/pipelines/goal/${goalId}`, {
+      context,
+    });
   }
 
   cancelPipeline(jobId: string) {
@@ -789,13 +878,16 @@ export class ApiClient {
     return this.request<PipelineTemplate>("POST", "/api/pipeline-templates", data);
   }
 
-  updatePipelineTemplate(id: string, data: {
-    name?: string;
-    description?: string;
-    stages?: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>;
-    defaultContext?: Record<string, unknown>;
-    isActive?: boolean;
-  }) {
+  updatePipelineTemplate(
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      stages?: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>;
+      defaultContext?: Record<string, unknown>;
+      isActive?: boolean;
+    },
+  ) {
     return this.request<PipelineTemplate>("PATCH", `/api/pipeline-templates/${id}`, data);
   }
 
@@ -803,8 +895,15 @@ export class ApiClient {
     return this.request<{ deleted: boolean }>("DELETE", `/api/pipeline-templates/${id}`);
   }
 
-  triggerPipelineTemplate(name: string, opts?: { goalId?: string; context?: Record<string, unknown> }) {
-    return this.request<TriggerTemplateResponse>("POST", `/api/pipeline-templates/${encodeURIComponent(name)}/trigger`, opts);
+  triggerPipelineTemplate(
+    name: string,
+    opts?: { goalId?: string; context?: Record<string, unknown> },
+  ) {
+    return this.request<TriggerTemplateResponse>(
+      "POST",
+      `/api/pipeline-templates/${encodeURIComponent(name)}/trigger`,
+      opts,
+    );
   }
 
   /* ── N8n Executions ── */
@@ -815,13 +914,23 @@ export class ApiClient {
     if (opts?.status) params.set("status", opts.status);
     if (opts?.limit) params.set("limit", String(opts.limit));
     const qs = params.toString();
-    return this.request<{ data: N8nExecution[] }>("GET", `/api/n8n/executions${qs ? `?${qs}` : ""}`);
+    return this.request<{ data: N8nExecution[] }>(
+      "GET",
+      `/api/n8n/executions${qs ? `?${qs}` : ""}`,
+    );
   }
 
   listN8nWorkflows() {
-    return this.request<Array<{ id: string; name: string; description?: string; webhookUrl: string; isActive: boolean; direction: string }>>(
-      "GET", "/api/n8n/workflows",
-    );
+    return this.request<
+      Array<{
+        id: string;
+        name: string;
+        description?: string;
+        webhookUrl: string;
+        isActive: boolean;
+        direction: string;
+      }>
+    >("GET", "/api/n8n/workflows");
   }
 
   /* ── Subagents ── */
@@ -834,11 +943,13 @@ export class ApiClient {
     return this.request<SubagentRun>("GET", `/api/subagents/${id}`);
   }
 
-  listSubagentRuns(opts?: {
-    goalId?: string;
-    status?: SubagentRunStatus;
-    parentRequestId?: string;
-  } & PaginationParams) {
+  listSubagentRuns(
+    opts?: {
+      goalId?: string;
+      status?: SubagentRunStatus;
+      parentRequestId?: string;
+    } & PaginationParams,
+  ) {
     const params = new URLSearchParams();
     if (opts?.goalId) params.set("goalId", opts.goalId);
     if (opts?.status) params.set("status", opts.status);
@@ -901,12 +1012,14 @@ export class ApiClient {
 
   /* ── Agent Messages ── */
 
-  listAgentMessages(opts?: {
-    goalId?: string;
-    role?: string;
-    type?: string;
-    status?: string;
-  } & PaginationParams) {
+  listAgentMessages(
+    opts?: {
+      goalId?: string;
+      role?: string;
+      type?: string;
+      status?: string;
+    } & PaginationParams,
+  ) {
     const params = new URLSearchParams();
     if (opts?.goalId) params.set("goalId", opts.goalId);
     if (opts?.role) params.set("role", opts.role);
@@ -954,11 +1067,7 @@ export class ApiClient {
   }
 
   togglePattern(id: string, isActive: boolean) {
-    return this.request<UserPattern>(
-      "PATCH",
-      `/api/patterns/${id}/toggle`,
-      { isActive },
-    );
+    return this.request<UserPattern>("PATCH", `/api/patterns/${id}/toggle`, { isActive });
   }
 
   createPattern(data: {
@@ -972,13 +1081,16 @@ export class ApiClient {
     return this.request<UserPattern>("POST", "/api/patterns", data);
   }
 
-  updatePattern(id: string, data: {
-    description?: string;
-    suggestedAction?: string;
-    triggerCondition?: Record<string, unknown>;
-    confidence?: number;
-    isActive?: boolean;
-  }) {
+  updatePattern(
+    id: string,
+    data: {
+      description?: string;
+      suggestedAction?: string;
+      triggerCondition?: Record<string, unknown>;
+      confidence?: number;
+      isActive?: boolean;
+    },
+  ) {
     return this.request<UserPattern>("PATCH", `/api/patterns/${id}`, data);
   }
 
@@ -992,11 +1104,7 @@ export class ApiClient {
   }
 
   acceptSuggestion(data: { suggestion: string; userId?: string; patternId?: string }) {
-    return this.request<{ ok: boolean }>(
-      "POST",
-      "/api/agents/accept-suggestion",
-      data,
-    );
+    return this.request<{ ok: boolean }>("POST", "/api/agents/accept-suggestion", data);
   }
 
   /* ── Autonomy Tiers ── */
@@ -1006,7 +1114,11 @@ export class ApiClient {
   }
 
   updateToolTier(toolName: string, data: { tier: AutonomyTier; timeoutMs?: number }) {
-    return this.request<ToolTierConfig>("PUT", `/api/autonomy/tiers/${encodeURIComponent(toolName)}`, data);
+    return this.request<ToolTierConfig>(
+      "PUT",
+      `/api/autonomy/tiers/${encodeURIComponent(toolName)}`,
+      data,
+    );
   }
 
   /* ── Autonomous Execution ── */
@@ -1054,7 +1166,10 @@ export class ApiClient {
   }
 
   cancelWorkSession(id: string) {
-    return this.request<WorkSession>("PATCH", `/api/work-sessions/${encodeURIComponent(id)}/cancel`);
+    return this.request<WorkSession>(
+      "PATCH",
+      `/api/work-sessions/${encodeURIComponent(id)}/cancel`,
+    );
   }
 
   /* ── Journal ── */
@@ -1110,15 +1225,25 @@ export class ApiClient {
   }
 
   resumeCircuitBreaker(resumedBy?: string) {
-    return this.request<{ status: string }>("POST", "/api/deploys/circuit-breaker/resume", { resumedBy });
+    return this.request<{ status: string }>("POST", "/api/deploys/circuit-breaker/resume", {
+      resumedBy,
+    });
   }
 
   rollbackDeployment(id: string, previousSha: string) {
-    return this.request<{ status: string; rollbackSha: string }>("POST", `/api/deploys/${id}/rollback`, { previousSha });
+    return this.request<{ status: string; rollbackSha: string }>(
+      "POST",
+      `/api/deploys/${id}/rollback`,
+      { previousSha },
+    );
   }
 
   remediateDeploy(id: string, action: "restart_containers" | "clear_cache" = "restart_containers") {
-    return this.request<{ action: string; result: string; timestamp: string }>("POST", `/api/deploys/${id}/remediate`, { action });
+    return this.request<{ action: string; result: string; timestamp: string }>(
+      "POST",
+      `/api/deploys/${id}/remediate`,
+      { action },
+    );
   }
 
   /* ── Routing ── */
@@ -1158,11 +1283,17 @@ export class ApiClient {
   }
 
   getEngagement(userId: string) {
-    return this.request<{ data: string | null }>("GET", `/api/context/engagement?userId=${encodeURIComponent(userId)}`);
+    return this.request<{ data: string | null }>(
+      "GET",
+      `/api/context/engagement?userId=${encodeURIComponent(userId)}`,
+    );
   }
 
   setTimezone(userId: string, timezone: string) {
-    return this.request<{ status: string; timezone: string }>("PUT", "/api/context/timezone", { userId, timezone });
+    return this.request<{ status: string; timezone: string }>("PUT", "/api/context/timezone", {
+      userId,
+      timezone,
+    });
   }
 
   /* ── Streaming ── */
@@ -1178,7 +1309,12 @@ export class ApiClient {
       const h: Record<string, string> = { ...this.headers };
       const t = token ?? this.getToken?.();
       if (t) h["Authorization"] = `Bearer ${t}`;
-      return fetch(url, { method: "GET", headers: h, credentials: "include", signal: opts?.signal });
+      return fetch(url, {
+        method: "GET",
+        headers: h,
+        credentials: "include",
+        signal: opts?.signal,
+      });
     };
 
     let res = await doFetch();
@@ -1306,7 +1442,10 @@ export class ApiClient {
     return this.request<ProjectDependency[]>("GET", `/api/projects/${id}/dependencies`);
   }
 
-  async createProjectDependency(projectId: string, data: CreateProjectDependencyInput): Promise<ProjectDependency> {
+  async createProjectDependency(
+    projectId: string,
+    data: CreateProjectDependencyInput,
+  ): Promise<ProjectDependency> {
     return this.request<ProjectDependency>("POST", `/api/projects/${projectId}/dependencies`, data);
   }
 
@@ -1343,10 +1482,7 @@ export class ApiClient {
   searchGmail(query: string, maxResults?: number) {
     const qs = new URLSearchParams({ q: query });
     if (maxResults != null) qs.set("maxResults", String(maxResults));
-    return this.request<{ messages: GmailMessageSummary[] }>(
-      "GET",
-      `/api/gmail/search?${qs}`,
-    );
+    return this.request<{ messages: GmailMessageSummary[] }>("GET", `/api/gmail/search?${qs}`);
   }
 
   getGmailUnreadCount() {
@@ -1369,10 +1505,7 @@ export class ApiClient {
   }
 
   markGmailRead(messageId: string) {
-    return this.request<{ success: boolean }>(
-      "POST",
-      `/api/gmail/messages/${messageId}/read`,
-    );
+    return this.request<{ success: boolean }>("POST", `/api/gmail/messages/${messageId}/read`);
   }
 
   /* ── Calendar ── */
@@ -1446,7 +1579,10 @@ export class ApiClient {
     if (opts?.limit != null) qs.set("limit", String(opts.limit));
     if (opts?.offset != null) qs.set("offset", String(opts.offset));
     const q = qs.toString();
-    return this.request<{ data: FollowUp[]; total: number }>("GET", `/api/follow-ups${q ? `?${q}` : ""}`);
+    return this.request<{ data: FollowUp[]; total: number }>(
+      "GET",
+      `/api/follow-ups${q ? `?${q}` : ""}`,
+    );
   }
 
   getFollowUp(id: string) {
@@ -1482,7 +1618,10 @@ export class ApiClient {
     if (opts?.from) params.set("from", opts.from);
     if (opts?.to) params.set("to", opts.to);
     const q = params.toString();
-    return this.request<{ data: ProductivityLog[]; total: number }>("GET", `/api/productivity/history${q ? `?${q}` : ""}`);
+    return this.request<{ data: ProductivityLog[]; total: number }>(
+      "GET",
+      `/api/productivity/history${q ? `?${q}` : ""}`,
+    );
   }
 
   getProductivityStats(days?: number) {
@@ -1526,7 +1665,10 @@ export class ApiClient {
     if (opts?.limit != null) params.set("limit", String(opts.limit));
     if (opts?.offset != null) params.set("offset", String(opts.offset));
     const q = params.toString();
-    return this.request<{ data: CodebaseInsight[]; total: number }>("GET", `/api/codebase/insights${q ? `?${q}` : ""}`);
+    return this.request<{ data: CodebaseInsight[]; total: number }>(
+      "GET",
+      `/api/codebase/insights${q ? `?${q}` : ""}`,
+    );
   }
 
   getCodebaseInsightsCount() {
@@ -1534,7 +1676,9 @@ export class ApiClient {
   }
 
   updateCodebaseInsightStatus(id: string, status: InsightStatus) {
-    return this.request<CodebaseInsight>("PATCH", `/api/codebase/insights/${id}/status`, { status });
+    return this.request<CodebaseInsight>("PATCH", `/api/codebase/insights/${id}/status`, {
+      status,
+    });
   }
 
   deleteProductivityLog(id: string) {
@@ -1561,7 +1705,10 @@ export class ApiClient {
   /* ── Quick Actions ── */
 
   getQuickActions() {
-    return this.request<{ data: Array<{ label: string; icon: string }> }>("GET", "/api/context/quick-actions");
+    return this.request<{ data: Array<{ label: string; icon: string }> }>(
+      "GET",
+      "/api/context/quick-actions",
+    );
   }
 
   /* ── Goal Analytics ── */

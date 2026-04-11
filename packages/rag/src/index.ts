@@ -3,7 +3,7 @@ export { chunkText, estimateTokens, detectContentType } from "./chunker.js";
 export type { Chunk, ChunkerOptions } from "./chunker.js";
 
 // Retriever
-export { retrieve, retrieveVectorOnly, formatContext } from "./retriever.js";
+export { retrieve, formatContext } from "./retriever.js";
 export type { EmbedFn, RetrievalOptions, RetrievedChunk } from "./retriever.js";
 
 // Ingester

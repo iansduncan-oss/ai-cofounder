@@ -1,7 +1,7 @@
 import { useRealtime } from "@/providers/realtime-provider";
 import { useHealth } from "@/api/queries";
 import { cn } from "@/lib/utils";
-import { Wifi, WifiOff, Activity } from "lucide-react";
+import { Wifi, WifiOff } from "lucide-react";
 
 interface StatusBarProps {
   isStreaming?: boolean;
@@ -21,7 +21,9 @@ export function StatusBar({ isStreaming }: StatusBarProps) {
           ) : (
             <WifiOff className="h-2.5 w-2.5 text-amber-500" />
           )}
-          <span>{status === "connected" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}</span>
+          <span>
+            {status === "connected" ? "Live" : status === "connecting" ? "Connecting" : "Offline"}
+          </span>
         </div>
         {isStreaming && (
           <div className="flex items-center gap-1">

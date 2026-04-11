@@ -29,10 +29,21 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=5
 
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ai_cofounder_test
+      REDIS_URL: redis://localhost:6379
       ANTHROPIC_API_KEY: test-key-not-real
+      NODE_OPTIONS: --max-old-space-size=6144
 
     steps:
       - uses: actions/checkout@v5
@@ -50,6 +61,10 @@ jobs:
 
       - name: Build all packages
         run: npm run build
+
+      - name: Enable pgvector extension
+        run: |
+          PGPASSWORD=ci psql -h localhost -U ci -d ai_cofounder_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
 
       - name: Push schema to test DB
         run: npm run db:push

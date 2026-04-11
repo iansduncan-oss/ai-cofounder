@@ -15,7 +15,9 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 // 2. Mock @ai-cofounder/db
 const mockListToolTierConfigs = vi.fn().mockResolvedValue([]);
-const mockCreateApproval = vi.fn().mockResolvedValue({ id: "approval-1", taskId: null, status: "pending" });
+const mockCreateApproval = vi
+  .fn()
+  .mockResolvedValue({ id: "approval-1", taskId: null, status: "pending" });
 const mockGetApproval = vi.fn().mockResolvedValue(null);
 const mockResolveApproval = vi.fn().mockResolvedValue({ id: "approval-1", status: "rejected" });
 
@@ -57,7 +59,6 @@ const { AutonomyTierService } = await import("../services/autonomy-tier.js");
 const { buildSharedToolList, executeWithTierCheck } = await import("../agents/tool-executor.js");
 const { notifyApprovalCreated } = await import("../services/notifications.js");
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockDb = {} as any;
 
 describe("AutonomyTierService", () => {
@@ -243,9 +244,10 @@ describe("executeWithTierCheck", () => {
       { db: mockDb, autonomyTierService: service },
       mockContext,
     );
-    // search_web returns results or handles gracefully
-    expect(result).toBeDefined();
-    // No approval should have been created
+    // search_web returns results or handles gracefully — it should NOT be blocked as red-tier
+    expect(result).not.toHaveProperty("error", expect.stringContaining("red tier"));
+    expect(typeof result).toBe("object");
+    // No approval should have been created (green tier bypasses approval)
     expect(mockCreateApproval).not.toHaveBeenCalled();
   });
 
@@ -256,11 +258,11 @@ describe("executeWithTierCheck", () => {
     const service = new AutonomyTierService(mockDb);
     await service.load();
 
-    const result = await executeWithTierCheck(
+    const result = (await executeWithTierCheck(
       mockBlock,
       { db: mockDb, autonomyTierService: service },
       mockContext,
-    ) as { error: string };
+    )) as { error: string };
 
     expect(result.error).toContain("red tier");
     expect(result.error).toContain("search_web");
@@ -268,11 +270,7 @@ describe("executeWithTierCheck", () => {
   });
 
   it("returns green behavior when no tier service (backward compat)", async () => {
-    const result = await executeWithTierCheck(
-      mockBlock,
-      { db: mockDb },
-      mockContext,
-    );
+    const result = await executeWithTierCheck(mockBlock, { db: mockDb }, mockContext);
     // Should not have created any approval
     expect(mockCreateApproval).not.toHaveBeenCalled();
     expect(result).toBeDefined();
@@ -329,7 +327,11 @@ describe("executeWithTierCheck", () => {
     await service.load();
 
     mockCreateApproval.mockResolvedValue({ id: "approval-2", taskId: null, status: "pending" });
-    mockGetApproval.mockResolvedValue({ id: "approval-2", status: "rejected", decision: "Not needed" });
+    mockGetApproval.mockResolvedValue({
+      id: "approval-2",
+      status: "rejected",
+      decision: "Not needed",
+    });
 
     const resultPromise = executeWithTierCheck(
       mockBlock,
@@ -338,7 +340,7 @@ describe("executeWithTierCheck", () => {
     );
 
     await vi.runAllTimersAsync();
-    const result = await resultPromise as { error: string };
+    const result = (await resultPromise) as { error: string };
 
     expect(result.error).toContain("rejected");
     expect(mockResolveApproval).not.toHaveBeenCalled(); // not auto-denied, was manually rejected
@@ -367,7 +369,7 @@ describe("executeWithTierCheck", () => {
 
     // Advance time past the timeout
     await vi.runAllTimersAsync();
-    const result = await resultPromise as { error: string };
+    const result = (await resultPromise) as { error: string };
 
     expect(result.error).toContain("timed out");
     expect(mockResolveApproval).toHaveBeenCalledWith(

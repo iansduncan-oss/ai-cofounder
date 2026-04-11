@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { usePendingApprovals, usePendingTasks } from "@/api/queries";
 import { Bell } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Link } from "react-router";
 import { RelativeTime } from "./relative-time";
 
@@ -57,11 +56,10 @@ export function NotificationBell() {
       });
     });
 
-  notifications.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
+  notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const count = (approvals?.length ?? 0) + (tasks?.filter((t) => t.status === "failed").length ?? 0);
+  const count =
+    (approvals?.length ?? 0) + (tasks?.filter((t) => t.status === "failed").length ?? 0);
 
   return (
     <div ref={ref} className="relative">

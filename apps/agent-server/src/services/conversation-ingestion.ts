@@ -37,8 +37,20 @@ export class ConversationIngestionService {
       // Long conversations (>= 30 messages) already have summaries from the lazy path in agents.ts.
       if (messageCount < 30) {
         const summaryText = await summarizeMessages(this.llmRegistry, [
-          { id: "tmp-user", conversationId, role: "user", content: userMessage, createdAt: new Date() },
-          { id: "tmp-agent", conversationId, role: "agent", content: agentResponse, createdAt: new Date() },
+          {
+            id: "tmp-user",
+            conversationId,
+            role: "user",
+            content: userMessage,
+            createdAt: new Date(),
+          },
+          {
+            id: "tmp-agent",
+            conversationId,
+            role: "agent",
+            content: agentResponse,
+            createdAt: new Date(),
+          },
         ]);
 
         await saveConversationSummary(this.db, {
@@ -49,7 +61,10 @@ export class ConversationIngestionService {
           toMessageCreatedAt: new Date(),
         });
 
-        logger.info({ conversationId, messageCount }, "eager summary created for short conversation");
+        logger.info(
+          { conversationId, messageCount },
+          "eager summary created for short conversation",
+        );
       }
 
       // Enqueue RAG ingestion for this conversation (picks up latest summary)
@@ -57,7 +72,7 @@ export class ConversationIngestionService {
       enqueueRagIngestion({
         action: "ingest_conversations",
         sourceId: conversationId,
-      }).catch(() => {}); // fire-and-forget
+      }).catch((err) => logger.warn({ err }, "conversation ingestion enqueue failed")); // fire-and-forget
     } catch (err) {
       logger.warn({ err, conversationId }, "conversation ingestion failed (non-fatal)");
     }

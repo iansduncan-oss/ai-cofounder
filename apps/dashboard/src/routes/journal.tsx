@@ -2,8 +2,17 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router";
 import {
-  GitCommit, GitPullRequest, CheckCircle2, XCircle, FileText,
-  Zap, Clock, Target, Bot, Rocket, Search, Workflow,
+  GitCommit,
+  GitPullRequest,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  Clock,
+  Target,
+  Bot,
+  Rocket,
+  Search,
+  Workflow,
 } from "lucide-react";
 import { apiClient } from "@/api/client";
 import { queryKeys } from "@/lib/query-keys";
@@ -56,9 +65,7 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
           </span>
         </div>
         <p className="text-sm font-medium">{entry.title}</p>
-        {entry.summary && (
-          <p className="text-xs text-muted-foreground mt-1">{entry.summary}</p>
-        )}
+        {entry.summary && <p className="text-xs text-muted-foreground mt-1">{entry.summary}</p>}
         <div className="flex gap-2 mt-2 flex-wrap items-center">
           {entry.goalId && (
             <Link
@@ -103,10 +110,18 @@ function EntryCard({ entry }: { entry: JournalEntry }) {
 }
 
 const entryTypes: JournalEntryType[] = [
-  "goal_started", "goal_completed", "goal_failed",
-  "task_completed", "task_failed",
-  "git_commit", "pr_created", "reflection", "work_session",
-  "subagent_run", "deployment", "content_pipeline",
+  "goal_started",
+  "goal_completed",
+  "goal_failed",
+  "task_completed",
+  "task_failed",
+  "git_commit",
+  "pr_created",
+  "reflection",
+  "work_session",
+  "subagent_run",
+  "deployment",
+  "content_pipeline",
 ];
 
 function toDateString(date: Date): string {
@@ -164,7 +179,8 @@ export function JournalPage() {
           existing.entries.push(entry);
         } else {
           // Extract goal title from the first goal-level entry, or use a fallback
-          const goalTitle = entry.title.replace(/^(Goal started|Goal completed|Goal failed): /, "") || "Goal";
+          const goalTitle =
+            entry.title.replace(/^(Goal started|Goal completed|Goal failed): /, "") || "Goal";
           groups.set(entry.goalId, { goalTitle, entries: [entry] });
         }
       } else {
@@ -193,9 +209,7 @@ export function JournalPage() {
       {standup && (
         <div className="bg-card rounded-lg border border-border p-4">
           <h2 className="text-sm font-semibold mb-2">Today's Standup</h2>
-          <p className="text-sm text-muted-foreground whitespace-pre-line">
-            {standup.narrative}
-          </p>
+          <p className="text-sm text-muted-foreground whitespace-pre-line">{standup.narrative}</p>
           {standup.data.totalEntries > 0 && (
             <p className="text-xs text-muted-foreground mt-2">
               {standup.data.totalEntries} entries today
@@ -312,9 +326,7 @@ export function JournalPage() {
           </div>
         )
       ) : (
-        <div className="text-center py-12 text-muted-foreground">
-          No journal entries found.
-        </div>
+        <div className="text-center py-12 text-muted-foreground">No journal entries found.</div>
       )}
 
       {journal && journal.total > 50 && (

@@ -208,7 +208,14 @@ describe("Briefing routes", () => {
     it("returns briefing without sending notifications", async () => {
       // Use persistent mocks so scheduler tick doesn't consume them
       mockListActiveGoals.mockResolvedValue([
-        { id: "g-1", title: "Build API", priority: "high", taskCount: 4, completedTaskCount: 2, updatedAt: new Date() },
+        {
+          id: "g-1",
+          title: "Build API",
+          priority: "high",
+          taskCount: 4,
+          completedTaskCount: 2,
+          updatedAt: new Date(),
+        },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValue([]);
       mockCountTasksByStatus.mockResolvedValue({ pending: 3, completed: 5 });
@@ -273,14 +280,15 @@ describe("Briefing routes", () => {
       expect(res.statusCode).toBe(200);
       const body = res.json();
       expect(body.sent).toBe(true);
-      expect(body.briefing).toBeDefined();
+      expect(typeof body.briefing).toBe("string");
+      expect(body.briefing.length).toBeGreaterThan(0);
     });
 
     it("includes cost data in briefing data", async () => {
       mockListActiveGoals.mockResolvedValue([]);
       mockListRecentlyCompletedGoals.mockResolvedValue([]);
       mockCountTasksByStatus.mockResolvedValue({});
-      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 2.50, requestCount: 42 });
+      mockGetUsageSummary.mockResolvedValue({ totalCostUsd: 2.5, requestCount: 42 });
       mockListEnabledSchedules.mockResolvedValue([]);
       mockListRecentWorkSessions.mockResolvedValue([]);
 
@@ -293,7 +301,7 @@ describe("Briefing routes", () => {
 
       expect(res.statusCode).toBe(200);
       const body = res.json();
-      expect(body.data.costsSinceYesterday.totalCostUsd).toBe(2.50);
+      expect(body.data.costsSinceYesterday.totalCostUsd).toBe(2.5);
       expect(body.data.costsSinceYesterday.requestCount).toBe(42);
     });
 

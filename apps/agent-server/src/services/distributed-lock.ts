@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type Redis from "ioredis";
 
 /**
@@ -16,7 +17,7 @@ export class DistributedLockService {
    * @param ttlMs    Lock TTL in milliseconds
    */
   async acquire(lockKey: string, ttlMs: number): Promise<string | null> {
-    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const token = crypto.randomUUID();
     const result = await this.redis.set(lockKey, token, "PX", ttlMs, "NX");
     return result === "OK" ? token : null;
   }

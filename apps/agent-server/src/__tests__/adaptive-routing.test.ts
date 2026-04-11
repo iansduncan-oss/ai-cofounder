@@ -20,7 +20,6 @@ vi.mock("@ai-cofounder/shared", () => ({
 
 const { AdaptiveRoutingService } = await import("../services/adaptive-routing.js");
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fakeDb = {} as any;
 
 describe("AdaptiveRoutingService", () => {
@@ -44,8 +43,28 @@ describe("AdaptiveRoutingService", () => {
 
     it("returns original assignment when current agent has insufficient data", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "coder", totalTasks: 5, completedTasks: 4, failedTasks: 1, avgDurationMs: 5000, overallSuccessRate: 0.8, recentSuccessRate: null, recentCompletedTasks: 0, recentFailedTasks: 0 },
-        { agent: "researcher", totalTasks: 20, completedTasks: 18, failedTasks: 2, avgDurationMs: 3000, overallSuccessRate: 0.9, recentSuccessRate: 0.95, recentCompletedTasks: 8, recentFailedTasks: 0 },
+        {
+          agent: "coder",
+          totalTasks: 5,
+          completedTasks: 4,
+          failedTasks: 1,
+          avgDurationMs: 5000,
+          overallSuccessRate: 0.8,
+          recentSuccessRate: null,
+          recentCompletedTasks: 0,
+          recentFailedTasks: 0,
+        },
+        {
+          agent: "researcher",
+          totalTasks: 20,
+          completedTasks: 18,
+          failedTasks: 2,
+          avgDurationMs: 3000,
+          overallSuccessRate: 0.9,
+          recentSuccessRate: 0.95,
+          recentCompletedTasks: 8,
+          recentFailedTasks: 0,
+        },
       ]);
 
       const result = await service.suggestAgent("Fix the login bug", "coder");
@@ -57,8 +76,28 @@ describe("AdaptiveRoutingService", () => {
 
     it("recommends higher-scoring agent when confidence is sufficient", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "coder", totalTasks: 30, completedTasks: 15, failedTasks: 15, avgDurationMs: 10000, overallSuccessRate: 0.5, recentSuccessRate: 0.4, recentCompletedTasks: 4, recentFailedTasks: 6 },
-        { agent: "researcher", totalTasks: 30, completedTasks: 27, failedTasks: 3, avgDurationMs: 3000, overallSuccessRate: 0.9, recentSuccessRate: 0.95, recentCompletedTasks: 19, recentFailedTasks: 1 },
+        {
+          agent: "coder",
+          totalTasks: 30,
+          completedTasks: 15,
+          failedTasks: 15,
+          avgDurationMs: 10000,
+          overallSuccessRate: 0.5,
+          recentSuccessRate: 0.4,
+          recentCompletedTasks: 4,
+          recentFailedTasks: 6,
+        },
+        {
+          agent: "researcher",
+          totalTasks: 30,
+          completedTasks: 27,
+          failedTasks: 3,
+          avgDurationMs: 3000,
+          overallSuccessRate: 0.9,
+          recentSuccessRate: 0.95,
+          recentCompletedTasks: 19,
+          recentFailedTasks: 1,
+        },
       ]);
 
       const result = await service.suggestAgent("Research the API docs", "coder");
@@ -70,8 +109,28 @@ describe("AdaptiveRoutingService", () => {
 
     it("keeps current assignment when it is the best agent", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "coder", totalTasks: 30, completedTasks: 27, failedTasks: 3, avgDurationMs: 3000, overallSuccessRate: 0.9, recentSuccessRate: 0.95, recentCompletedTasks: 19, recentFailedTasks: 1 },
-        { agent: "researcher", totalTasks: 30, completedTasks: 15, failedTasks: 15, avgDurationMs: 10000, overallSuccessRate: 0.5, recentSuccessRate: 0.4, recentCompletedTasks: 4, recentFailedTasks: 6 },
+        {
+          agent: "coder",
+          totalTasks: 30,
+          completedTasks: 27,
+          failedTasks: 3,
+          avgDurationMs: 3000,
+          overallSuccessRate: 0.9,
+          recentSuccessRate: 0.95,
+          recentCompletedTasks: 19,
+          recentFailedTasks: 1,
+        },
+        {
+          agent: "researcher",
+          totalTasks: 30,
+          completedTasks: 15,
+          failedTasks: 15,
+          avgDurationMs: 10000,
+          overallSuccessRate: 0.5,
+          recentSuccessRate: 0.4,
+          recentCompletedTasks: 4,
+          recentFailedTasks: 6,
+        },
       ]);
 
       const result = await service.suggestAgent("Fix the login bug", "coder");
@@ -83,20 +142,62 @@ describe("AdaptiveRoutingService", () => {
 
     it("filters out non-dispatchable roles like orchestrator", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "orchestrator", totalTasks: 100, completedTasks: 95, failedTasks: 5, avgDurationMs: 1000, overallSuccessRate: 0.95, recentSuccessRate: 0.98, recentCompletedTasks: 49, recentFailedTasks: 1 },
-        { agent: "coder", totalTasks: 30, completedTasks: 15, failedTasks: 15, avgDurationMs: 5000, overallSuccessRate: 0.5, recentSuccessRate: 0.5, recentCompletedTasks: 5, recentFailedTasks: 5 },
+        {
+          agent: "orchestrator",
+          totalTasks: 100,
+          completedTasks: 95,
+          failedTasks: 5,
+          avgDurationMs: 1000,
+          overallSuccessRate: 0.95,
+          recentSuccessRate: 0.98,
+          recentCompletedTasks: 49,
+          recentFailedTasks: 1,
+        },
+        {
+          agent: "coder",
+          totalTasks: 30,
+          completedTasks: 15,
+          failedTasks: 15,
+          avgDurationMs: 5000,
+          overallSuccessRate: 0.5,
+          recentSuccessRate: 0.5,
+          recentCompletedTasks: 5,
+          recentFailedTasks: 5,
+        },
       ]);
 
       const result = await service.suggestAgent("Build feature", "coder");
 
       // Orchestrator should not appear in stats
-      expect(result.stats.find((s: { agent: string }) => s.agent === "orchestrator")).toBeUndefined();
+      expect(
+        result.stats.find((s: { agent: string }) => s.agent === "orchestrator"),
+      ).toBeUndefined();
     });
 
     it("speed component rewards faster agents", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "coder", totalTasks: 30, completedTasks: 24, failedTasks: 6, avgDurationMs: 10000, overallSuccessRate: 0.8, recentSuccessRate: 0.8, recentCompletedTasks: 8, recentFailedTasks: 2 },
-        { agent: "researcher", totalTasks: 30, completedTasks: 24, failedTasks: 6, avgDurationMs: 2000, overallSuccessRate: 0.8, recentSuccessRate: 0.8, recentCompletedTasks: 8, recentFailedTasks: 2 },
+        {
+          agent: "coder",
+          totalTasks: 30,
+          completedTasks: 24,
+          failedTasks: 6,
+          avgDurationMs: 10000,
+          overallSuccessRate: 0.8,
+          recentSuccessRate: 0.8,
+          recentCompletedTasks: 8,
+          recentFailedTasks: 2,
+        },
+        {
+          agent: "researcher",
+          totalTasks: 30,
+          completedTasks: 24,
+          failedTasks: 6,
+          avgDurationMs: 2000,
+          overallSuccessRate: 0.8,
+          recentSuccessRate: 0.8,
+          recentCompletedTasks: 8,
+          recentFailedTasks: 2,
+        },
       ]);
 
       const result = await service.suggestAgent("Do something", "coder");
@@ -111,31 +212,45 @@ describe("AdaptiveRoutingService", () => {
   describe("recordDecision", () => {
     it("stores decisions in ring buffer", () => {
       service.recordDecision({
-        taskId: "t1", originalAgent: "coder", recommendedAgent: "researcher",
-        confidence: 0.8, overridden: true, timestamp: new Date(),
+        taskId: "t1",
+        originalAgent: "coder",
+        recommendedAgent: "researcher",
+        confidence: 0.8,
+        overridden: true,
+        timestamp: new Date(),
       });
       service.recordDecision({
-        taskId: "t2", originalAgent: "coder", recommendedAgent: "coder",
-        confidence: 0, overridden: false, timestamp: new Date(),
+        taskId: "t2",
+        originalAgent: "coder",
+        recommendedAgent: "coder",
+        confidence: 0,
+        overridden: false,
+        timestamp: new Date(),
       });
 
       // Access via getRoutingStats
       mockGetAgentPerformanceStats.mockResolvedValue([]);
-      return service.getRoutingStats().then((stats: Awaited<ReturnType<typeof service.getRoutingStats>>) => {
-        expect(stats.totalDecisions).toBe(2);
-        expect(stats.totalOverrides).toBe(1);
-        expect(stats.overrideRate).toBe(0.5);
-        expect(stats.recentDecisions).toHaveLength(2);
-        // Most recent first
-        expect(stats.recentDecisions[0].taskId).toBe("t2");
-      });
+      return service
+        .getRoutingStats()
+        .then((stats: Awaited<ReturnType<typeof service.getRoutingStats>>) => {
+          expect(stats.totalDecisions).toBe(2);
+          expect(stats.totalOverrides).toBe(1);
+          expect(stats.overrideRate).toBe(0.5);
+          expect(stats.recentDecisions).toHaveLength(2);
+          // Most recent first
+          expect(stats.recentDecisions[0].taskId).toBe("t2");
+        });
     });
 
     it("evicts oldest entries after 100", async () => {
       for (let i = 0; i < 105; i++) {
         service.recordDecision({
-          taskId: `t${i}`, originalAgent: "coder", recommendedAgent: "researcher",
-          confidence: 0.8, overridden: true, timestamp: new Date(),
+          taskId: `t${i}`,
+          originalAgent: "coder",
+          recommendedAgent: "researcher",
+          confidence: 0.8,
+          overridden: true,
+          timestamp: new Date(),
         });
       }
 
@@ -161,8 +276,28 @@ describe("AdaptiveRoutingService", () => {
 
     it("returns scored agent performance sorted by score", async () => {
       mockGetAgentPerformanceStats.mockResolvedValue([
-        { agent: "coder", totalTasks: 30, completedTasks: 15, failedTasks: 15, avgDurationMs: 5000, overallSuccessRate: 0.5, recentSuccessRate: 0.5, recentCompletedTasks: 5, recentFailedTasks: 5 },
-        { agent: "researcher", totalTasks: 30, completedTasks: 27, failedTasks: 3, avgDurationMs: 3000, overallSuccessRate: 0.9, recentSuccessRate: 0.9, recentCompletedTasks: 9, recentFailedTasks: 1 },
+        {
+          agent: "coder",
+          totalTasks: 30,
+          completedTasks: 15,
+          failedTasks: 15,
+          avgDurationMs: 5000,
+          overallSuccessRate: 0.5,
+          recentSuccessRate: 0.5,
+          recentCompletedTasks: 5,
+          recentFailedTasks: 5,
+        },
+        {
+          agent: "researcher",
+          totalTasks: 30,
+          completedTasks: 27,
+          failedTasks: 3,
+          avgDurationMs: 3000,
+          overallSuccessRate: 0.9,
+          recentSuccessRate: 0.9,
+          recentCompletedTasks: 9,
+          recentFailedTasks: 1,
+        },
       ]);
 
       const stats = await service.getRoutingStats();

@@ -18,9 +18,6 @@ export function GlobalChatBar() {
     () => localStorage.getItem(CONVERSATION_STORAGE_KEY) || undefined,
   );
 
-  // Hide on the full chat page
-  if (location.pathname.includes("/chat")) return null;
-
   const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed || stream.isStreaming) return;
@@ -49,6 +46,9 @@ export function GlobalChatBar() {
     return () => window.removeEventListener("keydown", handler);
   }, [open]);
 
+  // Hide on the full chat page (AFTER all hooks to satisfy rules-of-hooks)
+  if (location.pathname.includes("/chat")) return null;
+
   return (
     <>
       {/* Slide-over panel */}
@@ -56,7 +56,10 @@ export function GlobalChatBar() {
         <div className="fixed bottom-14 right-4 z-50 w-96 max-h-80 rounded-xl border border-border bg-background shadow-2xl flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border/50">
             <span className="text-xs font-medium text-muted-foreground">Quick Chat</span>
-            <button onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
+            <button
+              onClick={() => setOpen(false)}
+              className="text-muted-foreground hover:text-foreground"
+            >
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -64,7 +67,9 @@ export function GlobalChatBar() {
             {stream.accumulatedText ? (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown>{stream.accumulatedText}</ReactMarkdown>
-                {stream.isStreaming && <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground ml-0.5" />}
+                {stream.isStreaming && (
+                  <span className="inline-block h-4 w-0.5 animate-pulse bg-foreground ml-0.5" />
+                )}
               </div>
             ) : stream.isStreaming ? (
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -92,7 +97,12 @@ export function GlobalChatBar() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
           placeholder="Ask your cofounder... (⌘K)"
           aria-label="Quick chat input"
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 outline-none"

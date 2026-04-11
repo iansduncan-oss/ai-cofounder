@@ -1,6 +1,19 @@
 import { createLogger } from "@ai-cofounder/shared";
-import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue, getAutonomousSessionQueue, getMeetingPrepQueue } from "./queues.js";
-import type { MonitoringJob, BriefingJob, ReflectionJob, AutonomousSessionJob, MeetingPrepJob } from "./queues.js";
+import {
+  getMonitoringQueue,
+  getBriefingQueue,
+  getReflectionQueue,
+  getRagIngestionQueue,
+  getAutonomousSessionQueue,
+  getMeetingPrepQueue,
+} from "./queues.js";
+import type {
+  MonitoringJob,
+  BriefingJob,
+  ReflectionJob,
+  AutonomousSessionJob,
+  MeetingPrepJob,
+} from "./queues.js";
 
 const logger = createLogger("queue-scheduler");
 
@@ -65,10 +78,7 @@ export async function setupRecurringJobs(options?: {
       } satisfies BriefingJob,
     },
   );
-  logger.info(
-    { hour: briefingHour, tz: briefingTimezone },
-    "Scheduled morning briefing",
-  );
+  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled morning briefing");
 
   // ── Evening summary (daily at 8 PM) ──
 
@@ -87,6 +97,24 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled evening briefing at 20:00");
+
+  // ── Weekly summary briefing (Monday at briefingHour) ──
+
+  await briefingQueue.upsertJobScheduler(
+    "weekly-summary",
+    {
+      pattern: `0 ${briefingHour} * * 1`,
+      tz: briefingTimezone,
+    },
+    {
+      name: "weekly-summary",
+      data: {
+        type: "weekly" as const,
+        deliveryChannels: ["slack", "discord"],
+      } satisfies BriefingJob,
+    },
+  );
+  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled weekly summary (Mondays)");
 
   // ── Weekly reflection pattern extraction (Sunday 3 AM) ──
 
@@ -316,8 +344,9 @@ export async function setupRecurringJobs(options?: {
 
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 
-  const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes
-    ?? Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
+  const autonomousIntervalMin =
+    options?.autonomousSessionIntervalMinutes ??
+    Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
   const autonomousSessionQueue = getAutonomousSessionQueue();
   await autonomousSessionQueue.upsertJobScheduler(
     "recurring-autonomous-session",

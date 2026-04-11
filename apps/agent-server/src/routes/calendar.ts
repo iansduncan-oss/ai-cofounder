@@ -129,7 +129,6 @@ export async function calendarRoutes(app: FastifyInstance): Promise<void> {
       try {
         const svc = getService(request, reply);
         if (!svc) return;
-        const { summary, start, end } = request.body;
         return await svc.createEvent(request.body);
       } catch (err) {
         return handleError(err, reply);

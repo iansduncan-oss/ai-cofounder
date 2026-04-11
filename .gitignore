@@ -21,6 +21,8 @@ dist/
 .claude/commit-log.md
 .claude/next-session-prompt.md
 .claude/settings.local.json
+.claude/agent-memories.md
+tasks/next-session-prompt.md
 
 # Build artifacts
 **/tsconfig.tsbuildinfo

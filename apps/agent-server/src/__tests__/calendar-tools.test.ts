@@ -111,7 +111,7 @@ describe("calendar tool definitions", () => {
 
   it("all tool names have corresponding tier entries", () => {
     for (const tool of allTools) {
-      expect(CALENDAR_TOOL_TIERS[tool.name]).toBeDefined();
+      expect(["green", "yellow", "red"]).toContain(CALENDAR_TOOL_TIERS[tool.name]);
     }
   });
 });
