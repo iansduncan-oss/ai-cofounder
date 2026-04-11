@@ -1,0 +1,98 @@
+version: 2
+updates:
+  # Root package.json — monorepo dev dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      # Group minor/patch updates to reduce noise
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+      # OpenTelemetry packages change together
+      opentelemetry:
+        patterns:
+          - "@opentelemetry/*"
+      # Fastify ecosystem
+      fastify:
+        patterns:
+          - "fastify"
+          - "@fastify/*"
+      # TypeScript + ESLint
+      typescript-tooling:
+        patterns:
+          - "typescript"
+          - "typescript-eslint"
+          - "eslint*"
+          - "@typescript-eslint/*"
+          - "prettier"
+      # Vitest ecosystem
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+    ignore:
+      # Pin major versions — require manual review
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+
+  # Docker images
+  - package-ecosystem: "docker"
+    directory: "/apps/agent-server"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/discord-bot"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/slack-bot"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker"

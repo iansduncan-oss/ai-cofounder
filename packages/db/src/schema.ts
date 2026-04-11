@@ -47,35 +47,45 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const conversations = pgTable("conversations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  title: text("title"),
-  metadata: jsonb("metadata"),
-  parentConversationId: uuid("parent_conversation_id"),
-  branchPointMessageId: uuid("branch_point_message_id"),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title"),
+    metadata: jsonb("metadata"),
+    parentConversationId: uuid("parent_conversation_id"),
+    branchPointMessageId: uuid("branch_point_message_id"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Hot paths: listConversationsByUser (paginated), filtering active conversations
+    index("idx_conversations_user_deleted").on(table.userId, table.deletedAt),
+    // Workspace-scoped queries (most routes filter by workspaceId)
+    index("idx_conversations_workspace_user").on(table.workspaceId, table.userId),
+  ],
+);
 
-export const messages = pgTable("messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  role: text("role").notNull(), // "user" | "agent" | "system"
-  agentRole: agentRoleEnum("agent_role"),
-  content: text("content").notNull(),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_messages_conversation_created").on(table.conversationId, table.createdAt),
-]);
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    role: text("role").notNull(), // "user" | "agent" | "system"
+    agentRole: agentRoleEnum("agent_role"),
+    content: text("content").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_messages_conversation_created").on(table.conversationId, table.createdAt)],
+);
 
 /* ── Channel ↔ Conversation mapping (Discord bot persistence) ── */
 
@@ -105,7 +115,14 @@ export const toolTierConfig = pgTable("tool_tier_config", {
 
 /* ── Goal / Task / Approval enums ── */
 
-export const goalStatusEnum = pgEnum("goal_status", ["draft", "proposed", "active", "completed", "cancelled", "needs_review"]);
+export const goalStatusEnum = pgEnum("goal_status", [
+  "draft",
+  "proposed",
+  "active",
+  "completed",
+  "cancelled",
+  "needs_review",
+]);
 
 export const goalPriorityEnum = pgEnum("goal_priority", ["low", "medium", "high", "critical"]);
 
@@ -134,8 +151,9 @@ export const milestoneStatusEnum = pgEnum("milestone_status", [
 
 export const milestones = pgTable("milestones", {
   id: uuid("id").primaryKey().defaultRandom(),
-  conversationId: uuid("conversation_id")
-    .references(() => conversations.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, {
+    onDelete: "set null",
+  }),
   title: text("title").notNull(),
   description: text("description"),
   status: milestoneStatusEnum("status").notNull().default("planned"),
@@ -150,52 +168,61 @@ export const milestones = pgTable("milestones", {
 
 /* ── Goals ── */
 
-export const goals = pgTable("goals", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  milestoneId: uuid("milestone_id").references(() => milestones.id, { onDelete: "set null" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  status: goalStatusEnum("status").notNull().default("draft"),
-  priority: goalPriorityEnum("priority").notNull().default("medium"),
-  scope: text("scope"),
-  requiresApproval: boolean("requires_approval").notNull().default(false),
-  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
-  metadata: jsonb("metadata"),
-  deletedAt: timestamp("deleted_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const goals = pgTable(
+  "goals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    milestoneId: uuid("milestone_id").references(() => milestones.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: goalStatusEnum("status").notNull().default("draft"),
+    priority: goalPriorityEnum("priority").notNull().default("medium"),
+    scope: text("scope"),
+    requiresApproval: boolean("requires_approval").notNull().default(false),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    metadata: jsonb("metadata"),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Hot path: listGoalsByConversation (paginated, filters on conversationId)
+    index("idx_goals_conversation_deleted").on(table.conversationId, table.deletedAt),
+    // Hot path: listActiveGoals, getGoalAnalytics (filters workspace + status)
+    index("idx_goals_workspace_status").on(table.workspaceId, table.status, table.deletedAt),
+  ],
+);
 
 /* ── Tasks (children of goals) ── */
 
-export const tasks = pgTable("tasks", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  goalId: uuid("goal_id")
-    .notNull()
-    .references(() => goals.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  description: text("description"),
-  status: taskStatusEnum("status").notNull().default("pending"),
-  assignedAgent: agentRoleEnum("assigned_agent"),
-  orderIndex: integer("order_index").notNull().default(0),
-  parallelGroup: integer("parallel_group"),
-  dependsOn: jsonb("depends_on").$type<string[]>(),
-  input: text("input"),
-  output: text("output"),
-  error: text("error"),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_tasks_goal_status").on(table.goalId, table.status),
-]);
+export const tasks = pgTable(
+  "tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    goalId: uuid("goal_id")
+      .notNull()
+      .references(() => goals.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: taskStatusEnum("status").notNull().default("pending"),
+    assignedAgent: agentRoleEnum("assigned_agent"),
+    orderIndex: integer("order_index").notNull().default(0),
+    parallelGroup: integer("parallel_group"),
+    dependsOn: jsonb("depends_on").$type<string[]>(),
+    input: text("input"),
+    output: text("output"),
+    error: text("error"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_tasks_goal_status").on(table.goalId, table.status)],
+);
 
 /* ── Memories (long-term facts about users) ── */
 
@@ -210,29 +237,30 @@ export const memoryCategoryEnum = pgEnum("memory_category", [
   "other",
 ]);
 
-export const memories = pgTable("memories", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  category: memoryCategoryEnum("category").notNull().default("other"),
-  key: text("key").notNull(),
-  content: text("content").notNull(),
-  embedding: vector("embedding"),
-  importance: integer("importance").notNull().default(50), // 0-100 score
-  accessCount: integer("access_count").notNull().default(0),
-  lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
-  source: text("source"),
-  agentRole: agentRoleEnum("agent_role"),
-  metadata: jsonb("metadata"),
-  archivedAt: timestamp("archived_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_memories_user_category").on(table.userId, table.category),
-]);
+export const memories = pgTable(
+  "memories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    category: memoryCategoryEnum("category").notNull().default("other"),
+    key: text("key").notNull(),
+    content: text("content").notNull(),
+    embedding: vector("embedding"),
+    importance: integer("importance").notNull().default(50), // 0-100 score
+    accessCount: integer("access_count").notNull().default(0),
+    lastAccessedAt: timestamp("last_accessed_at", { withTimezone: true }),
+    source: text("source"),
+    agentRole: agentRoleEnum("agent_role"),
+    metadata: jsonb("metadata"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_memories_user_category").on(table.userId, table.category)],
+);
 
 /* ── Prompts (versioned system prompts for agents) ── */
 
@@ -248,18 +276,26 @@ export const prompts = pgTable("prompts", {
 
 /* ── Approvals (gate tasks that need human sign-off) ── */
 
-export const approvals = pgTable("approvals", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  taskId: uuid("task_id")
-    .references(() => tasks.id, { onDelete: "cascade" }),
-  requestedBy: agentRoleEnum("requested_by").notNull(),
-  status: approvalStatusEnum("status").notNull().default("pending"),
-  reason: text("reason").notNull(),
-  decision: text("decision"),
-  decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
-  decidedAt: timestamp("decided_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const approvals = pgTable(
+  "approvals",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "cascade" }),
+    requestedBy: agentRoleEnum("requested_by").notNull(),
+    status: approvalStatusEnum("status").notNull().default("pending"),
+    reason: text("reason").notNull(),
+    decision: text("decision"),
+    decidedBy: uuid("decided_by").references(() => users.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Hot paths: listApprovalsByTask, listPendingApprovalsForTasks (inArray)
+    index("idx_approvals_task_status").on(table.taskId, table.status),
+    // listPendingApprovals iterates all pending approvals
+    index("idx_approvals_status").on(table.status),
+  ],
+);
 
 /* ── Code Executions (sandbox results) ── */
 
@@ -278,76 +314,96 @@ export const codeExecutions = pgTable("code_executions", {
 
 /* ── LLM Usage Tracking ── */
 
-export const llmUsage = pgTable("llm_usage", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  provider: text("provider").notNull(),
-  model: text("model").notNull(),
-  taskCategory: text("task_category").notNull(), // planning, conversation, simple, research, code
-  agentRole: agentRoleEnum("agent_role"),
-  inputTokens: integer("input_tokens").notNull(),
-  outputTokens: integer("output_tokens").notNull(),
-  estimatedCostUsd: integer("estimated_cost_usd_micros").notNull().default(0), // cost in microdollars ($0.000001)
-  userId: uuid("user_id"),
-  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
-  taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
-  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_llm_usage_created_user").on(table.createdAt, table.userId),
-]);
+export const llmUsage = pgTable(
+  "llm_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    taskCategory: text("task_category").notNull(), // planning, conversation, simple, research, code
+    agentRole: agentRoleEnum("agent_role"),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    estimatedCostUsd: integer("estimated_cost_usd_micros").notNull().default(0), // cost in microdollars ($0.000001)
+    userId: uuid("user_id"),
+    goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+    taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
+    conversationId: uuid("conversation_id").references(() => conversations.id, {
+      onDelete: "set null",
+    }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_llm_usage_created_user").on(table.createdAt, table.userId)],
+);
 
 /* ── Schedules (natural language cron) ── */
 
-export const schedules = pgTable("schedules", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
-  cronExpression: text("cron_expression").notNull(),
-  actionPrompt: text("action_prompt").notNull(),
-  description: text("description"),
-  enabled: boolean("enabled").notNull().default(true),
-  lastRunAt: timestamp("last_run_at", { withTimezone: true }),
-  nextRunAt: timestamp("next_run_at", { withTimezone: true }),
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index("idx_schedules_enabled_next_run").on(table.enabled, table.nextRunAt),
-]);
+export const schedules = pgTable(
+  "schedules",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    cronExpression: text("cron_expression").notNull(),
+    actionPrompt: text("action_prompt").notNull(),
+    description: text("description"),
+    enabled: boolean("enabled").notNull().default(true),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }),
+    nextRunAt: timestamp("next_run_at", { withTimezone: true }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("idx_schedules_enabled_next_run").on(table.enabled, table.nextRunAt)],
+);
 
 /* ── Events (inbound triggers) ── */
 
-export const events = pgTable("events", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  source: text("source").notNull(), // "github", "n8n", "cron", "manual"
-  type: text("type").notNull(), // "push", "pr_opened", "workflow_complete", etc.
-  payload: jsonb("payload").notNull(),
-  processed: boolean("processed").notNull().default(false),
-  result: text("result"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const events = pgTable(
+  "events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: text("source").notNull(), // "github", "n8n", "cron", "manual"
+    type: text("type").notNull(), // "push", "pr_opened", "workflow_complete", etc.
+    payload: jsonb("payload").notNull(),
+    processed: boolean("processed").notNull().default(false),
+    result: text("result"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // Filter by creation date for listEvents (timeline views)
+    index("idx_events_created").on(table.createdAt),
+    // Filter unprocessed events efficiently
+    index("idx_events_processed_created").on(table.processed, table.createdAt),
+  ],
+);
 
 /* ── Work Sessions (autonomous execution logs) ── */
 
-export const workSessions = pgTable("work_sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  trigger: text("trigger").notNull(), // "schedule", "event", "manual"
-  scheduleId: uuid("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
-  eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
-  goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
-  context: jsonb("context"),
-  tokensUsed: integer("tokens_used").notNull().default(0),
-  durationMs: integer("duration_ms").notNull().default(0),
-  actionsTaken: jsonb("actions_taken"), // array of {action, result}
-  status: text("status").notNull().default("running"), // "running", "completed", "failed"
-  summary: text("summary"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-});
+export const workSessions = pgTable(
+  "work_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    trigger: text("trigger").notNull(), // "schedule", "event", "manual"
+    scheduleId: uuid("schedule_id").references(() => schedules.id, { onDelete: "set null" }),
+    eventId: uuid("event_id").references(() => events.id, { onDelete: "set null" }),
+    goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
+    context: jsonb("context"),
+    tokensUsed: integer("tokens_used").notNull().default(0),
+    durationMs: integer("duration_ms").notNull().default(0),
+    actionsTaken: jsonb("actions_taken"), // array of {action, result}
+    status: text("status").notNull().default("running"), // "running", "completed", "failed"
+    summary: text("summary"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [
+    // Recent work sessions (timeline view, sorted by createdAt DESC)
+    index("idx_work_sessions_created").on(table.createdAt),
+  ],
+);
 
 /* ── Conversation Summaries (context window management) ── */
 
@@ -539,8 +595,7 @@ export const userActionTypeEnum = pgEnum("user_action_type", [
 
 export const userActions = pgTable("user_actions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
   actionType: userActionTypeEnum("action_type").notNull(),
   actionDetail: text("action_detail"),
@@ -552,25 +607,32 @@ export const userActions = pgTable("user_actions", {
 
 /* ── User Patterns (learned behavioral patterns) ── */
 
-export const userPatterns = pgTable("user_patterns", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
-  patternType: text("pattern_type").notNull(), // "time_preference", "sequence", "recurring_action"
-  description: text("description").notNull(), // human-readable: "deploys on Fridays around 3 PM"
-  triggerCondition: jsonb("trigger_condition").notNull(), // { dayOfWeek?: number, hourRange?: [start,end], afterAction?: string }
-  suggestedAction: text("suggested_action").notNull(), // "Run the test suite before deploying"
-  confidence: integer("confidence").notNull().default(50), // 0-100
-  hitCount: integer("hit_count").notNull().default(0),
-  acceptCount: integer("accept_count").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-  expiresAt: timestamp("expires_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  uniqueIndex("idx_user_patterns_user_workspace_type").on(table.userId, table.workspaceId, table.patternType),
-]);
+export const userPatterns = pgTable(
+  "user_patterns",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    patternType: text("pattern_type").notNull(), // "time_preference", "sequence", "recurring_action"
+    description: text("description").notNull(), // human-readable: "deploys on Fridays around 3 PM"
+    triggerCondition: jsonb("trigger_condition").notNull(), // { dayOfWeek?: number, hourRange?: [start,end], afterAction?: string }
+    suggestedAction: text("suggested_action").notNull(), // "Run the test suite before deploying"
+    confidence: integer("confidence").notNull().default(50), // 0-100
+    hitCount: integer("hit_count").notNull().default(0),
+    acceptCount: integer("accept_count").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("idx_user_patterns_user_workspace_type").on(
+      table.userId,
+      table.workspaceId,
+      table.patternType,
+    ),
+  ],
+);
 
 /* ── Deployments (deploy tracking & self-healing) ── */
 
@@ -673,7 +735,9 @@ export const agentMessages = pgTable("agent_messages", {
   inReplyTo: uuid("in_reply_to"),
   goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
-  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, {
+    onDelete: "set null",
+  }),
   status: agentMessageStatusEnum("status").notNull().default("pending"),
   priority: goalPriorityEnum("priority").notNull().default("medium"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
@@ -693,7 +757,9 @@ export const subagentRunStatusEnum = pgEnum("subagent_run_status", [
 export const subagentRuns = pgTable("subagent_runs", {
   id: uuid("id").primaryKey().defaultRandom(),
   parentRequestId: text("parent_request_id"),
-  conversationId: uuid("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+  conversationId: uuid("conversation_id").references(() => conversations.id, {
+    onDelete: "set null",
+  }),
   goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   instruction: text("instruction").notNull(),
@@ -774,7 +840,9 @@ export const journalEntries = pgTable("journal_entries", {
   entryType: journalEntryTypeEnum("entry_type").notNull(),
   goalId: uuid("goal_id").references(() => goals.id, { onDelete: "set null" }),
   taskId: uuid("task_id").references(() => tasks.id, { onDelete: "set null" }),
-  workSessionId: uuid("work_session_id").references(() => workSessions.id, { onDelete: "set null" }),
+  workSessionId: uuid("work_session_id").references(() => workSessions.id, {
+    onDelete: "set null",
+  }),
   title: text("title").notNull(),
   summary: text("summary"),
   details: jsonb("details"),
@@ -822,8 +890,7 @@ export const followUpStatusEnum = pgEnum("follow_up_status", ["pending", "done",
 
 export const followUps = pgTable("follow_ups", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description"),
   status: followUpStatusEnum("status").notNull().default("pending"),
@@ -882,8 +949,7 @@ export const outboundWebhooks = pgTable("outbound_webhooks", {
 
 export const episodicMemories = pgTable("episodic_memories", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workspaceId: uuid("workspace_id")
-    .references(() => workspaces.id, { onDelete: "cascade" }),
+  workspaceId: uuid("workspace_id").references(() => workspaces.id, { onDelete: "cascade" }),
   conversationId: uuid("conversation_id")
     .notNull()
     .references(() => conversations.id, { onDelete: "cascade" }),
@@ -909,7 +975,9 @@ export const proceduralMemories = pgTable("procedural_memories", {
   successCount: integer("success_count").notNull().default(0),
   failureCount: integer("failure_count").notNull().default(0),
   lastUsed: timestamp("last_used", { withTimezone: true }),
-  createdFromGoalId: uuid("created_from_goal_id").references(() => goals.id, { onDelete: "set null" }),
+  createdFromGoalId: uuid("created_from_goal_id").references(() => goals.id, {
+    onDelete: "set null",
+  }),
   tags: jsonb("tags").default([]),
   embedding: vector("embedding"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

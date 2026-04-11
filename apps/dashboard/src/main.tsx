@@ -16,8 +16,19 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 1,
+      // Default staleTime for unspecified queries. Individual queries can
+      // override with shorter (live-updating) or longer (rarely-changing)
+      // values. 30s is a middle-ground for general list views.
       staleTime: 30_000,
+      // 5 min garbage collection — balances memory with back-button UX
+      gcTime: 5 * 60_000,
       refetchOnWindowFocus: true,
+      // Don't refetch on reconnect for paginated lists — most common case
+      // is brief network hiccups, not extended offline
+      refetchOnReconnect: "always",
+    },
+    mutations: {
+      retry: 0,
     },
   },
 });
@@ -44,15 +55,15 @@ initAuth().then(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
-          <Suspense
-            fallback={
-              <div className="flex h-screen items-center justify-center">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            }
-          >
-            <RouterProvider router={router} />
-          </Suspense>
+        <Suspense
+          fallback={
+            <div className="flex h-screen items-center justify-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            </div>
+          }
+        >
+          <RouterProvider router={router} />
+        </Suspense>
         <Toaster
           theme="system"
           position="bottom-right"
