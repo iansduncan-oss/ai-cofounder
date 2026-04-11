@@ -15,7 +15,7 @@ export async function setupRecurringJobs(options?: {
   autonomousSessionIntervalMinutes?: number;
 }): Promise<void> {
   const {
-    briefingHour = 9,
+    briefingHour = 6,
     briefingTimezone = "America/New_York",
     monitoringIntervalMinutes = 5,
   } = options ?? {};
@@ -70,12 +70,12 @@ export async function setupRecurringJobs(options?: {
     "Scheduled morning briefing",
   );
 
-  // ── Evening summary (daily at 6 PM) ──
+  // ── Evening summary (daily at 8 PM) ──
 
   await briefingQueue.upsertJobScheduler(
     "evening-briefing",
     {
-      pattern: `0 18 * * *`,
+      pattern: `0 20 * * *`,
       tz: briefingTimezone,
     },
     {
@@ -86,7 +86,7 @@ export async function setupRecurringJobs(options?: {
       } satisfies BriefingJob,
     },
   );
-  logger.info("Scheduled evening briefing at 18:00");
+  logger.info("Scheduled evening briefing at 20:00");
 
   // ── Weekly reflection pattern extraction (Sunday 3 AM) ──
 

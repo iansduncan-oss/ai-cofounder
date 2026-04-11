@@ -28,21 +28,27 @@ interface PushedRecord {
   context?: string;
 }
 
-/** Global daily cap across all proactive pushes. */
-const DAILY_PUSH_CAP = 3;
+/** Global daily cap across all proactive pushes. Scales with chatty mode. */
+const DAILY_PUSH_CAP = process.env.PROACTIVE_CHATTY === "0" ? 3 : 5;
 
-/** Work hours: only fire proactive pushes during this window. */
-const WORK_HOUR_START = 8;
-const WORK_HOUR_END = 20;
+/**
+ * Active hours: only fire proactive pushes during this window.
+ * Default: 6 AM – 10 PM (quiet hours 10 PM – 6 AM).
+ */
+const WORK_HOUR_START = 6;
+const WORK_HOUR_END = 22;
 
 /**
  * Which triggers to actually evaluate. Critical insights are always on — they're
- * the only true "page me immediately" category. The others are opt-in via env
- * to keep the default experience to: 1 morning + 1 evening + critical urgents.
+ * the only true "page me immediately" category.
  *
- * Set PROACTIVE_CHATTY=1 to enable wake_up, stall, celebration, and end_of_day.
+ * CHATTY is ON by default. Set PROACTIVE_CHATTY=0 to disable the wake_up / stall /
+ * celebration triggers and get only briefings + critical insights.
+ *
+ * Note: end_of_day is NOT in the chatty list because the evening briefing at 20:00
+ * already includes the productivity wrap-up and reflection prompt.
  */
-const CHATTY = process.env.PROACTIVE_CHATTY === "1";
+const CHATTY = process.env.PROACTIVE_CHATTY !== "0";
 
 /** Per-trigger cooldowns (milliseconds). */
 const COOLDOWNS: Record<ProactivePushType, number> = {
@@ -106,16 +112,14 @@ export class ProactiveEngine {
       return { evaluated: 0, fired };
     }
 
-    // Default behavior: only critical_insight fires (via direct call from scanner).
-    // Everything else is gated behind PROACTIVE_CHATTY=1.
-    //
-    // Rationale: morning briefing now includes the plan and follow-ups (no more
-    // wake_up needed), and the evening briefing now includes the productivity
-    // wrap-up + reflection prompt (no more end_of_day needed). Celebration and
-    // stall are nice-to-haves that add message volume.
+    // CHATTY ON (default): fires celebration, stall, and wake_up triggers
+    //   throughout the active-hours window (6 AM – 10 PM). end_of_day is NOT
+    //   included — the evening briefing at 20:00 already includes the
+    //   productivity wrap-up and reflection prompt, so end_of_day would be
+    //   a redundant extra message.
+    // CHATTY OFF: only critical_insight fires (via direct call from scanner).
     const triggers: Array<() => Promise<{ fired: boolean; type?: ProactivePushType }>> = CHATTY
       ? [
-          () => this.evalEndOfDay(adminUserId, log, pushed),
           () => this.evalCelebration(adminUserId, log, pushed),
           () => this.evalStall(adminUserId, log, pushed),
           () => this.evalWakeUp(adminUserId, log, pushed),
