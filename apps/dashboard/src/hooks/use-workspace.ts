@@ -27,6 +27,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data, isLoading } = useQuery({
     queryKey: queryKeys.workspaces.list,
     queryFn: () => apiClient.listWorkspaces(),
+    // Workspaces rarely change — 10 minute staleTime
+    staleTime: 10 * 60_000,
   });
 
   const workspaces = useMemo(() => data?.workspaces ?? [], [data]);
