@@ -56,11 +56,10 @@ export function NotificationBell() {
       });
     });
 
-  notifications.sort(
-    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-  );
+  notifications.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-  const count = (approvals?.length ?? 0) + (tasks?.filter((t) => t.status === "failed").length ?? 0);
+  const count =
+    (approvals?.length ?? 0) + (tasks?.filter((t) => t.status === "failed").length ?? 0);
 
   return (
     <div ref={ref} className="relative">

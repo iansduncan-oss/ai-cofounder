@@ -1,6 +1,19 @@
 import { createLogger } from "@ai-cofounder/shared";
-import { getMonitoringQueue, getBriefingQueue, getReflectionQueue, getRagIngestionQueue, getAutonomousSessionQueue, getMeetingPrepQueue } from "./queues.js";
-import type { MonitoringJob, BriefingJob, ReflectionJob, AutonomousSessionJob, MeetingPrepJob } from "./queues.js";
+import {
+  getMonitoringQueue,
+  getBriefingQueue,
+  getReflectionQueue,
+  getRagIngestionQueue,
+  getAutonomousSessionQueue,
+  getMeetingPrepQueue,
+} from "./queues.js";
+import type {
+  MonitoringJob,
+  BriefingJob,
+  ReflectionJob,
+  AutonomousSessionJob,
+  MeetingPrepJob,
+} from "./queues.js";
 
 const logger = createLogger("queue-scheduler");
 
@@ -15,7 +28,7 @@ export async function setupRecurringJobs(options?: {
   autonomousSessionIntervalMinutes?: number;
 }): Promise<void> {
   const {
-    briefingHour = 9,
+    briefingHour = 6,
     briefingTimezone = "America/New_York",
     monitoringIntervalMinutes = 5,
   } = options ?? {};
@@ -65,17 +78,14 @@ export async function setupRecurringJobs(options?: {
       } satisfies BriefingJob,
     },
   );
-  logger.info(
-    { hour: briefingHour, tz: briefingTimezone },
-    "Scheduled morning briefing",
-  );
+  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled morning briefing");
 
-  // ── Evening summary (daily at 6 PM) ──
+  // ── Evening summary (daily at 8 PM) ──
 
   await briefingQueue.upsertJobScheduler(
     "evening-briefing",
     {
-      pattern: `0 18 * * *`,
+      pattern: `0 20 * * *`,
       tz: briefingTimezone,
     },
     {
@@ -86,7 +96,7 @@ export async function setupRecurringJobs(options?: {
       } satisfies BriefingJob,
     },
   );
-  logger.info("Scheduled evening briefing at 18:00");
+  logger.info("Scheduled evening briefing at 20:00");
 
   // ── Weekly summary briefing (Monday at briefingHour) ──
 
@@ -104,10 +114,7 @@ export async function setupRecurringJobs(options?: {
       } satisfies BriefingJob,
     },
   );
-  logger.info(
-    { hour: briefingHour, tz: briefingTimezone },
-    "Scheduled weekly summary (Mondays)",
-  );
+  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled weekly summary (Mondays)");
 
   // ── Weekly reflection pattern extraction (Sunday 3 AM) ──
 
@@ -243,20 +250,55 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled DLQ check every 5 minutes");
 
-  // ── Follow-up reminders (daily at 9 AM) ──
+  // NOTE: follow-up reminders and the standalone productivity nudge have been
+  // intentionally consolidated INTO the morning briefing to reduce message volume.
+  // The morning briefing now:
+  //   1. Auto-generates today's plan (via generateDailyPlan in merge mode)
+  //   2. Marks overdue follow-ups as reminder-sent
+  //   3. Shows both the plan and the overdue follow-ups inline
+  //
+  // The handlers remain in place (queue plugin) for backwards compatibility if a
+  // manual `productivity_nudge` or `follow_up_reminders` job is enqueued, but no
+  // scheduler registers them as recurring anymore.
+
+  // ── Codebase scan (every 4 hours) — discovers things to fix/improve/add ──
 
   await monitoringQueue.upsertJobScheduler(
-    "follow-up-reminders",
+    "codebase-scan",
+    { every: 4 * 60 * 60 * 1000 },
     {
-      pattern: `0 ${briefingHour} * * *`,
-      tz: briefingTimezone,
-    },
-    {
-      name: "follow-up-reminders",
-      data: { check: "follow_up_reminders" } satisfies MonitoringJob,
+      name: "codebase-scan",
+      data: { check: "codebase_scan" } satisfies MonitoringJob,
     },
   );
-  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled daily follow-up reminders");
+  logger.info("Scheduled codebase scan every 4 hours");
+
+  // ── Productivity plan sync (every 15 minutes) ──
+  // Auto-marks completed items and tops up plan with new urgent work
+
+  await monitoringQueue.upsertJobScheduler(
+    "productivity-sync",
+    { every: 15 * 60 * 1000 },
+    {
+      name: "productivity-sync",
+      data: { check: "productivity_sync" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled productivity plan sync every 15 minutes");
+
+  // ── Proactive engine check (every 30 minutes) ──
+  // Evaluates stall detection, wake-up nudges, celebrations, end-of-day wrap-up
+  // without user input. Respects quiet hours (8 AM - 8 PM) and daily push cap.
+
+  await monitoringQueue.upsertJobScheduler(
+    "proactive-check",
+    { every: 30 * 60 * 1000 },
+    {
+      name: "proactive-check",
+      data: { check: "proactive_check" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled proactive engine check every 30 minutes");
 
   // ── Meeting prep: generate upcoming preps (hourly) ──
 
@@ -302,8 +344,9 @@ export async function setupRecurringJobs(options?: {
 
   // ── Recurring autonomous session (configurable interval, default 30 min) ──
 
-  const autonomousIntervalMin = options?.autonomousSessionIntervalMinutes
-    ?? Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
+  const autonomousIntervalMin =
+    options?.autonomousSessionIntervalMinutes ??
+    Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
   const autonomousSessionQueue = getAutonomousSessionQueue();
   await autonomousSessionQueue.upsertJobScheduler(
     "recurring-autonomous-session",

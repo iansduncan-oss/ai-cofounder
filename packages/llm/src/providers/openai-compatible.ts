@@ -18,7 +18,13 @@ export class OpenAICompatibleProvider implements LlmProvider {
   protected client: OpenAI | null = null;
   protected timeoutMs: number;
 
-  constructor(name: string, apiKey: string | undefined, defaultModel: string, baseURL: string, timeoutMs = 120_000) {
+  constructor(
+    name: string,
+    apiKey: string | undefined,
+    defaultModel: string,
+    baseURL: string,
+    timeoutMs = 120_000,
+  ) {
     this.name = name;
     this.defaultModel = defaultModel;
     this.available = !!apiKey;

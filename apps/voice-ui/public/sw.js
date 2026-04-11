@@ -9,9 +9,11 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))),
+      ),
   );
   self.clients.claim();
 });
@@ -26,13 +28,15 @@ self.addEventListener("fetch", (e) => {
     caches.match(e.request).then((cached) => {
       // Network-first for HTML, cache-first for assets
       if (url.pathname === "/voice/" || url.pathname === "/voice/index.html") {
-        return fetch(e.request).then((res) => {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
-          return res;
-        }).catch(() => cached);
+        return fetch(e.request)
+          .then((res) => {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then((c) => c.put(e.request, clone));
+            return res;
+          })
+          .catch(() => cached);
       }
       return cached || fetch(e.request);
-    })
+    }),
   );
 });

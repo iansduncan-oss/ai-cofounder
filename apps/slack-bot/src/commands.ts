@@ -48,7 +48,11 @@ function makeContext(channelId: string, userId: string, userName: string): Comma
 
 type RespondFn = (msg: string | Record<string, unknown>) => Promise<unknown>;
 
-async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephemeral = false): Promise<void> {
+async function sendSlackResponse(
+  respond: RespondFn,
+  result: HandlerResult,
+  ephemeral = false,
+): Promise<void> {
   const base = ephemeral ? { response_type: "ephemeral" as const } : {};
 
   switch (result.type) {
@@ -78,7 +82,10 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "header", text: { type: "plain_text", text: "AI Cofounder \u2014 System Status" } },
+          {
+            type: "header",
+            text: { type: "plain_text", text: "AI Cofounder \u2014 System Status" },
+          },
           {
             type: "section",
             fields: [
@@ -109,7 +116,10 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Pending Tasks" } },
           { type: "section", text: { type: "mrkdwn", text: lines.join("\n") } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} pending task(s)` }] },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${result.data.totalCount} pending task(s)` }],
+          },
         ],
       });
       return;
@@ -123,8 +133,14 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
         ...base,
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Memories" } },
-          { type: "section", text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} memory(s)` }] },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) },
+          },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${result.data.totalCount} memory(s)` }],
+          },
         ],
       });
       return;
@@ -134,7 +150,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "section", text: { type: "mrkdwn", text: "\u2705 Conversation cleared. Next `/ask` starts fresh." } },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: "\u2705 Conversation cleared. Next `/ask` starts fresh.",
+            },
+          },
         ],
       });
       return;
@@ -146,7 +168,10 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "header", text: { type: "plain_text", text: `Executing: ${result.data.goalTitle}` } },
+          {
+            type: "header",
+            text: { type: "plain_text", text: `Executing: ${result.data.goalTitle}` },
+          },
           { type: "section", text: { type: "mrkdwn", text: taskLines.join("\n") } },
           {
             type: "context",
@@ -166,7 +191,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "section", text: { type: "mrkdwn", text: `\u2705 Approval \`${result.data.approvalId}\` approved.` } },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `\u2705 Approval \`${result.data.approvalId}\` approved.`,
+            },
+          },
         ],
       });
       return;
@@ -175,7 +206,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "section", text: { type: "mrkdwn", text: `\u274c Approval \`${result.data.approvalId}\` rejected.` } },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `\u274c Approval \`${result.data.approvalId}\` rejected.`,
+            },
+          },
         ],
       });
       return;
@@ -237,14 +274,18 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
 
     case "schedule_list": {
       const lines = result.data.schedules.map(
-        (s) => `${s.enabled ? "\u2705" : "\u23f8\ufe0f"} \`${s.cronExpression}\` \u2014 ${s.description ?? "No description"}\nNext: ${s.nextRunAt}`,
+        (s) =>
+          `${s.enabled ? "\u2705" : "\u23f8\ufe0f"} \`${s.cronExpression}\` \u2014 ${s.description ?? "No description"}\nNext: ${s.nextRunAt}`,
       );
       await respond({
         ...base,
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Schedules" } },
           { type: "section", text: { type: "mrkdwn", text: lines.join("\n\n") } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} schedule(s)` }] },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${result.data.totalCount} schedule(s)` }],
+          },
         ],
       });
       return;
@@ -254,7 +295,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "section", text: { type: "mrkdwn", text: `\u2705 *Schedule Created*\n\`${result.data.cronExpression}\` \u2014 ${result.data.description ?? "No description"}` } },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `\u2705 *Schedule Created*\n\`${result.data.cronExpression}\` \u2014 ${result.data.description ?? "No description"}`,
+            },
+          },
           { type: "context", elements: [{ type: "mrkdwn", text: `ID: ${result.data.id}` }] },
         ],
       });
@@ -262,14 +309,18 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
 
     case "gmail_inbox": {
       const lines = result.data.messages.map(
-        (m) => `${m.isUnread ? "*" : ""}${m.from}: ${m.subject}${m.isUnread ? "*" : ""} \u2014 ${m.date}`,
+        (m) =>
+          `${m.isUnread ? "*" : ""}${m.from}: ${m.subject}${m.isUnread ? "*" : ""} \u2014 ${m.date}`,
       );
       await respond({
         ...base,
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Gmail Inbox" } },
           { type: "section", text: { type: "mrkdwn", text: truncate(lines.join("\n"), 3000) } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.unreadCount} unread` }] },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${result.data.unreadCount} unread` }],
+          },
         ],
       });
       return;
@@ -279,7 +330,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "section", text: { type: "mrkdwn", text: `\u2705 Email sent to *${result.data.to}*: ${result.data.subject}` } },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `\u2705 Email sent to *${result.data.to}*: ${result.data.subject}`,
+            },
+          },
         ],
       });
       return;
@@ -290,9 +347,7 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
         : `\u2705 You're already registered, *${result.data.displayName ?? "friend"}*!`;
       await respond({
         ...base,
-        blocks: [
-          { type: "section", text: { type: "mrkdwn", text: msg } },
-        ],
+        blocks: [{ type: "section", text: { type: "mrkdwn", text: msg } }],
       });
       return;
     }
@@ -305,13 +360,22 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
         {
           type: "section",
           fields: [
-            { type: "mrkdwn", text: `*Daily:* $${d.spentUsd.toFixed(4)} / $${d.limitUsd.toFixed(2)} (${d.percentUsed?.toFixed(1) ?? "N/A"}%)` },
-            { type: "mrkdwn", text: `*Weekly:* $${w.spentUsd.toFixed(4)} / $${w.limitUsd.toFixed(2)} (${w.percentUsed?.toFixed(1) ?? "N/A"}%)` },
+            {
+              type: "mrkdwn",
+              text: `*Daily:* $${d.spentUsd.toFixed(4)} / $${d.limitUsd.toFixed(2)} (${d.percentUsed?.toFixed(1) ?? "N/A"}%)`,
+            },
+            {
+              type: "mrkdwn",
+              text: `*Weekly:* $${w.spentUsd.toFixed(4)} / $${w.limitUsd.toFixed(2)} (${w.percentUsed?.toFixed(1) ?? "N/A"}%)`,
+            },
           ],
         },
       ];
       if (result.data.suggestions.length > 0) {
-        blocks.push({ type: "section", text: { type: "mrkdwn", text: `*Suggestions*\n${result.data.suggestions.join("\n")}` } });
+        blocks.push({
+          type: "section",
+          text: { type: "mrkdwn", text: `*Suggestions*\n${result.data.suggestions.join("\n")}` },
+        });
       }
       await respond({ ...base, blocks });
       return;
@@ -324,7 +388,13 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "header", text: { type: "plain_text", text: `Errors (${result.data.totalErrors} in past ${result.data.hours}h)` } },
+          {
+            type: "header",
+            text: {
+              type: "plain_text",
+              text: `Errors (${result.data.totalErrors} in past ${result.data.hours}h)`,
+            },
+          },
           { type: "section", text: { type: "mrkdwn", text: errorLines.join("\n") } },
         ],
       });
@@ -335,9 +405,23 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
       await respond({
         ...base,
         blocks: [
-          { type: "header", text: { type: "plain_text", text: `Standup \u2014 ${result.data.date}` } },
-          { type: "section", text: { type: "mrkdwn", text: truncate(result.data.narrative, 3000) } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalEntries} entries \u00b7 $${result.data.costUsd.toFixed(4)}` }] },
+          {
+            type: "header",
+            text: { type: "plain_text", text: `Standup \u2014 ${result.data.date}` },
+          },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: truncate(result.data.narrative, 3000) },
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `${result.data.totalEntries} entries \u00b7 $${result.data.costUsd.toFixed(4)}`,
+              },
+            ],
+          },
         ],
       });
       return;
@@ -353,7 +437,10 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Follow-Ups" } },
           { type: "section", text: { type: "mrkdwn", text: fuLines.join("\n") } },
-          { type: "context", elements: [{ type: "mrkdwn", text: `${result.data.totalCount} total` }] },
+          {
+            type: "context",
+            elements: [{ type: "mrkdwn", text: `${result.data.totalCount} total` }],
+          },
         ],
       });
       return;
@@ -361,22 +448,39 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
 
     case "search": {
       const sections: string[] = [];
-      if (result.data.goals.length > 0) sections.push(`*Goals*\n${result.data.goals.map((g) => `\u2022 ${g.title} [${g.status}]`).join("\n")}`);
-      if (result.data.tasks.length > 0) sections.push(`*Tasks*\n${result.data.tasks.map((t) => `\u2022 ${t.title} [${t.status}]`).join("\n")}`);
-      if (result.data.conversations.length > 0) sections.push(`*Conversations*\n${result.data.conversations.map((c) => `\u2022 ${c.title ?? "Untitled"}`).join("\n")}`);
-      if (result.data.memories.length > 0) sections.push(`*Memories*\n${result.data.memories.map((m) => `\u2022 [${m.category}] ${m.key}: ${m.content}`).join("\n")}`);
+      if (result.data.goals.length > 0)
+        sections.push(
+          `*Goals*\n${result.data.goals.map((g) => `\u2022 ${g.title} [${g.status}]`).join("\n")}`,
+        );
+      if (result.data.tasks.length > 0)
+        sections.push(
+          `*Tasks*\n${result.data.tasks.map((t) => `\u2022 ${t.title} [${t.status}]`).join("\n")}`,
+        );
+      if (result.data.conversations.length > 0)
+        sections.push(
+          `*Conversations*\n${result.data.conversations.map((c) => `\u2022 ${c.title ?? "Untitled"}`).join("\n")}`,
+        );
+      if (result.data.memories.length > 0)
+        sections.push(
+          `*Memories*\n${result.data.memories.map((m) => `\u2022 [${m.category}] ${m.key}: ${m.content}`).join("\n")}`,
+        );
       await respond({
         ...base,
         blocks: [
           { type: "header", text: { type: "plain_text", text: "Search Results" } },
-          { type: "section", text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) } },
+          {
+            type: "section",
+            text: { type: "mrkdwn", text: truncate(sections.join("\n\n"), 3000) },
+          },
         ],
       });
       return;
     }
 
     case "analytics": {
-      const statusLines = Object.entries(result.data.byStatus).map(([s, c]) => `\u2022 ${s}: ${c}`).join("\n");
+      const statusLines = Object.entries(result.data.byStatus)
+        .map(([s, c]) => `\u2022 ${s}: ${c}`)
+        .join("\n");
       await respond({
         ...base,
         blocks: [
@@ -385,8 +489,14 @@ async function sendSlackResponse(respond: RespondFn, result: HandlerResult, ephe
             type: "section",
             fields: [
               { type: "mrkdwn", text: `*Total Goals:* ${result.data.totalGoals}` },
-              { type: "mrkdwn", text: `*Completion Rate:* ${result.data.completionRate.toFixed(1)}%` },
-              { type: "mrkdwn", text: `*Task Success:* ${result.data.taskSuccessRate.toFixed(1)}%` },
+              {
+                type: "mrkdwn",
+                text: `*Completion Rate:* ${result.data.completionRate.toFixed(1)}%`,
+              },
+              {
+                type: "mrkdwn",
+                text: `*Task Success:* ${result.data.taskSuccessRate.toFixed(1)}%`,
+              },
               { type: "mrkdwn", text: `*Total Tasks:* ${result.data.totalTasks}` },
             ],
           },
@@ -415,7 +525,10 @@ export function registerCommands(app: App): void {
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
     const remaining = checkCooldown(ctx.userId, "ask");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before using \`/ask\` again.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before using \`/ask\` again.`,
+      });
       return;
     }
 
@@ -484,7 +597,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "status");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleStatus(client));
@@ -494,7 +610,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "goals");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
@@ -505,7 +624,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "tasks");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleTasks(client));
@@ -515,7 +637,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "memory");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
@@ -526,7 +651,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "clear");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const ctx = makeContext(command.channel_id, command.user_id, command.user_name);
@@ -537,7 +665,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "execute");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before using \`/execute\` again.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""} before using \`/execute\` again.`,
+      });
       return;
     }
     const goalId = command.text.trim();
@@ -551,7 +682,15 @@ export function registerCommands(app: App): void {
       const now = Date.now();
       if (now - lastUpdate > 2000) {
         lastUpdate = now;
-        try { await respond({ response_type: "in_channel", text: truncate(text, 3000), replace_original: true }); } catch { /* non-fatal */ }
+        try {
+          await respond({
+            response_type: "in_channel",
+            text: truncate(text, 3000),
+            replace_original: true,
+          });
+        } catch {
+          /* non-fatal */
+        }
       }
     });
     await sendSlackResponse(respond, result);
@@ -561,7 +700,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "approve");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const approvalId = command.text.trim();
@@ -577,7 +719,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "approvals");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleListApprovals(client));
@@ -598,7 +743,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "schedule");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
 
@@ -613,7 +761,9 @@ export function registerCommands(app: App): void {
       // Cron has 5 space-separated fields, then the rest is the task
       const rest = parts.slice(1);
       if (rest.length < 6) {
-        await respond("Usage: `/schedule create <min> <hour> <day> <month> <weekday> <task description>`\nExample: `/schedule create 0 9 * * 1-5 Review and prioritize today's work`");
+        await respond(
+          "Usage: `/schedule create <min> <hour> <day> <month> <weekday> <task description>`\nExample: `/schedule create 0 9 * * 1-5 Review and prioritize today's work`",
+        );
         return;
       }
       const cronExpression = rest.slice(0, 5).join(" ");
@@ -631,7 +781,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "gmail-inbox");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleGmailInbox(client));
@@ -641,14 +794,19 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "gmail-send");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     // Parse: /gmail-send <to> <subject> | <body>
     const text = command.text.trim();
     const parts = text.split("|");
     if (parts.length < 2) {
-      await respond("Usage: `/gmail-send <to> <subject> | <body>`\nExample: `/gmail-send bob@example.com Meeting tomorrow | Let's meet at 10am`");
+      await respond(
+        "Usage: `/gmail-send <to> <subject> | <body>`\nExample: `/gmail-send bob@example.com Meeting tomorrow | Let's meet at 10am`",
+      );
       return;
     }
     const headerParts = parts[0].trim().split(/\s+/);
@@ -666,7 +824,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "budget");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleBudget(client));
@@ -676,7 +837,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "errors");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const hours = parseInt(command.text.trim(), 10) || 24;
@@ -687,7 +851,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "standup");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const date = command.text.trim() || undefined;
@@ -698,7 +865,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "followups");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const status = command.text.trim() || undefined;
@@ -709,7 +879,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "search");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     const query = command.text.trim();
@@ -724,7 +897,10 @@ export function registerCommands(app: App): void {
     await ack();
     const remaining = checkCooldown(command.user_id, "analytics");
     if (remaining !== null) {
-      await respond({ response_type: "ephemeral", text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.` });
+      await respond({
+        response_type: "ephemeral",
+        text: `Please wait ${remaining} second${remaining !== 1 ? "s" : ""}.`,
+      });
       return;
     }
     await sendSlackResponse(respond, await handleAnalytics(client));
@@ -780,17 +956,30 @@ export function registerCommands(app: App): void {
       const now = Date.now();
       if (replyTs && now - lastEditTime >= 1500) {
         lastEditTime = now;
-        try { await slackClient.chat.update({ channel: event.channel, ts: replyTs, text: truncate(chunk, 3000) }); } catch { /* non-fatal */ }
+        try {
+          await slackClient.chat.update({
+            channel: event.channel,
+            ts: replyTs,
+            text: truncate(chunk, 3000),
+          });
+        } catch {
+          /* non-fatal */
+        }
       }
     });
 
     if (replyTs && (result.type === "ask_streaming" || result.type === "ask")) {
-      await slackClient.chat.update({ channel: event.channel, ts: replyTs, text: truncate(result.data.response, 3000) });
+      await slackClient.chat.update({
+        channel: event.channel,
+        ts: replyTs,
+        text: truncate(result.data.response, 3000),
+      });
     }
   });
 
   // ── Greeting detection for Jarvis-like responses ──
-  const GREETING_PATTERN = /^(morning|good morning|hey jarvis|jarvis|yo|hi|hello|evening|good evening|what's up|sup|howdy)/i;
+  const GREETING_PATTERN =
+    /^(morning|good morning|hey jarvis|jarvis|yo|hi|hello|evening|good evening|what's up|sup|howdy)/i;
 
   // ── Thread continuity: track latest thread per DM channel (30-minute window) ──
   const dmThreadMap = new Map<string, { threadTs: string; lastActivity: number }>();
@@ -844,12 +1033,20 @@ export function registerCommands(app: App): void {
       const now = Date.now();
       if (replyTs && now - lastEditTime >= 1500) {
         lastEditTime = now;
-        try { await slackClient.chat.update({ channel, ts: replyTs, text: truncate(chunk, 3000) }); } catch { /* non-fatal */ }
+        try {
+          await slackClient.chat.update({ channel, ts: replyTs, text: truncate(chunk, 3000) });
+        } catch {
+          /* non-fatal */
+        }
       }
     });
 
     if (replyTs && (result.type === "ask_streaming" || result.type === "ask")) {
-      await slackClient.chat.update({ channel, ts: replyTs, text: truncate(result.data.response, 3000) });
+      await slackClient.chat.update({
+        channel,
+        ts: replyTs,
+        text: truncate(result.data.response, 3000),
+      });
     }
   });
 }

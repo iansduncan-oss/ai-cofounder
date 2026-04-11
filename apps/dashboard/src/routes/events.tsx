@@ -20,11 +20,14 @@ export function EventsPage() {
   const [processedFilter, setProcessedFilter] = useState<string>("");
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
-  const filters = useMemo(() => ({
-    source: sourceFilter || undefined,
-    type: typeFilter || undefined,
-    processed: processedFilter === "" ? undefined : processedFilter === "true",
-  }), [sourceFilter, typeFilter, processedFilter]);
+  const filters = useMemo(
+    () => ({
+      source: sourceFilter || undefined,
+      type: typeFilter || undefined,
+      processed: processedFilter === "" ? undefined : processedFilter === "true",
+    }),
+    [sourceFilter, typeFilter, processedFilter],
+  );
 
   const { data, isLoading, error, refetch } = useEvents(filters);
   const reprocess = useReprocessEvent();
@@ -76,17 +79,17 @@ export function EventsPage() {
         >
           <option value="">All Sources</option>
           {sources.map((s) => (
-            <option key={s} value={s}>{s}</option>
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </Select>
-        <Select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="w-40"
-        >
+        <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="w-40">
           <option value="">All Types</option>
           {types.map((t) => (
-            <option key={t} value={t}>{t}</option>
+            <option key={t} value={t}>
+              {t}
+            </option>
           ))}
         </Select>
         <Select
@@ -133,8 +136,12 @@ export function EventsPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <Webhook className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <Badge variant="secondary" className="shrink-0">{event.source}</Badge>
-                    <Badge variant="outline" className="shrink-0">{event.type}</Badge>
+                    <Badge variant="secondary" className="shrink-0">
+                      {event.source}
+                    </Badge>
+                    <Badge variant="outline" className="shrink-0">
+                      {event.type}
+                    </Badge>
                     <Badge variant={event.processed ? "success" : "warning"} className="shrink-0">
                       {event.processed ? "Processed" : "Pending"}
                     </Badge>

@@ -356,7 +356,9 @@
 
     // Stop mic stream
     if (mediaStream) {
-      mediaStream.getTracks().forEach(function (t) { t.stop(); });
+      mediaStream.getTracks().forEach(function (t) {
+        t.stop();
+      });
       mediaStream = null;
     }
 
@@ -406,7 +408,9 @@
       });
 
       if (!res.ok) {
-        var err = await res.json().catch(function () { return {}; });
+        var err = await res.json().catch(function () {
+          return {};
+        });
         throw new Error(err.message || "Transcription failed");
       }
 
@@ -583,7 +587,7 @@
                   if (model) parts.push(model);
                   if (event.data.usage) {
                     parts.push(
-                      event.data.usage.inputTokens + " > " + event.data.usage.outputTokens + " tok"
+                      event.data.usage.inputTokens + " > " + event.data.usage.outputTokens + " tok",
                     );
                   }
                   providerInfo.textContent = parts.join(" · ");
@@ -609,8 +613,13 @@
     } catch (err) {
       console.error("API error:", err);
       showError("Connection failed");
-      addMessage("agent", "I'm afraid I've lost connection to the server, sir. Please verify it's running.");
-      setTimeout(function () { setState("idle"); }, 3000);
+      addMessage(
+        "agent",
+        "I'm afraid I've lost connection to the server, sir. Please verify it's running.",
+      );
+      setTimeout(function () {
+        setState("idle");
+      }, 3000);
     }
   }
 
@@ -661,7 +670,9 @@
         hideTranscript(agentTranscript);
         setState("idle");
         if (autoListenEnabled) {
-          setTimeout(function () { startListening(); }, 300);
+          setTimeout(function () {
+            startListening();
+          }, 300);
         }
       };
 
@@ -686,7 +697,9 @@
 
     var cleanText = text
       .replace(/```[\s\S]*?```/g, " (code block) ")
-      .replace(/`[^`]+`/g, function (m) { return m.slice(1, -1); })
+      .replace(/`[^`]+`/g, function (m) {
+        return m.slice(1, -1);
+      })
       .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
       .replace(/^#{1,6}\s+/gm, "")
       .replace(/[*_~]+/g, "")
@@ -723,7 +736,9 @@
       hideTranscript(agentTranscript);
       setState("idle");
       if (autoListenEnabled) {
-        setTimeout(function () { startListening(); }, 300);
+        setTimeout(function () {
+          startListening();
+        }, 300);
       }
     };
 
@@ -736,7 +751,11 @@
 
   function stopSpeaking() {
     if (playbackSource) {
-      try { playbackSource.stop(); } catch (e) { /* already stopped */ }
+      try {
+        playbackSource.stop();
+      } catch (e) {
+        /* already stopped */
+      }
       playbackSource = null;
       playbackAnalyser = null;
     }
@@ -768,7 +787,11 @@
     statusText.textContent = msg;
     statusText.className = "error";
     setTimeout(function () {
-      if (currentState !== "listening" && currentState !== "processing" && currentState !== "speaking") {
+      if (
+        currentState !== "listening" &&
+        currentState !== "processing" &&
+        currentState !== "speaking"
+      ) {
         setState("idle");
       }
     }, 3000);
@@ -825,7 +848,9 @@
           mediaRecorder.stop();
         }
         if (mediaStream) {
-          mediaStream.getTracks().forEach(function (t) { t.stop(); });
+          mediaStream.getTracks().forEach(function (t) {
+            t.stop();
+          });
           mediaStream = null;
         }
         analyserNode = null;
@@ -898,7 +923,8 @@
   // Play greeting after capabilities are checked
   setTimeout(async function () {
     var hour = new Date().getHours();
-    var greeting = hour < 12 ? "Good morning, sir." : hour < 18 ? "Good afternoon, sir." : "Good evening, sir.";
+    var greeting =
+      hour < 12 ? "Good morning, sir." : hour < 18 ? "Good afternoon, sir." : "Good evening, sir.";
     greeting += " How may I assist you?";
 
     // Try server TTS first, then browser fallback
@@ -920,7 +946,9 @@
           addMessage("agent", greeting);
           return;
         }
-      } catch (e) { /* fall through to browser */ }
+      } catch (e) {
+        /* fall through to browser */
+      }
     }
     // Browser fallback
     if (window.speechSynthesis) {
@@ -928,7 +956,9 @@
       utterance.rate = 1.0;
       utterance.pitch = 0.9;
       var voices = window.speechSynthesis.getVoices();
-      var british = voices.find(function (v) { return v.name.includes("Daniel") || v.name.includes("Google UK English Male"); });
+      var british = voices.find(function (v) {
+        return v.name.includes("Daniel") || v.name.includes("Google UK English Male");
+      });
       if (british) utterance.voice = british;
       window.speechSynthesis.speak(utterance);
       addMessage("agent", greeting);

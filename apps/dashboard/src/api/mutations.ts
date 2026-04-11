@@ -2,7 +2,20 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiClient } from "./client";
 import { queryKeys } from "@/lib/query-keys";
-import type { GoalStatus, UpsertPersonaInput, SubmitPipelineInput, AutonomyTier, CreateProjectInput, SendEmailInput, CreateCalendarEventInput, UpdateCalendarEventInput, CreateFollowUpInput, UpdateFollowUpInput } from "@ai-cofounder/api-client";
+import type {
+  GoalStatus,
+  UpsertPersonaInput,
+  SubmitPipelineInput,
+  AutonomyTier,
+  CreateProjectInput,
+  SendEmailInput,
+  CreateCalendarEventInput,
+  UpdateCalendarEventInput,
+  CreateFollowUpInput,
+  UpdateFollowUpInput,
+  UpsertProductivityInput,
+  InsightStatus,
+} from "@ai-cofounder/api-client";
 
 export function useResolveApproval() {
   const queryClient = useQueryClient();
@@ -21,11 +34,7 @@ export function useResolveApproval() {
     }) => apiClient.resolveApproval(id, { status, decision, decidedBy }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all });
-      toast.success(
-        variables.status === "approved"
-          ? "Approval granted"
-          : "Request rejected",
-      );
+      toast.success(variables.status === "approved" ? "Approval granted" : "Request rejected");
     },
     onError: (err) => {
       toast.error(`Failed to resolve approval: ${err.message}`);
@@ -37,13 +46,8 @@ export function useExecuteGoal() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      goalId,
-      userId,
-    }: {
-      goalId: string;
-      userId?: string;
-    }) => apiClient.executeGoal(goalId, { userId }),
+    mutationFn: ({ goalId, userId }: { goalId: string; userId?: string }) =>
+      apiClient.executeGoal(goalId, { userId }),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.goals.detail(variables.goalId),
@@ -60,13 +64,8 @@ export function useUpdateGoalStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      id,
-      status,
-    }: {
-      id: string;
-      status: GoalStatus;
-    }) => apiClient.updateGoalStatus(id, status),
+    mutationFn: ({ id, status }: { id: string; status: GoalStatus }) =>
+      apiClient.updateGoalStatus(id, status),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.goals.detail(variables.id),
@@ -115,11 +114,8 @@ export function useRejectGoal() {
 
 export function useRunAgent() {
   return useMutation({
-    mutationFn: (data: {
-      message: string;
-      conversationId?: string;
-      userId?: string;
-    }) => apiClient.runAgent(data),
+    mutationFn: (data: { message: string; conversationId?: string; userId?: string }) =>
+      apiClient.runAgent(data),
     onError: (err) => {
       toast.error(`Agent error: ${err.message}`);
     },
@@ -250,13 +246,8 @@ export function useSubmitGoalPipeline() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({
-      goalId,
-      context,
-    }: {
-      goalId: string;
-      context?: Record<string, unknown>;
-    }) => apiClient.submitGoalPipeline(goalId, context),
+    mutationFn: ({ goalId, context }: { goalId: string; context?: Record<string, unknown> }) =>
+      apiClient.submitGoalPipeline(goalId, context),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
       toast.success(`Pipeline submitted — Job ${data.jobId.slice(0, 8)}`);
@@ -528,16 +519,24 @@ export function useDeleteProject() {
 export function useSendGmailMessage() {
   return useMutation({
     mutationFn: (input: SendEmailInput) => apiClient.sendGmailMessage(input),
-    onSuccess: () => { toast.success("Email sent"); },
-    onError: (err) => { toast.error(`Failed to send email: ${err.message}`); },
+    onSuccess: () => {
+      toast.success("Email sent");
+    },
+    onError: (err) => {
+      toast.error(`Failed to send email: ${err.message}`);
+    },
   });
 }
 
 export function useCreateGmailDraft() {
   return useMutation({
     mutationFn: (input: SendEmailInput) => apiClient.createGmailDraft(input),
-    onSuccess: () => { toast.success("Draft saved"); },
-    onError: (err) => { toast.error(`Failed to create draft: ${err.message}`); },
+    onSuccess: () => {
+      toast.success("Draft saved");
+    },
+    onError: (err) => {
+      toast.error(`Failed to create draft: ${err.message}`);
+    },
   });
 }
 
@@ -559,7 +558,9 @@ export function useCreateCalendarEvent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
       toast.success("Event created");
     },
-    onError: (err) => { toast.error(`Failed to create event: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to create event: ${err.message}`);
+    },
   });
 }
 
@@ -572,7 +573,9 @@ export function useUpdateCalendarEvent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
       toast.success("Event updated");
     },
-    onError: (err) => { toast.error(`Failed to update event: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to update event: ${err.message}`);
+    },
   });
 }
 
@@ -584,20 +587,29 @@ export function useDeleteCalendarEvent() {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
       toast.success("Event deleted");
     },
-    onError: (err) => { toast.error(`Failed to delete event: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to delete event: ${err.message}`);
+    },
   });
 }
 
 export function useRespondToCalendarEvent() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ eventId, responseStatus }: { eventId: string; responseStatus: "accepted" | "declined" | "tentative" }) =>
-      apiClient.respondToCalendarEvent(eventId, responseStatus),
+    mutationFn: ({
+      eventId,
+      responseStatus,
+    }: {
+      eventId: string;
+      responseStatus: "accepted" | "declined" | "tentative";
+    }) => apiClient.respondToCalendarEvent(eventId, responseStatus),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.calendar.all });
       toast.success("RSVP sent");
     },
-    onError: (err) => { toast.error(`Failed to RSVP: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to RSVP: ${err.message}`);
+    },
   });
 }
 
@@ -611,7 +623,9 @@ export function useCreateFollowUp() {
       queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
       toast.success("Follow-up created");
     },
-    onError: (err) => { toast.error(`Failed to create follow-up: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to create follow-up: ${err.message}`);
+    },
   });
 }
 
@@ -624,7 +638,9 @@ export function useUpdateFollowUp() {
       queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
       toast.success("Follow-up updated");
     },
-    onError: (err) => { toast.error(`Failed to update follow-up: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to update follow-up: ${err.message}`);
+    },
   });
 }
 
@@ -636,20 +652,31 @@ export function useDeleteFollowUp() {
       queryClient.invalidateQueries({ queryKey: queryKeys.followUps.all });
       toast.success("Follow-up deleted");
     },
-    onError: (err) => { toast.error(`Failed to delete follow-up: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to delete follow-up: ${err.message}`);
+    },
   });
 }
 
 export function useTriggerPipelineTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, goalId, context }: { name: string; goalId?: string; context?: Record<string, unknown> }) =>
-      apiClient.triggerPipelineTemplate(name, { goalId, context }),
+    mutationFn: ({
+      name,
+      goalId,
+      context,
+    }: {
+      name: string;
+      goalId?: string;
+      context?: Record<string, unknown>;
+    }) => apiClient.triggerPipelineTemplate(name, { goalId, context }),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pipelines.all });
       toast.success(`Pipeline triggered: ${data.template}`);
     },
-    onError: (err) => { toast.error(`Failed to trigger template: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to trigger template: ${err.message}`);
+    },
   });
 }
 
@@ -658,13 +685,18 @@ export function useTriggerPipelineTemplate() {
 export function useCreatePipelineTemplate() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; description?: string; stages: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }> }) =>
-      apiClient.createPipelineTemplate(data),
+    mutationFn: (data: {
+      name: string;
+      description?: string;
+      stages: Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>;
+    }) => apiClient.createPipelineTemplate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.pipelineTemplates.all });
       toast.success("Template created");
     },
-    onError: (err) => { toast.error(`Failed to create template: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to create template: ${err.message}`);
+    },
   });
 }
 
@@ -676,7 +708,9 @@ export function useDeletePipelineTemplate() {
       queryClient.invalidateQueries({ queryKey: queryKeys.pipelineTemplates.all });
       toast.success("Template deleted");
     },
-    onError: (err) => { toast.error(`Failed to delete template: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to delete template: ${err.message}`);
+    },
   });
 }
 
@@ -691,7 +725,9 @@ export function useCreateSchedule() {
       queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
       toast.success("Schedule created");
     },
-    onError: (err) => { toast.error(`Failed to create schedule: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to create schedule: ${err.message}`);
+    },
   });
 }
 
@@ -704,7 +740,9 @@ export function useToggleSchedule() {
       queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
       toast.success(enabled ? "Schedule enabled" : "Schedule paused");
     },
-    onError: (err) => { toast.error(`Failed to toggle schedule: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to toggle schedule: ${err.message}`);
+    },
   });
 }
 
@@ -716,7 +754,9 @@ export function useDeleteSchedule() {
       queryClient.invalidateQueries({ queryKey: queryKeys.schedules.all });
       toast.success("Schedule deleted");
     },
-    onError: (err) => { toast.error(`Failed to delete schedule: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to delete schedule: ${err.message}`);
+    },
   });
 }
 
@@ -731,7 +771,9 @@ export function useRagIngest() {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all });
       toast.success("Ingestion started");
     },
-    onError: (err) => { toast.error(`Failed to start ingestion: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to start ingestion: ${err.message}`);
+    },
   });
 }
 
@@ -744,6 +786,98 @@ export function useRagDeleteSource() {
       queryClient.invalidateQueries({ queryKey: queryKeys.knowledge.all });
       toast.success("Source deleted");
     },
-    onError: (err) => { toast.error(`Failed to delete source: ${err.message}`); },
+    onError: (err) => {
+      toast.error(`Failed to delete source: ${err.message}`);
+    },
+  });
+}
+
+/* ── Productivity ── */
+
+export function useUpsertProductivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpsertProductivityInput) => apiClient.upsertProductivity(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+    },
+    onError: (err) => {
+      toast.error(`Failed to save: ${err.message}`);
+    },
+  });
+}
+
+export function useAutoPlanProductivity() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { force?: boolean; merge?: boolean }) =>
+      apiClient.autoGenerateProductivityPlan(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+      if (result.skipped) {
+        toast.info(result.reason ?? "Plan already exists");
+      } else {
+        toast.success(`Generated ${result.plannedItems.length} task(s)`);
+      }
+    },
+    onError: (err) => {
+      toast.error(`Failed to auto-plan: ${err.message}`);
+    },
+  });
+}
+
+export function useSyncProductivityPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { lookbackMinutes?: number; topUp?: boolean }) =>
+      apiClient.syncProductivityPlan(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.productivity.all });
+      if (result.skipped) {
+        toast.info(result.reason ?? "Nothing to sync");
+      } else if (result.autoCompleted.length === 0 && result.itemsAdded.length === 0) {
+        toast.info("Plan is already in sync");
+      } else {
+        const parts: string[] = [];
+        if (result.autoCompleted.length > 0) parts.push(`${result.autoCompleted.length} completed`);
+        if (result.itemsAdded.length > 0) parts.push(`${result.itemsAdded.length} added`);
+        toast.success(`Synced: ${parts.join(", ")}`);
+      }
+    },
+    onError: (err) => {
+      toast.error(`Sync failed: ${err.message}`);
+    },
+  });
+}
+
+/* ── Codebase ── */
+
+export function useScanCodebase() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (opts?: { synthesize?: boolean }) => apiClient.scanCodebase(opts),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codebase.all });
+      toast.success(
+        `Scan complete: ${result.insightsCreated} new, ${result.insightsRefreshed} refreshed`,
+      );
+    },
+    onError: (err) => {
+      toast.error(`Scan failed: ${err.message}`);
+    },
+  });
+}
+
+export function useUpdateInsightStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: InsightStatus }) =>
+      apiClient.updateCodebaseInsightStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.codebase.all });
+    },
+    onError: (err) => {
+      toast.error(`Failed to update: ${err.message}`);
+    },
   });
 }

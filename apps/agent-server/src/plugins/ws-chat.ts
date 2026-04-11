@@ -353,7 +353,9 @@ export const wsChatPlugin = fp(async (app) => {
 
       // Fire-and-forget title generation for new conversations
       if (result.conversationId && isNewConversation) {
-        generateConversationTitle(app, result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation title generation failed"));
+        generateConversationTitle(app, result.conversationId, message, result.response).catch(
+          (err) => logger.warn({ err }, "conversation title generation failed"),
+        );
       }
 
       // Record metrics
@@ -382,18 +384,22 @@ export const wsChatPlugin = fp(async (app) => {
       // Fire-and-forget conversation ingestion
       const redisEnabled = !!optionalEnv("REDIS_URL", "");
       if (redisEnabled && app.embeddingService && result.conversationId) {
-        conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation ingestion failed"));
+        conversationIngestion
+          .ingestAfterResponse(result.conversationId, message, result.response)
+          .catch((err) => logger.warn({ err }, "conversation ingestion failed"));
       }
 
       // Fire-and-forget decision extraction
       if (redisEnabled && dbUserId) {
         const { getReflectionQueue } = await import("@ai-cofounder/queue");
-        getReflectionQueue().add("extract-decision", {
-          action: "extract_decision",
-          response: result.response,
-          userId: dbUserId,
-          conversationId: result.conversationId,
-        }).catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
+        getReflectionQueue()
+          .add("extract-decision", {
+            action: "extract_decision",
+            response: result.response,
+            userId: dbUserId,
+            conversationId: result.conversationId,
+          })
+          .catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
       }
 
       // Generate and send suggestions

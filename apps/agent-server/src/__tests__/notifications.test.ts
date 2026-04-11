@@ -68,7 +68,8 @@ describe("NotificationService", () => {
       mockOptionalEnv.mockImplementation((name: string, def: string) => {
         if (name === "SLACK_BOT_TOKEN") return "xoxb-test";
         if (name === "SLACK_NOTIFICATION_CHANNEL") return "C12345";
-        if (name === "DISCORD_NOTIFICATION_WEBHOOK_URL") return "https://discord.com/api/webhooks/test";
+        if (name === "DISCORD_NOTIFICATION_WEBHOOK_URL")
+          return "https://discord.com/api/webhooks/test";
         return def;
       });
 
@@ -101,9 +102,7 @@ describe("NotificationService", () => {
         }),
       );
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.channel).toBe("C12345");
       expect(body.blocks).toEqual(
         expect.arrayContaining([
@@ -128,9 +127,7 @@ describe("NotificationService", () => {
         webhookUrl,
         expect.objectContaining({ method: "POST" }),
       );
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.embeds[0].title).toContain("approval is required");
       expect(body.embeds[0].color).toBe(0xfee75c);
     });
@@ -146,9 +143,7 @@ describe("NotificationService", () => {
     });
 
     it("handles fetch failure gracefully", async () => {
-      (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error("Network error"),
-      );
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Network error"));
       const service = new NotificationService({
         slackToken: "xoxb-test",
         slackChannel: "C12345",
@@ -199,9 +194,7 @@ describe("NotificationService", () => {
       });
       await service.notifyGoalCompleted(goalCompleted);
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.text).toContain("Objective Complete");
       expect(body.blocks[0].text.text).toContain("Objective Complete");
       expect(body.blocks[1].text.text).toContain("3/3 tasks completed");
@@ -217,9 +210,7 @@ describe("NotificationService", () => {
         completedTasks: 1,
       });
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.embeds[0].title).toContain("Objective Failed");
       expect(body.embeds[0].color).toBe(0xed4245);
       expect(body.embeds[0].description).toContain("1/3 tasks completed");
@@ -232,9 +223,7 @@ describe("NotificationService", () => {
       });
       await service.notifyGoalCompleted({ ...goalCompleted, durationMs: undefined });
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.blocks[1].text.text).not.toContain("in ");
     });
   });
@@ -262,9 +251,7 @@ describe("NotificationService", () => {
       });
       await service.notifyTaskFailed(taskFailed);
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.text).toContain("Task Failed");
       expect(body.blocks[1].text.text).toContain("Generate login component");
       expect(body.blocks[1].text.text).toContain("coder");
@@ -276,9 +263,7 @@ describe("NotificationService", () => {
       const service = new NotificationService({ discordWebhookUrl: webhookUrl });
       await service.notifyTaskFailed(taskFailed);
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.embeds[0].title).toContain("Task failed");
       expect(body.embeds[0].color).toBe(0xe67e22);
       expect(body.embeds[0].description).toContain("coder");
@@ -315,9 +300,7 @@ describe("NotificationService", () => {
         status: "completed",
       });
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.text).toContain("Research phase");
       expect(body.text).toContain("1/3");
     });
@@ -335,9 +318,7 @@ describe("NotificationService", () => {
         status: "completed",
       });
 
-      const body = JSON.parse(
-        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body,
-      );
+      const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
       expect(body.embeds[0].color).toBe(0x57f287); // green for completed
     });
   });
@@ -390,7 +371,10 @@ describe("NotificationService", () => {
     it("prefers DM path when slackDmUserId is configured", async () => {
       // conversations.open returns a channel id, then chat.postMessage is called
       (globalThis.fetch as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true, channel: { id: "D999" } }) })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ ok: true, channel: { id: "D999" } }),
+        })
         .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
 
       const service = new NotificationService({

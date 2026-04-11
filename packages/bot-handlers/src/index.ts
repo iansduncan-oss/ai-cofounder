@@ -23,6 +23,12 @@ export {
   handleFollowUps,
   handleSearch,
   handleAnalytics,
+  handlePlan,
+  handleAutoPlan,
+  handleAudit,
+  handleReflect,
+  handleStreak,
+  handleNext,
   truncate,
 } from "./handlers.js";
 

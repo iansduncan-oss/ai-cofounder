@@ -29,15 +29,24 @@ const simpleRequest: Omit<LlmCompletionRequest, "model"> = {
   messages: [{ role: "user", content: "hello" }],
 };
 
-function makeRoutes(entries: Array<{ provider: string; model: string }>, task: TaskCategory = "simple") {
+function makeRoutes(
+  entries: Array<{ provider: string; model: string }>,
+  task: TaskCategory = "simple",
+) {
   const base = {
-    planning: [], conversation: [], simple: [], research: [], code: [],
+    planning: [],
+    conversation: [],
+    simple: [],
+    research: [],
+    code: [],
   };
   return { ...base, [task]: entries };
 }
 
 function registryWithProvider(provider: LlmProvider, task: TaskCategory = "simple"): LlmRegistry {
-  const registry = new LlmRegistry(makeRoutes([{ provider: provider.name, model: `${provider.name}-model` }], task));
+  const registry = new LlmRegistry(
+    makeRoutes([{ provider: provider.name, model: `${provider.name}-model` }], task),
+  );
   registry.register(provider);
   return registry;
 }
@@ -454,9 +463,7 @@ describe("LLM Provider Error Handling", () => {
 
     it("throws on unresolvable task category with no routes", async () => {
       const registry = new LlmRegistry(makeRoutes([], "simple"));
-      await expect(
-        registry.complete("planning" as TaskCategory, simpleRequest),
-      ).rejects.toThrow();
+      await expect(registry.complete("planning" as TaskCategory, simpleRequest)).rejects.toThrow();
     });
   });
 });

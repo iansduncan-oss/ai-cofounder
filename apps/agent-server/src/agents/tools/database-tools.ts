@@ -30,7 +30,7 @@ export const QUERY_DATABASE_TOOL: LlmTool = {
  */
 function stripLeadingComments(s: string): string {
   let result = s;
-   
+
   while (true) {
     result = result.trimStart();
     if (result.startsWith("--")) {
@@ -99,7 +99,9 @@ export async function executeQueryDatabase(
 
   try {
     const rows = await db.execute(sql.raw(queryText));
-    const resultArray = Array.isArray(rows) ? rows : (rows as unknown as { rows: unknown[] }).rows ?? [];
+    const resultArray = Array.isArray(rows)
+      ? rows
+      : ((rows as unknown as { rows: unknown[] }).rows ?? []);
     const sliced = resultArray.slice(0, MAX_ROWS) as Record<string, unknown>[];
     return {
       rows: sliced,

@@ -22,16 +22,11 @@ const mockListReflections = vi.fn().mockResolvedValue({ data: [], total: 0 });
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
-  getRecentSessionSummaries: (...args: unknown[]) =>
-    mockGetRecentSessionSummaries(...args),
-  getLastUserMessageTimestamp: (...args: unknown[]) =>
-    mockGetLastUserMessageTimestamp(...args),
-  getRecentDecisionMemories: (...args: unknown[]) =>
-    mockGetRecentDecisionMemories(...args),
-  listRecentlyCompletedGoals: (...args: unknown[]) =>
-    mockListRecentlyCompletedGoals(...args),
-  listReflections: (...args: unknown[]) =>
-    mockListReflections(...args),
+  getRecentSessionSummaries: (...args: unknown[]) => mockGetRecentSessionSummaries(...args),
+  getLastUserMessageTimestamp: (...args: unknown[]) => mockGetLastUserMessageTimestamp(...args),
+  getRecentDecisionMemories: (...args: unknown[]) => mockGetRecentDecisionMemories(...args),
+  listRecentlyCompletedGoals: (...args: unknown[]) => mockListRecentlyCompletedGoals(...args),
+  listReflections: (...args: unknown[]) => mockListReflections(...args),
 }));
 
 // 3. Mock @ai-cofounder/llm
@@ -68,9 +63,8 @@ vi.mock("@ai-cofounder/queue", () => ({
 }));
 
 describe("session context", () => {
-   
   let SessionContextService: any;
-   
+
   const mockDb = {} as any;
 
   beforeEach(async () => {
@@ -161,7 +155,9 @@ describe("session context", () => {
     // This simulates what orchestrator.run() does: sessionBlock + "\n\n" + existingMemoryContext
     const existingMemoryContext = "General knowledge:\n- [projects] main: Some project detail";
     const combined = contextBlock! + "\n\n" + existingMemoryContext;
-    expect(combined.indexOf("## Recent Sessions")).toBeLessThan(combined.indexOf("General knowledge:"));
+    expect(combined.indexOf("## Recent Sessions")).toBeLessThan(
+      combined.indexOf("General knowledge:"),
+    );
     expect(combined.indexOf("## Recent Sessions")).toBe(0); // Session context is prepended first
   });
 
@@ -215,7 +211,12 @@ describe("session context", () => {
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
       mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
       mockGetRecentDecisionMemories.mockResolvedValueOnce([
-        { id: "d-1", key: "Use PostgreSQL", content: "Chose PostgreSQL for relational data", createdAt: new Date() },
+        {
+          id: "d-1",
+          key: "Use PostgreSQL",
+          content: "Chose PostgreSQL for relational data",
+          createdAt: new Date(),
+        },
       ]);
 
       const service = new SessionContextService(mockDb);
@@ -277,7 +278,10 @@ describe("session context", () => {
       const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
       mockGetLastUserMessageTimestamp.mockResolvedValueOnce(sixHoursAgo);
       const manyDecisions = Array.from({ length: 8 }, (_, i) => ({
-        id: `d-${i}`, key: `Decision ${i}`, content: `Content ${i}`, createdAt: new Date(),
+        id: `d-${i}`,
+        key: `Decision ${i}`,
+        content: `Content ${i}`,
+        createdAt: new Date(),
       }));
       mockGetRecentDecisionMemories.mockResolvedValueOnce(manyDecisions);
 

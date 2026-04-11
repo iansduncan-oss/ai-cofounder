@@ -67,6 +67,7 @@ docker compose -f infra/authentik/docker-compose.yml logs -f authentik-server
 ```
 
 First boot will:
+
 1. Start Postgres + Redis.
 2. Run Authentik DB migrations.
 3. Apply the blueprint in `./blueprints/` (creates groups, providers, apps,
@@ -153,12 +154,13 @@ login" — you're not locked out.
    user.
 
 **Validation checklist:**
+
 - [ ] Visiting grafana.aviontechs.com in a fresh incognito window bounces to
       auth.aviontechs.com.
 - [ ] After login, you land back on Grafana with your Authentik username.
 - [ ] Logging out of Authentik kicks you out of Grafana within 5 minutes.
 - [ ] `/api/health` on Grafana still works without auth (add a `location
-      = /api/health { auth_request off; proxy_pass http://grafana:3000; }`
+    = /api/health { auth_request off; proxy_pass http://grafana:3000; }`
       block before the catch-all — required for the internal healthcheck).
 
 If anything misbehaves, **immediately revert the NPM Advanced config** and
@@ -170,12 +172,12 @@ Grafana falls back to its built-in login.
 
 Repeat step 4 for each of:
 
-| App | Proxy Host | Recommended order |
-|---|---|---|
-| Uptime Kuma | `status.aviontechs.com` | 1st — low-stakes read-only |
-| n8n | `n8n.aviontechs.com` | 2nd — disable n8n built-in basic auth after cutover |
-| NPM admin UI | `npm.aviontechs.com` | 3rd — **do this last**, and only if you have an SSH escape hatch |
-| Dashboard (OIDC, not forward-auth) | `dashboard.aviontechs.com` | Separate flow — see step 6 |
+| App                                | Proxy Host                 | Recommended order                                                |
+| ---------------------------------- | -------------------------- | ---------------------------------------------------------------- |
+| Uptime Kuma                        | `status.aviontechs.com`    | 1st — low-stakes read-only                                       |
+| n8n                                | `n8n.aviontechs.com`       | 2nd — disable n8n built-in basic auth after cutover              |
+| NPM admin UI                       | `npm.aviontechs.com`       | 3rd — **do this last**, and only if you have an SSH escape hatch |
+| Dashboard (OIDC, not forward-auth) | `dashboard.aviontechs.com` | Separate flow — see step 6                                       |
 
 For each, the blueprint has already created the Application entry. You just
 need to paste the NPM Advanced block (swap `grafana:3000` → correct upstream).

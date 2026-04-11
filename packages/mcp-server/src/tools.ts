@@ -44,13 +44,18 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const result = await client.runAgent({ message, conversationId, userId });
         return {
-          content: [{
-            type: "text" as const,
-            text: `**${result.agentRole}** (${result.model}):\n\n${result.response}\n\nConversation: ${result.conversationId}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `**${result.agentRole}** (${result.model}):\n\n${result.response}\n\nConversation: ${result.conversationId}`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -64,7 +69,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getDashboardSummary();
         return { content: [{ type: "text" as const, text: formatDashboard(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -78,7 +86,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getMonitoringStatus();
         return { content: [{ type: "text" as const, text: formatMonitoring(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -92,7 +103,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getQueueStatus();
         return { content: [{ type: "text" as const, text: formatQueues(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -109,7 +123,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listGoals(conversationId, { limit: limit ?? 20 });
         return { content: [{ type: "text" as const, text: formatGoals(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -127,13 +144,18 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const goal = await client.createGoal({ conversationId, title, description, priority });
         return {
-          content: [{
-            type: "text" as const,
-            text: `Goal created: **${goal.title}** [${goal.status}/${goal.priority}] (${goal.id})`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Goal created: **${goal.title}** [${goal.status}/${goal.priority}] (${goal.id})`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -149,13 +171,18 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const result = await client.executeGoal(goalId, { userId });
         return {
-          content: [{
-            type: "text" as const,
-            text: `Executing goal: **${result.goalTitle}** (${result.totalTasks} tasks)\nStatus: ${result.status}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Executing goal: **${result.goalTitle}** (${result.totalTasks} tasks)\nStatus: ${result.status}`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -169,24 +196,25 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getBriefing();
         return { content: [{ type: "text" as const, text: formatBriefing(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
 
-  server.tool(
-    "list_pipelines",
-    "List pipeline runs and their status",
-    {},
-    async () => {
-      try {
-        const data = await client.listPipelines();
-        return { content: [{ type: "text" as const, text: formatPipelines(data) }] };
-      } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
-      }
-    },
-  );
+  server.tool("list_pipelines", "List pipeline runs and their status", {}, async () => {
+    try {
+      const data = await client.listPipelines();
+      return { content: [{ type: "text" as const, text: formatPipelines(data) }] };
+    } catch (e) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  });
 
   server.tool(
     "submit_pipeline",
@@ -198,13 +226,18 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const result = await client.submitGoalPipeline(goalId);
         return {
-          content: [{
-            type: "text" as const,
-            text: `Pipeline submitted: job ${result.jobId} (${result.stageCount} stages) — ${result.status}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Pipeline submitted: job ${result.jobId} (${result.stageCount} stages) — ${result.status}`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -214,17 +247,40 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     "Save a memory/fact to the Jarvis knowledge base. Use this to share context between Claude Code and Jarvis.",
     {
       userId: z.string().describe("The user ID to save the memory for"),
-      category: z.enum(["user_info", "preferences", "projects", "decisions", "goals", "technical", "business", "other"]).describe("Memory category"),
+      category: z
+        .enum([
+          "user_info",
+          "preferences",
+          "projects",
+          "decisions",
+          "goals",
+          "technical",
+          "business",
+          "other",
+        ])
+        .describe("Memory category"),
       key: z.string().describe("Unique key for this memory (used for upsert deduplication)"),
-      content: z.string().describe("The memory content — a fact, preference, or context to remember"),
+      content: z
+        .string()
+        .describe("The memory content — a fact, preference, or context to remember"),
       source: z.string().optional().describe("Source identifier (defaults to 'claude-code')"),
     },
     async ({ userId, category, key, content, source }) => {
       try {
         const result = await client.saveMemory({ userId, category, key, content, source });
-        return { content: [{ type: "text" as const, text: `Memory saved: [${category}] ${key} (id: ${result.id})` }] };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Memory saved: [${category}] ${key} (id: ${result.id})`,
+            },
+          ],
+        };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -241,7 +297,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listMemories(userId, { limit: limit ?? 20 });
         return { content: [{ type: "text" as const, text: formatMemories(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -255,7 +314,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.providerHealth();
         return { content: [{ type: "text" as const, text: formatProviderHealth(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -271,7 +333,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         await client.deleteGoal(id);
         return { content: [{ type: "text" as const, text: `Goal ${id} deleted.` }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -286,13 +351,18 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const goal = await client.cancelGoal(id);
         return {
-          content: [{
-            type: "text" as const,
-            text: `Goal cancelled: **${goal.title}** [${goal.status}] (${goal.id})`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Goal cancelled: **${goal.title}** [${goal.status}] (${goal.id})`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -308,7 +378,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         await client.deleteConversation(id);
         return { content: [{ type: "text" as const, text: `Conversation ${id} deleted.` }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -326,15 +399,27 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     },
     async ({ title, instruction, conversationId, goalId, userId, priority }) => {
       try {
-        const result = await client.spawnSubagent({ title, instruction, conversationId, goalId, userId, priority });
+        const result = await client.spawnSubagent({
+          title,
+          instruction,
+          conversationId,
+          goalId,
+          userId,
+          priority,
+        });
         return {
-          content: [{
-            type: "text" as const,
-            text: `Subagent spawned: **${result.title}** [${result.status}] (${result.subagentRunId})`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Subagent spawned: **${result.title}** [${result.status}] (${result.subagentRunId})`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -350,7 +435,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const run = await client.getSubagentRun(id);
         return { content: [{ type: "text" as const, text: formatSubagentRun(run) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -360,7 +448,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     "List subagent runs, optionally filtered by goal or status",
     {
       goalId: z.string().optional().describe("Filter by goal ID"),
-      status: z.enum(["queued", "running", "completed", "failed", "cancelled"]).optional().describe("Filter by status"),
+      status: z
+        .enum(["queued", "running", "completed", "failed", "cancelled"])
+        .optional()
+        .describe("Filter by status"),
       limit: z.number().optional().describe("Max results (default 20)"),
     },
     async ({ goalId, status, limit }) => {
@@ -368,7 +459,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listSubagentRuns({ goalId, status, limit: limit ?? 20 });
         return { content: [{ type: "text" as const, text: formatSubagentRuns(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -384,7 +478,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getGoal(id);
         return { content: [{ type: "text" as const, text: formatGoal(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -400,7 +497,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listPendingApprovals(limit ?? 50);
         return { content: [{ type: "text" as const, text: formatApprovals(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -418,30 +518,33 @@ export function registerTools(server: McpServer, client: ApiClient): void {
       try {
         const a = await client.resolveApproval(id, { status, decision, decidedBy });
         return {
-          content: [{
-            type: "text" as const,
-            text: `Approval ${a.id} ${a.status}: ${a.decision}`,
-          }],
+          content: [
+            {
+              type: "text" as const,
+              text: `Approval ${a.id} ${a.status}: ${a.decision}`,
+            },
+          ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
 
-  server.tool(
-    "get_budget_status",
-    "Get daily and weekly spend vs budget limits",
-    {},
-    async () => {
-      try {
-        const data = await client.getBudgetStatus();
-        return { content: [{ type: "text" as const, text: formatBudgetStatus(data) }] };
-      } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
-      }
-    },
-  );
+  server.tool("get_budget_status", "Get daily and weekly spend vs budget limits", {}, async () => {
+    try {
+      const data = await client.getBudgetStatus();
+      return { content: [{ type: "text" as const, text: formatBudgetStatus(data) }] };
+    } catch (e) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  });
 
   server.tool(
     "get_error_summary",
@@ -454,7 +557,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getErrorSummary(hours ?? 24);
         return { content: [{ type: "text" as const, text: formatErrorSummary(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -470,7 +576,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getStandup(date);
         return { content: [{ type: "text" as const, text: formatStandup(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -488,7 +597,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listConversations(userId, { limit: limit ?? 20, offset });
         return { content: [{ type: "text" as const, text: formatConversations(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -504,7 +616,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.globalSearch(q);
         return { content: [{ type: "text" as const, text: formatSearchResults(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -522,7 +637,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listFollowUps({ status, limit: limit ?? 20, offset });
         return { content: [{ type: "text" as const, text: formatFollowUps(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -536,7 +654,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getGoalAnalytics();
         return { content: [{ type: "text" as const, text: formatGoalAnalytics(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -553,7 +674,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listTasks(goalId, { limit: limit ?? 20 });
         return { content: [{ type: "text" as const, text: formatTasks(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -569,24 +693,25 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getCostByGoal(goalId);
         return { content: [{ type: "text" as const, text: formatGoalCost(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
 
-  server.tool(
-    "list_n8n_workflows",
-    "List available n8n automation workflows",
-    {},
-    async () => {
-      try {
-        const data = await client.listN8nWorkflows();
-        return { content: [{ type: "text" as const, text: formatN8nWorkflows(data) }] };
-      } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
-      }
-    },
-  );
+  server.tool("list_n8n_workflows", "List available n8n automation workflows", {}, async () => {
+    try {
+      const data = await client.listN8nWorkflows();
+      return { content: [{ type: "text" as const, text: formatN8nWorkflows(data) }] };
+    } catch (e) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+        isError: true,
+      };
+    }
+  });
 
   server.tool(
     "list_deployments",
@@ -599,7 +724,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listDeployments(limit ?? 20);
         return { content: [{ type: "text" as const, text: formatDeployments(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -613,7 +741,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getCircuitBreakerStatus();
         return { content: [{ type: "text" as const, text: formatCircuitBreaker(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -628,11 +759,22 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     async ({ query, limit }) => {
       try {
         const data = await client.ragSearch(query, { limit: limit ?? 5 });
-        if (data.results.length === 0) return { content: [{ type: "text" as const, text: "No RAG results found." }] };
+        if (data.results.length === 0)
+          return { content: [{ type: "text" as const, text: "No RAG results found." }] };
         const lines = data.results.map((r, i) => `${i + 1}. ${JSON.stringify(r).slice(0, 200)}`);
-        return { content: [{ type: "text" as const, text: `# RAG Results (${data.results.length})\n\n${lines.join("\n")}` }] };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `# RAG Results (${data.results.length})\n\n${lines.join("\n")}`,
+            },
+          ],
+        };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -646,7 +788,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getToolStats();
         return { content: [{ type: "text" as const, text: formatToolStats(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -662,7 +807,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.exportConversation(id);
         return { content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -671,7 +819,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     "list_reflections",
     "List goal completion reflections and lessons learned",
     {
-      type: z.string().optional().describe("Filter by type (e.g. goal_completion, failure_analysis)"),
+      type: z
+        .string()
+        .optional()
+        .describe("Filter by type (e.g. goal_completion, failure_analysis)"),
       limit: z.number().optional().describe("Max results (default 10)"),
     },
     async ({ type, limit }) => {
@@ -679,7 +830,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.listReflections({ type, limit: limit ?? 10 });
         return { content: [{ type: "text" as const, text: formatReflections(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -689,16 +843,27 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     "List journal entries (activity log: goals, tasks, deploys, git commits)",
     {
       goalId: z.string().optional().describe("Filter by goal ID"),
-      entryType: z.string().optional().describe("Filter by type (goal_started, task_completed, deployment, etc.)"),
+      entryType: z
+        .string()
+        .optional()
+        .describe("Filter by type (goal_started, task_completed, deployment, etc.)"),
       search: z.string().optional().describe("Full-text search"),
       limit: z.number().optional().describe("Max results (default 20)"),
     },
     async ({ goalId, entryType, search, limit }) => {
       try {
-        const data = await client.listJournalEntries({ goalId, entryType, search, limit: limit ?? 20 });
+        const data = await client.listJournalEntries({
+          goalId,
+          entryType,
+          search,
+          limit: limit ?? 20,
+        });
         return { content: [{ type: "text" as const, text: formatJournalEntries(data) }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -717,7 +882,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getVaultDailyNote(d);
         return { content: [{ type: "text" as const, text: data.content }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -726,18 +894,31 @@ export function registerTools(server: McpServer, client: ApiClient): void {
     "list_vault_notes",
     "List available daily notes or files in a vault section (projects, decisions, people)",
     {
-      section: z.enum(["daily", "projects", "decisions", "people"]).describe("Vault section to list"),
+      section: z
+        .enum(["daily", "projects", "decisions", "people"])
+        .describe("Vault section to list"),
     },
     async ({ section }) => {
       try {
         if (section === "daily") {
           const data = await client.listVaultDailyNotes();
-          return { content: [{ type: "text" as const, text: `Daily notes: ${data.dates.join(", ") || "(none)"}` }] };
+          return {
+            content: [
+              { type: "text" as const, text: `Daily notes: ${data.dates.join(", ") || "(none)"}` },
+            ],
+          };
         }
         const data = await client.listVaultFiles(section);
-        return { content: [{ type: "text" as const, text: `${section}: ${data.files.join(", ") || "(none)"}` }] };
+        return {
+          content: [
+            { type: "text" as const, text: `${section}: ${data.files.join(", ") || "(none)"}` },
+          ],
+        };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -754,7 +935,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
         const data = await client.getVaultFile(section, slug);
         return { content: [{ type: "text" as const, text: data.content }] };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -788,7 +972,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
           ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -814,7 +1001,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
           ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );
@@ -836,7 +1026,10 @@ export function registerTools(server: McpServer, client: ApiClient): void {
           ],
         };
       } catch (e) {
-        return { content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }], isError: true };
+        return {
+          content: [{ type: "text" as const, text: `Error: ${(e as Error).message}` }],
+          isError: true,
+        };
       }
     },
   );

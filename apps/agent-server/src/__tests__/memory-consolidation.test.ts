@@ -14,7 +14,9 @@ vi.mock("@ai-cofounder/shared", () => ({
 }));
 
 // 2. Mock @ai-cofounder/db with mockDbModule spread + custom saveMemory
-const mockSaveMemory = vi.fn().mockResolvedValue({ id: "composite-1", key: "Cluster title", category: "decisions" });
+const mockSaveMemory = vi
+  .fn()
+  .mockResolvedValue({ id: "composite-1", key: "Cluster title", category: "decisions" });
 
 vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
@@ -59,10 +61,7 @@ vi.mock("drizzle-orm", async () => {
   actual.and = vi.fn((...args: unknown[]) => `and(${args.join(",")})`);
   actual.desc = vi.fn((a: unknown) => `desc(${String(a)})`);
   // sql tag must be callable as tagged template and also as function
-  const sqlFn = Object.assign(
-    (..._args: unknown[]) => "sql-expr",
-    { raw: () => "sql-raw" },
-  );
+  const sqlFn = Object.assign((..._args: unknown[]) => "sql-expr", { raw: () => "sql-raw" });
   actual.sql = sqlFn;
   return actual;
 });
@@ -117,7 +116,6 @@ function createMockDb({
 }
 
 describe("consolidation", () => {
-   
   let MemoryConsolidationService: any;
 
   beforeEach(async () => {
@@ -129,9 +127,30 @@ describe("consolidation", () => {
     const { db } = createMockDb({
       userIds: [{ userId: "user-1" }],
       userMemories: [
-        { id: "m1", userId: "user-1", category: "decisions", key: "key1", content: "content1", metadata: null },
-        { id: "m2", userId: "user-1", category: "decisions", key: "key2", content: "content2", metadata: null },
-        { id: "m3", userId: "user-1", category: "decisions", key: "key3", content: "content3", metadata: null },
+        {
+          id: "m1",
+          userId: "user-1",
+          category: "decisions",
+          key: "key1",
+          content: "content1",
+          metadata: null,
+        },
+        {
+          id: "m2",
+          userId: "user-1",
+          category: "decisions",
+          key: "key2",
+          content: "content2",
+          metadata: null,
+        },
+        {
+          id: "m3",
+          userId: "user-1",
+          category: "decisions",
+          key: "key3",
+          content: "content3",
+          metadata: null,
+        },
       ],
     });
 
@@ -149,11 +168,46 @@ describe("consolidation", () => {
 
   it("consolidates related memories per-user into composite entries", async () => {
     const decisionsMemories = [
-      { id: "m1", userId: "user-1", category: "decisions", key: "Use Postgres", content: "We decided to use Postgres for our database", metadata: null },
-      { id: "m2", userId: "user-1", category: "decisions", key: "Use TypeScript", content: "We decided to use TypeScript", metadata: null },
-      { id: "m3", userId: "user-1", category: "decisions", key: "Use React", content: "We decided to use React for the frontend", metadata: null },
-      { id: "m4", userId: "user-1", category: "decisions", key: "Use Tailwind", content: "We decided to use Tailwind CSS", metadata: null },
-      { id: "m5", userId: "user-1", category: "decisions", key: "Deploy to Hetzner", content: "Deploy on Hetzner VPS for hosting", metadata: null },
+      {
+        id: "m1",
+        userId: "user-1",
+        category: "decisions",
+        key: "Use Postgres",
+        content: "We decided to use Postgres for our database",
+        metadata: null,
+      },
+      {
+        id: "m2",
+        userId: "user-1",
+        category: "decisions",
+        key: "Use TypeScript",
+        content: "We decided to use TypeScript",
+        metadata: null,
+      },
+      {
+        id: "m3",
+        userId: "user-1",
+        category: "decisions",
+        key: "Use React",
+        content: "We decided to use React for the frontend",
+        metadata: null,
+      },
+      {
+        id: "m4",
+        userId: "user-1",
+        category: "decisions",
+        key: "Use Tailwind",
+        content: "We decided to use Tailwind CSS",
+        metadata: null,
+      },
+      {
+        id: "m5",
+        userId: "user-1",
+        category: "decisions",
+        key: "Deploy to Hetzner",
+        content: "Deploy on Hetzner VPS for hosting",
+        metadata: null,
+      },
     ];
 
     const { db, mockUpdate, mockUpdateSet, mockUpdateWhere } = createMockDb({
@@ -208,11 +262,46 @@ describe("consolidation", () => {
 
   it("marks constituent memories with consolidated flag", async () => {
     const testMemories = [
-      { id: "m1", userId: "user-1", category: "preferences", key: "pref1", content: "content1", metadata: null },
-      { id: "m2", userId: "user-1", category: "preferences", key: "pref2", content: "content2", metadata: null },
-      { id: "m3", userId: "user-1", category: "preferences", key: "pref3", content: "content3", metadata: null },
-      { id: "m4", userId: "user-1", category: "preferences", key: "pref4", content: "content4", metadata: null },
-      { id: "m5", userId: "user-1", category: "preferences", key: "pref5", content: "content5", metadata: null },
+      {
+        id: "m1",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref1",
+        content: "content1",
+        metadata: null,
+      },
+      {
+        id: "m2",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref2",
+        content: "content2",
+        metadata: null,
+      },
+      {
+        id: "m3",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref3",
+        content: "content3",
+        metadata: null,
+      },
+      {
+        id: "m4",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref4",
+        content: "content4",
+        metadata: null,
+      },
+      {
+        id: "m5",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref5",
+        content: "content5",
+        metadata: null,
+      },
     ];
 
     const { db, mockUpdate } = createMockDb({
@@ -220,7 +309,11 @@ describe("consolidation", () => {
       userMemories: testMemories,
     });
 
-    mockSaveMemory.mockResolvedValue({ id: "composite-xyz", key: "Cluster", category: "preferences" });
+    mockSaveMemory.mockResolvedValue({
+      id: "composite-xyz",
+      key: "Cluster",
+      category: "preferences",
+    });
 
     // LLM returns a cluster of 3 members
     const clusteredResponse = JSON.stringify({
@@ -254,11 +347,46 @@ describe("consolidation", () => {
 
   it("handles LLM failure gracefully", async () => {
     const testMemories = [
-      { id: "m1", userId: "user-1", category: "preferences", key: "pref1", content: "content1", metadata: null },
-      { id: "m2", userId: "user-1", category: "preferences", key: "pref2", content: "content2", metadata: null },
-      { id: "m3", userId: "user-1", category: "preferences", key: "pref3", content: "content3", metadata: null },
-      { id: "m4", userId: "user-1", category: "preferences", key: "pref4", content: "content4", metadata: null },
-      { id: "m5", userId: "user-1", category: "preferences", key: "pref5", content: "content5", metadata: null },
+      {
+        id: "m1",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref1",
+        content: "content1",
+        metadata: null,
+      },
+      {
+        id: "m2",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref2",
+        content: "content2",
+        metadata: null,
+      },
+      {
+        id: "m3",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref3",
+        content: "content3",
+        metadata: null,
+      },
+      {
+        id: "m4",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref4",
+        content: "content4",
+        metadata: null,
+      },
+      {
+        id: "m5",
+        userId: "user-1",
+        category: "preferences",
+        key: "pref5",
+        content: "content5",
+        metadata: null,
+      },
     ];
 
     const { db } = createMockDb({

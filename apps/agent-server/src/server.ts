@@ -97,6 +97,7 @@ const DEFAULT_TOOLS = [
   "request_approval",
   "browser_action",
   "create_follow_up",
+  "log_productivity",
   "recall_episodes",
   "recall_procedures",
 ] as const;
@@ -453,7 +454,7 @@ export function buildServer(registry?: LlmRegistry) {
       autonomyTierService: app.autonomyTierService,
       monitoringService,
       pollIntervalMs: 60_000,
-      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
+      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "6")),
       briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
     });
     app.addHook("onClose", async () => scheduler.stop());

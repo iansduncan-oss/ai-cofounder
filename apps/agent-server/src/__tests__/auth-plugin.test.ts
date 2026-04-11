@@ -127,9 +127,7 @@ describe("Auth plugin — production mode", () => {
     }
 
     expect(thrownError).toBeDefined();
-    expect(thrownError!.message).toBe(
-      "JWT_SECRET and COOKIE_SECRET must be set in production",
-    );
+    expect(thrownError!.message).toBe("JWT_SECRET and COOKIE_SECRET must be set in production");
   });
 });
 

@@ -32,7 +32,10 @@ describe("observability metrics — memory bridge v2 + dashboard signals", () =>
       "discord_triage_results_total",
     ];
     for (const name of expected) {
-      expect(client.register.getSingleMetric(name), `metric "${name}" should be registered`).toBeDefined();
+      expect(
+        client.register.getSingleMetric(name),
+        `metric "${name}" should be registered`,
+      ).toBeDefined();
     }
   });
 

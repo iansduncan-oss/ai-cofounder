@@ -95,214 +95,81 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
 
   const dailyTokenLimit = parseInt(optionalEnv("DAILY_TOKEN_LIMIT", "0"), 10);
 
-  app.post<{ Body: RunBody }>("/run", { schema: { tags: ["agents"], body: RunBody } }, async (request, reply) => {
-    // Enforce daily token limit if configured
-    if (dailyTokenLimit > 0) {
-      const todayTotal = await getTodayTokenTotal(app.db);
-      if (todayTotal >= dailyTokenLimit) {
-        return reply.status(429).send({
-          error: "Daily token limit exceeded",
-          todayTotal,
-          limit: dailyTokenLimit,
-        });
-      }
-    }
-
-    const { message, conversationId, userId, platform, history } = request.body;
-
-    // Resolve or create conversation
-    let convId = conversationId;
-    let dbUserId: string | undefined;
-
-    if (userId) {
-      const user = await findOrCreateUser(app.db, userId, platform ?? "unknown");
-      dbUserId = user.id;
-
-      if (!convId) {
-        const conv = await createConversation(app.db, { userId: user.id, workspaceId: request.workspaceId });
-        convId = conv.id;
-      }
-    }
-
-    // Load history from DB (with automatic summarization for long conversations)
-    let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
-    if (convId) {
-      try {
-        const prepared = await contextWindow.prepareHistory(
-          convId,
-          resolvedHistory,
-        );
-        resolvedHistory = contextWindow.trimToFit(prepared.messages);
-        if (prepared.wasSummarized) {
-          logger.info({ convId, totalMessages: prepared.totalDbMessages, estimatedTokens: prepared.estimatedTokens }, "context window managed");
+  app.post<{ Body: RunBody }>(
+    "/run",
+    { schema: { tags: ["agents"], body: RunBody } },
+    async (request, reply) => {
+      // Enforce daily token limit if configured
+      if (dailyTokenLimit > 0) {
+        const todayTotal = await getTodayTokenTotal(app.db);
+        if (todayTotal >= dailyTokenLimit) {
+          return reply.status(429).send({
+            error: "Daily token limit exceeded",
+            todayTotal,
+            limit: dailyTokenLimit,
+          });
         }
-      } catch (err) {
-        logger.warn({ err, convId }, "context window management failed (non-fatal)");
       }
-    }
 
-    orchestrator.setWorkspaceId(request.workspaceId);
-    const llmStart = Date.now();
-    const result = await orchestrator.run(
-      message,
-      convId,
-      resolvedHistory,
-      dbUserId,
-      (request as unknown as Record<string, unknown>).requestId as string | undefined,
-    );
-    const llmDurationMs = Date.now() - llmStart;
+      const { message, conversationId, userId, platform, history } = request.body;
 
-    // Persist messages to DB
-    if (result.conversationId) {
-      const cid = result.conversationId;
-      await createMessage(app.db, {
-        conversationId: cid,
-        role: "user",
-        content: message,
-      });
-      await createMessage(app.db, {
-        conversationId: cid,
-        role: "agent",
-        agentRole: "orchestrator",
-        content: result.response,
-        metadata: result.usage
-          ? { usage: result.usage, model: result.model, provider: result.provider }
-          : undefined,
-      });
-    }
+      // Resolve or create conversation
+      let convId = conversationId;
+      let dbUserId: string | undefined;
 
-    // Fire-and-forget conversation title generation for new conversations
-    if (result.conversationId && !conversationId) {
-      generateConversationTitle(app, result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation title generation failed"));
-    }
+      if (userId) {
+        const user = await findOrCreateUser(app.db, userId, platform ?? "unknown");
+        dbUserId = user.id;
 
-    // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
-    if (result.usage && result.model) {
-      recordLlmMetrics({
-        provider: result.provider ?? "unknown",
-        model: result.model,
-        taskCategory: "conversation",
-        inputTokens: result.usage.inputTokens,
-        outputTokens: result.usage.outputTokens,
-        durationMs: llmDurationMs,
-        success: true,
-      });
-    }
-
-    // Record user action (fire-and-forget)
-    if (dbUserId) {
-      recordActionSafe(app.db, {
-        workspaceId: request.workspaceId,
-        userId: dbUserId,
-        actionType: "chat_message",
-        actionDetail: message.slice(0, 200),
-      });
-    }
-
-    // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
-    const redisEnabled = !!optionalEnv("REDIS_URL", "");
-    if (redisEnabled && app.embeddingService && result.conversationId) {
-      conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation ingestion failed"));
-    }
-
-    // Fire-and-forget decision extraction (MEM-02)
-    if (redisEnabled && dbUserId) {
-      const { getReflectionQueue } = await import("@ai-cofounder/queue");
-      getReflectionQueue().add("extract-decision", {
-        action: "extract_decision",
-        response: result.response,
-        userId: dbUserId,
-        conversationId: result.conversationId,
-      }).catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
-    }
-
-    // Generate anticipatory suggestions (pattern-aware)
-    const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
-      userMessage: message,
-      agentResponse: result.response,
-      userId: dbUserId,
-    });
-
-    return { ...result, suggestions };
-  });
-
-  // SSE streaming endpoint
-  app.post<{ Body: RunBody }>("/run/stream", { schema: { tags: ["agents"], body: RunBody } }, async (request, reply) => {
-    if (dailyTokenLimit > 0) {
-      const todayTotal = await getTodayTokenTotal(app.db);
-      if (todayTotal >= dailyTokenLimit) {
-        return reply.status(429).send({
-          error: "Daily token limit exceeded",
-          todayTotal,
-          limit: dailyTokenLimit,
-        });
+        if (!convId) {
+          const conv = await createConversation(app.db, {
+            userId: user.id,
+            workspaceId: request.workspaceId,
+          });
+          convId = conv.id;
+        }
       }
-    }
 
-    const { message, conversationId, userId, platform, history } = request.body;
-
-    let convId = conversationId;
-    let dbUserId: string | undefined;
-
-    if (userId) {
-      const user = await findOrCreateUser(app.db, userId, platform ?? "unknown");
-      dbUserId = user.id;
-
-      if (!convId) {
-        const conv = await createConversation(app.db, { userId: user.id, workspaceId: request.workspaceId });
-        convId = conv.id;
+      // Load history from DB (with automatic summarization for long conversations)
+      let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
+      if (convId) {
+        try {
+          const prepared = await contextWindow.prepareHistory(convId, resolvedHistory);
+          resolvedHistory = contextWindow.trimToFit(prepared.messages);
+          if (prepared.wasSummarized) {
+            logger.info(
+              {
+                convId,
+                totalMessages: prepared.totalDbMessages,
+                estimatedTokens: prepared.estimatedTokens,
+              },
+              "context window managed",
+            );
+          }
+        } catch (err) {
+          logger.warn({ err, convId }, "context window management failed (non-fatal)");
+        }
       }
-    }
 
-    let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
-    if (convId) {
-      try {
-        const prepared = await contextWindow.prepareHistory(
-          convId,
-          resolvedHistory,
-        );
-        resolvedHistory = contextWindow.trimToFit(prepared.messages);
-      } catch (err) {
-        logger.warn({ err, convId }, "context window management failed (non-fatal)");
-      }
-    }
-
-    reply.raw.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    });
-
-    const abortController = new AbortController();
-    request.raw.on("close", () => abortController.abort());
-
-    const send = (event: string, data: unknown) => {
-      if (!abortController.signal.aborted) {
-        reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-      }
-    };
-
-    const onEvent: StreamCallback = async (event) => {
-      send(event.type, event.data);
-    };
-
-    orchestrator.setWorkspaceId(request.workspaceId);
-    const streamLlmStart = Date.now();
-    try {
-      const result = await orchestrator.runStream(
+      orchestrator.setWorkspaceId(request.workspaceId);
+      const llmStart = Date.now();
+      const result = await orchestrator.run(
         message,
-        onEvent,
         convId,
         resolvedHistory,
         dbUserId,
         (request as unknown as Record<string, unknown>).requestId as string | undefined,
-        abortController.signal,
       );
+      const llmDurationMs = Date.now() - llmStart;
 
       // Persist messages to DB
       if (result.conversationId) {
         const cid = result.conversationId;
-        await createMessage(app.db, { conversationId: cid, role: "user", content: message });
+        await createMessage(app.db, {
+          conversationId: cid,
+          role: "user",
+          content: message,
+        });
         await createMessage(app.db, {
           conversationId: cid,
           role: "agent",
@@ -314,13 +181,14 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
         });
       }
 
-      // Usage recording handled automatically by LlmRegistry.onCompletion hook
-
       // Fire-and-forget conversation title generation for new conversations
       if (result.conversationId && !conversationId) {
-        generateConversationTitle(app, result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation title generation failed"));
+        generateConversationTitle(app, result.conversationId, message, result.response).catch(
+          (err) => logger.warn({ err }, "conversation title generation failed"),
+        );
       }
 
+      // Record Prometheus metrics (usage is handled automatically by LlmRegistry.onCompletion hook)
       if (result.usage && result.model) {
         recordLlmMetrics({
           provider: result.provider ?? "unknown",
@@ -328,7 +196,7 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
           taskCategory: "conversation",
           inputTokens: result.usage.inputTokens,
           outputTokens: result.usage.outputTokens,
-          durationMs: Date.now() - streamLlmStart,
+          durationMs: llmDurationMs,
           success: true,
         });
       }
@@ -344,40 +212,199 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       }
 
       // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
-      const streamRedisEnabled = !!optionalEnv("REDIS_URL", "");
-      if (streamRedisEnabled && app.embeddingService && result.conversationId) {
-        conversationIngestion.ingestAfterResponse(result.conversationId, message, result.response).catch((err) => logger.warn({ err }, "conversation ingestion failed"));
+      const redisEnabled = !!optionalEnv("REDIS_URL", "");
+      if (redisEnabled && app.embeddingService && result.conversationId) {
+        conversationIngestion
+          .ingestAfterResponse(result.conversationId, message, result.response)
+          .catch((err) => logger.warn({ err }, "conversation ingestion failed"));
       }
 
       // Fire-and-forget decision extraction (MEM-02)
-      if (streamRedisEnabled && dbUserId) {
+      if (redisEnabled && dbUserId) {
         const { getReflectionQueue } = await import("@ai-cofounder/queue");
-        getReflectionQueue().add("extract-decision", {
-          action: "extract_decision",
-          response: result.response,
-          userId: dbUserId,
-          conversationId: result.conversationId,
-        }).catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
+        getReflectionQueue()
+          .add("extract-decision", {
+            action: "extract_decision",
+            response: result.response,
+            userId: dbUserId,
+            conversationId: result.conversationId,
+          })
+          .catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
       }
 
-      // Generate and emit anticipatory suggestions (pattern-aware)
+      // Generate anticipatory suggestions (pattern-aware)
       const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
         userMessage: message,
         agentResponse: result.response,
         userId: dbUserId,
       });
-      if (suggestions.length > 0) {
-        send("suggestions", { suggestions });
+
+      return { ...result, suggestions };
+    },
+  );
+
+  // SSE streaming endpoint
+  app.post<{ Body: RunBody }>(
+    "/run/stream",
+    { schema: { tags: ["agents"], body: RunBody } },
+    async (request, reply) => {
+      if (dailyTokenLimit > 0) {
+        const todayTotal = await getTodayTokenTotal(app.db);
+        if (todayTotal >= dailyTokenLimit) {
+          return reply.status(429).send({
+            error: "Daily token limit exceeded",
+            todayTotal,
+            limit: dailyTokenLimit,
+          });
+        }
       }
-    } catch (err) {
-      // Orchestrator already emits error event via onEvent; only log here
-      if (!abortController.signal.aborted) {
-        logger.error({ err }, "stream handler error");
+
+      const { message, conversationId, userId, platform, history } = request.body;
+
+      let convId = conversationId;
+      let dbUserId: string | undefined;
+
+      if (userId) {
+        const user = await findOrCreateUser(app.db, userId, platform ?? "unknown");
+        dbUserId = user.id;
+
+        if (!convId) {
+          const conv = await createConversation(app.db, {
+            userId: user.id,
+            workspaceId: request.workspaceId,
+          });
+          convId = conv.id;
+        }
       }
-    } finally {
-      reply.raw.end();
-    }
-  });
+
+      let resolvedHistory: AgentMessage[] | undefined = history as AgentMessage[] | undefined;
+      if (convId) {
+        try {
+          const prepared = await contextWindow.prepareHistory(convId, resolvedHistory);
+          resolvedHistory = contextWindow.trimToFit(prepared.messages);
+        } catch (err) {
+          logger.warn({ err, convId }, "context window management failed (non-fatal)");
+        }
+      }
+
+      reply.raw.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      });
+
+      const abortController = new AbortController();
+      request.raw.on("close", () => abortController.abort());
+
+      const send = (event: string, data: unknown) => {
+        if (!abortController.signal.aborted) {
+          reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+        }
+      };
+
+      const onEvent: StreamCallback = async (event) => {
+        send(event.type, event.data);
+      };
+
+      orchestrator.setWorkspaceId(request.workspaceId);
+      const streamLlmStart = Date.now();
+      try {
+        const result = await orchestrator.runStream(
+          message,
+          onEvent,
+          convId,
+          resolvedHistory,
+          dbUserId,
+          (request as unknown as Record<string, unknown>).requestId as string | undefined,
+          abortController.signal,
+        );
+
+        // Persist messages to DB
+        if (result.conversationId) {
+          const cid = result.conversationId;
+          await createMessage(app.db, { conversationId: cid, role: "user", content: message });
+          await createMessage(app.db, {
+            conversationId: cid,
+            role: "agent",
+            agentRole: "orchestrator",
+            content: result.response,
+            metadata: result.usage
+              ? { usage: result.usage, model: result.model, provider: result.provider }
+              : undefined,
+          });
+        }
+
+        // Usage recording handled automatically by LlmRegistry.onCompletion hook
+
+        // Fire-and-forget conversation title generation for new conversations
+        if (result.conversationId && !conversationId) {
+          generateConversationTitle(app, result.conversationId, message, result.response).catch(
+            (err) => logger.warn({ err }, "conversation title generation failed"),
+          );
+        }
+
+        if (result.usage && result.model) {
+          recordLlmMetrics({
+            provider: result.provider ?? "unknown",
+            model: result.model,
+            taskCategory: "conversation",
+            inputTokens: result.usage.inputTokens,
+            outputTokens: result.usage.outputTokens,
+            durationMs: Date.now() - streamLlmStart,
+            success: true,
+          });
+        }
+
+        // Record user action (fire-and-forget)
+        if (dbUserId) {
+          recordActionSafe(app.db, {
+            workspaceId: request.workspaceId,
+            userId: dbUserId,
+            actionType: "chat_message",
+            actionDetail: message.slice(0, 200),
+          });
+        }
+
+        // Fire-and-forget conversation ingestion (eager summarization + RAG enqueue)
+        const streamRedisEnabled = !!optionalEnv("REDIS_URL", "");
+        if (streamRedisEnabled && app.embeddingService && result.conversationId) {
+          conversationIngestion
+            .ingestAfterResponse(result.conversationId, message, result.response)
+            .catch((err) => logger.warn({ err }, "conversation ingestion failed"));
+        }
+
+        // Fire-and-forget decision extraction (MEM-02)
+        if (streamRedisEnabled && dbUserId) {
+          const { getReflectionQueue } = await import("@ai-cofounder/queue");
+          getReflectionQueue()
+            .add("extract-decision", {
+              action: "extract_decision",
+              response: result.response,
+              userId: dbUserId,
+              conversationId: result.conversationId,
+            })
+            .catch((err) => logger.warn({ err }, "decision extraction enqueue failed"));
+        }
+
+        // Generate and emit anticipatory suggestions (pattern-aware)
+        const suggestions = await generateSuggestions(app.db, app.llmRegistry, {
+          userMessage: message,
+          agentResponse: result.response,
+          userId: dbUserId,
+        });
+        if (suggestions.length > 0) {
+          send("suggestions", { suggestions });
+        }
+      } catch (err) {
+        // Orchestrator already emits error event via onEvent; only log here
+        if (!abortController.signal.aborted) {
+          logger.error({ err }, "stream handler error");
+        }
+      } finally {
+        reply.raw.end();
+      }
+    },
+  );
 
   /* POST /accept-suggestion — record that a user clicked a suggestion chip */
   const AcceptSuggestionBody = Type.Object({
@@ -401,8 +428,12 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
       });
 
       if (patternId) {
-        incrementPatternAcceptCount(app.db, patternId).catch((err) => logger.warn({ err }, "pattern accept count increment failed"));
-        adjustPatternConfidence(app.db, patternId, 5).catch((err) => logger.warn({ err }, "pattern confidence adjustment failed"));
+        incrementPatternAcceptCount(app.db, patternId).catch((err) =>
+          logger.warn({ err }, "pattern accept count increment failed"),
+        );
+        adjustPatternConfidence(app.db, patternId, 5).catch((err) =>
+          logger.warn({ err }, "pattern confidence adjustment failed"),
+        );
       }
 
       return { ok: true };

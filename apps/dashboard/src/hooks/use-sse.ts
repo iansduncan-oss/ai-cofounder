@@ -76,8 +76,7 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
               toast.success("Execution completed");
             } else {
               toast.error(
-                ((data as Record<string, unknown>).error as string) ||
-                  "Execution failed",
+                ((data as Record<string, unknown>).error as string) || "Execution failed",
               );
             }
             return;
@@ -95,22 +94,16 @@ export function useSSE(goalId: string | null, options: SSEOptions = {}) {
 
         if (retryCountRef.current < maxRetries && goalIdRef.current) {
           retryCountRef.current++;
-          const delay = Math.min(
-            1000 * Math.pow(2, retryCountRef.current - 1),
-            8000,
-          );
+          const delay = Math.min(1000 * Math.pow(2, retryCountRef.current - 1), 8000);
           toast.error(`Connection lost, retrying in ${delay / 1000}s...`);
           setTimeout(() => {
             if (goalIdRef.current) connect(goalIdRef.current);
           }, delay);
         } else {
-          const message =
-            err instanceof Error ? err.message : "Connection lost";
+          const message = err instanceof Error ? err.message : "Connection lost";
           setError(message);
           toast.error("SSE connection failed after retries");
-          optionsRef.current.onError?.(
-            err instanceof Error ? err : new Error(message),
-          );
+          optionsRef.current.onError?.(err instanceof Error ? err : new Error(message));
         }
       }
     },

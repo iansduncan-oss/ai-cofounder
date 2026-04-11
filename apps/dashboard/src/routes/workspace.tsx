@@ -6,14 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { usePageTitle } from "@/hooks/use-page-title";
-import {
-  FolderOpen,
-  File,
-  Folder,
-  ChevronRight,
-  AlertTriangle,
-  X,
-} from "lucide-react";
+import { FolderOpen, File, Folder, ChevronRight, AlertTriangle, X } from "lucide-react";
 
 export function WorkspacePage() {
   usePageTitle("Workspace");
@@ -80,15 +73,16 @@ export function WorkspacePage() {
     <div>
       <PageHeader
         title="Workspace"
-        description={activeProjectName ? `Project: ${activeProjectName}` : "Browse workspace files and repositories"}
+        description={
+          activeProjectName
+            ? `Project: ${activeProjectName}`
+            : "Browse workspace files and repositories"
+        }
       />
 
       {/* Breadcrumbs */}
       <div className="mb-4 flex items-center gap-1 text-sm">
-        <button
-          className="text-primary hover:underline"
-          onClick={() => navigateTo(".")}
-        >
+        <button className="text-primary hover:underline" onClick={() => navigateTo(".")}>
           workspace
         </button>
         {breadcrumbs.map((part, i) => (
@@ -96,9 +90,7 @@ export function WorkspacePage() {
             <ChevronRight className="h-3 w-3 text-muted-foreground" />
             <button
               className="text-primary hover:underline"
-              onClick={() =>
-                navigateTo(breadcrumbs.slice(0, i + 1).join("/"))
-              }
+              onClick={() => navigateTo(breadcrumbs.slice(0, i + 1).join("/"))}
             >
               {part}
             </button>
@@ -176,11 +168,7 @@ export function WorkspacePage() {
                 <span className="text-xs font-mono text-muted-foreground truncate">
                   {selectedFile}
                 </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedFile(null)}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setSelectedFile(null)}>
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -193,16 +181,12 @@ export function WorkspacePage() {
                   <code>{fileData.content}</code>
                 </pre>
               ) : (
-                <p className="p-4 text-xs text-muted-foreground">
-                  Unable to read file
-                </p>
+                <p className="p-4 text-xs text-muted-foreground">Unable to read file</p>
               )}
             </div>
           ) : (
             <div className="flex items-center justify-center rounded-lg border border-dashed py-20 text-center">
-              <p className="text-sm text-muted-foreground">
-                Select a file to view its contents
-              </p>
+              <p className="text-sm text-muted-foreground">Select a file to view its contents</p>
             </div>
           )}
         </div>

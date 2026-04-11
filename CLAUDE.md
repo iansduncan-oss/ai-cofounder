@@ -5,6 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Session Workflow
 
 At the **start** of each session:
+
 1. Read `.claude/primer.md` for context from the previous session
 2. Read `.claude/git-state.md` for current repository state (includes staleness warnings and session metadata)
 3. Read `.claude/commit-log.md` for recent commit history
@@ -13,6 +14,7 @@ At the **start** of each session:
 6. If `~/.claude/projects-overview.md` exists, it has cross-project status (read if relevant)
 
 At the **end** of each session (**MANDATORY** — always do this before the session ends):
+
 1. Completely rewrite `.claude/primer.md` with all sections below
 2. The first line after the `# Session Primer` heading MUST be the metadata line:
    `**Session #N** | **Last Updated:** YYYY-MM-DD HH:MM UTC`
@@ -170,6 +172,35 @@ vi.mock("@ai-cofounder/llm", () => {
 
 **Critical**: `getProviderHealth = vi.fn().mockReturnValue([])` is required in MockLlmRegistry. Import the module AFTER mocks are set up using dynamic `await import()`.
 
+## Productivity Tracker (auto-loop)
+
+Fully autonomous daily productivity system. The user does nothing; the system plans, tracks, nudges, and reflects on its own.
+
+- **DB tables** — `productivity_logs` (one row per user per day: plannedItems, mood, energyLevel, completionScore, streakDays, reflection notes, proactivePushes metadata), `codebase_insights` (dedupe'd open/resolved/dismissed issues with severity ordering)
+- **AutoPlannerService** (`apps/agent-server/src/services/auto-planner.ts`) — reads active goals, pending tasks, overdue follow-ups, calendar events, yesterday's blockers, and top codebase insights; LLM generates 3-5 tasks for today with time-of-day-aware task count (4-5 early morning, 1-2 late afternoon); deterministic fallback
+- **CodebaseScannerService** (`apps/agent-server/src/services/codebase-scanner.ts`) — runs every 4h via monitoring queue; scans git log for recent commits, TODO/FIXME in changed files, open GitHub PRs (age → severity), failing CI, recurring failure patterns, then LLM-synthesizes 0-5 higher-level suggestions. When a new CRITICAL insight lands, calls `ProactiveEngine.pushCriticalInsights()` immediately
+- **PlanSyncService** (`apps/agent-server/src/services/plan-sync.ts`) — runs every 15 min AND is triggered instantly on task/follow-up completion via debounced `PlanSyncScheduler` (app.planSync decorator); fuzzy-matches completions to `plannedItems` and auto-marks them done; tops up plan with new overdue follow-ups and high-severity insights; dynamically auto-replans if plan is empty and >2h until EOD
+- **ProactiveEngine** (`apps/agent-server/src/services/proactive-engine.ts`) — runs every 30 min; evaluates 5 triggers in priority order and fires at most ONE push per tick:
+  - `end_of_day` (17:30-18:30): summary + reflection prompt
+  - `celebration`: just hit 100% completion
+  - `stall`: 2h+ idle during work hours with pending items
+  - `wake_up`: past 11 AM with no completions yet
+  - `critical_insight`: invoked directly by scanner on new critical findings
+  - Guardrails: quiet hours (8 AM - 8 PM), daily cap of 6 pushes, per-trigger cooldowns stored in `productivity_logs.metadata.proactivePushes`
+- **Morning nudge job** — at `BRIEFING_HOUR+1`, calls `generateDailyPlan()` then DMs the user via Slack/Discord with the ready-made plan; skipped if user manually checked in
+- **Orchestrator tool** — `log_productivity` lets Jarvis log check-ins from chat
+- **REST endpoints** — `GET/PUT/DELETE /api/productivity`, `GET /api/productivity/next`, `POST /api/productivity/auto-plan`, `POST /api/productivity/sync`, `POST /api/productivity/proactive-check`, `GET /api/productivity/weekly`, `POST /api/codebase/scan`, `GET/PATCH /api/codebase/insights`
+- **Discord slash commands** — `/plan`, `/autoplan`, `/audit`, `/next`, `/reflect`, `/streak`
+- **Dashboard** — `/dashboard/productivity` (Next Up spotlight card, plan editor, mood/energy, weekly reflection panel, codebase insights panel, Sync/Auto-plan/Rescan buttons), `/dashboard/productivity/history`
+- **Setup** — `npm run productivity:setup` runs prerequisites check, starts Docker, `db:push`, builds shared packages, and prints next steps
+
+**Recurring jobs registered in `packages/queue/src/scheduler.ts` → monitoring queue:**
+
+- `productivity-nudge` — daily at `BRIEFING_HOUR+1`
+- `productivity-sync` — every 15 min (backstop; also triggered on task/follow-up completion)
+- `proactive-check` — every 30 min
+- `codebase-scan` — every 4 hours
+
 ## Milestones
 
 Multi-step planning via `milestones` table. Goals can be linked to milestones via `goals.milestone_id`. Routes: `POST/GET/PATCH/DELETE /api/milestones`, `GET /:id/progress`, `POST /:id/goals`.
@@ -192,6 +223,7 @@ Scoped to `WORKSPACE_DIR` env (default `/tmp/ai-cofounder-workspace`). Path trav
 **Skills** (5 in `~/.claude/skills/`): `ai-cofounder-deploy`, `ai-cofounder-test`, `ai-cofounder-db`, `ai-cofounder-monitor`, `ai-cofounder-logs`
 
 **Hooks** (in `.claude/settings.local.json`):
+
 - Auto-lint on Edit/Write (eslint --fix)
 - Auto-build on Edit/Write for: `packages/db`, `packages/llm`, `packages/shared`, `packages/queue`, `packages/api-client`, `packages/bot-handlers`, `packages/rag`, `packages/mcp-server`
 

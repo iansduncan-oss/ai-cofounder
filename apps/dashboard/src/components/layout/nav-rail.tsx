@@ -37,6 +37,7 @@ import {
   Network,
   Route,
   Search,
+  TrendingUp,
   Mic,
   HeartPulse,
   Layers,
@@ -75,6 +76,7 @@ const navSections: NavSection[] = [
       { icon: Target, label: "Goals", path: "/dashboard/goals" },
       { icon: ShieldCheck, label: "Approvals", path: "/dashboard/approvals", drawer: true },
       { icon: ListChecks, label: "Follow-Ups", path: "/dashboard/follow-ups", drawer: true },
+      { icon: TrendingUp, label: "Productivity", path: "/dashboard/productivity" },
       { icon: BarChart3, label: "Analytics", path: "/dashboard/analytics" },
       { icon: Library, label: "Knowledge", path: "/dashboard/knowledge", drawer: true },
     ],
@@ -86,7 +88,12 @@ const navSections: NavSection[] = [
       { icon: CalendarDays, label: "Calendar", path: "/dashboard/calendar", drawer: true },
       { icon: Workflow, label: "N8n", path: "/dashboard/n8n", drawer: true },
       { icon: GitBranch, label: "Pipelines", path: "/dashboard/pipelines", drawer: true },
-      { icon: LayoutTemplate, label: "Templates", path: "/dashboard/pipeline-templates", drawer: true },
+      {
+        icon: LayoutTemplate,
+        label: "Templates",
+        path: "/dashboard/pipeline-templates",
+        drawer: true,
+      },
     ],
   },
   {
@@ -154,7 +161,8 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
   useEffect(() => {
     if (!mobileOpen) return;
     const handler = (e: MouseEvent) => {
-      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node)) setMobileOpen(false);
+      if (sidebarRef.current && !sidebarRef.current.contains(e.target as Node))
+        setMobileOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -162,7 +170,9 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
 
   useEffect(() => {
     if (!mobileOpen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [mobileOpen]);
@@ -214,7 +224,10 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
               {workspaces.map((ws) => (
                 <button
                   key={ws.id}
-                  onClick={() => { switchWorkspace(ws.id); setWsDropdownOpen(false); }}
+                  onClick={() => {
+                    switchWorkspace(ws.id);
+                    setWsDropdownOpen(false);
+                  }}
                   className={cn(
                     "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs transition-colors",
                     ws.id === currentWorkspaceId
@@ -223,7 +236,9 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
                   )}
                 >
                   <span className="truncate">{ws.name}</span>
-                  {ws.isDefault && <span className="ml-auto text-[10px] text-muted-foreground">default</span>}
+                  {ws.isDefault && (
+                    <span className="ml-auto text-[10px] text-muted-foreground">default</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -241,7 +256,9 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
               </div>
             )}
             {mobileOpen && (
-              <p className="px-4 mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">{section.label}</p>
+              <p className="px-4 mb-1 text-[9px] uppercase tracking-widest text-muted-foreground">
+                {section.label}
+              </p>
             )}
             <div className="space-y-0.5 px-1.5">
               {section.items.map((item) => {
@@ -326,7 +343,10 @@ export function NavRail({ onDrawerOpen }: NavRailProps) {
 
       {/* Mobile overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 md:hidden animate-fade-in" aria-hidden="true" />
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden animate-fade-in"
+          aria-hidden="true"
+        />
       )}
 
       {/* Rail — desktop: 56px icon-only, mobile: slide-in with labels */}

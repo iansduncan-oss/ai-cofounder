@@ -154,7 +154,14 @@ export interface CreateTestAppOptions {
  * ```
  */
 export async function createTestApp(
-  buildServer: () => { app: { close: () => Promise<void>; ready: () => Promise<void>; inject: (opts: unknown) => unknown }; logger: unknown },
+  buildServer: () => {
+    app: {
+      close: () => Promise<void>;
+      ready: () => Promise<void>;
+      inject: (opts: unknown) => unknown;
+    };
+    logger: unknown;
+  },
   options: CreateTestAppOptions = {},
 ) {
   const { envOverrides = {}, clearMocksBeforeEach = true } = options;
@@ -213,7 +220,9 @@ export async function createTestApp(
  * ```
  */
 export async function importBuildServer(
-  importServer: () => Promise<{ buildServer: (...args: unknown[]) => { app: unknown; logger: unknown } }>,
+  importServer: () => Promise<{
+    buildServer: (...args: unknown[]) => { app: unknown; logger: unknown };
+  }>,
   options: CreateTestAppOptions = {},
 ) {
   const { envOverrides = {}, clearMocksBeforeEach = true } = options;

@@ -167,7 +167,13 @@ export function ChatPanel() {
     if (stream.isStreaming && stream.accumulatedText) return "streaming";
     if (stream.isStreaming) return "thinking";
     return "idle";
-  }, [speech.error, tts.isSpeaking, speech.isListening, stream.isStreaming, stream.accumulatedText]);
+  }, [
+    speech.error,
+    tts.isSpeaking,
+    speech.isListening,
+    stream.isStreaming,
+    stream.accumulatedText,
+  ]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -196,12 +202,18 @@ export function ChatPanel() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") { e.preventDefault(); handleNewChat(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
       if (e.key === "Escape" && stream.isStreaming) stream.cancel();
     };
     document.addEventListener("keydown", handler);
@@ -228,7 +240,10 @@ export function ChatPanel() {
 
   const handleMicClick = () => {
     if (speech.isListening) speech.stopListening();
-    else { tts.stop(); speech.startListening(); }
+    else {
+      tts.stop();
+      speech.startListening();
+    }
   };
 
   const lastAssistantIndex = useMemo(() => {
@@ -268,7 +283,8 @@ export function ChatPanel() {
               {msg.plan && <PlanCard plan={msg.plan} />}
               {msg.model && (
                 <p className="mt-1 text-[10px] opacity-50">
-                  {msg.model}{msg.provider && ` via ${msg.provider}`}
+                  {msg.model}
+                  {msg.provider && ` via ${msg.provider}`}
                 </p>
               )}
             </div>
@@ -281,7 +297,11 @@ export function ChatPanel() {
         ];
         if (i === lastAssistantIndex && msg.suggestions?.length && !stream.isStreaming) {
           elements.push(
-            <SuggestionChips key={`s-${i}`} suggestions={msg.suggestions} onSelect={handleSuggestionSelect} />,
+            <SuggestionChips
+              key={`s-${i}`}
+              suggestions={msg.suggestions}
+              onSelect={handleSuggestionSelect}
+            />,
           );
         }
         return elements;
@@ -344,7 +364,12 @@ export function ChatPanel() {
             </Button>
           )}
           {speech.isSupported && (
-            <Button variant="ghost" size="icon-sm" onClick={() => setVoiceMode(true)} title="Voice mode">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setVoiceMode(true)}
+              title="Voice mode"
+            >
               <Expand className="h-3 w-3" />
             </Button>
           )}
@@ -357,11 +382,7 @@ export function ChatPanel() {
       </div>
 
       {/* Messages */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-y-auto min-h-0"
-        onScroll={handleScroll}
-      >
+      <div ref={containerRef} className="flex-1 overflow-y-auto min-h-0" onScroll={handleScroll}>
         {messages.length === 0 && !stream.isStreaming ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center max-w-xs px-4">
@@ -432,7 +453,11 @@ export function ChatPanel() {
             <Button
               variant="ghost"
               size="icon-sm"
-              className={speech.isListening ? "bg-purple-500 text-white hover:bg-purple-600" : "text-muted-foreground"}
+              className={
+                speech.isListening
+                  ? "bg-purple-500 text-white hover:bg-purple-600"
+                  : "text-muted-foreground"
+              }
               onClick={handleMicClick}
               disabled={stream.isStreaming}
             >
@@ -446,7 +471,11 @@ export function ChatPanel() {
             size="icon-sm"
             className="rounded-full"
           >
-            {stream.isStreaming ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+            {stream.isStreaming ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
           </Button>
         </div>
       </div>

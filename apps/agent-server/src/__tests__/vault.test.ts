@@ -28,12 +28,8 @@ vi.mock("@ai-cofounder/db", () => ({
   getPrimaryAdminUserId: (...args: unknown[]) => mockGetPrimaryAdminUserId(...args),
 }));
 
-const {
-  ensureVaultStructure,
-  writeDailyNote,
-  writeProjectNote,
-  writeDecisionNote,
-} = await import("../services/vault.js");
+const { ensureVaultStructure, writeDailyNote, writeProjectNote, writeDecisionNote } =
+  await import("../services/vault.js");
 const { vaultRoutes } = await import("../routes/vault.js");
 
 // Minimal fake Db — vault functions pass it through to the mocked db functions
@@ -301,7 +297,10 @@ describe("vault routes", () => {
     });
 
     it("scopes results when section parameter is provided", async () => {
-      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy&section=decisions" });
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/vault/search?q=deploy&section=decisions",
+      });
       expect(res.statusCode).toBe(200);
       const body = res.json() as { matches: Array<{ section: string }> };
       expect(body.matches.length).toBeGreaterThan(0);
@@ -309,7 +308,10 @@ describe("vault routes", () => {
     });
 
     it("rejects an invalid section", async () => {
-      const res = await app.inject({ method: "GET", url: "/api/vault/search?q=deploy&section=secrets" });
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/vault/search?q=deploy&section=secrets",
+      });
       expect(res.statusCode).toBe(400);
     });
 

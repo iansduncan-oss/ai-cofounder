@@ -4,15 +4,7 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { RelativeTime } from "@/components/common/relative-time";
 import { usePageTitle } from "@/hooks/use-page-title";
-import {
-  PlayCircle,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Timer,
-  Zap,
-} from "lucide-react";
+import { PlayCircle, Clock, CheckCircle2, XCircle, AlertTriangle, Timer, Zap } from "lucide-react";
 import { Link } from "react-router";
 import type { WorkSession } from "@ai-cofounder/api-client";
 
@@ -106,9 +98,7 @@ function SessionCard({ session }: SessionCardProps) {
             <span className={`h-2 w-2 rounded-full ${cfg.dotColor}`} />
             {cfg.label}
           </span>
-          <span className="text-xs text-muted-foreground capitalize">
-            via {session.trigger}
-          </span>
+          <span className="text-xs text-muted-foreground capitalize">via {session.trigger}</span>
         </div>
         <span className="text-xs text-muted-foreground shrink-0">
           <RelativeTime date={session.createdAt} />
@@ -116,9 +106,7 @@ function SessionCard({ session }: SessionCardProps) {
       </div>
 
       {/* Summary */}
-      {truncatedSummary && (
-        <p className="text-sm text-muted-foreground">{truncatedSummary}</p>
-      )}
+      {truncatedSummary && <p className="text-sm text-muted-foreground">{truncatedSummary}</p>}
 
       {/* Stats row: duration + tokens + goal link */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
@@ -147,7 +135,13 @@ function SessionCard({ session }: SessionCardProps) {
 function SessionActivityGrid({ sessions }: { sessions: WorkSession[] }) {
   // Build 7-day × 6 time-slots (4h each) grid
   const now = new Date();
-  const grid: Array<{ day: string; slot: number; total: number; completed: number; failed: number }> = [];
+  const grid: Array<{
+    day: string;
+    slot: number;
+    total: number;
+    completed: number;
+    failed: number;
+  }> = [];
 
   for (let d = 6; d >= 0; d--) {
     const date = new Date(now);
@@ -160,7 +154,11 @@ function SessionActivityGrid({ sessions }: { sessions: WorkSession[] }) {
       const slotEnd = slotStart + 4;
       const matching = sessions.filter((s) => {
         const sd = new Date(s.createdAt);
-        return sd.toISOString().split("T")[0] === dateStr && sd.getHours() >= slotStart && sd.getHours() < slotEnd;
+        return (
+          sd.toISOString().split("T")[0] === dateStr &&
+          sd.getHours() >= slotStart &&
+          sd.getHours() < slotEnd
+        );
       });
       grid.push({
         day: dayStr,
@@ -181,36 +179,49 @@ function SessionActivityGrid({ sessions }: { sessions: WorkSession[] }) {
       <div className="flex gap-1">
         <div className="flex flex-col gap-1 pr-1 pt-5">
           {slotLabels.map((l) => (
-            <div key={l} className="flex h-5 items-center text-[9px] text-muted-foreground">{l}</div>
+            <div key={l} className="flex h-5 items-center text-[9px] text-muted-foreground">
+              {l}
+            </div>
           ))}
         </div>
         {days.map((day) => (
           <div key={day} className="flex flex-1 flex-col items-center gap-1">
             <span className="text-[9px] text-muted-foreground">{day}</span>
-            {grid.filter((g) => g.day === day).map((cell, i) => {
-              const bg = cell.total === 0
-                ? "bg-muted"
-                : cell.failed > 0
-                  ? "bg-red-400 dark:bg-red-600"
-                  : cell.completed > 0
-                    ? "bg-emerald-400 dark:bg-emerald-600"
-                    : "bg-blue-400 dark:bg-blue-600";
-              return (
-                <div
-                  key={i}
-                  className={`h-5 w-full rounded-sm ${bg} transition-colors`}
-                  title={`${cell.day} ${slotLabels[cell.slot]}h: ${cell.total} session${cell.total !== 1 ? "s" : ""} (${cell.completed} ok, ${cell.failed} fail)`}
-                />
-              );
-            })}
+            {grid
+              .filter((g) => g.day === day)
+              .map((cell, i) => {
+                const bg =
+                  cell.total === 0
+                    ? "bg-muted"
+                    : cell.failed > 0
+                      ? "bg-red-400 dark:bg-red-600"
+                      : cell.completed > 0
+                        ? "bg-emerald-400 dark:bg-emerald-600"
+                        : "bg-blue-400 dark:bg-blue-600";
+                return (
+                  <div
+                    key={i}
+                    className={`h-5 w-full rounded-sm ${bg} transition-colors`}
+                    title={`${cell.day} ${slotLabels[cell.slot]}h: ${cell.total} session${cell.total !== 1 ? "s" : ""} (${cell.completed} ok, ${cell.failed} fail)`}
+                  />
+                );
+              })}
           </div>
         ))}
       </div>
       <div className="mt-2 flex items-center gap-3 text-[9px] text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-muted" /> None</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" /> Completed</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> Failed</span>
-        <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-blue-400" /> Running</span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-muted" /> None
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-emerald-400" /> Completed
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-red-400" /> Failed
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-2.5 w-2.5 rounded-sm bg-blue-400" /> Running
+        </span>
       </div>
     </div>
   );
@@ -226,16 +237,14 @@ export function AutonomousSessionsPage() {
   const completed = sessions.filter((s) => s.status === "completed").length;
   const _failed = sessions.filter((s) => s.status === "failed" || s.status === "timeout").length;
   const totalTokens = sessions.reduce((s, sess) => s + (sess.tokensUsed ?? 0), 0);
-  const avgDuration = sessions.length > 0
-    ? sessions.reduce((s, sess) => s + (sess.durationMs ?? 0), 0) / sessions.length
-    : 0;
+  const avgDuration =
+    sessions.length > 0
+      ? sessions.reduce((s, sess) => s + (sess.durationMs ?? 0), 0) / sessions.length
+      : 0;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Autonomous Sessions"
-        description="History of autonomous work sessions"
-      />
+      <PageHeader title="Autonomous Sessions" description="History of autonomous work sessions" />
 
       {isLoading ? (
         <ListSkeleton rows={5} />

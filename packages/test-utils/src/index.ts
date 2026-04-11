@@ -10,7 +10,4 @@ export {
   createTestApp,
   importBuildServer,
 } from "./server-factory.js";
-export type {
-  MockQueueModule,
-  CreateTestAppOptions,
-} from "./server-factory.js";
+export type { MockQueueModule, CreateTestAppOptions } from "./server-factory.js";

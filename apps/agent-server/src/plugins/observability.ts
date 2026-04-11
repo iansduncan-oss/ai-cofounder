@@ -257,7 +257,13 @@ export function recordSandboxMetrics(data: {
   oomKilled: boolean;
   timedOut: boolean;
 }) {
-  const status = data.oomKilled ? "oom" : data.timedOut ? "timeout" : data.success ? "success" : "error";
+  const status = data.oomKilled
+    ? "oom"
+    : data.timedOut
+      ? "timeout"
+      : data.success
+        ? "success"
+        : "error";
   sandboxExecutionsTotal.inc({ language: data.language, status });
   if (data.oomKilled) {
     sandboxOomKillsTotal.inc({ language: data.language });
@@ -304,8 +310,14 @@ export function recordLlmMetrics(data: {
   const labels = { provider: data.provider, model: data.model, task_category: data.taskCategory };
   llmRequestDuration.observe(labels, data.durationMs / 1000);
   llmRequestsTotal.inc({ ...labels, status: data.success ? "success" : "error" });
-  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "input" }, data.inputTokens);
-  llmTokensTotal.inc({ provider: data.provider, model: data.model, direction: "output" }, data.outputTokens);
+  llmTokensTotal.inc(
+    { provider: data.provider, model: data.model, direction: "input" },
+    data.inputTokens,
+  );
+  llmTokensTotal.inc(
+    { provider: data.provider, model: data.model, direction: "output" },
+    data.outputTokens,
+  );
   if (data.estimatedCostMicros) {
     llmCostMicros.inc({ provider: data.provider, model: data.model }, data.estimatedCostMicros);
   }

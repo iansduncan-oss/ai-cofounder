@@ -3,66 +3,32 @@ import { createBrowserRouter, Navigate } from "react-router";
 import { App } from "@/app";
 import { CommandCenter } from "@/components/layout/command-center";
 
-const _OverviewPage = lazy(() =>
-  import("./overview").then((m) => ({ default: m.OverviewPage })),
-);
-const GoalsPage = lazy(() =>
-  import("./goals").then((m) => ({ default: m.GoalsPage })),
-);
+const _OverviewPage = lazy(() => import("./overview").then((m) => ({ default: m.OverviewPage })));
+const GoalsPage = lazy(() => import("./goals").then((m) => ({ default: m.GoalsPage })));
 const GoalDetailPage = lazy(() =>
   import("./goal-detail").then((m) => ({ default: m.GoalDetailPage })),
 );
-const ApprovalsPage = lazy(() =>
-  import("./approvals").then((m) => ({ default: m.ApprovalsPage })),
-);
-const ChatPage = lazy(() =>
-  import("./chat").then((m) => ({ default: m.ChatPage })),
-);
-const SettingsPage = lazy(() =>
-  import("./settings").then((m) => ({ default: m.SettingsPage })),
-);
-const MemoriesPage = lazy(() =>
-  import("./memories").then((m) => ({ default: m.MemoriesPage })),
-);
+const ApprovalsPage = lazy(() => import("./approvals").then((m) => ({ default: m.ApprovalsPage })));
+const ChatPage = lazy(() => import("./chat").then((m) => ({ default: m.ChatPage })));
+const SettingsPage = lazy(() => import("./settings").then((m) => ({ default: m.SettingsPage })));
+const MemoriesPage = lazy(() => import("./memories").then((m) => ({ default: m.MemoriesPage })));
 const MilestonesPage = lazy(() =>
   import("./milestones").then((m) => ({ default: m.MilestonesPage })),
 );
-const ActivityPage = lazy(() =>
-  import("./activity").then((m) => ({ default: m.ActivityPage })),
-);
-const AnalyticsPage = lazy(() =>
-  import("./analytics").then((m) => ({ default: m.AnalyticsPage })),
-);
-const WorkspacePage = lazy(() =>
-  import("./workspace").then((m) => ({ default: m.WorkspacePage })),
-);
-const HudPage = lazy(() =>
-  import("./hud").then((m) => ({ default: m.HudPage })),
-);
-const PipelinesPage = lazy(() =>
-  import("./pipelines").then((m) => ({ default: m.PipelinesPage })),
-);
+const ActivityPage = lazy(() => import("./activity").then((m) => ({ default: m.ActivityPage })));
+const AnalyticsPage = lazy(() => import("./analytics").then((m) => ({ default: m.AnalyticsPage })));
+const WorkspacePage = lazy(() => import("./workspace").then((m) => ({ default: m.WorkspacePage })));
+const HudPage = lazy(() => import("./hud").then((m) => ({ default: m.HudPage })));
+const PipelinesPage = lazy(() => import("./pipelines").then((m) => ({ default: m.PipelinesPage })));
 const PipelineDetailPage = lazy(() =>
   import("./pipeline-detail").then((m) => ({ default: m.PipelineDetailPage })),
 );
-const PersonaPage = lazy(() =>
-  import("./persona").then((m) => ({ default: m.PersonaPage })),
-);
-const DlqPage = lazy(() =>
-  import("./dlq").then((m) => ({ default: m.DlqPage })),
-);
-const SubagentsPage = lazy(() =>
-  import("./subagents").then((m) => ({ default: m.SubagentsPage })),
-);
-const PatternsPage = lazy(() =>
-  import("./patterns").then((m) => ({ default: m.PatternsPage })),
-);
-const JournalPage = lazy(() =>
-  import("./journal").then((m) => ({ default: m.JournalPage })),
-);
-const LoginPage = lazy(() =>
-  import("./login").then((m) => ({ default: m.LoginPage })),
-);
+const PersonaPage = lazy(() => import("./persona").then((m) => ({ default: m.PersonaPage })));
+const DlqPage = lazy(() => import("./dlq").then((m) => ({ default: m.DlqPage })));
+const SubagentsPage = lazy(() => import("./subagents").then((m) => ({ default: m.SubagentsPage })));
+const PatternsPage = lazy(() => import("./patterns").then((m) => ({ default: m.PatternsPage })));
+const JournalPage = lazy(() => import("./journal").then((m) => ({ default: m.JournalPage })));
+const LoginPage = lazy(() => import("./login").then((m) => ({ default: m.LoginPage })));
 const AuthCallbackPage = lazy(() =>
   import("./auth-callback").then((m) => ({ default: m.AuthCallbackPage })),
 );
@@ -75,59 +41,41 @@ const NotificationsPage = lazy(() =>
 const AutonomousSessionsPage = lazy(() =>
   import("./autonomous-sessions").then((m) => ({ default: m.AutonomousSessionsPage })),
 );
-const GmailPage = lazy(() =>
-  import("./gmail").then((m) => ({ default: m.GmailPage })),
-);
-const CalendarPage = lazy(() =>
-  import("./calendar").then((m) => ({ default: m.CalendarPage })),
-);
+const GmailPage = lazy(() => import("./gmail").then((m) => ({ default: m.GmailPage })));
+const CalendarPage = lazy(() => import("./calendar").then((m) => ({ default: m.CalendarPage })));
 const FollowUpsPage = lazy(() =>
   import("./follow-ups").then((m) => ({ default: m.FollowUpsPage })),
 );
-const DecisionsPage = lazy(() =>
-  import("./decisions").then((m) => ({ default: m.DecisionsPage })),
-);
-const EventsPage = lazy(() =>
-  import("./events").then((m) => ({ default: m.EventsPage })),
-);
+const DecisionsPage = lazy(() => import("./decisions").then((m) => ({ default: m.DecisionsPage })));
+const EventsPage = lazy(() => import("./events").then((m) => ({ default: m.EventsPage })));
 const PipelineTemplatesPage = lazy(() =>
   import("./pipeline-templates").then((m) => ({ default: m.PipelineTemplatesPage })),
 );
 const WorkSessionsPage = lazy(() =>
   import("./work-sessions").then((m) => ({ default: m.WorkSessionsPage })),
 );
-const ThinkingPage = lazy(() =>
-  import("./thinking").then((m) => ({ default: m.ThinkingPage })),
-);
+const ThinkingPage = lazy(() => import("./thinking").then((m) => ({ default: m.ThinkingPage })));
 const ReflectionsPage = lazy(() =>
   import("./reflections").then((m) => ({ default: m.ReflectionsPage })),
 );
-const AgentsPage = lazy(() =>
-  import("./agents").then((m) => ({ default: m.AgentsPage })),
-);
-const SchedulesPage = lazy(() =>
-  import("./schedules").then((m) => ({ default: m.SchedulesPage })),
-);
-const KnowledgePage = lazy(() =>
-  import("./knowledge").then((m) => ({ default: m.KnowledgePage })),
-);
-const SearchPage = lazy(() =>
-  import("./search").then((m) => ({ default: m.SearchPage })),
-);
-const VoicePage = lazy(() =>
-  import("./voice").then((m) => ({ default: m.VoicePage })),
-);
-const RoutingPage = lazy(() =>
-  import("./routing").then((m) => ({ default: m.RoutingPage })),
-);
+const AgentsPage = lazy(() => import("./agents").then((m) => ({ default: m.AgentsPage })));
+const SchedulesPage = lazy(() => import("./schedules").then((m) => ({ default: m.SchedulesPage })));
+const KnowledgePage = lazy(() => import("./knowledge").then((m) => ({ default: m.KnowledgePage })));
+const SearchPage = lazy(() => import("./search").then((m) => ({ default: m.SearchPage })));
+const VoicePage = lazy(() => import("./voice").then((m) => ({ default: m.VoicePage })));
+const RoutingPage = lazy(() => import("./routing").then((m) => ({ default: m.RoutingPage })));
 const SelfHealingPage = lazy(() =>
   import("./self-healing").then((m) => ({ default: m.SelfHealingPage })),
 );
 const WorkspacesPage = lazy(() =>
   import("./workspaces").then((m) => ({ default: m.WorkspacesPage })),
 );
-const RegisterPage = lazy(() =>
-  import("./register").then((m) => ({ default: m.RegisterPage })),
+const RegisterPage = lazy(() => import("./register").then((m) => ({ default: m.RegisterPage })));
+const ProductivityPage = lazy(() =>
+  import("./productivity").then((m) => ({ default: m.ProductivityPage })),
+);
+const ProductivityHistoryPage = lazy(() =>
+  import("./productivity-history").then((m) => ({ default: m.ProductivityHistoryPage })),
 );
 
 export const router = createBrowserRouter([
@@ -186,6 +134,8 @@ export const router = createBrowserRouter([
       { path: "routing", element: <RoutingPage /> },
       { path: "self-healing", element: <SelfHealingPage /> },
       { path: "workspaces", element: <WorkspacesPage /> },
+      { path: "productivity", element: <ProductivityPage /> },
+      { path: "productivity/history", element: <ProductivityHistoryPage /> },
       { path: "settings", element: <SettingsPage /> },
       { path: "*", element: <Navigate to="/dashboard" replace /> },
     ],

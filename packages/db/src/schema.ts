@@ -984,6 +984,84 @@ export const proceduralMemories = pgTable("procedural_memories", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/* ── Codebase Insights (auto-discovered improvements / fixes / additions) ── */
+
+export const insightCategoryEnum = pgEnum("insight_category", [
+  "fix", // bug, broken test, CI failure
+  "improve", // refactor, performance, cleanup
+  "add", // missing test, missing doc, new feature suggestion
+  "review", // open PR needing review
+  "followup", // TODO/FIXME comment
+  "security", // dependency CVE, secret leak
+  "other",
+]);
+
+export const insightSeverityEnum = pgEnum("insight_severity", [
+  "low",
+  "medium",
+  "high",
+  "critical",
+]);
+
+export const codebaseInsights = pgTable(
+  "codebase_insights",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    /** Stable identity used for deduping across scans (hash of type + title + filePath). */
+    fingerprint: text("fingerprint").notNull().unique(),
+    category: insightCategoryEnum("category").notNull(),
+    severity: insightSeverityEnum("severity").notNull().default("medium"),
+    title: text("title").notNull(),
+    description: text("description"),
+    /** Suggested concrete action the user (or an agent) can take. */
+    suggestedAction: text("suggested_action"),
+    /** File path or URL reference (PR link, commit sha, etc.) */
+    reference: text("reference"),
+    /** Source signal type: "git" | "github_pr" | "github_ci" | "todo" | "failure_pattern" */
+    source: text("source").notNull(),
+    status: text("status").notNull().default("open"), // "open" | "dismissed" | "resolved"
+    hitCount: integer("hit_count").notNull().default(1),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    metadata: jsonb("metadata"),
+  },
+  (table) => [index("idx_codebase_insights_status_severity").on(table.status, table.severity)],
+);
+
+/* ── Productivity Logs (daily check-in / reflection tracker) ── */
+
+export const productivityMoodEnum = pgEnum("productivity_mood", [
+  "great",
+  "good",
+  "okay",
+  "rough",
+  "terrible",
+]);
+
+export const productivityLogs = pgTable(
+  "productivity_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => adminUsers.id, { onDelete: "cascade" }),
+    date: text("date").notNull(), // YYYY-MM-DD
+    plannedItems: jsonb("planned_items").default([]), // [{text, completed}]
+    reflectionNotes: text("reflection_notes"),
+    mood: productivityMoodEnum("mood"),
+    energyLevel: integer("energy_level"), // 1-5
+    completionScore: integer("completion_score"), // 0-100, auto-calculated
+    streakDays: integer("streak_days").notNull().default(0),
+    highlights: text("highlights"),
+    blockers: text("blockers"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("idx_productivity_logs_user_date").on(table.userId, table.date)],
+);
+
 /* ── Failure Patterns (tool error tracking and resolutions) ── */
 
 export const failurePatterns = pgTable("failure_patterns", {

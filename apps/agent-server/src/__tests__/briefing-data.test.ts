@@ -73,9 +73,7 @@ vi.mock("../services/discord-digest.js", () => ({
 }));
 
 // ── Import after mocks ──
-const { gatherBriefingData, sendDailyBriefing } = await import(
-  "../services/briefing.js"
-);
+const { gatherBriefingData, sendDailyBriefing } = await import("../services/briefing.js");
 import type { Db } from "@ai-cofounder/db";
 import { LlmRegistry } from "@ai-cofounder/llm";
 
@@ -92,7 +90,15 @@ function hoursAgo(hours: number): Date {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
 
-function makeGoal(overrides: Partial<{ title: string; priority: string; taskCount: number; completedTaskCount: number; updatedAt: Date }> = {}) {
+function makeGoal(
+  overrides: Partial<{
+    title: string;
+    priority: string;
+    taskCount: number;
+    completedTaskCount: number;
+    updatedAt: Date;
+  }> = {},
+) {
   return {
     title: overrides.title ?? "Test Goal",
     priority: overrides.priority ?? "medium",
@@ -125,26 +131,31 @@ describe("gatherBriefingData", () => {
   it("returns all fields correctly with mock data", async () => {
     const now = new Date();
     mockListActiveGoals.mockResolvedValue([
-      makeGoal({ title: "Build API", priority: "high", taskCount: 5, completedTaskCount: 2, updatedAt: now }),
+      makeGoal({
+        title: "Build API",
+        priority: "high",
+        taskCount: 5,
+        completedTaskCount: 2,
+        updatedAt: now,
+      }),
     ]);
-    mockListRecentlyCompletedGoals.mockResolvedValue([
-      { title: "Fix login bug" },
-    ]);
+    mockListRecentlyCompletedGoals.mockResolvedValue([{ title: "Fix login bug" }]);
     mockCountTasksByStatus.mockResolvedValue({
       pending: 3,
       completed: 7,
       failed: 1,
     });
     mockListEnabledSchedules.mockResolvedValue([
-      { description: "Daily backup", actionPrompt: "Run backup script", nextRunAt: new Date("2026-04-11T08:00:00Z") },
+      {
+        description: "Daily backup",
+        actionPrompt: "Run backup script",
+        nextRunAt: new Date("2026-04-11T08:00:00Z"),
+      },
     ]);
     mockListRecentWorkSessions.mockResolvedValue([
       { trigger: "discord", status: "completed", summary: "Deployed v2.1" },
     ]);
-    mockListPendingApprovals.mockResolvedValue([
-      { id: "appr-1" },
-      { id: "appr-2" },
-    ]);
+    mockListPendingApprovals.mockResolvedValue([{ id: "appr-1" }, { id: "appr-2" }]);
 
     const data = await gatherBriefingData(mockDb);
 
@@ -250,7 +261,8 @@ describe("gatherBriefingData", () => {
     mockListEnabledSchedules.mockResolvedValue([
       {
         description: null,
-        actionPrompt: "This is a very long action prompt that should be truncated to 80 characters maximum for display purposes in the briefing",
+        actionPrompt:
+          "This is a very long action prompt that should be truncated to 80 characters maximum for display purposes in the briefing",
         nextRunAt: null,
       },
     ]);
@@ -304,8 +316,8 @@ describe("sendDailyBriefing", () => {
 
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any,  
-      llmRegistry as any,  
+      mockNotificationService as any,
+      llmRegistry as any,
     );
 
     // LLM was called
@@ -314,18 +326,14 @@ describe("sendDailyBriefing", () => {
       "simple",
       expect.objectContaining({
         system: expect.stringContaining("Jarvis"),
-        messages: expect.arrayContaining([
-          expect.objectContaining({ role: "user" }),
-        ]),
+        messages: expect.arrayContaining([expect.objectContaining({ role: "user" })]),
         max_tokens: 1024,
       }),
     );
 
     // Notification was sent
     expect(mockSendBriefing).toHaveBeenCalledOnce();
-    expect(mockSendBriefing).toHaveBeenCalledWith(
-      "Good morning, sir. All systems operational.",
-    );
+    expect(mockSendBriefing).toHaveBeenCalledWith("Good morning, sir. All systems operational.");
 
     // Result cached
     expect(mockUpsertBriefingCache).toHaveBeenCalledOnce();
@@ -345,8 +353,8 @@ describe("sendDailyBriefing", () => {
 
     const result = await sendDailyBriefing(
       mockDb,
-      mockNotificationService as any,  
-      llmRegistry as any,  
+      mockNotificationService as any,
+      llmRegistry as any,
     );
 
     // Should still send a notification (with the static fallback)
@@ -359,10 +367,7 @@ describe("sendDailyBriefing", () => {
   });
 
   it("uses static format when no llmRegistry is provided", async () => {
-    const result = await sendDailyBriefing(
-      mockDb,
-      mockNotificationService as any,  
-    );
+    const result = await sendDailyBriefing(mockDb, mockNotificationService as any);
 
     // LLM was NOT called
     expect(mockComplete).not.toHaveBeenCalled();
@@ -379,10 +384,7 @@ describe("sendDailyBriefing", () => {
     mockUpsertBriefingCache.mockRejectedValue(new Error("DB write failed"));
 
     // Should not throw even when caching fails
-    const result = await sendDailyBriefing(
-      mockDb,
-      mockNotificationService as any,  
-    );
+    const result = await sendDailyBriefing(mockDb, mockNotificationService as any);
 
     expect(mockSendBriefing).toHaveBeenCalledOnce();
     expect(result).toBeTruthy();

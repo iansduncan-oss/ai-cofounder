@@ -28,8 +28,8 @@ your main workstation as an escape hatch until you're confident.**
 ## 0.1 What this does NOT replace
 
 - **Public DNS for aviontechs.com.** Cloudflare still hosts the
-  authoritative zone for `*.aviontechs.com`. AdGuard is a *recursive
-  resolver* for your clients, not an authoritative nameserver.
+  authoritative zone for `*.aviontechs.com`. AdGuard is a _recursive
+  resolver_ for your clients, not an authoritative nameserver.
 - **Router DHCP.** Clients still get their IP + default gateway from
   the router. Only the DNS server setting changes.
 
@@ -71,6 +71,7 @@ docker compose logs -f adguard
 ```
 
 Expected log lines:
+
 - Unbound: `generate keytag query _ta-4f66`, `info: start of service`
 - AdGuard: `Initialize: opening file`, `Init: initial listener: udp://...`
 
@@ -114,6 +115,7 @@ AdGuard admin UI → Settings → DNS settings:
 - **Apply**.
 
 Then Settings → Filters → DNS blocklists → enable at minimum:
+
 - AdGuard DNS filter
 - AdAway Default Blocklist
 - Peter Lowe's Blocklist
@@ -170,6 +172,7 @@ This is the moment of highest risk. Do it in this exact order:
    This pushes the config to every device in the tailnet.
 
 **Escape hatches during cutover:**
+
 - On macOS: delete the DNS entry in Network settings. Falls back to
   DHCP-provided DNS instantly.
 - On Tailscale: disable "Override local DNS" in the admin console.
@@ -191,6 +194,7 @@ docker compose down -v
 
 After stopping, any client still pointed at the tailnet IP will
 **lose DNS entirely**. Either:
+
 - Revert the Tailscale "Override local DNS" setting (fastest — clients
   fall back in ~1 min), OR
 - Remove the manual DNS entry on each device.

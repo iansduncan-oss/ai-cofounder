@@ -81,51 +81,47 @@ export class NotificationService {
   /** Posts approval notification to Slack with Approve/Reject buttons + Discord embed */
   async notifyApprovalCreated(approval: ApprovalNotification): Promise<void> {
     const slackPromise = this.hasSlack()
-      ? this.sendSlack(
-          this.slackChannel,
-          `Approval requested: ${approval.reason}`,
-          [
-            {
-              type: "header",
-              text: { type: "plain_text", text: "A Matter Requiring Your Approval, Sir" },
+      ? this.sendSlack(this.slackChannel, `Approval requested: ${approval.reason}`, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "A Matter Requiring Your Approval, Sir" },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${approval.reason}*\nRequested by: \`${approval.requestedBy}\` · Task: \`${approval.taskId.slice(0, 8)}…\``,
             },
-            {
-              type: "section",
-              text: {
-                type: "mrkdwn",
-                text: `*${approval.reason}*\nRequested by: \`${approval.requestedBy}\` · Task: \`${approval.taskId.slice(0, 8)}…\``,
+          },
+          {
+            type: "actions",
+            elements: [
+              {
+                type: "button",
+                text: { type: "plain_text", text: "Approve" },
+                style: "primary",
+                action_id: "approval_approve",
+                value: approval.approvalId,
               },
-            },
-            {
-              type: "actions",
-              elements: [
-                {
-                  type: "button",
-                  text: { type: "plain_text", text: "Approve" },
-                  style: "primary",
-                  action_id: "approval_approve",
-                  value: approval.approvalId,
-                },
-                {
-                  type: "button",
-                  text: { type: "plain_text", text: "Reject" },
-                  style: "danger",
-                  action_id: "approval_reject",
-                  value: approval.approvalId,
-                },
-              ],
-            },
-            {
-              type: "context",
-              elements: [
-                {
-                  type: "mrkdwn",
-                  text: `ID: \`${approval.approvalId}\` · Or use \`/approve ${approval.approvalId}\``,
-                },
-              ],
-            },
-          ],
-        )
+              {
+                type: "button",
+                text: { type: "plain_text", text: "Reject" },
+                style: "danger",
+                action_id: "approval_reject",
+                value: approval.approvalId,
+              },
+            ],
+          },
+          {
+            type: "context",
+            elements: [
+              {
+                type: "mrkdwn",
+                text: `ID: \`${approval.approvalId}\` · Or use \`/approve ${approval.approvalId}\``,
+              },
+            ],
+          },
+        ])
       : Promise.resolve();
 
     const discordPromise = this.hasDiscord()
@@ -156,32 +152,28 @@ export class NotificationService {
     const summary = `${notification.completedTasks}/${notification.totalTasks} tasks completed${durationText ? ` in ${durationText}` : ""}`;
 
     const slackPromise = this.hasSlack()
-      ? this.sendSlack(
-          this.slackChannel,
-          `${emoji} ${title}: ${notification.goalTitle}`,
-          [
-            {
-              type: "header",
-              text: { type: "plain_text", text: `${emoji} ${title}` },
+      ? this.sendSlack(this.slackChannel, `${emoji} ${title}: ${notification.goalTitle}`, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: `${emoji} ${title}` },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${notification.goalTitle}*\n${summary}`,
             },
-            {
-              type: "section",
-              text: {
+          },
+          {
+            type: "context",
+            elements: [
+              {
                 type: "mrkdwn",
-                text: `*${notification.goalTitle}*\n${summary}`,
+                text: `Goal: \`${notification.goalId.slice(0, 8)}…\` · ${new Date().toISOString()}`,
               },
-            },
-            {
-              type: "context",
-              elements: [
-                {
-                  type: "mrkdwn",
-                  text: `Goal: \`${notification.goalId.slice(0, 8)}…\` · ${new Date().toISOString()}`,
-                },
-              ],
-            },
-          ],
-        )
+            ],
+          },
+        ])
       : Promise.resolve();
 
     const discordPromise = this.hasDiscord()
@@ -203,32 +195,28 @@ export class NotificationService {
     const errorTruncated = notification.error.slice(0, 500);
 
     const slackPromise = this.hasSlack()
-      ? this.sendSlack(
-          this.slackChannel,
-          `\u274c Task Failed: ${notification.taskTitle}`,
-          [
-            {
-              type: "header",
-              text: { type: "plain_text", text: "I'm Afraid a Task Has Failed, Sir" },
+      ? this.sendSlack(this.slackChannel, `\u274c Task Failed: ${notification.taskTitle}`, [
+          {
+            type: "header",
+            text: { type: "plain_text", text: "I'm Afraid a Task Has Failed, Sir" },
+          },
+          {
+            type: "section",
+            text: {
+              type: "mrkdwn",
+              text: `*${notification.taskTitle}*\nAgent: \`${notification.agent}\`\nError: \`\`\`${errorTruncated}\`\`\``,
             },
-            {
-              type: "section",
-              text: {
+          },
+          {
+            type: "context",
+            elements: [
+              {
                 type: "mrkdwn",
-                text: `*${notification.taskTitle}*\nAgent: \`${notification.agent}\`\nError: \`\`\`${errorTruncated}\`\`\``,
+                text: `Goal: *${notification.goalTitle}* · Task: \`${notification.taskId.slice(0, 8)}…\``,
               },
-            },
-            {
-              type: "context",
-              elements: [
-                {
-                  type: "mrkdwn",
-                  text: `Goal: *${notification.goalTitle}* · Task: \`${notification.taskId.slice(0, 8)}…\``,
-                },
-              ],
-            },
-          ],
-        )
+            ],
+          },
+        ])
       : Promise.resolve();
 
     const discordPromise = this.hasDiscord()
@@ -308,7 +296,10 @@ export class NotificationService {
           [
             {
               type: "header",
-              text: { type: "plain_text", text: `${scopeEmoji} A Proposed Objective Awaits Your Approval, Sir` },
+              text: {
+                type: "plain_text",
+                text: `${scopeEmoji} A Proposed Objective Awaits Your Approval, Sir`,
+              },
             },
             {
               type: "section",
@@ -455,7 +446,10 @@ export class NotificationService {
   }
 
   /** Alert when dead-letter queue exceeds a threshold */
-  async notifyDlqAlert(count: number, recentJobs: Array<{ originalQueue: string; failedReason: string; failedAt: string }>): Promise<void> {
+  async notifyDlqAlert(
+    count: number,
+    recentJobs: Array<{ originalQueue: string; failedReason: string; failedAt: string }>,
+  ): Promise<void> {
     const jobList = recentJobs
       .slice(0, 5)
       .map((j) => `- \`${j.originalQueue}\`: ${j.failedReason.slice(0, 100)} (${j.failedAt})`)
@@ -555,7 +549,11 @@ export class NotificationService {
         return;
       }
 
-      const openData = (await openRes.json()) as { ok: boolean; channel?: { id: string }; error?: string };
+      const openData = (await openRes.json()) as {
+        ok: boolean;
+        channel?: { id: string };
+        error?: string;
+      };
       if (!openData.ok || !openData.channel) {
         logger.warn({ error: openData.error }, "Slack DM open failed");
         return;
@@ -576,11 +574,7 @@ export class NotificationService {
     }
   }
 
-  private async sendSlack(
-    channel: string,
-    text: string,
-    blocks: object[],
-  ): Promise<void> {
+  private async sendSlack(channel: string, text: string, blocks: object[]): Promise<void> {
     try {
       const res = await fetch("https://slack.com/api/chat.postMessage", {
         method: "POST",

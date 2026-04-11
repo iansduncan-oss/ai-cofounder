@@ -107,10 +107,7 @@ describe("executeQueryDatabase", () => {
     });
 
     it("rejects CREATE TABLE", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "CREATE TABLE evil (id int)",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "CREATE TABLE evil (id int)");
       expect(result).toHaveProperty("error");
       expect(mockExecute).not.toHaveBeenCalled();
     });
@@ -173,10 +170,7 @@ describe("executeQueryDatabase", () => {
     });
 
     it("handles comment-only input", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "-- just a comment",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "-- just a comment");
       expect(result).toHaveProperty("error");
       expect(mockExecute).not.toHaveBeenCalled();
     });
@@ -186,10 +180,7 @@ describe("executeQueryDatabase", () => {
 
   describe("blocks multi-statement injection", () => {
     it("rejects SELECT; DELETE piggyback", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "SELECT 1; DELETE FROM users",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "SELECT 1; DELETE FROM users");
       expect(result).toEqual({
         error: "Multiple SQL statements are not allowed.",
       });
@@ -206,18 +197,12 @@ describe("executeQueryDatabase", () => {
     });
 
     it("allows trailing semicolons (common in SQL editors)", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "SELECT * FROM users;",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users;");
       expect(result).toHaveProperty("rows");
     });
 
     it("allows trailing semicolons with whitespace", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "SELECT * FROM users;  \n  ",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users;  \n  ");
       expect(result).toHaveProperty("rows");
     });
 
@@ -309,7 +294,7 @@ describe("executeQueryDatabase", () => {
     });
 
     it("handles DB errors gracefully", async () => {
-      mockExecute.mockRejectedValue(new Error("relation \"users\" does not exist"));
+      mockExecute.mockRejectedValue(new Error('relation "users" does not exist'));
       const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
       expect(result).toEqual({
         error: 'Query failed: relation "users" does not exist',
@@ -339,10 +324,7 @@ describe("executeQueryDatabase", () => {
     });
 
     it("handles leading whitespace before SELECT", async () => {
-      const result = await executeQueryDatabase(
-        createMockDb(),
-        "   \n  SELECT * FROM users",
-      );
+      const result = await executeQueryDatabase(createMockDb(), "   \n  SELECT * FROM users");
       expect(result).toHaveProperty("rows");
     });
   });

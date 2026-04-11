@@ -71,18 +71,38 @@ vi.mock("@ai-cofounder/rag", () => ({
 // ── Mock agent tools that orchestrator imports ─────────────────────────────────
 
 vi.mock("../agents/tools/web-search.js", () => ({
-  SEARCH_WEB_TOOL: { name: "search_web", description: "Search", input_schema: { type: "object", properties: {}, required: [] } },
+  SEARCH_WEB_TOOL: {
+    name: "search_web",
+    description: "Search",
+    input_schema: { type: "object", properties: {}, required: [] },
+  },
   executeWebSearch: vi.fn().mockResolvedValue({ results: [] }),
 }));
 
 vi.mock("../agents/tools/memory-tools.js", () => ({
-  SAVE_MEMORY_TOOL: { name: "save_memory", description: "Save", input_schema: { type: "object", properties: {} } },
-  RECALL_MEMORIES_TOOL: { name: "recall_memories", description: "Recall", input_schema: { type: "object", properties: {} } },
+  SAVE_MEMORY_TOOL: {
+    name: "save_memory",
+    description: "Save",
+    input_schema: { type: "object", properties: {} },
+  },
+  RECALL_MEMORIES_TOOL: {
+    name: "recall_memories",
+    description: "Recall",
+    input_schema: { type: "object", properties: {} },
+  },
 }));
 
 vi.mock("../agents/tools/n8n-tools.js", () => ({
-  TRIGGER_N8N_WORKFLOW_TOOL: { name: "trigger_workflow", description: "Trigger", input_schema: { type: "object", properties: {} } },
-  LIST_N8N_WORKFLOWS_TOOL: { name: "list_workflows", description: "List", input_schema: { type: "object", properties: {} } },
+  TRIGGER_N8N_WORKFLOW_TOOL: {
+    name: "trigger_workflow",
+    description: "Trigger",
+    input_schema: { type: "object", properties: {} },
+  },
+  LIST_N8N_WORKFLOWS_TOOL: {
+    name: "list_workflows",
+    description: "List",
+    input_schema: { type: "object", properties: {} },
+  },
 }));
 
 // ── Import modules under test ──────────────────────────────────────────────────
@@ -123,13 +143,15 @@ beforeEach(() => {
 
 describe("decision extraction", () => {
   it("extracts and stores decision from response with decision language", async () => {
-    mockComplete.mockResolvedValue(jsonResponse({
-      hasDecision: true,
-      title: "Use Postgres",
-      decision: "Going with Postgres for persistence",
-      rationale: "Better JSON support",
-      alternatives: ["MongoDB", "SQLite"],
-    }));
+    mockComplete.mockResolvedValue(
+      jsonResponse({
+        hasDecision: true,
+        title: "Use Postgres",
+        decision: "Going with Postgres for persistence",
+        rationale: "Better JSON support",
+        alternatives: ["MongoDB", "SQLite"],
+      }),
+    );
 
     const registry = new LlmRegistry();
     const db = {} as any;
@@ -240,7 +262,12 @@ describe("proactive reference", () => {
       embeddingService: { embed: vi.fn().mockResolvedValue(new Array(768).fill(0.1)) } as any,
     });
 
-    const result = await orchestrator.run("How do we set up the database?", "conv-1", undefined, "user-1");
+    const result = await orchestrator.run(
+      "How do we set up the database?",
+      "conv-1",
+      undefined,
+      "user-1",
+    );
 
     // Verify LLM was called and the system prompt includes the past decisions block
     expect(mockComplete).toHaveBeenCalled();

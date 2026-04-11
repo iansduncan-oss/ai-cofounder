@@ -1,6 +1,11 @@
 import { createLogger } from "@ai-cofounder/shared";
 import type { LlmProvider } from "./provider.js";
-import type { LlmCompletionRequest, LlmCompletionResponse, TaskCategory, CompletionMetadata } from "./types.js";
+import type {
+  LlmCompletionRequest,
+  LlmCompletionResponse,
+  TaskCategory,
+  CompletionMetadata,
+} from "./types.js";
 
 /** Data passed to the onCompletion callback after every successful complete() */
 export interface CompletionEvent {
@@ -48,8 +53,8 @@ const MODEL_COSTS: Record<string, ModelCost> = {
   // Ollama (local inference — free)
   "llama3.2": { inputPer1M: 0, outputPer1M: 0 },
   "llama3.1": { inputPer1M: 0, outputPer1M: 0 },
-  "mistral": { inputPer1M: 0, outputPer1M: 0 },
-  "codellama": { inputPer1M: 0, outputPer1M: 0 },
+  mistral: { inputPer1M: 0, outputPer1M: 0 },
+  codellama: { inputPer1M: 0, outputPer1M: 0 },
 };
 
 /* ── Circuit breaker ── */
@@ -205,7 +210,10 @@ export class LlmRegistry {
     // Reset circuit breaker on success
     const b = this.getBreaker(provider);
     if (b.state !== "closed") {
-      this.logger.info({ provider, previousState: b.state }, "circuit breaker closed after success");
+      this.logger.info(
+        { provider, previousState: b.state },
+        "circuit breaker closed after success",
+      );
     }
     b.state = "closed";
     b.consecutiveFailures = 0;
@@ -233,10 +241,7 @@ export class LlmRegistry {
     } else if (b.consecutiveFailures >= CIRCUIT_BREAKER_DEFAULTS.failureThreshold) {
       b.state = "open";
       b.openUntil = new Date(Date.now() + CIRCUIT_BREAKER_DEFAULTS.resetTimeoutMs);
-      this.logger.warn(
-        { provider, failures: b.consecutiveFailures },
-        "circuit breaker opened",
-      );
+      this.logger.warn({ provider, failures: b.consecutiveFailures }, "circuit breaker opened");
     }
   }
 
@@ -278,26 +283,20 @@ export class LlmRegistry {
     const chainLength = chain.length;
 
     // Quality score: first in chain = highest quality
-    const qualityScore = 1 - (routeIndex / Math.max(chainLength, 1));
+    const qualityScore = 1 - routeIndex / Math.max(chainLength, 1);
 
     // Cost score: estimate cost for a typical request (1K in, 500 out)
     const routeCost = this.estimateRequestCost(route.model);
-    const maxCostInChain = Math.max(
-      1,
-      ...chain.map((r) => this.estimateRequestCost(r.model)),
-    );
-    const costScore = 1 - (routeCost / maxCostInChain);
+    const maxCostInChain = Math.max(1, ...chain.map((r) => this.estimateRequestCost(r.model)));
+    const costScore = 1 - routeCost / maxCostInChain;
 
     // Error penalty: penalize unreliable providers
     const stats = this.stats.get(route.provider);
-    const errorPenalty = stats
-      ? (stats.errorCount / Math.max(stats.totalRequests, 1)) * 0.3
-      : 0;
+    const errorPenalty = stats ? (stats.errorCount / Math.max(stats.totalRequests, 1)) * 0.3 : 0;
 
     // Latency penalty: light penalty for slow providers
-    const avgLatency = stats && stats.successCount > 0
-      ? stats.totalLatencyMs / stats.successCount
-      : 0;
+    const avgLatency =
+      stats && stats.successCount > 0 ? stats.totalLatencyMs / stats.successCount : 0;
     const latencyPenalty = Math.min(avgLatency / 10_000, 0.2);
 
     return (1 - costWeight) * qualityScore + costWeight * costScore - errorPenalty - latencyPenalty;
@@ -309,7 +308,12 @@ export class LlmRegistry {
   }
 
   /** Get circuit breaker state for all providers */
-  getCircuitBreakerStates(): Array<{ provider: string; state: CircuitState; consecutiveFailures: number; openUntil?: string }> {
+  getCircuitBreakerStates(): Array<{
+    provider: string;
+    state: CircuitState;
+    consecutiveFailures: number;
+    openUntil?: string;
+  }> {
     return Array.from(this.breakers.entries()).map(([provider, b]) => ({
       provider,
       state: b.state,
@@ -322,7 +326,11 @@ export class LlmRegistry {
   getProviderHealth(): ProviderHealth[] {
     return Array.from(this.providers.values()).map((p) => {
       const s = this.stats.get(p.name) ?? {
-        totalRequests: 0, successCount: 0, errorCount: 0, totalLatencyMs: 0, recentErrors: [],
+        totalRequests: 0,
+        successCount: 0,
+        errorCount: 0,
+        totalLatencyMs: 0,
+        recentErrors: [],
       };
       return {
         provider: p.name,
@@ -331,7 +339,10 @@ export class LlmRegistry {
         successCount: s.successCount,
         errorCount: s.errorCount,
         avgLatencyMs: s.successCount > 0 ? Math.round(s.totalLatencyMs / s.successCount) : 0,
-        recentErrors: s.recentErrors.map((e) => ({ time: e.time.toISOString(), message: e.message })),
+        recentErrors: s.recentErrors.map((e) => ({
+          time: e.time.toISOString(),
+          message: e.message,
+        })),
         lastSuccessAt: s.lastSuccessAt?.toISOString(),
         lastErrorAt: s.lastErrorAt?.toISOString(),
       };
@@ -395,10 +406,7 @@ export class LlmRegistry {
 
       // Circuit breaker check
       if (this.isCircuitOpen(route.provider)) {
-        this.logger.info(
-          { task, provider: route.provider },
-          "skipping provider (circuit open)",
-        );
+        this.logger.info({ task, provider: route.provider }, "skipping provider (circuit open)");
         continue;
       }
 
@@ -477,7 +485,13 @@ export class LlmRegistry {
           if (this.isTransientError(err) && attempt < MAX_RETRIES_PER_PROVIDER) {
             const delayMs = 2000 + Math.random() * 1000;
             this.logger.warn(
-              { task, provider: route.provider, model: route.model, attempt, delayMs: Math.round(delayMs) },
+              {
+                task,
+                provider: route.provider,
+                model: route.model,
+                attempt,
+                delayMs: Math.round(delayMs),
+              },
               "transient error, retrying same provider",
             );
             await new Promise((r) => setTimeout(r, delayMs));
@@ -535,9 +549,8 @@ export class LlmRegistry {
       successCount: s.successCount,
       errorCount: s.errorCount,
       avgLatencyMs: s.successCount > 0 ? Math.round(s.totalLatencyMs / s.successCount) : 0,
-      lastErrorMessage: s.recentErrors.length > 0
-        ? s.recentErrors[s.recentErrors.length - 1].message
-        : undefined,
+      lastErrorMessage:
+        s.recentErrors.length > 0 ? s.recentErrors[s.recentErrors.length - 1].message : undefined,
       lastErrorAt: s.lastErrorAt,
       lastSuccessAt: s.lastSuccessAt,
     }));
@@ -557,7 +570,10 @@ export class LlmRegistry {
           lastSuccessAt: snap.lastSuccessAt,
           lastErrorAt: snap.lastErrorAt,
         });
-        this.logger.info({ provider: snap.providerName, requests: snap.requestCount }, "seeded stats from DB");
+        this.logger.info(
+          { provider: snap.providerName, requests: snap.requestCount },
+          "seeded stats from DB",
+        );
       }
     }
   }

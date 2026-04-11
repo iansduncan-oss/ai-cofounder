@@ -47,7 +47,12 @@ describe("notifyCiFailures", () => {
   it("notifies with formatted failure lines for each failing run", async () => {
     const results = [
       ciStatus({ repo: "alice/api", branch: "main", conclusion: "failure", url: "https://gh/1" }),
-      ciStatus({ repo: "alice/web", branch: "feat/x", conclusion: "timed_out", url: "https://gh/2" }),
+      ciStatus({
+        repo: "alice/web",
+        branch: "feat/x",
+        conclusion: "timed_out",
+        url: "https://gh/2",
+      }),
       ciStatus({ status: "success", conclusion: "success" }),
     ];
     const count = await notifyCiFailures(notificationService, results);

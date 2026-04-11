@@ -31,8 +31,16 @@ export interface N8nWorkflow {
 }
 
 export interface N8nService {
-  trigger(webhookUrl: string, workflowName: string, payload: Record<string, unknown>): Promise<N8nTriggerResult>;
-  listExecutions(opts?: { workflowId?: string; status?: string; limit?: number }): Promise<N8nExecution[]>;
+  trigger(
+    webhookUrl: string,
+    workflowName: string,
+    payload: Record<string, unknown>,
+  ): Promise<N8nTriggerResult>;
+  listExecutions(opts?: {
+    workflowId?: string;
+    status?: string;
+    limit?: number;
+  }): Promise<N8nExecution[]>;
   listApiWorkflows(): Promise<N8nWorkflow[]>;
   activateWorkflow(id: string): Promise<boolean>;
   deactivateWorkflow(id: string): Promise<boolean>;

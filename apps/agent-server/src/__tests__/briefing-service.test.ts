@@ -11,7 +11,17 @@ beforeAll(() => {
 const mockListActiveGoals = vi.fn();
 const mockListRecentlyCompletedGoals = vi.fn();
 const mockCountTasksByStatus = vi.fn();
-const mockGetUsageSummary = vi.fn().mockResolvedValue({ totalCostUsd: 0, requestCount: 0, totalInputTokens: 0, totalOutputTokens: 0, byProvider: {}, byModel: {}, byAgent: {} });
+const mockGetUsageSummary = vi
+  .fn()
+  .mockResolvedValue({
+    totalCostUsd: 0,
+    requestCount: 0,
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    byProvider: {},
+    byModel: {},
+    byAgent: {},
+  });
 const mockListEnabledSchedules = vi.fn();
 const mockListRecentWorkSessions = vi.fn();
 const mockListPendingApprovals = vi.fn();
@@ -51,7 +61,13 @@ vi.mock("ioredis", () => {
   return { default: MockRedis };
 });
 
-const { gatherBriefingData, formatBriefing, sendDailyBriefing, generateWeeklySummary, sendWeeklySummary } = await import("../services/briefing.js");
+const {
+  gatherBriefingData,
+  formatBriefing,
+  sendDailyBriefing,
+  generateWeeklySummary,
+  sendWeeklySummary,
+} = await import("../services/briefing.js");
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,7 +77,13 @@ describe("Briefing service", () => {
   describe("gatherBriefingData", () => {
     it("aggregates data from all queries", async () => {
       mockListActiveGoals.mockResolvedValueOnce([
-        { title: "Build MVP", priority: "high", taskCount: 5, completedTaskCount: 2, updatedAt: new Date() },
+        {
+          title: "Build MVP",
+          priority: "high",
+          taskCount: 5,
+          completedTaskCount: 2,
+          updatedAt: new Date(),
+        },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValueOnce([{ title: "Setup CI" }]);
       mockCountTasksByStatus.mockResolvedValueOnce({ pending: 3, completed: 10, running: 1 });
@@ -89,7 +111,13 @@ describe("Briefing service", () => {
 
     it("handles goals with no tasks", async () => {
       mockListActiveGoals.mockResolvedValueOnce([
-        { title: "New Goal", priority: "medium", taskCount: 0, completedTaskCount: 0, updatedAt: new Date() },
+        {
+          title: "New Goal",
+          priority: "medium",
+          taskCount: 0,
+          completedTaskCount: 0,
+          updatedAt: new Date(),
+        },
       ]);
       mockListRecentlyCompletedGoals.mockResolvedValueOnce([]);
       mockCountTasksByStatus.mockResolvedValueOnce({});

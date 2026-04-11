@@ -21,6 +21,9 @@ import {
   deleteSchedule,
   touchMemory,
   createFollowUp,
+  upsertProductivityLog,
+  getProductivityLog,
+  getPrimaryAdminUserId,
   getChunkCount,
   listIngestionStates,
   getToolStats,
@@ -37,7 +40,13 @@ import type { MonitoringService } from "../services/monitoring.js";
 import { SAVE_MEMORY_TOOL, RECALL_MEMORIES_TOOL } from "./tools/memory-tools.js";
 import { SEARCH_WEB_TOOL, executeWebSearch } from "./tools/web-search.js";
 import { BROWSE_WEB_TOOL, executeBrowseWeb } from "./tools/browse-web.js";
-import { TRIGGER_N8N_WORKFLOW_TOOL, LIST_N8N_WORKFLOWS_TOOL, LIST_N8N_API_WORKFLOWS_TOOL, LIST_N8N_EXECUTIONS_TOOL, TOGGLE_N8N_WORKFLOW_TOOL } from "./tools/n8n-tools.js";
+import {
+  TRIGGER_N8N_WORKFLOW_TOOL,
+  LIST_N8N_WORKFLOWS_TOOL,
+  LIST_N8N_API_WORKFLOWS_TOOL,
+  LIST_N8N_EXECUTIONS_TOOL,
+  TOGGLE_N8N_WORKFLOW_TOOL,
+} from "./tools/n8n-tools.js";
 import { EXECUTE_CODE_TOOL } from "./tools/sandbox-tools.js";
 import {
   CREATE_SCHEDULE_TOOL,
@@ -80,6 +89,7 @@ import {
 } from "./tools/project-tools.js";
 import { QUERY_VPS_TOOL } from "./tools/vps-tools.js";
 import { CREATE_FOLLOW_UP_TOOL } from "./tools/follow-up-tools.js";
+import { LOG_PRODUCTIVITY_TOOL } from "./tools/productivity-tools.js";
 import { QUERY_DATABASE_TOOL, executeQueryDatabase } from "./tools/database-tools.js";
 import { BROWSER_ACTION_TOOL } from "./tools/browser-tools.js";
 import { RECALL_EPISODES_TOOL } from "./tools/episodic-tools.js";
@@ -98,7 +108,11 @@ import {
 import { REVIEW_PR_TOOL } from "./tools/review-tools.js";
 import { REGISTER_WEBHOOK_TOOL, LIST_WEBHOOKS_TOOL } from "./tools/webhook-tools.js";
 import { READ_DISCORD_MESSAGES_TOOL, LIST_DISCORD_CHANNELS_TOOL } from "./tools/discord-tools.js";
-import { EXECUTE_VPS_COMMAND_TOOL, DOCKER_SERVICE_LOGS_TOOL, DOCKER_RESTART_SERVICE_TOOL } from "./tools/vps-command-tools.js";
+import {
+  EXECUTE_VPS_COMMAND_TOOL,
+  DOCKER_SERVICE_LOGS_TOOL,
+  DOCKER_RESTART_SERVICE_TOOL,
+} from "./tools/vps-command-tools.js";
 import type { VpsCommandService } from "../services/vps-command.js";
 import type { PrReviewService } from "../services/pr-review.js";
 import type { OutboundWebhookService } from "../services/outbound-webhooks.js";
@@ -191,7 +205,9 @@ export function buildSharedToolList(
   const redTierExclude = tierService ? new Set(tierService.getAllRed()) : new Set<string>();
   const effectiveExclude = exclude
     ? new Set([...exclude, ...redTierExclude])
-    : redTierExclude.size > 0 ? redTierExclude : undefined;
+    : redTierExclude.size > 0
+      ? redTierExclude
+      : undefined;
   const add = (tool: LlmTool) => {
     if (!effectiveExclude?.has(tool.name)) tools.push(tool);
   };
@@ -209,6 +225,7 @@ export function buildSharedToolList(
     add(REMIND_ME_TOOL);
     add(QUERY_DATABASE_TOOL);
     add(CREATE_FOLLOW_UP_TOOL);
+    add(LOG_PRODUCTIVITY_TOOL);
   }
 
   if (services.n8nService && services.db) {
@@ -346,7 +363,13 @@ async function executeYellowTierTool(
 
   // Autonomous sessions auto-approve most YELLOW tools (human reviews the PR, not the push).
   // Tools that communicate externally on the user's behalf always require approval.
-  const ALWAYS_REQUIRE_APPROVAL = new Set(["send_email", "create_calendar_event", "update_calendar_event", "delete_calendar_event", "respond_to_calendar_event"]);
+  const ALWAYS_REQUIRE_APPROVAL = new Set([
+    "send_email",
+    "create_calendar_event",
+    "update_calendar_event",
+    "delete_calendar_event",
+    "respond_to_calendar_event",
+  ]);
   if (context.isAutonomous && !ALWAYS_REQUIRE_APPROVAL.has(block.name)) {
     logger.info({ toolName: block.name }, "yellow-tier tool auto-approved for autonomous session");
     return executeSharedTool(block, services, context);
@@ -357,7 +380,12 @@ async function executeYellowTierTool(
 
   const approval = await createApproval(db, {
     taskId: context.goalId ?? undefined,
-    requestedBy: (context.agentRole ?? "orchestrator") as "orchestrator" | "researcher" | "coder" | "reviewer" | "planner",
+    requestedBy: (context.agentRole ?? "orchestrator") as
+      | "orchestrator"
+      | "researcher"
+      | "coder"
+      | "reviewer"
+      | "planner",
     reason,
   });
 
@@ -369,7 +397,10 @@ async function executeYellowTierTool(
     requestedBy: context.agentRole ?? "orchestrator",
   }).catch((err) => logger.warn({ err }, "approval notification failed"));
 
-  logger.info({ approvalId: approval.id, toolName: block.name, timeoutMs }, "yellow-tier approval requested");
+  logger.info(
+    { approvalId: approval.id, toolName: block.name, timeoutMs },
+    "yellow-tier approval requested",
+  );
 
   // Poll until approved/rejected/timeout
   const deadline = Date.now() + timeoutMs;
@@ -382,20 +413,30 @@ async function executeYellowTierTool(
     if (!current) break;
 
     if (current.status === "approved") {
-      logger.info({ approvalId: approval.id, toolName: block.name }, "yellow-tier tool approved, executing");
+      logger.info(
+        { approvalId: approval.id, toolName: block.name },
+        "yellow-tier tool approved, executing",
+      );
       return executeSharedTool(block, services, context);
     }
 
     if (current.status === "rejected") {
       logger.info({ approvalId: approval.id, toolName: block.name }, "yellow-tier tool rejected");
-      return { error: `Tool "${block.name}" was rejected by the user. Reason: ${current.decision ?? "No reason provided"}` };
+      return {
+        error: `Tool "${block.name}" was rejected by the user. Reason: ${current.decision ?? "No reason provided"}`,
+      };
     }
   }
 
   // Timeout — auto-deny
   await resolveApproval(db, approval.id, "rejected", "Auto-denied: approval timeout exceeded");
-  logger.warn({ approvalId: approval.id, toolName: block.name, timeoutMs }, "yellow-tier tool timed out");
-  return { error: `Tool "${block.name}" approval timed out after ${Math.round(timeoutMs / 1000)}s. The request has been auto-denied.` };
+  logger.warn(
+    { approvalId: approval.id, toolName: block.name, timeoutMs },
+    "yellow-tier tool timed out",
+  );
+  return {
+    error: `Tool "${block.name}" approval timed out after ${Math.round(timeoutMs / 1000)}s. The request has been auto-denied.`,
+  };
 }
 
 /**
@@ -445,7 +486,17 @@ export async function executeSharedTool(
   services: ToolExecutorServices,
   context: ToolExecutorContext,
 ): Promise<unknown> {
-  const { db, embeddingService, n8nService, sandboxService, workspaceService, messagingService, projectRegistryService, monitoringService, browserService } = services;
+  const {
+    db,
+    embeddingService,
+    n8nService,
+    sandboxService,
+    workspaceService,
+    messagingService,
+    projectRegistryService,
+    monitoringService,
+    browserService,
+  } = services;
 
   switch (block.name) {
     case "save_memory": {
@@ -480,7 +531,13 @@ export async function executeSharedTool(
         try {
           const queryEmbedding = await embeddingService.embed(input.query);
           const agentRoleForSearch = input.scope !== "all" ? context.agentRole : undefined;
-          const results = await searchMemoriesByVector(db, queryEmbedding, context.userId, 10, agentRoleForSearch);
+          const results = await searchMemoriesByVector(
+            db,
+            queryEmbedding,
+            context.userId,
+            10,
+            agentRoleForSearch,
+          );
           if (results.length > 0) {
             for (const m of results) {
               touchMemory(db, m.id).catch((err) => logger.warn({ err }, "memory touch failed"));
@@ -517,12 +574,9 @@ export async function executeSharedTool(
       let ragContext = "";
       if (input.query && embeddingService) {
         try {
-          const chunks = await retrieve(
-            db,
-            (text) => embeddingService.embed(text),
-            input.query,
-            { limit: 5 },
-          );
+          const chunks = await retrieve(db, (text) => embeddingService.embed(text), input.query, {
+            limit: 5,
+          });
           ragContext = formatContext(chunks);
         } catch (err) {
           logger.warn({ err }, "RAG retrieval failed");
@@ -566,14 +620,27 @@ export async function executeSharedTool(
     case "list_n8n_workflows": {
       if (!n8nService) return { error: "n8n not available" };
       const workflows = await n8nService.listApiWorkflows();
-      return { count: workflows.length, workflows: workflows.map((w) => ({ id: w.id, name: w.name, active: w.active })) };
+      return {
+        count: workflows.length,
+        workflows: workflows.map((w) => ({ id: w.id, name: w.name, active: w.active })),
+      };
     }
 
     case "list_n8n_executions": {
       if (!n8nService) return { error: "n8n not available" };
       const { status, limit } = block.input as { status?: string; limit?: number };
       const executions = await n8nService.listExecutions({ status, limit: limit ?? 10 });
-      return { count: executions.length, executions: executions.map((e) => ({ id: e.id, workflowId: e.workflowId, status: e.status, mode: e.mode, startedAt: e.startedAt, stoppedAt: e.stoppedAt })) };
+      return {
+        count: executions.length,
+        executions: executions.map((e) => ({
+          id: e.id,
+          workflowId: e.workflowId,
+          status: e.status,
+          mode: e.mode,
+          startedAt: e.startedAt,
+          stoppedAt: e.stoppedAt,
+        })),
+      };
     }
 
     case "toggle_n8n_workflow": {
@@ -587,7 +654,11 @@ export async function executeSharedTool(
 
     case "create_schedule": {
       if (!db) return { error: "Database not available" };
-      const input = block.input as { cron_expression: string; action_prompt: string; description?: string };
+      const input = block.input as {
+        cron_expression: string;
+        action_prompt: string;
+        description?: string;
+      };
       try {
         const { CronExpressionParser } = await import("cron-parser");
         const interval = CronExpressionParser.parse(input.cron_expression);
@@ -615,7 +686,11 @@ export async function executeSharedTool(
 
     case "remind_me": {
       if (!db) return { error: "Database not available" };
-      const input = block.input as { reminder_text: string; cron_expression: string; description?: string };
+      const input = block.input as {
+        reminder_text: string;
+        cron_expression: string;
+        description?: string;
+      };
       try {
         const { CronExpressionParser } = await import("cron-parser");
         const interval = CronExpressionParser.parse(input.cron_expression);
@@ -670,7 +745,12 @@ export async function executeSharedTool(
 
     case "execute_code": {
       if (!sandboxService?.available) return { error: "Sandbox execution not available" };
-      const input = block.input as { code: string; language: string; timeout_ms?: number; dependencies?: string[] };
+      const input = block.input as {
+        code: string;
+        language: string;
+        timeout_ms?: number;
+        dependencies?: string[];
+      };
       const timeoutMs = Math.min(input.timeout_ms ?? 30_000, 60_000);
       const result = await sandboxService.execute({
         code: input.code,
@@ -687,7 +767,9 @@ export async function executeSharedTool(
           oomKilled: result.oomKilled,
           timedOut: result.timedOut,
         });
-      } catch { /* metrics are best-effort */ }
+      } catch {
+        /* metrics are best-effort */
+      }
       if (db) {
         try {
           const { hashCode } = await import("@ai-cofounder/sandbox");
@@ -773,18 +855,17 @@ export async function executeSharedTool(
     case "git_clone": {
       if (!workspaceService) return { error: "Workspace not available" };
       const input = block.input as { repo_url: string; directory_name?: string; depth?: number };
-      const result = await workspaceService.gitClone(input.repo_url, input.directory_name, input.depth);
+      const result = await workspaceService.gitClone(
+        input.repo_url,
+        input.directory_name,
+        input.depth,
+      );
 
       // Auto-ingest project documentation on workspace registration (MEM-03)
       try {
         const { enqueueRagIngestion } = await import("@ai-cofounder/queue");
         const dirName =
-          input.directory_name ??
-          input.repo_url
-            .split("/")
-            .pop()
-            ?.replace(".git", "") ??
-          "repo";
+          input.directory_name ?? input.repo_url.split("/").pop()?.replace(".git", "") ?? "repo";
         enqueueRagIngestion({
           action: "ingest_repo",
           sourceId: dirName,
@@ -979,10 +1060,15 @@ export async function executeSharedTool(
       };
 
       if (!projectRegistryService.validateProjectPath(input.workspace_path)) {
-        return { error: `Path "${input.workspace_path}" is outside allowed base directories. Configure PROJECTS_BASE_DIR to allow this path.` };
+        return {
+          error: `Path "${input.workspace_path}" is outside allowed base directories. Configure PROJECTS_BASE_DIR to allow this path.`,
+        };
       }
 
-      const slug = input.name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+      const slug = input.name
+        .toLowerCase()
+        .replace(/\s+/g, "-")
+        .replace(/[^a-z0-9-]/g, "");
       const project = await createRegisteredProject(db, {
         name: input.name,
         slug,
@@ -1008,16 +1094,28 @@ export async function executeSharedTool(
           config: project.config as Record<string, unknown> | null,
         });
       } catch (err) {
-        logger.warn({ err, projectId: project.id }, "failed to register project workspace (non-fatal)");
+        logger.warn(
+          { err, projectId: project.id },
+          "failed to register project workspace (non-fatal)",
+        );
       }
 
       // Optionally enqueue RAG ingestion (fire-and-forget)
       try {
         const { enqueueRagIngestion } = await import("@ai-cofounder/queue");
-        enqueueRagIngestion({ action: "ingest_repo", sourceId: slug }).catch((err) => logger.warn({ err }, "RAG ingestion enqueue failed"));
-      } catch { /* non-fatal */ }
+        enqueueRagIngestion({ action: "ingest_repo", sourceId: slug }).catch((err) =>
+          logger.warn({ err }, "RAG ingestion enqueue failed"),
+        );
+      } catch {
+        /* non-fatal */
+      }
 
-      return { projectId: project.id, name: project.name, slug, message: `Project "${project.name}" registered successfully. Use switch_project to make it active.` };
+      return {
+        projectId: project.id,
+        name: project.name,
+        slug,
+        message: `Project "${project.name}" registered successfully. Use switch_project to make it active.`,
+      };
     }
 
     case "switch_project": {
@@ -1027,11 +1125,19 @@ export async function executeSharedTool(
       const project = await getRegisteredProjectByName(db, input.project_name);
       if (!project) {
         const available = projectRegistryService.listProjects().map((p) => p.name);
-        return { error: `Project "${input.project_name}" not found. Available projects: ${available.join(", ") || "none registered yet"}` };
+        return {
+          error: `Project "${input.project_name}" not found. Available projects: ${available.join(", ") || "none registered yet"}`,
+        };
       }
 
       await updateConversationMetadata(db, context.conversationId, { activeProjectId: project.id });
-      return { switched: true, projectId: project.id, name: project.name, slug: project.slug, message: `Switched to project "${project.name}". RAG retrieval and workspace operations are now scoped to this project.` };
+      return {
+        switched: true,
+        projectId: project.id,
+        name: project.name,
+        slug: project.slug,
+        message: `Switched to project "${project.name}". RAG retrieval and workspace operations are now scoped to this project.`,
+      };
     }
 
     case "list_projects": {
@@ -1063,7 +1169,8 @@ export async function executeSharedTool(
       const deps = await listProjectDependencies(db, project.id);
       const dependencyDetails = await Promise.all(
         deps.map(async (dep) => {
-          const targetId = dep.sourceProjectId === project.id ? dep.targetProjectId : dep.sourceProjectId;
+          const targetId =
+            dep.sourceProjectId === project.id ? dep.targetProjectId : dep.sourceProjectId;
           const direction = dep.sourceProjectId === project.id ? "depends_on" : "depended_on_by";
           const targetProject = await getRegisteredProjectById(db, targetId);
           return {
@@ -1077,7 +1184,12 @@ export async function executeSharedTool(
       );
 
       return {
-        project: { id: project.id, name: project.name, slug: project.slug, description: project.description },
+        project: {
+          id: project.id,
+          name: project.name,
+          slug: project.slug,
+          description: project.description,
+        },
         change_description: input.change_description,
         dependency_count: deps.length,
         dependencies: dependencyDetails,
@@ -1093,7 +1205,12 @@ export async function executeSharedTool(
 
     case "create_follow_up": {
       if (!db) return { error: "Database not available" };
-      const input = block.input as { title: string; description?: string; due_date?: string; source?: string };
+      const input = block.input as {
+        title: string;
+        description?: string;
+        due_date?: string;
+        source?: string;
+      };
       const followUp = await createFollowUp(db, {
         title: input.title,
         description: input.description,
@@ -1102,6 +1219,61 @@ export async function executeSharedTool(
         workspaceId: context.workspaceId ?? "",
       });
       return { created: true, followUpId: followUp.id, title: followUp.title };
+    }
+
+    case "log_productivity": {
+      if (!db) return { error: "Database not available" };
+      const adminUserId = await getPrimaryAdminUserId(db);
+      if (!adminUserId) return { error: "No admin user configured" };
+
+      const input = block.input as {
+        planned_items?: { text: string; completed: boolean }[];
+        mood?: "great" | "good" | "okay" | "rough" | "terrible";
+        energy_level?: number;
+        highlights?: string;
+        blockers?: string;
+        reflection_notes?: string;
+      };
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Calculate completion score if planned items provided
+      let completionScore: number | undefined;
+      if (input.planned_items && input.planned_items.length > 0) {
+        const done = input.planned_items.filter((i) => i.completed).length;
+        completionScore = Math.round((done / input.planned_items.length) * 100);
+      }
+
+      // Compute streak from yesterday
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const prevLog = await getProductivityLog(
+        db,
+        adminUserId,
+        yesterday.toISOString().slice(0, 10),
+      );
+      const streakDays = prevLog ? prevLog.streakDays + 1 : 1;
+
+      const row = await upsertProductivityLog(db, {
+        userId: adminUserId,
+        date: today,
+        plannedItems: input.planned_items,
+        mood: input.mood,
+        energyLevel: input.energy_level,
+        highlights: input.highlights,
+        blockers: input.blockers,
+        reflectionNotes: input.reflection_notes,
+        completionScore,
+        streakDays,
+      });
+
+      return {
+        logged: true,
+        date: today,
+        streakDays: row.streakDays,
+        completionScore: row.completionScore,
+        itemsPlanned: (row.plannedItems as unknown[] | null)?.length ?? 0,
+      };
     }
 
     case "query_vps": {
@@ -1147,8 +1319,16 @@ export async function executeSharedTool(
     case "draft_reply": {
       if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
       const gmail = services.gmailService ?? new GmailService(db, context.userId);
-      const input = block.input as { to: string; subject: string; body: string; cc?: string; threadId?: string; inReplyTo?: string };
-      if (!input.to || !input.subject || !input.body) return { error: "to, subject, and body are required" };
+      const input = block.input as {
+        to: string;
+        subject: string;
+        body: string;
+        cc?: string;
+        threadId?: string;
+        inReplyTo?: string;
+      };
+      if (!input.to || !input.subject || !input.body)
+        return { error: "to, subject, and body are required" };
       const draft = await gmail.createDraft(input);
       return { success: true, draftId: draft.id };
     }
@@ -1156,8 +1336,15 @@ export async function executeSharedTool(
     case "send_email": {
       if (!db || !context.userId) return { error: "Gmail not connected — no authenticated user" };
       const gmail = services.gmailService ?? new GmailService(db, context.userId);
-      const input = block.input as { to: string; subject: string; body: string; cc?: string; threadId?: string };
-      if (!input.to || !input.subject || !input.body) return { error: "to, subject, and body are required" };
+      const input = block.input as {
+        to: string;
+        subject: string;
+        body: string;
+        cc?: string;
+        threadId?: string;
+      };
+      if (!input.to || !input.subject || !input.body)
+        return { error: "to, subject, and body are required" };
       const sent = await gmail.sendEmail(input);
       return { success: true, messageId: sent.id, threadId: sent.threadId };
     }
@@ -1165,15 +1352,25 @@ export async function executeSharedTool(
     /* ── Calendar tools ── */
 
     case "list_calendar_events": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const { timeMin, timeMax, maxResults } = block.input as { timeMin?: string; timeMax?: string; maxResults?: number };
-      const events = await cal.listEvents({ timeMin, timeMax, maxResults: maxResults ? Math.min(maxResults, 50) : undefined });
+      const { timeMin, timeMax, maxResults } = block.input as {
+        timeMin?: string;
+        timeMax?: string;
+        maxResults?: number;
+      };
+      const events = await cal.listEvents({
+        timeMin,
+        timeMax,
+        maxResults: maxResults ? Math.min(maxResults, 50) : undefined,
+      });
       return { events, count: events.length };
     }
 
     case "get_calendar_event": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
       const { eventId } = block.input as { eventId: string };
       if (!eventId) return { error: "eventId is required" };
@@ -1181,7 +1378,8 @@ export async function executeSharedTool(
     }
 
     case "search_calendar_events": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
       const { query, maxResults } = block.input as { query: string; maxResults?: number };
       if (!query) return { error: "query is required" };
@@ -1190,7 +1388,8 @@ export async function executeSharedTool(
     }
 
     case "get_free_busy": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
       const { timeMin, timeMax } = block.input as { timeMin: string; timeMax: string };
       if (!timeMin || !timeMax) return { error: "timeMin and timeMax are required" };
@@ -1198,25 +1397,46 @@ export async function executeSharedTool(
     }
 
     case "create_calendar_event": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const input = block.input as { summary: string; start: string; end: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
-      if (!input.summary || !input.start || !input.end) return { error: "summary, start, and end are required" };
+      const input = block.input as {
+        summary: string;
+        start: string;
+        end: string;
+        description?: string;
+        location?: string;
+        attendees?: string[];
+        timeZone?: string;
+      };
+      if (!input.summary || !input.start || !input.end)
+        return { error: "summary, start, and end are required" };
       const event = await cal.createEvent(input);
       return { success: true, eventId: event.id, summary: event.summary, htmlLink: event.htmlLink };
     }
 
     case "update_calendar_event": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const { eventId, ...updates } = block.input as { eventId: string; summary?: string; start?: string; end?: string; description?: string; location?: string; attendees?: string[]; timeZone?: string };
+      const { eventId, ...updates } = block.input as {
+        eventId: string;
+        summary?: string;
+        start?: string;
+        end?: string;
+        description?: string;
+        location?: string;
+        attendees?: string[];
+        timeZone?: string;
+      };
       if (!eventId) return { error: "eventId is required" };
       const event = await cal.updateEvent(eventId, updates);
       return { success: true, eventId: event.id, summary: event.summary };
     }
 
     case "delete_calendar_event": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
       const { eventId } = block.input as { eventId: string };
       if (!eventId) return { error: "eventId is required" };
@@ -1225,9 +1445,13 @@ export async function executeSharedTool(
     }
 
     case "respond_to_calendar_event": {
-      if (!db || !context.userId) return { error: "Calendar not connected — no authenticated user" };
+      if (!db || !context.userId)
+        return { error: "Calendar not connected — no authenticated user" };
       const cal = services.calendarService ?? new CalendarService(db, context.userId);
-      const { eventId, responseStatus } = block.input as { eventId: string; responseStatus: "accepted" | "declined" | "tentative" };
+      const { eventId, responseStatus } = block.input as {
+        eventId: string;
+        responseStatus: "accepted" | "declined" | "tentative";
+      };
       if (!eventId || !responseStatus) return { error: "eventId and responseStatus are required" };
       const event = await cal.respondToEvent(eventId, responseStatus);
       return { success: true, eventId: event.id, responseStatus };
@@ -1264,16 +1488,33 @@ export async function executeSharedTool(
     /* ── Knowledge base tools ── */
 
     case "search_knowledge": {
-      if (!services.db || !services.embeddingService) return { error: "Knowledge base not available" };
-      const { query, limit: kLimit, source_type } = block.input as {
+      if (!services.db || !services.embeddingService)
+        return { error: "Knowledge base not available" };
+      const {
+        query,
+        limit: kLimit,
+        source_type,
+      } = block.input as {
         query: string;
         limit?: number;
         source_type?: string;
       };
-      const chunks = await retrieve(services.db, services.embeddingService.embed.bind(services.embeddingService), query, {
-        limit: kLimit ?? 5,
-        sourceType: source_type as "git" | "conversation" | "slack" | "memory" | "reflection" | "markdown" | undefined,
-      });
+      const chunks = await retrieve(
+        services.db,
+        services.embeddingService.embed.bind(services.embeddingService),
+        query,
+        {
+          limit: kLimit ?? 5,
+          sourceType: source_type as
+            | "git"
+            | "conversation"
+            | "slack"
+            | "memory"
+            | "reflection"
+            | "markdown"
+            | undefined,
+        },
+      );
       if (chunks.length === 0) return { results: [], message: "No matching documents found." };
       return {
         results: chunks.map((c) => ({
@@ -1287,7 +1528,8 @@ export async function executeSharedTool(
     }
 
     case "ingest_document": {
-      if (!services.db || !services.embeddingService) return { error: "Knowledge base not available" };
+      if (!services.db || !services.embeddingService)
+        return { error: "Knowledge base not available" };
       const { content, source_id, source_type } = block.input as {
         content: string;
         source_id: string;
@@ -1297,7 +1539,13 @@ export async function executeSharedTool(
       const result = await ingestText(
         services.db,
         services.embeddingService.embed.bind(services.embeddingService),
-        (source_type ?? "markdown") as "git" | "conversation" | "slack" | "memory" | "reflection" | "markdown",
+        (source_type ?? "markdown") as
+          | "git"
+          | "conversation"
+          | "slack"
+          | "memory"
+          | "reflection"
+          | "markdown",
         source_id,
         content,
       );
@@ -1395,7 +1643,9 @@ export async function executeSharedTool(
       const template = await getPipelineTemplateByName(services.db, template_name);
       if (!template) return { error: `Template "${template_name}" not found` };
       const { enqueuePipeline } = await import("@ai-cofounder/queue");
-      const stages = (template.stages as Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>).map((s) => ({
+      const stages = (
+        template.stages as Array<{ agent: string; prompt: string; dependsOnPrevious?: boolean }>
+      ).map((s) => ({
         agent: s.agent as "researcher" | "coder" | "reviewer" | "planner",
         prompt: s.prompt,
         dependsOnPrevious: s.dependsOnPrevious ?? false,
@@ -1433,9 +1683,17 @@ export async function executeSharedTool(
     case "register_webhook": {
       if (!services.outboundWebhookService) return { error: "Webhook service not available" };
       const { url, event_types, description, headers } = block.input as {
-        url: string; event_types: string[]; description?: string; headers?: Record<string, string>;
+        url: string;
+        event_types: string[];
+        description?: string;
+        headers?: Record<string, string>;
       };
-      const webhook = await services.outboundWebhookService.register(url, event_types, headers, description);
+      const webhook = await services.outboundWebhookService.register(
+        url,
+        event_types,
+        headers,
+        description,
+      );
       return { registered: true, id: webhook.id, url, event_types };
     }
 
@@ -1444,7 +1702,10 @@ export async function executeSharedTool(
       const webhooks = await services.outboundWebhookService.list();
       return {
         webhooks: webhooks.map((w) => ({
-          id: w.id, url: w.url, event_types: w.eventTypes, description: w.description,
+          id: w.id,
+          url: w.url,
+          event_types: w.eventTypes,
+          description: w.description,
         })),
         count: webhooks.length,
       };
@@ -1457,23 +1718,35 @@ export async function executeSharedTool(
       const { branch_point_message_id } = block.input as { branch_point_message_id?: string };
       if (!context.userId) return { error: "User ID required for branching" };
       const result = await services.conversationBranchingService.branch(
-        context.conversationId, context.userId, branch_point_message_id,
+        context.conversationId,
+        context.userId,
+        branch_point_message_id,
       );
-      return { branched: true, new_conversation_id: result.id, messages_copied: result.messagesCopied };
+      return {
+        branched: true,
+        new_conversation_id: result.id,
+        messages_copied: result.messagesCopied,
+      };
     }
 
     /* ── VPS command execution ── */
 
     case "execute_vps_command": {
       if (!services.vpsCommandService) return { error: "VPS command service not available" };
-      const { command, timeout_seconds } = block.input as { command: string; timeout_seconds?: number };
+      const { command, timeout_seconds } = block.input as {
+        command: string;
+        timeout_seconds?: number;
+      };
       return services.vpsCommandService.execute(command, { timeoutSeconds: timeout_seconds });
     }
 
     case "docker_service_logs": {
       if (!services.vpsCommandService) return { error: "VPS command service not available" };
       const { service, lines } = block.input as { service: string; lines?: number };
-      const logs = await services.vpsCommandService.getServiceLogs(service, Math.min(lines ?? 50, 200));
+      const logs = await services.vpsCommandService.getServiceLogs(
+        service,
+        Math.min(lines ?? 50, 200),
+      );
       return { service, logs };
     }
 

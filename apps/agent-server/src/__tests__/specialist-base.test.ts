@@ -2,19 +2,15 @@ import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vite
 import { setupTestEnv, mockLlmModule, mockDbModule } from "@ai-cofounder/test-utils";
 
 // Use vi.hoisted so these are available when vi.mock factories run
-const {
-  mockComplete,
-  mockSetAttribute,
-  mockSetStatus,
-  mockSpanEnd,
-  mockEstimate,
-} = vi.hoisted(() => ({
-  mockComplete: vi.fn(),
-  mockSetAttribute: vi.fn(),
-  mockSetStatus: vi.fn(),
-  mockSpanEnd: vi.fn(),
-  mockEstimate: vi.fn().mockReturnValue({ roundBudget: 3 }),
-}));
+const { mockComplete, mockSetAttribute, mockSetStatus, mockSpanEnd, mockEstimate } = vi.hoisted(
+  () => ({
+    mockComplete: vi.fn(),
+    mockSetAttribute: vi.fn(),
+    mockSetStatus: vi.fn(),
+    mockSpanEnd: vi.fn(),
+    mockEstimate: vi.fn().mockReturnValue({ roundBudget: 3 }),
+  }),
+);
 
 beforeAll(() => {
   setupTestEnv();
@@ -35,8 +31,14 @@ vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 vi.mock("@opentelemetry/api", () => ({
   trace: {
     getTracer: () => ({
-      startActiveSpan: (_name: string, fn: (span: { setAttribute: typeof mockSetAttribute; setStatus: typeof mockSetStatus; end: typeof mockSpanEnd }) => unknown) =>
-        fn({ setAttribute: mockSetAttribute, setStatus: mockSetStatus, end: mockSpanEnd }),
+      startActiveSpan: (
+        _name: string,
+        fn: (span: {
+          setAttribute: typeof mockSetAttribute;
+          setStatus: typeof mockSetStatus;
+          end: typeof mockSpanEnd;
+        }) => unknown,
+      ) => fn({ setAttribute: mockSetAttribute, setStatus: mockSetStatus, end: mockSpanEnd }),
     }),
   },
   SpanStatusCode: { ERROR: 2 },
@@ -60,7 +62,8 @@ const { LlmRegistry } = await import("@ai-cofounder/llm");
 
 // --- Concrete TestAgent subclass ---
 
-type SpecialistContext = InstanceType<typeof SpecialistAgent> extends { execute(ctx: infer C): unknown } ? C : never;
+type SpecialistContext =
+  InstanceType<typeof SpecialistAgent> extends { execute(ctx: infer C): unknown } ? C : never;
 
 class TestAgent extends SpecialistAgent {
   readonly role = "researcher" as const;
@@ -693,9 +696,7 @@ describe("SpecialistAgent base class", () => {
 
       const registry = new LlmRegistry();
       const agent = new TestAgent("test", registry);
-      await agent.execute(
-        makeContext({ taskDescription: "Complex task requiring analysis" }),
-      );
+      await agent.execute(makeContext({ taskDescription: "Complex task requiring analysis" }));
 
       expect(mockEstimate).toHaveBeenCalledWith({
         description: "Complex task requiring analysis",

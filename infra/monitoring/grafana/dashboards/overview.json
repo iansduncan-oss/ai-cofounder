@@ -155,9 +155,7 @@
         }
       },
       "options": { "colorMode": "background", "graphMode": "none" },
-      "targets": [
-        { "expr": "(time() - backup_last_success_timestamp) / 3600", "refId": "A" }
-      ]
+      "targets": [{ "expr": "(time() - backup_last_success_timestamp) / 3600", "refId": "A" }]
     },
 
     {
@@ -253,9 +251,18 @@
           "unit": "reqps"
         },
         "overrides": [
-          { "matcher": { "id": "byName", "options": "5xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }] },
-          { "matcher": { "id": "byName", "options": "4xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }] },
-          { "matcher": { "id": "byName", "options": "2xx" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }] }
+          {
+            "matcher": { "id": "byName", "options": "5xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "4xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "2xx" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
         ]
       },
       "targets": [
@@ -400,7 +407,12 @@
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
         "defaults": {
-          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 25, "stacking": { "mode": "normal" } },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 25,
+            "stacking": { "mode": "normal" }
+          },
           "unit": "currencyUSD",
           "decimals": 4
         }
@@ -475,9 +487,7 @@
         }
       },
       "options": { "colorMode": "background" },
-      "targets": [
-        { "expr": "sum(queue_stale_jobs)", "legendFormat": "stale", "refId": "A" }
-      ]
+      "targets": [{ "expr": "sum(queue_stale_jobs)", "legendFormat": "stale", "refId": "A" }]
     },
     {
       "title": "Oldest Waiting Job Age",
@@ -498,9 +508,7 @@
         }
       },
       "options": { "colorMode": "background" },
-      "targets": [
-        { "expr": "max(queue_oldest_waiting_job_age_seconds)", "refId": "A" }
-      ]
+      "targets": [{ "expr": "max(queue_oldest_waiting_job_age_seconds)", "refId": "A" }]
     },
     {
       "title": "Jobs Completed / Failed (1h)",
@@ -555,9 +563,7 @@
         }
       },
       "options": { "colorMode": "background" },
-      "targets": [
-        { "expr": "sum(increase(github_ci_failures_total[24h]))", "refId": "A" }
-      ]
+      "targets": [{ "expr": "sum(increase(github_ci_failures_total[24h]))", "refId": "A" }]
     },
     {
       "title": "Open PRs",

@@ -97,25 +97,21 @@ export const vaultRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Querystring: { q?: string; section?: string; limit?: string };
     Reply: VaultSearchResponse | { error: string };
-  }>(
-    "/search",
-    { schema: { tags: ["vault"] } },
-    async (request, reply) => {
-      const q = (request.query.q ?? "").trim();
-      if (!q) {
-        return reply.status(400).send({ error: "Query parameter 'q' is required" });
-      }
-      const sectionParam = (request.query.section ?? "all") as VaultSearchSection;
-      if (!VALID_SEARCH_SECTIONS.includes(sectionParam)) {
-        return reply.status(400).send({
-          error: `section must be one of: ${VALID_SEARCH_SECTIONS.join(", ")}`,
-        });
-      }
-      const limit = Math.max(1, Math.min(100, Number(request.query.limit ?? 10)));
-      const matches = await searchVaultFiles(q, sectionParam, limit);
-      return { query: q, matches };
-    },
-  );
+  }>("/search", { schema: { tags: ["vault"] } }, async (request, reply) => {
+    const q = (request.query.q ?? "").trim();
+    if (!q) {
+      return reply.status(400).send({ error: "Query parameter 'q' is required" });
+    }
+    const sectionParam = (request.query.section ?? "all") as VaultSearchSection;
+    if (!VALID_SEARCH_SECTIONS.includes(sectionParam)) {
+      return reply.status(400).send({
+        error: `section must be one of: ${VALID_SEARCH_SECTIONS.join(", ")}`,
+      });
+    }
+    const limit = Math.max(1, Math.min(100, Number(request.query.limit ?? 10)));
+    const matches = await searchVaultFiles(q, sectionParam, limit);
+    return { query: q, matches };
+  });
 
   // GET /api/vault/daily/:date — read a daily note (YYYY-MM-DD)
   app.get<{ Params: { date: string }; Reply: VaultDailyResponse | { error: string } }>(
@@ -158,50 +154,44 @@ export const vaultRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Params: { section: string };
     Reply: VaultSectionListResponse | { error: string };
-  }>(
-    "/:section",
-    { schema: { tags: ["vault"] } },
-    async (request, reply) => {
-      const { section } = request.params;
-      const validSections = ["projects", "decisions", "people"];
-      if (!validSections.includes(section)) {
-        return reply.status(400).send({ error: `Section must be one of: ${validSections.join(", ")}` });
-      }
-      try {
-        const files = await readdir(join(VAULT_DIR, section));
-        return {
-          section,
-          files: files.filter((f) => f.endsWith(".md")).map((f) => f.replace(".md", "")),
-        };
-      } catch {
-        return { section, files: [] };
-      }
-    },
-  );
+  }>("/:section", { schema: { tags: ["vault"] } }, async (request, reply) => {
+    const { section } = request.params;
+    const validSections = ["projects", "decisions", "people"];
+    if (!validSections.includes(section)) {
+      return reply
+        .status(400)
+        .send({ error: `Section must be one of: ${validSections.join(", ")}` });
+    }
+    try {
+      const files = await readdir(join(VAULT_DIR, section));
+      return {
+        section,
+        files: files.filter((f) => f.endsWith(".md")).map((f) => f.replace(".md", "")),
+      };
+    } catch {
+      return { section, files: [] };
+    }
+  });
 
   // GET /api/vault/:section/:slug — read a specific vault file
   app.get<{
     Params: { section: string; slug: string };
     Reply: VaultFileResponse | { error: string };
-  }>(
-    "/:section/:slug",
-    { schema: { tags: ["vault"] } },
-    async (request, reply) => {
-      const { section, slug } = request.params;
-      const validSections = ["projects", "decisions", "people", "daily"];
-      if (!validSections.includes(section)) {
-        return reply.status(400).send({ error: "Invalid section" });
-      }
-      // Prevent path traversal
-      if (slug.includes("..") || slug.includes("/")) {
-        return reply.status(400).send({ error: "Invalid slug" });
-      }
-      try {
-        const content = await readFile(join(VAULT_DIR, section, `${slug}.md`), "utf-8");
-        return { section, slug, content };
-      } catch {
-        return reply.status(404).send({ error: "File not found" });
-      }
-    },
-  );
+  }>("/:section/:slug", { schema: { tags: ["vault"] } }, async (request, reply) => {
+    const { section, slug } = request.params;
+    const validSections = ["projects", "decisions", "people", "daily"];
+    if (!validSections.includes(section)) {
+      return reply.status(400).send({ error: "Invalid section" });
+    }
+    // Prevent path traversal
+    if (slug.includes("..") || slug.includes("/")) {
+      return reply.status(400).send({ error: "Invalid slug" });
+    }
+    try {
+      const content = await readFile(join(VAULT_DIR, section, `${slug}.md`), "utf-8");
+      return { section, slug, content };
+    } catch {
+      return reply.status(404).send({ error: "File not found" });
+    }
+  });
 };

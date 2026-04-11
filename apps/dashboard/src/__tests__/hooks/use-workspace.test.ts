@@ -125,9 +125,7 @@ describe("useWorkspace", () => {
   });
 
   it("switchWorkspace invalidates queries", async () => {
-    const workspaces = [
-      { id: "ws-1", name: "First", isDefault: true },
-    ];
+    const workspaces = [{ id: "ws-1", name: "First", isDefault: true }];
     mockListWorkspaces.mockResolvedValue({ workspaces });
     mockGetStoredWorkspaceId.mockReturnValue("ws-1");
 

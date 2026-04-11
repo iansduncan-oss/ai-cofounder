@@ -11,6 +11,10 @@ import {
   listFailurePatterns,
   upsertBriefingCache,
   getBriefingCache,
+  getProductivityLog,
+  getPrimaryAdminUserId,
+  listDueFollowUps,
+  markFollowUpReminderSent,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -29,10 +33,30 @@ export interface BriefingData {
   todayEvents?: Array<{ summary: string; start: string; end: string; attendeeCount: number }>;
   unreadEmailCount?: number;
   importantEmails?: Array<{ from: string; subject: string; snippet: string }>;
-  discordActivity?: Array<{ channelName: string; summary: string; category: string; urgency: string; suggestedAction: string }>;
+  discordActivity?: Array<{
+    channelName: string;
+    summary: string;
+    category: string;
+    urgency: string;
+    suggestedAction: string;
+  }>;
+  productivity?: {
+    todayPlan: Array<{ text: string; completed: boolean }>;
+    streakDays: number;
+    completionScore: number | null;
+    mood: string | null;
+    energyLevel: number | null;
+  };
+  overdueFollowUps?: Array<{ id: string; title: string; dueDate: Date | null }>;
   systemInsights?: string[];
   githubCi?: Array<{ repo: string; status: string; conclusion: string | null; url: string }>;
-  githubPrs?: Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>;
+  githubPrs?: Array<{
+    repo: string;
+    number: number;
+    title: string;
+    author: string;
+    isDraft: boolean;
+  }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -42,26 +66,51 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
 
-  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, failurePatternRows] =
-    await Promise.all([
-      listActiveGoals(db),
-      listRecentlyCompletedGoals(db, yesterday),
-      countTasksByStatus(db),
-      getUsageSummary(db, { since: yesterday }),
-      listEnabledSchedules(db),
-      listRecentWorkSessions(db, 5),
-      listPendingApprovals(db),
-      listFailurePatterns(db, 5),
-    ]);
+  const [
+    activeGoals,
+    completedGoals,
+    taskCounts,
+    usage,
+    schedules,
+    sessions,
+    pendingApprovals,
+    adminUserId,
+    dueFollowUps,
+    failurePatternRows,
+  ] = await Promise.all([
+    listActiveGoals(db),
+    listRecentlyCompletedGoals(db, yesterday),
+    countTasksByStatus(db),
+    getUsageSummary(db, { since: yesterday }),
+    listEnabledSchedules(db),
+    listRecentWorkSessions(db, 5),
+    listPendingApprovals(db),
+    getPrimaryAdminUserId(db),
+    listDueFollowUps(db),
+    listFailurePatterns(db, 5),
+  ]);
+
+  // Fetch today's productivity log if admin user exists
+  let productivity: BriefingData["productivity"];
+  if (adminUserId) {
+    const today = new Date().toISOString().slice(0, 10);
+    const log = await getProductivityLog(db, adminUserId, today);
+    if (log) {
+      productivity = {
+        todayPlan: (log.plannedItems as { text: string; completed: boolean }[] | null) ?? [],
+        streakDays: log.streakDays,
+        completionScore: log.completionScore,
+        mood: log.mood,
+        energyLevel: log.energyLevel,
+      };
+    }
+  }
 
   const now = Date.now();
   const goalsWithStaleness = activeGoals.map((g) => ({
     title: g.title,
     priority: g.priority,
-    progress:
-      g.taskCount > 0
-        ? `${g.completedTaskCount}/${g.taskCount} tasks`
-        : "no tasks yet",
+    progress: g.taskCount > 0 ? `${g.completedTaskCount}/${g.taskCount} tasks` : "no tasks yet",
     hoursStale: Math.round((now - g.updatedAt.getTime()) / (60 * 60 * 1000)),
   }));
 
@@ -84,9 +133,14 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     })),
     pendingApprovalCount: pendingApprovals.length,
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
+    productivity,
+    overdueFollowUps: dueFollowUps.map((f) => ({ id: f.id, title: f.title, dueDate: f.dueDate })),
     systemInsights: failurePatternRows
       .filter((p) => p.frequency >= 3)
-      .map((p) => `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`),
+      .map(
+        (p) =>
+          `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`,
+      ),
   };
 }
 
@@ -130,7 +184,10 @@ export async function enrichWithGoogle(
       })),
     };
   } catch (err) {
-    logger.warn({ err }, "Google enrichment failed — briefing will proceed without calendar/email data");
+    logger.warn(
+      { err },
+      "Google enrichment failed — briefing will proceed without calendar/email data",
+    );
     return null;
   }
 }
@@ -140,8 +197,33 @@ export function formatBriefing(data: BriefingData): string {
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
-  lines.push(`**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`);
+  lines.push(
+    `**${greeting}, sir.** Here is your briefing for ${now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}.`,
+  );
   lines.push("");
+
+  // Productivity check-in (if logged today)
+  if (data.productivity) {
+    const p = data.productivity;
+    const streakStr = p.streakDays > 1 ? ` — ${p.streakDays}-day streak` : "";
+    const scoreStr = p.completionScore != null ? ` (${p.completionScore}% complete)` : "";
+    lines.push(`**Productivity${streakStr}:**${scoreStr}`);
+    if (p.todayPlan.length > 0) {
+      for (const item of p.todayPlan) {
+        const check = item.completed ? "[x]" : "[ ]";
+        lines.push(`  ${check} ${item.text}`);
+      }
+    } else {
+      lines.push(`  _No plan logged for today yet, sir._`);
+    }
+    if (p.mood || p.energyLevel != null) {
+      const bits: string[] = [];
+      if (p.mood) bits.push(`mood: ${p.mood}`);
+      if (p.energyLevel != null) bits.push(`energy: ${p.energyLevel}/5`);
+      lines.push(`  _${bits.join(", ")}_`);
+    }
+    lines.push("");
+  }
 
   // Today's schedule
   if (data.todayEvents && data.todayEvents.length > 0) {
@@ -200,7 +282,22 @@ export function formatBriefing(data: BriefingData): string {
 
   // Pending approvals
   if (data.pendingApprovalCount > 0) {
-    lines.push(`**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`);
+    lines.push(
+      `**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`,
+    );
+    lines.push("");
+  }
+
+  // Overdue follow-ups (folded in to avoid separate reminder DMs)
+  if (data.overdueFollowUps && data.overdueFollowUps.length > 0) {
+    lines.push(`**Overdue Follow-ups (${data.overdueFollowUps.length}):**`);
+    for (const f of data.overdueFollowUps.slice(0, 5)) {
+      const when = f.dueDate ? ` (was due ${f.dueDate.toLocaleDateString()})` : "";
+      lines.push(`  - ${f.title}${when}`);
+    }
+    if (data.overdueFollowUps.length > 5) {
+      lines.push(`  _...and ${data.overdueFollowUps.length - 5} more_`);
+    }
     lines.push("");
   }
 
@@ -222,7 +319,9 @@ export function formatBriefing(data: BriefingData): string {
 
   // Stale goals
   if (data.staleGoalCount > 0) {
-    lines.push(`**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`);
+    lines.push(
+      `**Stale Goals:** ${data.staleGoalCount} goal(s) idle for ${STALE_THRESHOLD_HOURS}h+`,
+    );
     lines.push("");
   }
 
@@ -262,10 +361,13 @@ export function formatBriefing(data: BriefingData): string {
   }
 
   // Costs
-  const costStr = data.costsSinceYesterday.totalCostUsd < 0.01
-    ? "< $0.01"
-    : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
-  lines.push(`**LLM Costs (24h):** ${costStr} across ${data.costsSinceYesterday.requestCount} requests`);
+  const costStr =
+    data.costsSinceYesterday.totalCostUsd < 0.01
+      ? "< $0.01"
+      : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
+  lines.push(
+    `**LLM Costs (24h):** ${costStr} across ${data.costsSinceYesterday.requestCount} requests`,
+  );
   lines.push("");
 
   // Upcoming schedules
@@ -293,7 +395,9 @@ export function formatBriefing(data: BriefingData): string {
 /** Build a prompt for the LLM to generate a narrative briefing */
 function buildBriefingPrompt(data: BriefingData): string {
   const lines: string[] = [];
-  lines.push("Generate a concise morning briefing. You are Jarvis, a composed British AI assistant. Address the user as 'sir'. Be direct, measured, and useful. No exclamation marks.");
+  lines.push(
+    "Generate a concise morning briefing. You are Jarvis, a composed British AI assistant. Address the user as 'sir'. Be direct, measured, and useful. No exclamation marks.",
+  );
   lines.push("Use markdown (bold, bullet points). Keep it under 1500 characters.");
   lines.push("");
 
@@ -331,14 +435,19 @@ function buildBriefingPrompt(data: BriefingData): string {
 
   if (data.staleGoalCount > 0) {
     lines.push("");
-    lines.push(`${data.staleGoalCount} goal(s) haven't been touched in ${STALE_THRESHOLD_HOURS}h+.`);
+    lines.push(
+      `${data.staleGoalCount} goal(s) haven't been touched in ${STALE_THRESHOLD_HOURS}h+.`,
+    );
   }
 
-  const costStr = data.costsSinceYesterday.totalCostUsd < 0.01
-    ? "< $0.01"
-    : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
+  const costStr =
+    data.costsSinceYesterday.totalCostUsd < 0.01
+      ? "< $0.01"
+      : `$${data.costsSinceYesterday.totalCostUsd.toFixed(2)}`;
   lines.push("");
-  lines.push(`LLM costs (24h): ${costStr} across ${data.costsSinceYesterday.requestCount} requests`);
+  lines.push(
+    `LLM costs (24h): ${costStr} across ${data.costsSinceYesterday.requestCount} requests`,
+  );
 
   if (data.todayEvents && data.todayEvents.length > 0) {
     lines.push("");
@@ -385,7 +494,10 @@ function buildBriefingPrompt(data: BriefingData): string {
 }
 
 /** Generate a briefing using LLM, falling back to static format on error */
-export async function generateLlmBriefing(registry: LlmRegistry, data: BriefingData): Promise<string> {
+export async function generateLlmBriefing(
+  registry: LlmRegistry,
+  data: BriefingData,
+): Promise<string> {
   try {
     const response = await registry.complete("simple", {
       system:
@@ -413,9 +525,39 @@ export async function sendDailyBriefing(
   notificationService: NotificationService,
   llmRegistry?: LlmRegistry,
   adminUserId?: string,
-  monitoringService?: { checkGitHubCI(): Promise<Array<{ repo: string; status: string; conclusion: string | null; url: string }>>; checkGitHubPRs(): Promise<Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>> },
+  monitoringService?: {
+    checkGitHubCI(): Promise<
+      Array<{ repo: string; status: string; conclusion: string | null; url: string }>
+    >;
+    checkGitHubPRs(): Promise<
+      Array<{ repo: string; number: number; title: string; author: string; isDraft: boolean }>
+    >;
+  },
 ): Promise<string> {
+  // Auto-generate today's plan BEFORE gathering briefing data so the plan
+  // shows up in the message. Uses merge mode so a manual check-in is preserved.
+  if (llmRegistry) {
+    try {
+      const { generateDailyPlan } = await import("./auto-planner.js");
+      await generateDailyPlan(db, llmRegistry, { merge: true });
+    } catch (err) {
+      logger.warn({ err }, "auto-plan generation failed in briefing (non-fatal)");
+    }
+  }
+
   const data = await gatherBriefingData(db);
+
+  // Mark overdue follow-ups as reminder-sent so the standalone reminder job
+  // won't also DM them. Non-fatal if it fails.
+  if (data.overdueFollowUps && data.overdueFollowUps.length > 0) {
+    for (const fu of data.overdueFollowUps) {
+      try {
+        await markFollowUpReminderSent(db, fu.id);
+      } catch (err) {
+        logger.warn({ err, id: fu.id }, "mark reminder-sent failed (non-fatal)");
+      }
+    }
+  }
 
   // Enrich with GitHub CI + PR data
   if (monitoringService) {
@@ -457,9 +599,7 @@ export async function sendDailyBriefing(
     // Discord digest unavailable — skip
   }
 
-  const text = llmRegistry
-    ? await generateLlmBriefing(llmRegistry, data)
-    : formatBriefing(data);
+  const text = llmRegistry ? await generateLlmBriefing(llmRegistry, data) : formatBriefing(data);
 
   await notificationService.sendBriefing(text);
   logger.info("daily briefing sent");
@@ -476,7 +616,9 @@ export async function sendDailyBriefing(
 /** Build prompt for evening wind-down summary */
 function buildEveningPrompt(data: BriefingData): string {
   const lines: string[] = [];
-  lines.push("Generate a concise evening wrap-up. You are Jarvis. Address the user as 'sir'. Be warm but measured. No exclamation marks.");
+  lines.push(
+    "Generate a concise evening wrap-up. You are Jarvis. Address the user as 'sir'. Be warm but measured. No exclamation marks.",
+  );
   lines.push("Use markdown (bold, bullet points). Keep it under 1000 characters.");
   lines.push("");
 
@@ -508,12 +650,33 @@ function buildEveningPrompt(data: BriefingData): string {
     }
   }
 
+  // Productivity wrap-up — how did today's plan go?
+  if (data.productivity) {
+    const p = data.productivity;
+    const done = p.todayPlan.filter((i) => i.completed).length;
+    const total = p.todayPlan.length;
+    lines.push("");
+    lines.push(
+      `Today's plan: ${done}/${total} complete (${p.completionScore ?? 0}%), streak: ${p.streakDays} day(s)`,
+    );
+    const remaining = p.todayPlan.filter((i) => !i.completed);
+    if (remaining.length > 0) {
+      lines.push(
+        `Items left: ${remaining
+          .slice(0, 3)
+          .map((i) => `"${i.text}"`)
+          .join(", ")}${remaining.length > 3 ? `, +${remaining.length - 3} more` : ""}`,
+      );
+    }
+  }
+
   lines.push("");
   lines.push(
     "Based on this data, write an evening summary. Include: " +
-      "(1) a brief acknowledgement of what was accomplished today, " +
+      "(1) a brief acknowledgement of what was accomplished today (use the productivity completion score if provided), " +
       "(2) anything left open that carries over to tomorrow, " +
-      "(3) a suggested top priority for tomorrow morning. " +
+      "(3) a suggested top priority for tomorrow morning, " +
+      "(4) a short reflection prompt at the end asking sir to log highlights/blockers via `/reflect`. " +
       "Frame it warmly — sir is winding down. Example opening: 'Good evening, sir. A productive day, all told.'",
   );
 
@@ -521,7 +684,10 @@ function buildEveningPrompt(data: BriefingData): string {
 }
 
 /** Generate an evening wrap-up briefing using LLM */
-export async function generateEveningWrapUp(registry: LlmRegistry, data: BriefingData): Promise<string> {
+export async function generateEveningWrapUp(
+  registry: LlmRegistry,
+  data: BriefingData,
+): Promise<string> {
   try {
     const response = await registry.complete("simple", {
       system:
@@ -550,10 +716,7 @@ export async function generateEveningWrapUp(registry: LlmRegistry, data: Briefin
  * LlmRegistry is supplied, runs the aggregated text through an LLM for a
  * narrative rollup; otherwise returns the concatenated briefings directly.
  */
-export async function generateWeeklySummary(
-  db: Db,
-  llmRegistry?: LlmRegistry,
-): Promise<string> {
+export async function generateWeeklySummary(db: Db, llmRegistry?: LlmRegistry): Promise<string> {
   const dates: string[] = [];
   const today = new Date();
   for (let i = 0; i < 7; i++) {
@@ -571,9 +734,7 @@ export async function generateWeeklySummary(
     return "Good morning, sir. No daily briefings were recorded in the past week — nothing to summarise.";
   }
 
-  const combined = entries
-    .map((e) => `### ${e.date}\n\n${e.text}`)
-    .join("\n\n---\n\n");
+  const combined = entries.map((e) => `### ${e.date}\n\n${e.text}`).join("\n\n---\n\n");
 
   if (!llmRegistry) {
     return `# Weekly Summary\n\nThe past ${entries.length} day(s) of briefings:\n\n${combined}`;

@@ -367,10 +367,9 @@ describe("useWsChat reducer transitions", () => {
   });
 
   it("closes WebSocket when conversationId becomes undefined", () => {
-    const { rerender } = renderHook(
-      ({ convId }) => useWsChat(convId),
-      { initialProps: { convId: "conv-1" as string | undefined } },
-    );
+    const { rerender } = renderHook(({ convId }) => useWsChat(convId), {
+      initialProps: { convId: "conv-1" as string | undefined },
+    });
 
     const firstWs = mockWs;
 
@@ -380,10 +379,9 @@ describe("useWsChat reducer transitions", () => {
   });
 
   it("reconnects when conversationId changes", () => {
-    const { rerender } = renderHook(
-      ({ convId }) => useWsChat(convId),
-      { initialProps: { convId: "conv-1" } },
-    );
+    const { rerender } = renderHook(({ convId }) => useWsChat(convId), {
+      initialProps: { convId: "conv-1" },
+    });
 
     const firstWs = mockWs;
 

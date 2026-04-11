@@ -35,6 +35,7 @@ const UNCACHEABLE_TOOLS = new Set([
   "delegate_to_subagent",
   "delegate_parallel",
   "create_follow_up",
+  "log_productivity",
   "draft_reply",
   "send_email",
   "create_calendar_event",

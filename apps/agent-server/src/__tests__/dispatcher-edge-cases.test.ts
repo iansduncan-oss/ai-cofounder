@@ -73,19 +73,31 @@ vi.mock("@ai-cofounder/llm", () => {
 });
 
 vi.mock("../agents/tools/web-search.js", () => ({
-  SEARCH_WEB_TOOL: { name: "search_web", description: "search", input_schema: { type: "object", properties: {} } },
+  SEARCH_WEB_TOOL: {
+    name: "search_web",
+    description: "search",
+    input_schema: { type: "object", properties: {} },
+  },
   executeWebSearch: vi.fn().mockResolvedValue({ results: [] }),
 }));
 
 vi.mock("../agents/tools/memory-tools.js", () => ({
-  RECALL_MEMORIES_TOOL: { name: "recall_memories", description: "recall", input_schema: { type: "object", properties: {} } },
+  RECALL_MEMORIES_TOOL: {
+    name: "recall_memories",
+    description: "recall",
+    input_schema: { type: "object", properties: {} },
+  },
 }));
 
 vi.mock("../agents/tools/sandbox-tools.js", () => ({
   EXECUTE_CODE_TOOL: {
     name: "execute_code",
     description: "execute",
-    input_schema: { type: "object", properties: { code: { type: "string" }, language: { type: "string" } }, required: ["code", "language"] },
+    input_schema: {
+      type: "object",
+      properties: { code: { type: "string" }, language: { type: "string" } },
+      required: ["code", "language"],
+    },
   },
 }));
 
@@ -232,19 +244,17 @@ describe("TaskDispatcher edge cases", { timeout: 15_000 }, () => {
       mockListTasksByGoal.mockResolvedValueOnce([
         makeTask("t-1", { orderIndex: 0, dependsOn: [] }),
         makeTask("t-2", { orderIndex: 1, dependsOn: ["t-1"] }),
-        makeTask("t-3", { orderIndex: 2, dependsOn: [] }),  // no dependency on t-1
+        makeTask("t-3", { orderIndex: 2, dependsOn: [] }), // no dependency on t-1
       ]);
 
       // t-1 fails, t-3 should still run and succeed
-      mockComplete
-        .mockRejectedValueOnce(new Error("t-1 failed"))
-        .mockResolvedValueOnce({
-          content: [{ type: "text", text: "t-3 output" }],
-          model: "test-model",
-          stop_reason: "end_turn",
-          usage: { inputTokens: 10, outputTokens: 20 },
-          provider: "test",
-        });
+      mockComplete.mockRejectedValueOnce(new Error("t-1 failed")).mockResolvedValueOnce({
+        content: [{ type: "text", text: "t-3 output" }],
+        model: "test-model",
+        stop_reason: "end_turn",
+        usage: { inputTokens: 10, outputTokens: 20 },
+        provider: "test",
+      });
 
       const dispatcher = createDispatcher();
       const result = await dispatcher.runGoal("g-1");

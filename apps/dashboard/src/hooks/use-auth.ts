@@ -108,7 +108,7 @@ export function useAuth() {
     }
   }, [baseUrl]);
 
-  const role = _accessToken ? decodeJwtRole(_accessToken) : "viewer" as AdminRole;
+  const role = _accessToken ? decodeJwtRole(_accessToken) : ("viewer" as AdminRole);
 
   return { isAuthenticated, login, logout, refresh, role };
 }

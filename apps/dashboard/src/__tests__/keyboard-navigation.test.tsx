@@ -322,10 +322,7 @@ describe("Keyboard Navigation", () => {
       const user = userEvent.setup();
       renderWithProviders(<ChatPage />);
 
-      const tabs = await tabsToReach(
-        user,
-        (el) => el?.tagName === "TEXTAREA",
-      );
+      const tabs = await tabsToReach(user, (el) => el?.tagName === "TEXTAREA");
       expect(tabs).toBeGreaterThan(0);
     });
 
@@ -398,10 +395,7 @@ describe("Keyboard Navigation", () => {
         initialEntries: ["/dashboard/goals"],
       });
 
-      const tabs = await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      const tabs = await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
       expect(tabs).toBeGreaterThan(0);
     });
 
@@ -442,10 +436,7 @@ describe("Keyboard Navigation", () => {
       });
 
       // Tab to the New Goal button
-      await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
 
       // Press Enter to open dialog
       await user.keyboard("{Enter}");
@@ -462,10 +453,7 @@ describe("Keyboard Navigation", () => {
       });
 
       // Tab to the New Goal button
-      await tabsToReach(
-        user,
-        (el) => el?.textContent?.includes("New Goal") ?? false,
-      );
+      await tabsToReach(user, (el) => el?.textContent?.includes("New Goal") ?? false);
 
       // Press Space to activate
       await user.keyboard(" ");

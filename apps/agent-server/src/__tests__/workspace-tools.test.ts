@@ -15,11 +15,8 @@ vi.mock("@ai-cofounder/shared", () => ({
   optionalEnv: vi.fn(),
 }));
 
-const {
-  READ_FILE_TOOL,
-  WRITE_FILE_TOOL,
-  LIST_DIRECTORY_TOOL,
-} = await import("../agents/tools/filesystem-tools.js");
+const { READ_FILE_TOOL, WRITE_FILE_TOOL, LIST_DIRECTORY_TOOL } =
+  await import("../agents/tools/filesystem-tools.js");
 
 const {
   GIT_CLONE_TOOL,

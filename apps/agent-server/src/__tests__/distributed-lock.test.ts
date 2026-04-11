@@ -6,9 +6,8 @@ vi.mock("@ai-cofounder/shared", () => ({
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
 
-const { DistributedLockService, AUTONOMOUS_SESSION_LOCK } = await import(
-  "../services/distributed-lock.js"
-);
+const { DistributedLockService, AUTONOMOUS_SESSION_LOCK } =
+  await import("../services/distributed-lock.js");
 
 function createMockRedis() {
   return {
@@ -40,13 +39,7 @@ describe("DistributedLockService", () => {
     it("calls redis.set with NX and PX options", async () => {
       redis.set.mockResolvedValue("OK");
       await service.acquire("my-lock", 30_000);
-      expect(redis.set).toHaveBeenCalledWith(
-        "my-lock",
-        expect.any(String),
-        "PX",
-        30_000,
-        "NX",
-      );
+      expect(redis.set).toHaveBeenCalledWith("my-lock", expect.any(String), "PX", 30_000, "NX");
     });
 
     it("returns null when redis.set returns null (lock already held)", async () => {
@@ -105,7 +98,7 @@ describe("DistributedLockService", () => {
       await service.release("my-lock", "my-token");
       const luaScript = redis.eval.mock.calls[0][0] as string;
       expect(luaScript).toContain('redis.call("get", KEYS[1])');
-      expect(luaScript).toContain('ARGV[1]');
+      expect(luaScript).toContain("ARGV[1]");
       expect(luaScript).toContain('redis.call("del", KEYS[1])');
     });
   });

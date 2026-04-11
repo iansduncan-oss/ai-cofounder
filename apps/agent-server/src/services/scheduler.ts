@@ -176,7 +176,11 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
           notifiedMeetings.add(eventKey);
 
           const eventTime = event.start.includes("T")
-            ? new Date(event.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: briefingTimezone })
+            ? new Date(event.start).toLocaleTimeString("en-US", {
+                hour: "numeric",
+                minute: "2-digit",
+                timeZone: briefingTimezone,
+              })
             : "shortly";
 
           const prepText = `Sir, your meeting "${event.summary}" begins at ${eventTime}.${event.attendeeCount > 0 ? ` ${event.attendeeCount} attendee(s) expected.` : ""}`;
@@ -275,7 +279,10 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       if (dailyTokenLimit > 0) {
         const todayTotal = await getTodayTokenTotal(db);
         if (todayTotal >= dailyTokenLimit) {
-          logger.warn({ todayTotal, dailyTokenLimit }, "daily token limit reached, skipping schedule execution");
+          logger.warn(
+            { todayTotal, dailyTokenLimit },
+            "daily token limit reached, skipping schedule execution",
+          );
           running = false;
           return;
         }
@@ -298,13 +305,19 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
           session = await createWorkSession(db, {
             trigger: "schedule",
             scheduleId: schedule.id,
-            context: { actionPrompt: schedule.actionPrompt, cronExpression: schedule.cronExpression },
+            context: {
+              actionPrompt: schedule.actionPrompt,
+              cronExpression: schedule.cronExpression,
+            },
           });
 
           // Skip if no LLM providers are available (e.g., all API credits exhausted)
           const availableProviders = llmRegistry.listProviders().filter((p) => p.available);
           if (availableProviders.length === 0) {
-            logger.warn({ scheduleId: schedule.id }, "no LLM providers available, skipping schedule execution");
+            logger.warn(
+              { scheduleId: schedule.id },
+              "no LLM providers available, skipping schedule execution",
+            );
             // Still update next run so we don't hammer on the next tick
             const interval = CronExpressionParser.parse(schedule.cronExpression);
             const nextRunAt = interval.next().toDate();
@@ -335,15 +348,14 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
 
           // Create a system user + conversation for scheduled tasks
           const user = await findOrCreateUser(db, "system-scheduler", "system");
-          const conv = await createConversation(db, { userId: user.id, title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 50)}`, workspaceId: (schedule as { workspaceId?: string }).workspaceId ?? "" });
+          const conv = await createConversation(db, {
+            userId: user.id,
+            title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 50)}`,
+            workspaceId: (schedule as { workspaceId?: string }).workspaceId ?? "",
+          });
 
           // Run the orchestrator
-          const result = await orchestrator.run(
-            schedule.actionPrompt,
-            conv.id,
-            [],
-            user.id,
-          );
+          const result = await orchestrator.run(schedule.actionPrompt, conv.id, [], user.id);
 
           // Calculate next run
           const interval = CronExpressionParser.parse(schedule.cronExpression);
@@ -357,22 +369,31 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
             durationMs,
             actionsTaken: [{ tool: "orchestrator", prompt: schedule.actionPrompt }],
             status: "completed",
-            summary: typeof result.response === "string" ? result.response.slice(0, 500) : "Completed",
+            summary:
+              typeof result.response === "string" ? result.response.slice(0, 500) : "Completed",
           });
 
           void createJournalEntry(db, {
             entryType: "work_session",
             title: `Schedule: ${schedule.description ?? schedule.actionPrompt.slice(0, 80)}`,
-            summary: typeof result.response === "string" ? result.response.slice(0, 300) : "Completed",
+            summary:
+              typeof result.response === "string" ? result.response.slice(0, 300) : "Completed",
             workSessionId: session.id,
-            details: { scheduleId: schedule.id, durationMs, tokensUsed: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0) },
+            details: {
+              scheduleId: schedule.id,
+              durationMs,
+              tokensUsed: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0),
+            },
           }).catch((err) => logger.warn({ err }, "journal entry write failed"));
 
           // Auto-disable one-shot schedules (reminders) after they fire
           const meta = schedule.metadata as Record<string, unknown> | null;
           if (meta?.isOneShot) {
             await toggleSchedule(db, schedule.id, false);
-            logger.info({ scheduleId: schedule.id }, "one-shot schedule auto-disabled after execution");
+            logger.info(
+              { scheduleId: schedule.id },
+              "one-shot schedule auto-disabled after execution",
+            );
           }
 
           logger.info(

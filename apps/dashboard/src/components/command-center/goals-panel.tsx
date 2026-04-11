@@ -76,12 +76,17 @@ export function GoalsPanel() {
           <div className="flex items-center gap-1.5 flex-wrap">
             {isProposed && (
               <>
-                <Button size="sm" onClick={() => approveGoal.mutate(goal.id)} disabled={approveGoal.isPending}>
+                <Button
+                  size="sm"
+                  onClick={() => approveGoal.mutate(goal.id)}
+                  disabled={approveGoal.isPending}
+                >
                   <CheckCircle className="mr-1 h-3 w-3" />
                   {approveGoal.isPending ? "..." : "Approve"}
                 </Button>
                 <Button
-                  variant="destructive" size="sm"
+                  variant="destructive"
+                  size="sm"
                   onClick={() => rejectGoal.mutate({ id: goal.id })}
                   disabled={rejectGoal.isPending}
                 >
@@ -92,7 +97,8 @@ export function GoalsPanel() {
             )}
             {canCancel && (
               <Button
-                variant="outline" size="sm"
+                variant="outline"
+                size="sm"
                 onClick={() => updateStatus.mutate({ id: goal.id, status: "cancelled" })}
                 disabled={updateStatus.isPending}
               >
@@ -101,7 +107,8 @@ export function GoalsPanel() {
               </Button>
             )}
             <Button
-              variant="ghost" size="sm"
+              variant="ghost"
+              size="sm"
               onClick={() => focusChat(`Tell me about goal: ${goal.title}`)}
             >
               <MessageSquare className="mr-1 h-3 w-3" />
@@ -109,9 +116,7 @@ export function GoalsPanel() {
             </Button>
           </div>
 
-          {goal.description && (
-            <p className="text-xs text-muted-foreground">{goal.description}</p>
-          )}
+          {goal.description && <p className="text-xs text-muted-foreground">{goal.description}</p>}
 
           {/* Tasks */}
           <div>
@@ -131,10 +136,14 @@ export function GoalsPanel() {
                         <TaskStatusBadge status={task.status} />
                       </div>
                       {task.assignedAgent && (
-                        <Badge variant="outline" className="mt-1 text-[10px]">{task.assignedAgent}</Badge>
+                        <Badge variant="outline" className="mt-1 text-[10px]">
+                          {task.assignedAgent}
+                        </Badge>
                       )}
                       {task.output && (
-                        <pre className="mt-1 max-h-20 overflow-auto rounded bg-muted p-1.5 text-[10px]">{task.output}</pre>
+                        <pre className="mt-1 max-h-20 overflow-auto rounded bg-muted p-1.5 text-[10px]">
+                          {task.output}
+                        </pre>
                       )}
                       {task.error && (
                         <p className="mt-1 text-[10px] text-destructive">{task.error}</p>
@@ -153,9 +162,20 @@ export function GoalsPanel() {
 
           {/* Details */}
           <div className="text-xs space-y-1 text-muted-foreground">
-            <p>Priority: <span className="text-foreground capitalize">{goal.priority}</span></p>
-            <p>Created: <span className="text-foreground">{new Date(goal.createdAt).toLocaleDateString()}</span></p>
-            {goal.createdBy && <p>By: <span className="text-foreground">{goal.createdBy}</span></p>}
+            <p>
+              Priority: <span className="text-foreground capitalize">{goal.priority}</span>
+            </p>
+            <p>
+              Created:{" "}
+              <span className="text-foreground">
+                {new Date(goal.createdAt).toLocaleDateString()}
+              </span>
+            </p>
+            {goal.createdBy && (
+              <p>
+                By: <span className="text-foreground">{goal.createdBy}</span>
+              </p>
+            )}
           </div>
         </div>
       </div>

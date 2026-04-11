@@ -33,12 +33,7 @@ import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
 
 /** Tools that require explicit user approval before execution */
-const DESTRUCTIVE_TOOLS = new Set([
-  "delete_file",
-  "delete_directory",
-  "git_push",
-  "git_checkout",
-]);
+const DESTRUCTIVE_TOOLS = new Set(["delete_file", "delete_directory", "git_push", "git_checkout"]);
 import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
@@ -48,7 +43,11 @@ import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import { notifyApprovalCreated, notifyGoalProposed } from "../services/notifications.js";
 import { classifyGoalScope, scopeRequiresApproval } from "../services/scope-classifier.js";
-import { buildSharedToolList, executeWithTierCheck, type ToolExecutorContext } from "./tool-executor.js";
+import {
+  buildSharedToolList,
+  executeWithTierCheck,
+  type ToolExecutorContext,
+} from "./tool-executor.js";
 import type { AgentMessagingService } from "../services/agent-messaging.js";
 import type { AutonomyTierService } from "../services/autonomy-tier.js";
 import type { ProjectRegistryService } from "../services/project-registry.js";
@@ -72,10 +71,7 @@ import {
   DELEGATE_PARALLEL_TOOL,
   CHECK_SUBAGENT_TOOL,
 } from "./tools/subagent-tools.js";
-import {
-  createSubagentRun,
-  getSubagentRun,
-} from "@ai-cofounder/db";
+import { createSubagentRun, getSubagentRun } from "@ai-cofounder/db";
 import { enqueueSubagentTask } from "@ai-cofounder/queue";
 
 /* ── Result types ── */
@@ -204,7 +200,8 @@ const REQUEST_APPROVAL_TOOL: LlmTool = {
       },
       reason: {
         type: "string",
-        description: "Clear explanation of what will happen and why approval is needed (1-3 sentences)",
+        description:
+          "Clear explanation of what will happen and why approval is needed (1-3 sentences)",
       },
     },
     required: ["task_id", "reason"],
@@ -434,7 +431,12 @@ export class Orchestrator {
    * Also parses legacy <thinking> tags from text blocks for backward compatibility.
    */
   private extractAndStoreThinking(
-    contentBlocks: (LlmTextContent | LlmThinkingContent | LlmToolUseContent | LlmToolResultContent)[],
+    contentBlocks: (
+      | LlmTextContent
+      | LlmThinkingContent
+      | LlmToolUseContent
+      | LlmToolResultContent
+    )[],
     conversationId: string,
     round: number,
   ): (LlmTextContent | LlmToolUseContent | LlmToolResultContent)[] {
@@ -528,7 +530,8 @@ export class Orchestrator {
       const userMemories = await recallMemories(this.db, userId, { limit: 10 });
 
       // Auto semantic retrieval: find memories relevant to the current message
-      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
+      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> =
+        [];
       if (this.embeddingService) {
         try {
           const queryEmbedding = await this.embeddingService.embed(message);
@@ -551,12 +554,20 @@ export class Orchestrator {
       const parts: string[] = [];
       if (relevantMemories.length > 0) {
         parts.push("Relevant to this conversation:");
-        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
+        parts.push(
+          ...relevantMemories.map(
+            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
+          ),
+        );
       }
       if (generalMemories.length > 0) {
         if (parts.length > 0) parts.push("");
         parts.push("General knowledge:");
-        parts.push(...generalMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
+        parts.push(
+          ...generalMemories.map(
+            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
+          ),
+        );
       }
 
       // Proactive decision surfacing (SESS-02): highlight decisions separately
@@ -567,7 +578,9 @@ export class Orchestrator {
             .map((m) => `- ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`)
             .join("\n");
           parts.push("");
-          parts.push("Past decisions relevant to this topic (reference these naturally when applicable):");
+          parts.push(
+            "Past decisions relevant to this topic (reference these naturally when applicable):",
+          );
           parts.push(decisionBlock);
         }
       }
@@ -583,7 +596,9 @@ export class Orchestrator {
           if (episodes.length > 0) {
             const episodeBlock = [
               "Recent relevant episodes:",
-              ...episodes.map((e) => `- ${sanitizeForPrompt(e.summary)} (importance: ${e.importance.toFixed(1)})`),
+              ...episodes.map(
+                (e) => `- ${sanitizeForPrompt(e.summary)} (importance: ${e.importance.toFixed(1)})`,
+              ),
             ].join("\n");
             memoryContext = memoryContext ? `${memoryContext}\n\n${episodeBlock}` : episodeBlock;
           }
@@ -652,7 +667,9 @@ export class Orchestrator {
           const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
           activeProjectSlug = proj?.slug;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // RAG retrieval: find relevant document chunks (scoped to active project if set)
@@ -670,7 +687,9 @@ export class Orchestrator {
         if (hints) {
           memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // Failure pattern hints
@@ -680,7 +699,9 @@ export class Orchestrator {
         if (failureHints) {
           memoryContext = memoryContext ? `${memoryContext}\n\n${failureHints}` : failureHints;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
@@ -702,25 +723,38 @@ export class Orchestrator {
 
     // Build tools array: orchestrator-only tools + shared tools
     const rawTools: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
+      ? [
+          CREATE_PLAN_TOOL,
+          CREATE_MILESTONE_TOOL,
+          REQUEST_APPROVAL_TOOL,
+          DELEGATE_TO_SUBAGENT_TOOL,
+          DELEGATE_PARALLEL_TOOL,
+          CHECK_SUBAGENT_TOOL,
+        ]
       : [];
 
-    rawTools.push(...buildSharedToolList({
-      db: this.db,
-      embeddingService: this.embeddingService,
-      n8nService: this.n8nService,
-      sandboxService: this.sandboxService,
-      workspaceService: this.workspaceService,
-      messagingService: this.messagingService,
-      projectRegistryService: this.projectRegistryService,
-      monitoringService: this.monitoringService,
-      browserService: this.browserService,
-      gmailService: this.gmailService,
-      calendarService: this.calendarService,
-      episodicMemoryService: this.episodicMemoryService,
-      proceduralMemoryService: this.proceduralMemoryService,
-      prReviewService: this.prReviewService,
-    }, undefined, this.autonomyTierService));
+    rawTools.push(
+      ...buildSharedToolList(
+        {
+          db: this.db,
+          embeddingService: this.embeddingService,
+          n8nService: this.n8nService,
+          sandboxService: this.sandboxService,
+          workspaceService: this.workspaceService,
+          messagingService: this.messagingService,
+          projectRegistryService: this.projectRegistryService,
+          monitoringService: this.monitoringService,
+          browserService: this.browserService,
+          gmailService: this.gmailService,
+          calendarService: this.calendarService,
+          episodicMemoryService: this.episodicMemoryService,
+          proceduralMemoryService: this.proceduralMemoryService,
+          prReviewService: this.prReviewService,
+        },
+        undefined,
+        this.autonomyTierService,
+      ),
+    );
 
     const tools = await this.filterAvailableTools(rawTools);
     const toolCache = new ToolCache();
@@ -736,7 +770,15 @@ export class Orchestrator {
         toolCount: tools.length,
         goalPriority: this.isAutonomous ? "high" : "medium",
       });
-      this.logger.info({ complexity: complexity.level, score: complexity.score, roundBudget: complexity.roundBudget, thinkingBudget: complexity.thinkingTokenBudget }, "task complexity estimated");
+      this.logger.info(
+        {
+          complexity: complexity.level,
+          score: complexity.score,
+          roundBudget: complexity.roundBudget,
+          thinkingBudget: complexity.thinkingTokenBudget,
+        },
+        "task complexity estimated",
+      );
 
       // Agentic tool-use loop with dynamic budgets
       const useThinking = complexity.thinkingTokenBudget > 0;
@@ -745,7 +787,11 @@ export class Orchestrator {
         messages,
         tools,
         max_tokens: useThinking ? complexity.thinkingTokenBudget + 8192 : 8192,
-        ...(useThinking ? { thinking: { type: "enabled" as const, budget_tokens: complexity.thinkingTokenBudget } } : {}),
+        ...(useThinking
+          ? {
+              thinking: { type: "enabled" as const, budget_tokens: complexity.thinkingTokenBudget },
+            }
+          : {}),
         metadata: { agentRole: "orchestrator", conversationId: id, userId },
       });
 
@@ -897,25 +943,41 @@ export class Orchestrator {
     let memoryContext = "";
     if (userId && this.db) {
       const userMemories = await recallMemories(this.db, userId, { limit: 10 });
-      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> = [];
+      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> =
+        [];
       if (this.embeddingService) {
         try {
           const queryEmbedding = await this.embeddingService.embed(message);
           const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
-          relevantMemories = vectorResults.map((m) => ({ id: m.id, category: m.category, key: m.key, content: m.content }));
-        } catch { /* non-fatal */ }
+          relevantMemories = vectorResults.map((m) => ({
+            id: m.id,
+            category: m.category,
+            key: m.key,
+            content: m.content,
+          }));
+        } catch {
+          /* non-fatal */
+        }
       }
       const seenIds = new Set(relevantMemories.map((m) => m.id));
       const generalMemories = userMemories.filter((m) => !seenIds.has(m.id));
       const parts: string[] = [];
       if (relevantMemories.length > 0) {
         parts.push("Relevant to this conversation:");
-        parts.push(...relevantMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
+        parts.push(
+          ...relevantMemories.map(
+            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
+          ),
+        );
       }
       if (generalMemories.length > 0) {
         if (parts.length > 0) parts.push("");
         parts.push("General knowledge:");
-        parts.push(...generalMemories.map((m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`));
+        parts.push(
+          ...generalMemories.map(
+            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
+          ),
+        );
       }
       if (parts.length > 0) memoryContext = parts.join("\n");
 
@@ -928,7 +990,9 @@ export class Orchestrator {
         if (contextBlock) {
           memoryContext = contextBlock + (memoryContext ? "\n\n" + memoryContext : "");
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       // Session continuity for streaming
       try {
@@ -942,7 +1006,9 @@ export class Orchestrator {
             memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
           }
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // Resolve active project from conversation metadata
@@ -955,7 +1021,9 @@ export class Orchestrator {
           const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
           activeProjectSlugStream = proj?.slug;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     // RAG retrieval: find relevant document chunks (scoped to active project if set)
@@ -973,7 +1041,9 @@ export class Orchestrator {
         if (hints) {
           memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
 
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
@@ -985,23 +1055,36 @@ export class Orchestrator {
     messages.push({ role: "user", content: message });
 
     const rawToolsStream: LlmTool[] = this.db
-      ? [CREATE_PLAN_TOOL, CREATE_MILESTONE_TOOL, REQUEST_APPROVAL_TOOL, DELEGATE_TO_SUBAGENT_TOOL, DELEGATE_PARALLEL_TOOL, CHECK_SUBAGENT_TOOL]
+      ? [
+          CREATE_PLAN_TOOL,
+          CREATE_MILESTONE_TOOL,
+          REQUEST_APPROVAL_TOOL,
+          DELEGATE_TO_SUBAGENT_TOOL,
+          DELEGATE_PARALLEL_TOOL,
+          CHECK_SUBAGENT_TOOL,
+        ]
       : [];
-    rawToolsStream.push(...buildSharedToolList({
-      db: this.db,
-      embeddingService: this.embeddingService,
-      n8nService: this.n8nService,
-      sandboxService: this.sandboxService,
-      workspaceService: this.workspaceService,
-      messagingService: this.messagingService,
-      projectRegistryService: this.projectRegistryService,
-      monitoringService: this.monitoringService,
-      browserService: this.browserService,
-      gmailService: this.gmailService,
-      calendarService: this.calendarService,
-      episodicMemoryService: this.episodicMemoryService,
-      proceduralMemoryService: this.proceduralMemoryService,
-    }, undefined, this.autonomyTierService));
+    rawToolsStream.push(
+      ...buildSharedToolList(
+        {
+          db: this.db,
+          embeddingService: this.embeddingService,
+          n8nService: this.n8nService,
+          sandboxService: this.sandboxService,
+          workspaceService: this.workspaceService,
+          messagingService: this.messagingService,
+          projectRegistryService: this.projectRegistryService,
+          monitoringService: this.monitoringService,
+          browserService: this.browserService,
+          gmailService: this.gmailService,
+          calendarService: this.calendarService,
+          episodicMemoryService: this.episodicMemoryService,
+          proceduralMemoryService: this.proceduralMemoryService,
+        },
+        undefined,
+        this.autonomyTierService,
+      ),
+    );
 
     const tools = await this.filterAvailableTools(rawToolsStream);
     const toolCache = new ToolCache();
@@ -1021,7 +1104,14 @@ export class Orchestrator {
       };
 
       if (signal?.aborted) throw new Error("Request aborted");
-      let response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id }, onTextDelta: streamTextDelta });
+      let response = await this.completeWithRetry(this.taskCategory, {
+        system: systemPrompt,
+        messages,
+        tools,
+        max_tokens: 4096,
+        metadata: { agentRole: "orchestrator", conversationId: id },
+        onTextDelta: streamTextDelta,
+      });
       totalInputTokens += response.usage.inputTokens;
       totalOutputTokens += response.usage.outputTokens;
       const providerName = response.provider;
@@ -1037,14 +1127,28 @@ export class Orchestrator {
         for (const block of response.content) {
           if (block.type === "tool_use") {
             const toolInput = block.input as Record<string, unknown>;
-            await onEvent({ type: "tool_call", data: { tool: block.name, input: this.sanitizeToolInput(toolInput) } });
+            await onEvent({
+              type: "tool_call",
+              data: { tool: block.name, input: this.sanitizeToolInput(toolInput) },
+            });
 
             // Destructive tools require an approved approval before execution
             if (DESTRUCTIVE_TOOLS.has(block.name)) {
               const approvalResult = await this.checkOrCreateDestructiveApproval(block.name, id);
               if (!approvalResult.approved) {
-                await onEvent({ type: "tool_result", data: { tool: block.name, summary: `Blocked: ${block.name} requires approval`, needs_confirmation: true } });
-                toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeToolResult(JSON.stringify(approvalResult)) });
+                await onEvent({
+                  type: "tool_result",
+                  data: {
+                    tool: block.name,
+                    summary: `Blocked: ${block.name} requires approval`,
+                    needs_confirmation: true,
+                  },
+                });
+                toolResults.push({
+                  type: "tool_result",
+                  tool_use_id: block.id,
+                  content: sanitizeToolResult(JSON.stringify(approvalResult)),
+                });
                 continue;
               }
             }
@@ -1063,24 +1167,43 @@ export class Orchestrator {
               plan = result as PlanResult;
             }
 
-            await onEvent({ type: "tool_result", data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) } });
-            toolResults.push({ type: "tool_result", tool_use_id: block.id, content: sanitizeToolResult(JSON.stringify(result)) });
+            await onEvent({
+              type: "tool_result",
+              data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) },
+            });
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: sanitizeToolResult(JSON.stringify(result)),
+            });
           }
         }
 
         messages.push({ role: "assistant", content: response.content });
         messages.push({ role: "user", content: toolResults });
 
-        await onEvent({ type: "thinking", data: { round: round + 1, message: `Processing (round ${round + 1})...` } });
+        await onEvent({
+          type: "thinking",
+          data: { round: round + 1, message: `Processing (round ${round + 1})...` },
+        });
         if (signal?.aborted) throw new Error("Request aborted");
-        response = await this.completeWithRetry(this.taskCategory, { system: systemPrompt, messages, tools, max_tokens: 4096, metadata: { agentRole: "orchestrator", conversationId: id }, onTextDelta: streamTextDelta });
+        response = await this.completeWithRetry(this.taskCategory, {
+          system: systemPrompt,
+          messages,
+          tools,
+          max_tokens: 4096,
+          metadata: { agentRole: "orchestrator", conversationId: id },
+          onTextDelta: streamTextDelta,
+        });
         totalInputTokens += response.usage.inputTokens;
         totalOutputTokens += response.usage.outputTokens;
       }
 
       // Extract thinking traces and filter to non-thinking content
       const finalContent = this.extractAndStoreThinking(response.content, id, round);
-      const textBlocks = finalContent.filter((b): b is LlmTextContent => b.type === "text").map((b) => b.text);
+      const textBlocks = finalContent
+        .filter((b): b is LlmTextContent => b.type === "text")
+        .map((b) => b.text);
       let responseText = textBlocks.join("\n");
 
       if (!responseText && plan) responseText = this.buildPlanSummary(plan);
@@ -1089,10 +1212,21 @@ export class Orchestrator {
       if (!streamedDirectly) {
         const CHUNK_SIZE = 100;
         for (let i = 0; i < responseText.length; i += CHUNK_SIZE) {
-          await onEvent({ type: "text_delta", data: { text: responseText.slice(i, i + CHUNK_SIZE) } });
+          await onEvent({
+            type: "text_delta",
+            data: { text: responseText.slice(i, i + CHUNK_SIZE) },
+          });
         }
       }
-      await onEvent({ type: "done", data: { response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens } } });
+      await onEvent({
+        type: "done",
+        data: {
+          response: responseText,
+          model: response.model,
+          provider: providerName,
+          usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+        },
+      });
 
       // Record LLM usage for the orchestrator's streaming calls
       if (this.db) {
@@ -1112,7 +1246,15 @@ export class Orchestrator {
         }
       }
 
-      return { conversationId: id, agentRole: "orchestrator", response: responseText, model: response.model, provider: providerName, usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens }, plan };
+      return {
+        conversationId: id,
+        agentRole: "orchestrator",
+        response: responseText,
+        model: response.model,
+        provider: providerName,
+        usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+        plan,
+      };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       await onEvent({ type: "error", data: { error: errorMsg } });
@@ -1120,7 +1262,9 @@ export class Orchestrator {
     }
   }
 
-  private sanitizeToolInput(input: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  private sanitizeToolInput(
+    input: Record<string, unknown> | null | undefined,
+  ): Record<string, unknown> {
     if (!input) return {};
     const sanitized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(input)) {
@@ -1138,9 +1282,12 @@ export class Orchestrator {
     const r = result as Record<string, unknown>;
     if (r.error) return `error: ${String(r.error).slice(0, 100)}`;
     switch (toolName) {
-      case "create_plan": return `Plan created: ${r.goalTitle ?? ""}`;
-      case "search_web": return `Found results`;
-      case "save_memory": return `Saved: ${r.key ?? ""}`;
+      case "create_plan":
+        return `Plan created: ${r.goalTitle ?? ""}`;
+      case "search_web":
+        return `Found results`;
+      case "save_memory":
+        return `Saved: ${r.key ?? ""}`;
       case "recall_memories": {
         if (Array.isArray(result)) return `Recalled ${result.length} memories`;
         const rm = result as Record<string, unknown>;
@@ -1148,10 +1295,14 @@ export class Orchestrator {
         const hasRag = Boolean(rm.ragContext);
         return `Recalled ${memCount} memories${hasRag ? " + RAG context" : ""}`;
       }
-      case "execute_code": return `Exit code: ${r.exitCode ?? "?"}`;
-      case "read_file": return `Read: ${r.path ?? ""}`;
-      case "write_file": return `Wrote: ${r.path ?? ""}`;
-      default: return "completed";
+      case "execute_code":
+        return `Exit code: ${r.exitCode ?? "?"}`;
+      case "read_file":
+        return `Read: ${r.path ?? ""}`;
+      case "write_file":
+        return `Wrote: ${r.path ?? ""}`;
+      default:
+        return "completed";
     }
   }
 
@@ -1203,7 +1354,10 @@ export class Orchestrator {
       reason: `${marker} Destructive tool "${toolName}" invoked during conversation ${conversationId}. Requires human approval before execution.`,
     });
 
-    this.logger.info({ toolName, approvalId: approval.id, conversationId }, "destructive tool approval requested");
+    this.logger.info(
+      { toolName, approvalId: approval.id, conversationId },
+      "destructive tool approval requested",
+    );
 
     // Notify the user
     notifyApprovalCreated({
@@ -1247,7 +1401,10 @@ export class Orchestrator {
           errorMessage: success ? undefined : "tool returned error",
           requestId: this.requestId,
         }).catch((err) => {
-          this.logger.warn({ err, tool: block.name }, "failed to persist tool execution (non-fatal)");
+          this.logger.warn(
+            { err, tool: block.name },
+            "failed to persist tool execution (non-fatal)",
+          );
         });
         recordActionSafe(this.db, {
           userId,
@@ -1322,7 +1479,11 @@ export class Orchestrator {
 
       case "delegate_to_subagent": {
         if (!this.db) return { error: "Database not available" };
-        const input = block.input as { title: string; instruction: string; wait_for_result?: boolean };
+        const input = block.input as {
+          title: string;
+          instruction: string;
+          wait_for_result?: boolean;
+        };
         const run = await createSubagentRun(this.db, {
           parentRequestId: this.requestId,
           conversationId,
@@ -1353,10 +1514,18 @@ export class Orchestrator {
               return { subagentRunId: run.id, status: "failed", error: status.error };
             }
           }
-          return { subagentRunId: run.id, status: "timeout", message: "Subagent still running after 5 minutes. Use check_subagent to poll later." };
+          return {
+            subagentRunId: run.id,
+            status: "timeout",
+            message: "Subagent still running after 5 minutes. Use check_subagent to poll later.",
+          };
         }
 
-        return { subagentRunId: run.id, status: "queued", message: "Subagent spawned. Use check_subagent to poll for results." };
+        return {
+          subagentRunId: run.id,
+          status: "queued",
+          message: "Subagent spawned. Use check_subagent to poll for results.",
+        };
       }
 
       case "delegate_parallel": {
@@ -1382,7 +1551,10 @@ export class Orchestrator {
           results.push({ subagentRunId: run.id, title: task.title, status: "queued" });
         }
         this.logger.info({ count: results.length }, "parallel subagents delegated");
-        return { subagents: results, message: "Use check_subagent to poll each subagent for results." };
+        return {
+          subagents: results,
+          message: "Use check_subagent to poll each subagent for results.",
+        };
       }
 
       case "check_subagent": {
@@ -1405,26 +1577,36 @@ export class Orchestrator {
 
       default: {
         // Delegate to shared tool executor with tier enforcement
-        const result = await executeWithTierCheck(block, {
-          db: this.db,
-          embeddingService: this.embeddingService,
-          n8nService: this.n8nService,
-          sandboxService: this.sandboxService,
-          workspaceService: this.workspaceService,
-          messagingService: this.messagingService,
-          autonomyTierService: this.autonomyTierService,
-          projectRegistryService: this.projectRegistryService,
-          monitoringService: this.monitoringService,
-          browserService: this.browserService,
-          gmailService: this.gmailService,
-          calendarService: this.calendarService,
-          episodicMemoryService: this.episodicMemoryService,
-          proceduralMemoryService: this.proceduralMemoryService,
-          outboundWebhookService: this.outboundWebhookService,
-          conversationBranchingService: this.conversationBranchingService,
-          discordService: this.discordService,
-          vpsCommandService: this.vpsCommandService,
-        }, { conversationId, userId, workspaceId: this.workspaceId, agentRole: "orchestrator", isAutonomous: this.isAutonomous } as ToolExecutorContext);
+        const result = await executeWithTierCheck(
+          block,
+          {
+            db: this.db,
+            embeddingService: this.embeddingService,
+            n8nService: this.n8nService,
+            sandboxService: this.sandboxService,
+            workspaceService: this.workspaceService,
+            messagingService: this.messagingService,
+            autonomyTierService: this.autonomyTierService,
+            projectRegistryService: this.projectRegistryService,
+            monitoringService: this.monitoringService,
+            browserService: this.browserService,
+            gmailService: this.gmailService,
+            calendarService: this.calendarService,
+            episodicMemoryService: this.episodicMemoryService,
+            proceduralMemoryService: this.proceduralMemoryService,
+            outboundWebhookService: this.outboundWebhookService,
+            conversationBranchingService: this.conversationBranchingService,
+            discordService: this.discordService,
+            vpsCommandService: this.vpsCommandService,
+          },
+          {
+            conversationId,
+            userId,
+            workspaceId: this.workspaceId,
+            agentRole: "orchestrator",
+            isAutonomous: this.isAutonomous,
+          } as ToolExecutorContext,
+        );
 
         if (result === null) return { error: `Unknown tool: ${block.name}` };
         return result;
@@ -1435,14 +1617,19 @@ export class Orchestrator {
   private async retrieveRagContext(query: string, sourceId?: string): Promise<string | null> {
     if (!this.db || !this.embeddingService) return null;
     try {
-      const chunks = await retrieve(this.db, this.embeddingService.embed.bind(this.embeddingService), query, {
-        limit: 5,
-        minScore: 0.3,
-        diversifySources: true,
-        llmRegistry: this.registry,
-        enableReranking: true,
-        ...(sourceId ? { sourceId } : {}),
-      });
+      const chunks = await retrieve(
+        this.db,
+        this.embeddingService.embed.bind(this.embeddingService),
+        query,
+        {
+          limit: 5,
+          minScore: 0.3,
+          diversifySources: true,
+          llmRegistry: this.registry,
+          enableReranking: true,
+          ...(sourceId ? { sourceId } : {}),
+        },
+      );
       if (chunks.length === 0) return null;
       return formatContext(chunks);
     } catch (err) {
@@ -1463,7 +1650,11 @@ export class Orchestrator {
     return trimmed;
   }
 
-  private async persistPlan(conversationId: string, input: CreatePlanInput, userId?: string): Promise<PlanResult> {
+  private async persistPlan(
+    conversationId: string,
+    input: CreatePlanInput,
+    userId?: string,
+  ): Promise<PlanResult> {
     const db = this.db!;
 
     // Validate dependency graph before creating anything (cycle detection)
@@ -1475,7 +1666,6 @@ export class Orchestrator {
     // Classify scope — server-side keyword analysis merged with optional LLM hint
     const scope = classifyGoalScope(input.tasks, input.scope);
     const requiresApproval = scopeRequiresApproval(scope);
-
 
     const goal = await createGoal(db, {
       conversationId,
@@ -1544,7 +1734,6 @@ export class Orchestrator {
         taskCount: createdTasks.length,
       }).catch((err) => this.logger.warn({ err }, "Failed to notify goal proposed"));
     }
-
 
     return {
       goalId: goal.id,

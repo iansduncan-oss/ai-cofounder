@@ -15,5 +15,7 @@ export function recordActionSafe(
     metadata?: Record<string, unknown>;
   },
 ) {
-  recordUserAction(db, action as Parameters<typeof recordUserAction>[1]).catch((err) => logger.warn({ err }, "user action recording failed"));
+  recordUserAction(db, action as Parameters<typeof recordUserAction>[1]).catch((err) =>
+    logger.warn({ err }, "user action recording failed"),
+  );
 }

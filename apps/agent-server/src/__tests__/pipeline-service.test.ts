@@ -116,10 +116,10 @@ describe("PipelineExecutor", () => {
     const registry = new LlmRegistry();
     executor = new PipelineExecutor(
       registry as never,
-      {} as never,             // db
+      {} as never, // db
       mockNotificationService as never,
-      undefined,               // embeddingService
-      undefined,               // sandboxService
+      undefined, // embeddingService
+      undefined, // sandboxService
       mockJournalService as never,
     );
   });
@@ -232,9 +232,7 @@ describe("PipelineExecutor", () => {
   });
 
   it("sends notification on pipeline completion", async () => {
-    const job = makeJob([
-      { agent: "researcher", prompt: "Research", dependsOnPrevious: false },
-    ]);
+    const job = makeJob([{ agent: "researcher", prompt: "Research", dependsOnPrevious: false }]);
 
     await executor.execute(job);
 
@@ -245,9 +243,7 @@ describe("PipelineExecutor", () => {
   });
 
   it("writes a journal entry on pipeline completion", async () => {
-    const job = makeJob([
-      { agent: "researcher", prompt: "Research", dependsOnPrevious: false },
-    ]);
+    const job = makeJob([{ agent: "researcher", prompt: "Research", dependsOnPrevious: false }]);
 
     await executor.execute(job);
 
@@ -303,14 +299,9 @@ describe("PipelineExecutor", () => {
 
   it("works without notification or journal services", async () => {
     const registry = new LlmRegistry();
-    const bareExecutor = new PipelineExecutor(
-      registry as never,
-      {} as never,
-    );
+    const bareExecutor = new PipelineExecutor(registry as never, {} as never);
 
-    const job = makeJob([
-      { agent: "researcher", prompt: "Research", dependsOnPrevious: false },
-    ]);
+    const job = makeJob([{ agent: "researcher", prompt: "Research", dependsOnPrevious: false }]);
 
     const result = await bareExecutor.execute(job);
 

@@ -18,18 +18,18 @@ The codebase has **solid coverage for the core agent-server** (149 test files fo
 
 These files contain critical business logic and have zero test coverage:
 
-| File | Lines | Risk | Why It Matters |
-|------|-------|------|---------------|
-| `agents/specialists/base.ts` | 235 | **Critical** | Base class for all specialist agents — tool loop, retry logic, error handling. Untested means every specialist inherits untested behavior. |
-| `agents/specialists/coder.ts` | ~200 | **Critical** | Self-review logic for generated code. Bugs here produce unreviewed AI output. |
-| `agents/specialists/researcher.ts` | ~150 | **High** | Research agent used for web search + synthesis. |
-| `agents/specialists/planner.ts` | ~150 | **High** | Planning agent — generates task DAGs. |
-| `agents/specialists/reviewer.ts` | ~150 | **High** | Reviews generated artifacts. |
-| `services/briefing.ts` | 504 | **High** | Daily briefing aggregation (Calendar + Gmail + action items). Complex data merging with multiple failure modes. |
-| `services/monitoring.ts` | 491 | **High** | GitHub, VPS, and service health monitoring. Side effects (notifications) need verification. |
-| `services/pipeline.ts` | ~300 | **High** | Multi-step pipeline execution. State machine logic with many edge cases. |
-| `plugins/auth.ts` | 55 | **Critical** | JWT + cookie auth. Security-critical, compact enough to test exhaustively. |
-| `plugins/websocket.ts` | ~200 | **High** | WebSocket lifecycle management. Connection/disconnection edge cases. |
+| File                               | Lines | Risk         | Why It Matters                                                                                                                             |
+| ---------------------------------- | ----- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `agents/specialists/base.ts`       | 235   | **Critical** | Base class for all specialist agents — tool loop, retry logic, error handling. Untested means every specialist inherits untested behavior. |
+| `agents/specialists/coder.ts`      | ~200  | **Critical** | Self-review logic for generated code. Bugs here produce unreviewed AI output.                                                              |
+| `agents/specialists/researcher.ts` | ~150  | **High**     | Research agent used for web search + synthesis.                                                                                            |
+| `agents/specialists/planner.ts`    | ~150  | **High**     | Planning agent — generates task DAGs.                                                                                                      |
+| `agents/specialists/reviewer.ts`   | ~150  | **High**     | Reviews generated artifacts.                                                                                                               |
+| `services/briefing.ts`             | 504   | **High**     | Daily briefing aggregation (Calendar + Gmail + action items). Complex data merging with multiple failure modes.                            |
+| `services/monitoring.ts`           | 491   | **High**     | GitHub, VPS, and service health monitoring. Side effects (notifications) need verification.                                                |
+| `services/pipeline.ts`             | ~300  | **High**     | Multi-step pipeline execution. State machine logic with many edge cases.                                                                   |
+| `plugins/auth.ts`                  | 55    | **Critical** | JWT + cookie auth. Security-critical, compact enough to test exhaustively.                                                                 |
+| `plugins/websocket.ts`             | ~200  | **High**     | WebSocket lifecycle management. Connection/disconnection edge cases.                                                                       |
 
 ### Priority 2 — Untested Tool Definitions (~2,175 lines across 21 files)
 
@@ -56,6 +56,7 @@ These are the functions the AI orchestrator calls. Each tool definition includes
 ### Priority 4 — LLM Providers (626 lines, 0 tests)
 
 All provider implementations lack tests:
+
 - `providers/anthropic.ts`, `providers/groq.ts`, `providers/gemini.ts`
 - `providers/openrouter.ts`, `providers/cerebras.ts`, `providers/ollama.ts`
 - `providers/together.ts`, `providers/huggingface.ts`
@@ -64,11 +65,11 @@ While they share an `openai-compatible` base class, provider-specific quirks (au
 
 ### Priority 5 — Apps with Minimal Tests
 
-| Workspace | Test Files | Source Files | Ratio |
-|-----------|-----------|-------------|-------|
-| `apps/discord-bot` | 3 | 24 | 0.12 |
-| `packages/mcp-server` | 1 | 3 | 0.33 |
-| `packages/sandbox` | 1 | 3 | 0.33 |
+| Workspace             | Test Files | Source Files | Ratio |
+| --------------------- | ---------- | ------------ | ----- |
+| `apps/discord-bot`    | 3          | 24           | 0.12  |
+| `packages/mcp-server` | 1          | 3            | 0.33  |
+| `packages/sandbox`    | 1          | 3            | 0.33  |
 
 The discord-bot commands are thin wrappers (5-22 lines each) that delegate to `bot-handlers`, so the low ratio is partially justified. But `handlers/message-watcher.ts` and `register.ts` (66 lines) have real logic worth testing.
 
@@ -82,6 +83,7 @@ The most pervasive issue. Many tests mock so aggressively that they test the moc
 
 **`packages/db` — repositories.test.ts:**
 Uses a 67-line `Proxy`-based mock that simulates Drizzle's query builder chain. Tests verify that `select().from().where()` was called with the right arguments — but never verify actual SQL semantics, JOIN behavior, or constraint handling. This means:
+
 - A broken WHERE clause passes tests
 - A missing JOIN passes tests
 - Incorrect column references pass tests
@@ -103,14 +105,14 @@ Several tests use assertions too loose to catch regressions:
 
 Key error-handling code that exists in source but has no test:
 
-| Location | Error Case | Impact |
-|----------|-----------|--------|
-| `orchestrator.ts:276-277` | Invalid dependency index in task graph | Could silently accept bad plans |
-| `orchestrator.ts:300` | Dependency cycle detection | Could deadlock on circular task dependencies |
-| `orchestrator.ts:1023,1075` | Request abort / signal handling | Leaked resources on cancellation |
-| `orchestrator.ts:1448-1451` | RAG retrieval failure | Silent degradation not verified |
-| `dispatcher.ts:174` | Fire-and-forget verification failure | Goal completion status could be wrong |
-| `dispatcher.ts:421` | Deadlock safety valve (empty batch + no running) | Could hang forever in untested scenario |
+| Location                    | Error Case                                       | Impact                                       |
+| --------------------------- | ------------------------------------------------ | -------------------------------------------- |
+| `orchestrator.ts:276-277`   | Invalid dependency index in task graph           | Could silently accept bad plans              |
+| `orchestrator.ts:300`       | Dependency cycle detection                       | Could deadlock on circular task dependencies |
+| `orchestrator.ts:1023,1075` | Request abort / signal handling                  | Leaked resources on cancellation             |
+| `orchestrator.ts:1448-1451` | RAG retrieval failure                            | Silent degradation not verified              |
+| `dispatcher.ts:174`         | Fire-and-forget verification failure             | Goal completion status could be wrong        |
+| `dispatcher.ts:421`         | Deadlock safety valve (empty batch + no running) | Could hang forever in untested scenario      |
 
 ### 2d. Test Anti-Patterns Found
 
@@ -131,13 +133,13 @@ Key error-handling code that exists in source but has no test:
    - `completeWithRetry()` retry behavior (429, timeout, ECONNRESET, 503)
    - Non-retryable error passthrough
    - Signal/abort handling
-   - *Why:* Every specialist inherits this. A bug here affects all 7 agents.
+   - _Why:_ Every specialist inherits this. A bug here affects all 7 agents.
 
 2. **Test auth plugin (`auth.ts`, 55 lines)**
    - JWT validation (valid, expired, malformed, missing)
    - Cookie auth fallback
    - Internal/localhost bypass
-   - *Why:* Security-critical, small surface area, high ROI.
+   - _Why:_ Security-critical, small surface area, high ROI.
 
 3. **Add orchestrator error path tests**
    - Dependency cycle detection
@@ -145,40 +147,40 @@ Key error-handling code that exists in source but has no test:
    - Request abort handling
    - RAG retrieval failure graceful degradation
    - History trimming edge cases (empty, single huge message, boundary)
-   - *Why:* The orchestrator is the core of the system. These are _known_ error paths with code that handles them but no test proving it works.
+   - _Why:_ The orchestrator is the core of the system. These are _known_ error paths with code that handles them but no test proving it works.
 
 4. **Add dispatcher edge case tests**
    - Deadlock safety valve
    - Mixed parallel/sequential ordering verification
    - All-tasks-fail with multiple tasks
    - Verification failure handling
-   - *Why:* The dispatcher runs goal execution. Untested edge cases can hang or misreport.
+   - _Why:_ The dispatcher runs goal execution. Untested edge cases can hang or misreport.
 
 ### Tier 2 — Medium Impact, Medium Effort
 
 5. **Test 5-6 high-use agent tools**
    - Focus on: `git-tools.ts`, `filesystem-tools.ts`, `sandbox-tools.ts`, `memory-tools.ts`, `verification-tools.ts`
    - Test parameter validation, happy path execution, error responses
-   - *Why:* These are the tools the AI calls most frequently. Tool failures cascade into bad agent behavior.
+   - _Why:_ These are the tools the AI calls most frequently. Tool failures cascade into bad agent behavior.
 
 6. **Add DB repository integration tests**
    - Test 10-15 critical queries against a real test database
    - Focus on: `createGoal`/`getGoal`, memory save/recall with vectors, conversation CRUD
    - Use `testcontainers` or a `docker-compose.test.yml` with ephemeral Postgres
-   - *Why:* Current Proxy-based mocks can't catch SQL-level bugs.
+   - _Why:_ Current Proxy-based mocks can't catch SQL-level bugs.
 
 7. **Test LLM provider error handling**
    - Rate limit responses (429 + retry-after header)
    - Timeout behavior
    - Malformed response handling
    - Auth failures
-   - *Why:* Provider failures are the most common production issue. Each provider has different error shapes.
+   - _Why:_ Provider failures are the most common production issue. Each provider has different error shapes.
 
 8. **Strengthen assertion quality across existing tests**
    - Replace `toBeDefined()` with content assertions
    - Replace `toBeGreaterThanOrEqual` with exact counts where deterministic
    - Add return-value checks alongside mock-call checks
-   - *Why:* Low-effort improvement that catches real regressions.
+   - _Why:_ Low-effort improvement that catches real regressions.
 
 ### Tier 3 — Lower Priority, Good Hygiene
 
@@ -211,20 +213,20 @@ Key error-handling code that exists in source but has no test:
 
 ## 4. Summary Statistics
 
-| Workspace | Source Files | Test Files | Ratio | Assessment |
-|-----------|------------|-----------|-------|------------|
-| apps/agent-server | 177 | 149 | 0.84 | Good quantity, quality gaps |
-| apps/discord-bot | 24 | 3 | 0.12 | Low (thin wrappers, partially justified) |
-| apps/slack-bot | 2 | 1 | 0.50 | Acceptable |
-| apps/dashboard | 20 | 10 | 0.50 | Acceptable |
-| packages/db | 8 | 4 | 0.50 | Needs integration tests |
-| packages/llm | 14 | 6 | 0.42 | Provider gap |
-| packages/queue | 7 | 3 | 0.42 | Acceptable |
-| packages/rag | 7 | 7 | **1.00** | Exemplary |
-| packages/shared | 6 | 3 | 0.50 | Acceptable |
-| packages/api-client | 3 | 2 | 0.66 | Good |
-| packages/bot-handlers | 4 | 3 | 0.75 | Good |
-| packages/sandbox | 3 | 1 | 0.33 | Low |
-| packages/mcp-server | 3 | 1 | 0.33 | Low |
+| Workspace             | Source Files | Test Files | Ratio    | Assessment                               |
+| --------------------- | ------------ | ---------- | -------- | ---------------------------------------- |
+| apps/agent-server     | 177          | 149        | 0.84     | Good quantity, quality gaps              |
+| apps/discord-bot      | 24           | 3          | 0.12     | Low (thin wrappers, partially justified) |
+| apps/slack-bot        | 2            | 1          | 0.50     | Acceptable                               |
+| apps/dashboard        | 20           | 10         | 0.50     | Acceptable                               |
+| packages/db           | 8            | 4          | 0.50     | Needs integration tests                  |
+| packages/llm          | 14           | 6          | 0.42     | Provider gap                             |
+| packages/queue        | 7            | 3          | 0.42     | Acceptable                               |
+| packages/rag          | 7            | 7          | **1.00** | Exemplary                                |
+| packages/shared       | 6            | 3          | 0.50     | Acceptable                               |
+| packages/api-client   | 3            | 2          | 0.66     | Good                                     |
+| packages/bot-handlers | 4            | 3          | 0.75     | Good                                     |
+| packages/sandbox      | 3            | 1          | 0.33     | Low                                      |
+| packages/mcp-server   | 3            | 1          | 0.33     | Low                                      |
 
 **Total: 220 test files, 2,385 passing tests across 13 workspaces.**

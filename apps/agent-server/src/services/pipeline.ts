@@ -4,7 +4,11 @@ import { createLogger } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import { updateGoalStatus } from "@ai-cofounder/db";
 import type { PipelineJob, PipelineStage } from "@ai-cofounder/queue";
-import type { SpecialistAgent, SpecialistContext, SpecialistResult } from "../agents/specialists/base.js";
+import type {
+  SpecialistAgent,
+  SpecialistContext,
+  SpecialistResult,
+} from "../agents/specialists/base.js";
 import { ResearcherAgent } from "../agents/specialists/researcher.js";
 import { CoderAgent } from "../agents/specialists/coder.js";
 import { ReviewerAgent } from "../agents/specialists/reviewer.js";
@@ -89,7 +93,12 @@ export class PipelineExecutor {
         // Sequential execution
         const { index, stage } = group[0];
         const result = await this.executeStage(
-          stage, index, pipelineId, goalId, groupPreviousOutputs, groupContext,
+          stage,
+          index,
+          pipelineId,
+          goalId,
+          groupPreviousOutputs,
+          groupContext,
         );
         stageResults.push(result);
 
@@ -133,9 +142,13 @@ export class PipelineExecutor {
     const anyCompleted = stageResults.some((r) => r.status === "completed");
 
     if (allCompleted) {
-      await updateGoalStatus(this.db, goalId, "completed").catch((err) => logger.warn({ err }, "goal status update failed"));
+      await updateGoalStatus(this.db, goalId, "completed").catch((err) =>
+        logger.warn({ err }, "goal status update failed"),
+      );
     } else if (!anyCompleted) {
-      await updateGoalStatus(this.db, goalId, "cancelled").catch((err) => logger.warn({ err }, "goal status update failed"));
+      await updateGoalStatus(this.db, goalId, "cancelled").catch((err) =>
+        logger.warn({ err }, "goal status update failed"),
+      );
     }
 
     const pipelineStatus = allCompleted ? "completed" : anyCompleted ? "partial" : "failed";
@@ -153,40 +166,54 @@ export class PipelineExecutor {
     // Write journal entry for content_pipeline
     if (this.journalService) {
       const completedStages = stageResults.filter((r) => r.status === "completed").length;
-      this.journalService.writeEntry({
-        entryType: "content_pipeline",
-        title: `Pipeline ${pipelineId} ${pipelineStatus}`,
-        summary: `${completedStages}/${stages.length} stages completed`,
-        goalId,
-        details: {
-          pipelineId,
-          stageResults: stageResults.map((r) => ({ agent: r.agent, status: r.status })),
-          templateName: (context as Record<string, unknown>).templateName,
-        },
-      }).catch((err) => logger.warn({ err }, "pipeline event write failed"));
+      this.journalService
+        .writeEntry({
+          entryType: "content_pipeline",
+          title: `Pipeline ${pipelineId} ${pipelineStatus}`,
+          summary: `${completedStages}/${stages.length} stages completed`,
+          goalId,
+          details: {
+            pipelineId,
+            stageResults: stageResults.map((r) => ({ agent: r.agent, status: r.status })),
+            templateName: (context as Record<string, unknown>).templateName,
+          },
+        })
+        .catch((err) => logger.warn({ err }, "pipeline event write failed"));
     }
 
     // Auto-trigger n8n workflow for templates that specify one
     if (this.n8nService && pipelineStatus === "completed" && context.templateName) {
-      const n8nWorkflowName = (context as Record<string, unknown>).n8nWorkflow as string | undefined;
+      const n8nWorkflowName = (context as Record<string, unknown>).n8nWorkflow as
+        | string
+        | undefined;
       if (n8nWorkflowName) {
         const { getN8nWorkflowByName } = await import("@ai-cofounder/db");
         const workflow = await getN8nWorkflowByName(this.db, n8nWorkflowName);
         if (workflow?.webhookUrl) {
-          const lastOutput = stageResults.filter((r) => r.output).map((r) => r.output).pop();
-          this.n8nService.trigger(workflow.webhookUrl, n8nWorkflowName, {
-            pipelineId,
-            goalId,
-            output: lastOutput,
-          }).catch((err) => {
-            logger.warn({ err, n8nWorkflowName }, "n8n post-pipeline trigger failed");
-          });
+          const lastOutput = stageResults
+            .filter((r) => r.output)
+            .map((r) => r.output)
+            .pop();
+          this.n8nService
+            .trigger(workflow.webhookUrl, n8nWorkflowName, {
+              pipelineId,
+              goalId,
+              output: lastOutput,
+            })
+            .catch((err) => {
+              logger.warn({ err, n8nWorkflowName }, "n8n post-pipeline trigger failed");
+            });
         }
       }
     }
 
     logger.info(
-      { pipelineId, goalId, status: pipelineStatus, completed: stageResults.filter((r) => r.status === "completed").length },
+      {
+        pipelineId,
+        goalId,
+        status: pipelineStatus,
+        completed: stageResults.filter((r) => r.status === "completed").length,
+      },
       "pipeline finished",
     );
 

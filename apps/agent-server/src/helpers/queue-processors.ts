@@ -31,9 +31,7 @@ export async function notifyCiFailures(
   const lines = ciFailures.map(
     (ci) => `- **${ci.repo}** (${ci.branch}): ${ci.conclusion ?? "failed"} — ${ci.url}`,
   );
-  await notificationService.notifySystemInsights([
-    `CI failure(s) detected:\n${lines.join("\n")}`,
-  ]);
+  await notificationService.notifySystemInsights([`CI failure(s) detected:\n${lines.join("\n")}`]);
   logger.warn({ count: ciFailures.length }, "CI failure notification sent");
   return ciFailures.length;
 }

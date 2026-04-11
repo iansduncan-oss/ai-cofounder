@@ -23,6 +23,12 @@ import {
   handleFollowUps,
   handleSearch,
   handleAnalytics,
+  handlePlan,
+  handleAutoPlan,
+  handleAudit,
+  handleReflect,
+  handleStreak,
+  handleNext,
   checkCooldown,
   truncate,
   type CommandContext,
@@ -180,6 +186,45 @@ export async function handleInteraction(interaction: Interaction): Promise<void>
       await interaction.deferReply();
       await sendDiscordResponse(interaction, await handleAnalytics(client));
       return;
+    case "plan": {
+      const tasks = interaction.options.getString("tasks", true);
+      const mood = interaction.options.getString("mood") ?? undefined;
+      const energy = interaction.options.getInteger("energy") ?? undefined;
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handlePlan(client, tasks, mood, energy));
+      return;
+    }
+    case "autoplan": {
+      const force = interaction.options.getBoolean("force") ?? undefined;
+      const merge = interaction.options.getBoolean("merge") ?? undefined;
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleAutoPlan(client, { force, merge }));
+      return;
+    }
+    case "audit": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleAudit(client));
+      return;
+    }
+    case "next": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleNext(client));
+      return;
+    }
+    case "reflect": {
+      const highlights = interaction.options.getString("highlights") ?? undefined;
+      const blockers = interaction.options.getString("blockers") ?? undefined;
+      const notes = interaction.options.getString("notes") ?? undefined;
+      const mood = interaction.options.getString("mood") ?? undefined;
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleReflect(client, highlights, blockers, notes, mood));
+      return;
+    }
+    case "streak": {
+      await interaction.deferReply({ ephemeral: true });
+      await sendDiscordResponse(interaction, await handleStreak(client));
+      return;
+    }
     case "help": {
       await interaction.deferReply({ ephemeral: true });
       await sendDiscordResponse(interaction, handleHelp());

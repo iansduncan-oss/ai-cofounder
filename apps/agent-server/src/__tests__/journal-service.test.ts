@@ -12,8 +12,11 @@ vi.mock("@ai-cofounder/db", () => ({
 
 vi.mock("@ai-cofounder/shared", () => ({
   createLogger: () => ({
-    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
- fatal: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    fatal: vi.fn(),
   }),
   optionalEnv: (_name: string, defaultValue: string) => defaultValue,
 }));
@@ -42,7 +45,7 @@ describe("JournalService", () => {
   let service: ReturnType<typeof createJournalService>;
   let registry: InstanceType<typeof LlmRegistry>;
   const mockEmit = vi.fn();
-  const mockEvents = { emit: mockEmit } as any;  
+  const mockEvents = { emit: mockEmit } as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -92,7 +95,12 @@ describe("JournalService", () => {
     it("generates LLM narrative for non-empty day", async () => {
       mockListJournalEntries.mockResolvedValueOnce({
         data: [
-          { id: "je-1", entryType: "goal_completed", title: "Built feature", summary: "Added auth" },
+          {
+            id: "je-1",
+            entryType: "goal_completed",
+            title: "Built feature",
+            summary: "Added auth",
+          },
           { id: "je-2", entryType: "pr_created", title: "PR #42", summary: "Auth PR" },
         ],
         total: 2,
@@ -108,9 +116,7 @@ describe("JournalService", () => {
 
     it("falls back to static format on LLM failure", async () => {
       mockListJournalEntries.mockResolvedValueOnce({
-        data: [
-          { id: "je-1", entryType: "work_session", title: "Session", summary: "Did stuff" },
-        ],
+        data: [{ id: "je-1", entryType: "work_session", title: "Session", summary: "Did stuff" }],
         total: 1,
       });
       (registry.complete as ReturnType<typeof vi.fn>).mockRejectedValueOnce(

@@ -6,16 +6,15 @@ import { ListSkeleton } from "@/components/common/loading-skeleton";
 import { EmptyState } from "@/components/common/empty-state";
 import { RelativeTime } from "@/components/common/relative-time";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { usePageTitle } from "@/hooks/use-page-title";
 import {
-  PlayCircle,
-  Timer,
-  Zap,
-  ChevronDown,
-  ChevronRight,
-  StopCircle,
-} from "lucide-react";
+  Dialog,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { usePageTitle } from "@/hooks/use-page-title";
+import { PlayCircle, Timer, Zap, ChevronDown, ChevronRight, StopCircle } from "lucide-react";
 import { Link } from "react-router";
 import type { WorkSession } from "@ai-cofounder/api-client";
 
@@ -41,7 +40,13 @@ function formatDuration(ms: number | null): string {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
-function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (id: string) => void }) {
+function SessionCard({
+  session,
+  onCancel,
+}: {
+  session: WorkSession;
+  onCancel: (id: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const cfg = statusConfig[session.status] ?? statusConfig.failed;
   const actions = Array.isArray(session.actionsTaken) ? session.actionsTaken : [];
@@ -53,7 +58,11 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-2 text-left"
         >
-          {expanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 shrink-0" />}
+          {expanded ? (
+            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+          )}
           <span className={`inline-flex items-center gap-1.5 text-sm font-medium ${cfg.color}`}>
             <span className={`h-2 w-2 rounded-full ${cfg.dotColor}`} />
             {cfg.label}
@@ -62,7 +71,12 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
         </button>
         <div className="flex items-center gap-2">
           {session.status === "running" && (
-            <Button variant="ghost" size="sm" className="h-7 text-destructive hover:text-destructive" onClick={() => onCancel(session.id)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-destructive hover:text-destructive"
+              onClick={() => onCancel(session.id)}
+            >
               <StopCircle className="mr-1 h-3 w-3" />
               Cancel
             </Button>
@@ -73,9 +87,7 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
         </div>
       </div>
 
-      {session.summary && (
-        <p className="text-sm text-muted-foreground">{session.summary}</p>
-      )}
+      {session.summary && <p className="text-sm text-muted-foreground">{session.summary}</p>}
 
       <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
         <span className="flex items-center gap-1">
@@ -87,7 +99,10 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
           {session.tokensUsed?.toLocaleString() ?? "\u2014"} tokens
         </span>
         {session.goalId && (
-          <Link to={`/dashboard/goals/${session.goalId}`} className="flex items-center gap-1 text-primary hover:underline">
+          <Link
+            to={`/dashboard/goals/${session.goalId}`}
+            className="flex items-center gap-1 text-primary hover:underline"
+          >
             View goal
           </Link>
         )}
@@ -99,8 +114,12 @@ function SessionCard({ session, onCancel }: { session: WorkSession; onCancel: (i
           <div className="space-y-1.5 max-h-64 overflow-y-auto">
             {actions.map((action: Record<string, unknown>, i: number) => (
               <div key={i} className="text-xs bg-muted rounded px-2 py-1.5 font-mono">
-                <span className="font-semibold">{String(action.action ?? action.type ?? "action")}</span>
-                {action.result ? <span className="text-muted-foreground ml-2">{String(action.result)}</span> : null}
+                <span className="font-semibold">
+                  {String(action.action ?? action.type ?? "action")}
+                </span>
+                {action.result ? (
+                  <span className="text-muted-foreground ml-2">{String(action.result)}</span>
+                ) : null}
               </div>
             ))}
           </div>
@@ -153,7 +172,9 @@ export function WorkSessionsPage() {
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setCancelTarget(null)}>Keep Running</Button>
+          <Button variant="outline" onClick={() => setCancelTarget(null)}>
+            Keep Running
+          </Button>
           <Button
             variant="destructive"
             disabled={cancelSession.isPending}

@@ -179,38 +179,34 @@ export function ChatPage() {
   // Handle stream error — show as message
   useEffect(() => {
     if (stream.error && stream.error !== "Cancelled") {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Error: ${stream.error}` },
-      ]);
+      setMessages((prev) => [...prev, { role: "assistant", content: `Error: ${stream.error}` }]);
       stream.reset();
     }
     // stream is a hook return that changes identity every render; only trigger on error changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.error]);
 
-  const handleSend = useCallback((text?: string) => {
-    const trimmed = (text ?? input).trim();
-    if (!trimmed || stream.isStreaming) return;
+  const handleSend = useCallback(
+    (text?: string) => {
+      const trimmed = (text ?? input).trim();
+      if (!trimmed || stream.isStreaming) return;
 
-    tts.stop(); // Stop speaking when sending new message
-    setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
-    if (!text) setInput("");
+      tts.stop(); // Stop speaking when sending new message
+      setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+      if (!text) setInput("");
 
-    stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
-    // stream and tts are hook returns that change identity every render;
-    // only meaningful dependencies are tracked.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop]);
+      stream.sendMessage(trimmed, conversationId, dashboardUser?.id);
+      // stream and tts are hook returns that change identity every render;
+      // only meaningful dependencies are tracked.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    },
+    [input, stream.isStreaming, stream.sendMessage, conversationId, dashboardUser?.id, tts.stop],
+  );
 
   // Send speech transcript when recognition completes (final result)
   const lastTranscript = useRef("");
   useEffect(() => {
-    if (
-      !speech.isListening &&
-      speech.transcript &&
-      speech.transcript !== lastTranscript.current
-    ) {
+    if (!speech.isListening && speech.transcript && speech.transcript !== lastTranscript.current) {
       lastTranscript.current = speech.transcript;
       handleSend(speech.transcript);
     }
@@ -224,7 +220,13 @@ export function ChatPage() {
     if (stream.isStreaming && stream.accumulatedText) return "streaming";
     if (stream.isStreaming) return "thinking";
     return "idle";
-  }, [speech.error, tts.isSpeaking, speech.isListening, stream.isStreaming, stream.accumulatedText]);
+  }, [
+    speech.error,
+    tts.isSpeaking,
+    speech.isListening,
+    stream.isStreaming,
+    stream.accumulatedText,
+  ]);
 
   // Track scroll position
   const handleScroll = useCallback(() => {
@@ -310,9 +312,7 @@ export function ChatPage() {
         const elements = [
           <div
             key={i}
-            className={`flex gap-3 chat-message-enter ${
-              msg.role === "user" ? "justify-end" : ""
-            }`}
+            className={`flex gap-3 chat-message-enter ${msg.role === "user" ? "justify-end" : ""}`}
           >
             {msg.role === "assistant" && (
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-blue-500 shadow-lg shadow-purple-500/20">
@@ -450,11 +450,7 @@ export function ChatPage() {
                 </Button>
               )}
               {stream.isStreaming && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={stream.cancel}
-                >
+                <Button variant="outline" size="sm" onClick={stream.cancel}>
                   <X className="mr-1 h-3 w-3" />
                   Cancel
                 </Button>
@@ -482,9 +478,7 @@ export function ChatPage() {
                     <Bot className="h-8 w-8 text-white" />
                   </div>
                 </div>
-                <h2 className="text-lg font-medium text-foreground mb-2">
-                  What can I help with?
-                </h2>
+                <h2 className="text-lg font-medium text-foreground mb-2">What can I help with?</h2>
                 <p className="text-sm text-muted-foreground mb-6">
                   Chat with your AI Cofounder to plan, build, and monitor your projects.
                 </p>
@@ -569,9 +563,7 @@ export function ChatPage() {
                 <Mic className="h-4 w-4" />
               </Button>
             )}
-            {speech.isListening && (
-              <VoiceRing state="listening" size="sm" />
-            )}
+            {speech.isListening && <VoiceRing state="listening" size="sm" />}
             <Button
               onClick={() => handleSend()}
               disabled={!input.trim() || stream.isStreaming}

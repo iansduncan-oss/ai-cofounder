@@ -30,7 +30,11 @@ describe("buildMemorySnapshot", () => {
   it("filters archived memories and counts them as excluded", () => {
     const memories = [
       mem({ key: "live-1", category: "projects" }),
-      mem({ key: "archived-1", category: "projects", archivedAt: new Date("2026-03-01T00:00:00Z") }),
+      mem({
+        key: "archived-1",
+        category: "projects",
+        archivedAt: new Date("2026-03-01T00:00:00Z"),
+      }),
       mem({ key: "live-2", category: "decisions" }),
     ];
     const snap = buildMemorySnapshot(memories, { now: FIXED_NOW });
@@ -118,9 +122,7 @@ describe("buildMemorySnapshot", () => {
   });
 
   it("truncates long memory content with an ellipsis", () => {
-    const memories = [
-      mem({ key: "long", content: "x".repeat(2000), category: "technical" }),
-    ];
+    const memories = [mem({ key: "long", content: "x".repeat(2000), category: "technical" })];
     const snap = buildMemorySnapshot(memories, { now: FIXED_NOW, maxContentChars: 50 });
     expect(snap.markdown).toContain("long");
     expect(snap.markdown).toContain("…");

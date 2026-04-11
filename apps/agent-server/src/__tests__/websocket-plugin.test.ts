@@ -16,7 +16,7 @@ vi.mock("@ai-cofounder/db", () => ({
 }));
 
 vi.mock("@ai-cofounder/shared", async (importOriginal) => {
-  const actual = ((await importOriginal()) as Record<string, unknown>);
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     createLogger: () => ({
@@ -84,7 +84,6 @@ vi.mock("@ai-cofounder/sandbox", () => ({
 import WebSocket from "ws";
 import { _wsClients, _goalListeners } from "../plugins/websocket.js";
 
- 
 let app: any;
 
 /** Track all connections opened during a test for guaranteed cleanup */
@@ -128,8 +127,14 @@ function connectWs(timeoutMs = 5000): Promise<WebSocket> {
       ws.close();
       reject(new Error("WebSocket connect timeout"));
     }, timeoutMs);
-    ws.on("open", () => { clearTimeout(timer); resolve(ws); });
-    ws.on("error", (err) => { clearTimeout(timer); reject(err); });
+    ws.on("open", () => {
+      clearTimeout(timer);
+      resolve(ws);
+    });
+    ws.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
   });
 }
 
@@ -204,7 +209,12 @@ describe("WebSocket plugin", () => {
   it("subscribes to multiple channels", async () => {
     const ws = await connectWs();
 
-    ws.send(JSON.stringify({ type: "subscribe", channels: ["tasks", "goals", "usage"] } satisfies WsClientMessage));
+    ws.send(
+      JSON.stringify({
+        type: "subscribe",
+        channels: ["tasks", "goals", "usage"],
+      } satisfies WsClientMessage),
+    );
     await flushMessages(ws);
 
     // Should receive from all three
@@ -284,7 +294,10 @@ describe("WebSocket plugin", () => {
 
     const [msg1, msg2] = await Promise.all([
       waitForMessage(ws1),
-      (() => { app.wsBroadcast("tasks"); return waitForMessage(ws2); })(),
+      (() => {
+        app.wsBroadcast("tasks");
+        return waitForMessage(ws2);
+      })(),
     ]);
 
     expect(msg1).toEqual({ type: "invalidate", channel: "tasks" });
@@ -294,7 +307,12 @@ describe("WebSocket plugin", () => {
   it("accepts hyphenated channel names (follow-ups, conversations, work-sessions)", async () => {
     const ws = await connectWs();
 
-    ws.send(JSON.stringify({ type: "subscribe", channels: ["follow-ups", "conversations", "work-sessions"] } satisfies WsClientMessage));
+    ws.send(
+      JSON.stringify({
+        type: "subscribe",
+        channels: ["follow-ups", "conversations", "work-sessions"],
+      } satisfies WsClientMessage),
+    );
     await flushMessages(ws);
 
     for (const channel of ["follow-ups", "conversations", "work-sessions"] as const) {
@@ -351,7 +369,9 @@ describe("WebSocket plugin", () => {
 
     // Close and wait for server to process the disconnect
     ws.close();
-    await new Promise<void>((resolve) => { ws.on("close", () => resolve()); });
+    await new Promise<void>((resolve) => {
+      ws.on("close", () => resolve());
+    });
     // Give the server-side close handler a tick to fire
     await new Promise((r) => setTimeout(r, 50));
 
@@ -375,7 +395,10 @@ describe("WebSocket plugin", () => {
     const payload = JSON.stringify({ goalId, data: { step: 1 } });
     const [msg1, msg2] = await Promise.all([
       waitForMessage(ws1),
-      (() => { app.agentEvents.emit("ws:goal_event", payload); return waitForMessage(ws2); })(),
+      (() => {
+        app.agentEvents.emit("ws:goal_event", payload);
+        return waitForMessage(ws2);
+      })(),
     ]);
     expect(msg1).toEqual({ type: "goal_event", goalId, data: { step: 1 } });
     expect(msg2).toEqual({ type: "goal_event", goalId, data: { step: 1 } });
@@ -401,7 +424,9 @@ describe("WebSocket plugin", () => {
 
     // Disconnect — server-side cleanup should remove the listener
     ws.close();
-    await new Promise<void>((resolve) => { ws.on("close", () => resolve()); });
+    await new Promise<void>((resolve) => {
+      ws.on("close", () => resolve());
+    });
     await new Promise((r) => setTimeout(r, 50));
 
     expect(_goalListeners.has(goalId)).toBe(false);

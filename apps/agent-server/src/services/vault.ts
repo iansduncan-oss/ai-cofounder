@@ -44,7 +44,9 @@ export async function ensureVaultStructure(): Promise<void> {
 }
 
 function todayStr(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: optionalEnv("BRIEFING_TIMEZONE", "America/Los_Angeles") });
+  return new Date().toLocaleDateString("en-CA", {
+    timeZone: optionalEnv("BRIEFING_TIMEZONE", "America/Los_Angeles"),
+  });
 }
 
 export async function writeDailyNote(db: Db): Promise<string> {
@@ -67,9 +69,7 @@ export async function writeDailyNote(db: Db): Promise<string> {
     "",
     "## Active Goals",
     ...(goals.length
-      ? (goals as VaultGoalSummary[]).map(
-          (g) => `- **${g.title}** (${g.status}, ${g.priority})`,
-        )
+      ? (goals as VaultGoalSummary[]).map((g) => `- **${g.title}** (${g.status}, ${g.priority})`)
       : ["_No active goals_"]),
     "",
     "## Journal",
@@ -97,8 +97,16 @@ export async function writeDailyNote(db: Db): Promise<string> {
   return filePath;
 }
 
-export async function writeProjectNote(db: Db, goalId: string, title: string, summary: string): Promise<string> {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+export async function writeProjectNote(
+  db: Db,
+  goalId: string,
+  title: string,
+  summary: string,
+): Promise<string> {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 50);
   const filePath = join(VAULT_DIR, "projects", `${slug}.md`);
 
   let existing = "";
@@ -109,9 +117,7 @@ export async function writeProjectNote(db: Db, goalId: string, title: string, su
   }
 
   const entry = `\n## ${todayStr()}\n\n${summary}\n`;
-  const content = existing
-    ? existing + entry
-    : `# ${title}\n\nGoal ID: ${goalId}\n${entry}`;
+  const content = existing ? existing + entry : `# ${title}\n\nGoal ID: ${goalId}\n${entry}`;
 
   await mkdir(join(VAULT_DIR, "projects"), { recursive: true });
   await writeFile(filePath, content, "utf-8");
@@ -121,7 +127,10 @@ export async function writeProjectNote(db: Db, goalId: string, title: string, su
 
 export async function writeDecisionNote(topic: string, content: string): Promise<string> {
   const date = todayStr();
-  const slug = topic.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 50);
+  const slug = topic
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, 50);
   const filePath = join(VAULT_DIR, "decisions", `${date}-${slug}.md`);
 
   const md = `# Decision: ${topic}\n\n**Date:** ${date}\n\n${content}\n`;

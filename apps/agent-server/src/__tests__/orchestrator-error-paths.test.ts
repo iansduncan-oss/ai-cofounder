@@ -76,7 +76,11 @@ vi.mock("../agents/tools/web-search.js", () => ({
   SEARCH_WEB_TOOL: {
     name: "search_web",
     description: "Search",
-    input_schema: { type: "object", properties: { query: { type: "string" } }, required: ["query"] },
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" } },
+      required: ["query"],
+    },
   },
   executeWebSearch: vi.fn().mockResolvedValue({ results: [] }),
 }));
@@ -139,18 +143,12 @@ describe("validateDependencyGraph", () => {
   }
 
   it("accepts a valid DAG with no dependencies", () => {
-    expect(() =>
-      validateDependencyGraph([task(), task(), task()]),
-    ).not.toThrow();
+    expect(() => validateDependencyGraph([task(), task(), task()])).not.toThrow();
   });
 
   it("accepts a valid chain: task 1 → 0, task 2 → 1", () => {
     expect(() =>
-      validateDependencyGraph([
-        task(),
-        task({ depends_on: [0] }),
-        task({ depends_on: [1] }),
-      ]),
+      validateDependencyGraph([task(), task({ depends_on: [0] }), task({ depends_on: [1] })]),
     ).not.toThrow();
   });
 
@@ -175,29 +173,20 @@ describe("validateDependencyGraph", () => {
   });
 
   it("rejects negative dependency index", () => {
-    expect(() =>
-      validateDependencyGraph([
-        task(),
-        task({ depends_on: [-1] }),
-      ]),
-    ).toThrow("invalid dependency index");
+    expect(() => validateDependencyGraph([task(), task({ depends_on: [-1] })])).toThrow(
+      "invalid dependency index",
+    );
   });
 
   it("rejects dependency index >= task count (out of bounds)", () => {
-    expect(() =>
-      validateDependencyGraph([
-        task(),
-        task({ depends_on: [5] }),
-      ]),
-    ).toThrow("invalid dependency index");
+    expect(() => validateDependencyGraph([task(), task({ depends_on: [5] })])).toThrow(
+      "invalid dependency index",
+    );
   });
 
   it("detects simple cycle: A→B→A", () => {
     expect(() =>
-      validateDependencyGraph([
-        task({ depends_on: [1] }),
-        task({ depends_on: [0] }),
-      ]),
+      validateDependencyGraph([task({ depends_on: [1] }), task({ depends_on: [0] })]),
     ).toThrow("Dependency cycle detected");
   });
 
@@ -292,9 +281,7 @@ describe("Orchestrator — trimHistory (indirect)", () => {
 
     // One message of 40,000 chars ≈ 10,000 tokens — exceeds the 8,000 budget.
     const oversizedMessage = "a".repeat(40_000);
-    const history = [
-      { role: "user" as const, content: oversizedMessage },
-    ];
+    const history = [{ role: "user" as const, content: oversizedMessage }];
     await orchestrator.run("new question", "conv-trim-4", history as any);
 
     const callArgs = mockComplete.mock.calls[0][1];

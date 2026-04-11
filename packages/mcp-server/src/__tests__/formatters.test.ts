@@ -57,7 +57,9 @@ describe("MCP formatters", () => {
     it("formats full monitoring report", () => {
       const result = formatMonitoring({
         github: {
-          ciStatus: [{ repo: "ai-cofounder", branch: "main", status: "completed", conclusion: "success" }],
+          ciStatus: [
+            { repo: "ai-cofounder", branch: "main", status: "completed", conclusion: "success" },
+          ],
           openPRs: [{ number: 1, title: "Fix bug", author: "alice" }],
         },
         vps: {
@@ -89,7 +91,9 @@ describe("MCP formatters", () => {
   describe("formatQueues", () => {
     it("formats queue status", () => {
       const result = formatQueues({
-        queues: [{ name: "agent-tasks", waiting: 5, active: 2, completed: 100, failed: 3, delayed: 1 }],
+        queues: [
+          { name: "agent-tasks", waiting: 5, active: 2, completed: 100, failed: 3, delayed: 1 },
+        ],
       });
       expect(result).toContain("agent-tasks");
       expect(result).toContain("Waiting: 5");
@@ -100,7 +104,15 @@ describe("MCP formatters", () => {
   describe("formatGoals", () => {
     it("formats goal list", () => {
       const result = formatGoals({
-        data: [{ id: "g-1", title: "Build API", status: "active", priority: "high", description: "REST API" } as any],
+        data: [
+          {
+            id: "g-1",
+            title: "Build API",
+            status: "active",
+            priority: "high",
+            description: "REST API",
+          } as any,
+        ],
         total: 1,
       });
       expect(result).toContain("**Build API** [active/high]");
@@ -155,7 +167,9 @@ describe("MCP formatters", () => {
         timestamp: "2024-01-01",
         hours: 24,
         totalErrors: 5,
-        errors: [{ toolName: "search_web", errorMessage: "timeout", count: 3, lastSeen: "2024-01-01" }],
+        errors: [
+          { toolName: "search_web", errorMessage: "timeout", count: 3, lastSeen: "2024-01-01" },
+        ],
       });
       expect(result).toContain("5 errors in past 24h");
       expect(result).toContain("**search_web** (x3)");
@@ -246,7 +260,9 @@ describe("MCP formatters", () => {
     it("formats tool statistics", () => {
       const result = formatToolStats({
         timestamp: "2024-01-01",
-        tools: [{ toolName: "search_web", totalExecutions: 100, successCount: 95, avgDurationMs: 1500 }],
+        tools: [
+          { toolName: "search_web", totalExecutions: 100, successCount: 95, avgDurationMs: 1500 },
+        ],
       } as any);
       expect(result).toContain("**search_web**: 95.0% success, 1500ms avg, 100 calls");
     });
@@ -259,7 +275,15 @@ describe("MCP formatters", () => {
   describe("formatFollowUps", () => {
     it("formats follow-ups with due dates", () => {
       const result = formatFollowUps({
-        data: [{ id: "fu-1", title: "Review PR", status: "pending", dueDate: "2024-01-15", description: "Check tests" } as any],
+        data: [
+          {
+            id: "fu-1",
+            title: "Review PR",
+            status: "pending",
+            dueDate: "2024-01-15",
+            description: "Check tests",
+          } as any,
+        ],
         total: 1,
       });
       expect(result).toContain("[pending] **Review PR** — due 2024-01-15");
@@ -274,7 +298,9 @@ describe("MCP formatters", () => {
   describe("formatDeployments", () => {
     it("formats deployment list", () => {
       const result = formatDeployments({
-        data: [{ shortSha: "abc1234", status: "success", branch: "main", triggeredBy: "ci" } as any],
+        data: [
+          { shortSha: "abc1234", status: "success", branch: "main", triggeredBy: "ci" } as any,
+        ],
         total: 1,
       });
       expect(result).toContain("**abc1234** [success] main — by ci");
@@ -329,11 +355,13 @@ describe("MCP formatters", () => {
   describe("formatReflections", () => {
     it("formats reflections with lessons", () => {
       const result = formatReflections({
-        data: [{
-          reflectionType: "post_goal",
-          content: "The API integration went well but needed more error handling",
-          lessons: [{ lesson: "Always add retry logic" }],
-        } as any],
+        data: [
+          {
+            reflectionType: "post_goal",
+            content: "The API integration went well but needed more error handling",
+            lessons: [{ lesson: "Always add retry logic" }],
+          } as any,
+        ],
         total: 1,
       });
       expect(result).toContain("[post_goal]");
@@ -348,12 +376,14 @@ describe("MCP formatters", () => {
   describe("formatJournalEntries", () => {
     it("formats journal entries", () => {
       const result = formatJournalEntries({
-        data: [{
-          entryType: "work_session",
-          title: "Morning session",
-          occurredAt: "2024-01-01",
-          summary: "Completed 3 tasks",
-        } as any],
+        data: [
+          {
+            entryType: "work_session",
+            title: "Morning session",
+            occurredAt: "2024-01-01",
+            summary: "Completed 3 tasks",
+          } as any,
+        ],
         total: 1,
       });
       expect(result).toContain("[work_session] **Morning session**");

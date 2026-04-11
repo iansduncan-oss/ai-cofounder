@@ -20,6 +20,12 @@ import { standupCommand } from "./standup.js";
 import { followupsCommand } from "./followups.js";
 import { searchCommand } from "./search.js";
 import { analyticsCommand } from "./analytics.js";
+import { planCommand } from "./plan.js";
+import { autoplanCommand } from "./autoplan.js";
+import { auditCommand } from "./audit.js";
+import { reflectCommand } from "./reflect.js";
+import { streakCommand } from "./streak.js";
+import { nextCommand } from "./next.js";
 
 const logger = createLogger("discord-commands");
 
@@ -40,6 +46,12 @@ const commands = [
   followupsCommand.toJSON(),
   searchCommand.toJSON(),
   analyticsCommand.toJSON(),
+  planCommand.toJSON(),
+  autoplanCommand.toJSON(),
+  auditCommand.toJSON(),
+  reflectCommand.toJSON(),
+  streakCommand.toJSON(),
+  nextCommand.toJSON(),
   helpCommand.toJSON(),
   scheduleCommand.toJSON(),
   gmailCommand.toJSON(),

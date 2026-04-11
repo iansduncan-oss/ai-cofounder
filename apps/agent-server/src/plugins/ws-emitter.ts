@@ -44,6 +44,7 @@ export const wsEmitterPlugin = fp(async (app) => {
   app.agentEvents.on("ws:journal_change", () => emit("journal"));
   app.agentEvents.on("ws:usage_change", () => emit("usage"));
   app.agentEvents.on("ws:follow_up_change", () => emit("follow-ups"));
+  app.agentEvents.on("ws:codebase_updated", () => emit("codebase"));
 
   logger.info("WS emitter bridge initialized");
 });

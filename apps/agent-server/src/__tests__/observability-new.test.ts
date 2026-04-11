@@ -153,10 +153,7 @@ describe("Provider Health History", () => {
     await app.close();
 
     expect(res.statusCode).toBe(200);
-    expect(mockGetProviderHealthHistory).toHaveBeenCalledWith(
-      expect.anything(),
-      "anthropic",
-    );
+    expect(mockGetProviderHealthHistory).toHaveBeenCalledWith(expect.anything(), "anthropic");
   });
 });
 
@@ -255,9 +252,7 @@ describe("Observability — Route Exclusions", () => {
     const durationLines = body
       .split("\n")
       .filter((l: string) => l.startsWith("http_request_duration_avg_ms{"));
-    const metricsRouteDuration = durationLines.find((l: string) =>
-      l.includes('route="/metrics"'),
-    );
+    const metricsRouteDuration = durationLines.find((l: string) => l.includes('route="/metrics"'));
     expect(metricsRouteDuration).toBeUndefined();
   });
 

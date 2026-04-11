@@ -45,6 +45,8 @@ import { searchRoutes } from "../routes/search.js";
 import { workSessionRoutes } from "../routes/work-sessions.js";
 import { routingRoutes, routingStatsRoutes } from "../routes/routing.js";
 import { selfHealingRoutes } from "../routes/self-healing.js";
+import { productivityRoutes } from "../routes/productivity.js";
+import { codebaseRoutes } from "../routes/codebase.js";
 import { workspaceTenantRoutes } from "../routes/workspaces.js";
 import { workspaceContextPlugin } from "../plugins/workspace-context.js";
 import type { AdminRole } from "../plugins/rbac.js";
@@ -53,13 +55,20 @@ import type { AdminRole } from "../plugins/rbac.js";
 function isLoopbackOrDocker(request: FastifyRequest): boolean {
   const socketIp = request.socket.remoteAddress ?? "";
   const isExemptSocket =
-    socketIp === "127.0.0.1" || socketIp === "::1" || socketIp === "::ffff:127.0.0.1" ||
-    (socketIp.startsWith("172.") && (() => { const s = parseInt(socketIp.split(".")[1], 10); return s >= 16 && s <= 31; })());
+    socketIp === "127.0.0.1" ||
+    socketIp === "::1" ||
+    socketIp === "::ffff:127.0.0.1" ||
+    (socketIp.startsWith("172.") &&
+      (() => {
+        const s = parseInt(socketIp.split(".")[1], 10);
+        return s >= 16 && s <= 31;
+      })());
   if (!isExemptSocket) return false;
   // When behind a proxy, also check the forwarded IP
   const clientIp = request.ip;
   if (clientIp !== socketIp) {
-    if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1") return true;
+    if (clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "::ffff:127.0.0.1")
+      return true;
     if (clientIp.startsWith("172.")) {
       const s = parseInt(clientIp.split(".")[1], 10);
       if (s >= 16 && s <= 31) return true;
@@ -90,7 +99,9 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
 
     if (typeof request.jwtVerify !== "function") {
       if (process.env.NODE_ENV === "production") {
-        reply.code(503).send({ error: "Authentication not configured — JWT_SECRET is required in production" });
+        reply
+          .code(503)
+          .send({ error: "Authentication not configured — JWT_SECRET is required in production" });
         return;
       }
       // In dev, allow through when JWT_SECRET not set for easier local testing
@@ -189,4 +200,6 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(routingRoutes, { prefix: "/api/analytics/routing" });
   app.register(routingStatsRoutes, { prefix: "/api/routing" });
   app.register(selfHealingRoutes, { prefix: "/api/self-healing" });
+  app.register(productivityRoutes, { prefix: "/api/productivity" });
+  app.register(codebaseRoutes, { prefix: "/api/codebase" });
 }

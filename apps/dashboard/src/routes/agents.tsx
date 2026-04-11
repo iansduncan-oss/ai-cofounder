@@ -46,7 +46,10 @@ export function AgentsPage() {
 
   return (
     <div>
-      <PageHeader title="Agent Roles" description="Specialist agents, their tools, and capabilities" />
+      <PageHeader
+        title="Agent Roles"
+        description="Specialist agents, their tools, and capabilities"
+      />
 
       {isLoading ? (
         <ListSkeleton rows={4} />
@@ -60,18 +63,17 @@ export function AgentsPage() {
           {agents.map((a) => {
             const taskStats = agentTaskStats.get(a.role);
             const toolPerf = getAgentToolPerformance(a.tools);
-            const taskSuccessRate = taskStats && taskStats.total > 0
-              ? Math.round((taskStats.completed / taskStats.total) * 100)
-              : null;
+            const taskSuccessRate =
+              taskStats && taskStats.total > 0
+                ? Math.round((taskStats.completed / taskStats.total) * 100)
+                : null;
 
             return (
               <Card key={a.role}>
                 <CardContent className="pt-4">
                   <div className="mb-2 flex items-center gap-2">
                     <Bot className="h-4 w-4 text-muted-foreground" />
-                    <Badge className={ROLE_COLORS[a.role] ?? ""}>
-                      {a.role}
-                    </Badge>
+                    <Badge className={ROLE_COLORS[a.role] ?? ""}>{a.role}</Badge>
                   </div>
                   <p className="mb-3 text-sm text-muted-foreground">{a.description}</p>
 
@@ -85,7 +87,16 @@ export function AgentsPage() {
                             <p className="text-[10px] text-muted-foreground">Tasks</p>
                           </div>
                           <div className="text-center">
-                            <p className={cn("text-sm font-bold", taskSuccessRate != null && taskSuccessRate >= 80 ? "text-emerald-600" : taskSuccessRate != null && taskSuccessRate >= 50 ? "text-amber-600" : "text-red-600")}>
+                            <p
+                              className={cn(
+                                "text-sm font-bold",
+                                taskSuccessRate != null && taskSuccessRate >= 80
+                                  ? "text-emerald-600"
+                                  : taskSuccessRate != null && taskSuccessRate >= 50
+                                    ? "text-amber-600"
+                                    : "text-red-600",
+                              )}
+                            >
                               {taskSuccessRate ?? 0}%
                             </p>
                             <p className="text-[10px] text-muted-foreground">Success</p>
@@ -102,7 +113,12 @@ export function AgentsPage() {
                             <p className="text-[10px] text-muted-foreground">Tool Calls</p>
                           </div>
                           <div className="text-center">
-                            <p className={cn("text-sm font-bold", toolPerf.successRate >= 90 ? "text-emerald-600" : "text-amber-600")}>
+                            <p
+                              className={cn(
+                                "text-sm font-bold",
+                                toolPerf.successRate >= 90 ? "text-emerald-600" : "text-amber-600",
+                              )}
+                            >
                               {toolPerf.successRate}%
                             </p>
                             <p className="text-[10px] text-muted-foreground">Success</p>
@@ -141,8 +157,15 @@ export function AgentsPage() {
                             <Badge
                               key={t}
                               variant="outline"
-                              className={cn("text-xs", stat && stat.errorCount > 0 && "border-amber-500/50")}
-                              title={stat ? `${stat.totalExecutions} calls, ${stat.successCount} ok, ${stat.errorCount} err` : undefined}
+                              className={cn(
+                                "text-xs",
+                                stat && stat.errorCount > 0 && "border-amber-500/50",
+                              )}
+                              title={
+                                stat
+                                  ? `${stat.totalExecutions} calls, ${stat.successCount} ok, ${stat.errorCount} err`
+                                  : undefined
+                              }
                             >
                               {t}
                               {stat && stat.totalExecutions > 0 && (

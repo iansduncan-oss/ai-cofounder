@@ -101,7 +101,10 @@ function reducer(state: WsChatState, action: WsChatAction): WsChatState {
     case "suggestions":
       return { ...state, suggestions: action.suggestions };
     case "rich_card":
-      return { ...state, richCards: [...state.richCards, { type: action.cardType, data: action.data }] };
+      return {
+        ...state,
+        richCards: [...state.richCards, { type: action.cardType, data: action.data }],
+      };
     case "error":
       return { ...state, isStreaming: false, error: action.message };
     case "reset":
@@ -200,104 +203,101 @@ export function useWsChat(conversationId?: string) {
   }, [conversationId]);
 
   /** Send a message via WebSocket, falling back to SSE if WS is not connected */
-  const sendMessage = useCallback(
-    async (message: string, convId?: string, userId?: string) => {
-      dispatch({ type: "start" });
+  const sendMessage = useCallback(async (message: string, convId?: string, userId?: string) => {
+    dispatch({ type: "start" });
 
-      const effectiveConvId = convId ?? currentConvIdRef.current;
-      const ws = wsRef.current;
+    const effectiveConvId = convId ?? currentConvIdRef.current;
+    const ws = wsRef.current;
 
-      // Try WebSocket first
-      if (ws?.isConnected) {
-        ws.sendMessage(message, userId, "dashboard");
-        return;
+    // Try WebSocket first
+    if (ws?.isConnected) {
+      ws.sendMessage(message, userId, "dashboard");
+      return;
+    }
+
+    // Fallback to SSE
+    dispatch({ type: "set_transport", transport: "sse" });
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const stream = apiClient.streamChat({
+        message,
+        conversationId: effectiveConvId,
+        userId,
+        platform: "dashboard",
+      });
+
+      for await (const event of stream) {
+        if (controller.signal.aborted) break;
+
+        switch (event.type) {
+          case "thinking":
+            dispatch({
+              type: "thinking",
+              message: (event.data.message as string) ?? "Thinking...",
+            });
+            break;
+          case "tool_call":
+            dispatch({
+              type: "tool_start",
+              id: (event.data.id as string) ?? crypto.randomUUID(),
+              name: (event.data.name as string) ?? "unknown",
+              input: (event.data.input as Record<string, unknown>) ?? {},
+            });
+            break;
+          case "tool_result":
+            dispatch({
+              type: "tool_result",
+              id: (event.data.id as string) ?? "",
+              result: (event.data.result as string) ?? "",
+            });
+            break;
+          case "text_delta":
+            dispatch({ type: "agent_chunk", text: (event.data.text as string) ?? "" });
+            break;
+          case "rich_card":
+            dispatch({
+              type: "rich_card",
+              cardType: (event.data.type as string) ?? "goal_progress",
+              data: (event.data.data as Record<string, unknown>) ?? {},
+            });
+            break;
+          case "suggestions":
+            dispatch({
+              type: "suggestions",
+              suggestions: (event.data.suggestions as string[]) ?? [],
+            });
+            break;
+          case "done":
+            dispatch({
+              type: "agent_complete",
+              conversationId: event.data.conversationId as string | undefined,
+              model: event.data.model as string | undefined,
+              provider: event.data.provider as string | undefined,
+              plan: event.data.plan as PlanInfo | undefined,
+            });
+            break;
+          case "error":
+            dispatch({ type: "error", message: (event.data.message as string) ?? "Unknown error" });
+            break;
+        }
       }
 
-      // Fallback to SSE
-      dispatch({ type: "set_transport", transport: "sse" });
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      try {
-        const stream = apiClient.streamChat({
-          message,
-          conversationId: effectiveConvId,
-          userId,
-          platform: "dashboard",
+      // If stream ended without a done event
+      if (!controller.signal.aborted && isStreamingRef.current) {
+        dispatch({ type: "agent_complete" });
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        dispatch({
+          type: "error",
+          message: err instanceof Error ? err.message : "Stream failed",
         });
-
-        for await (const event of stream) {
-          if (controller.signal.aborted) break;
-
-          switch (event.type) {
-            case "thinking":
-              dispatch({
-                type: "thinking",
-                message: (event.data.message as string) ?? "Thinking...",
-              });
-              break;
-            case "tool_call":
-              dispatch({
-                type: "tool_start",
-                id: (event.data.id as string) ?? crypto.randomUUID(),
-                name: (event.data.name as string) ?? "unknown",
-                input: (event.data.input as Record<string, unknown>) ?? {},
-              });
-              break;
-            case "tool_result":
-              dispatch({
-                type: "tool_result",
-                id: (event.data.id as string) ?? "",
-                result: (event.data.result as string) ?? "",
-              });
-              break;
-            case "text_delta":
-              dispatch({ type: "agent_chunk", text: (event.data.text as string) ?? "" });
-              break;
-            case "rich_card":
-              dispatch({
-                type: "rich_card",
-                cardType: (event.data.type as string) ?? "goal_progress",
-                data: (event.data.data as Record<string, unknown>) ?? {},
-              });
-              break;
-            case "suggestions":
-              dispatch({
-                type: "suggestions",
-                suggestions: (event.data.suggestions as string[]) ?? [],
-              });
-              break;
-            case "done":
-              dispatch({
-                type: "agent_complete",
-                conversationId: event.data.conversationId as string | undefined,
-                model: event.data.model as string | undefined,
-                provider: event.data.provider as string | undefined,
-                plan: event.data.plan as PlanInfo | undefined,
-              });
-              break;
-            case "error":
-              dispatch({ type: "error", message: (event.data.message as string) ?? "Unknown error" });
-              break;
-          }
-        }
-
-        // If stream ended without a done event
-        if (!controller.signal.aborted && isStreamingRef.current) {
-          dispatch({ type: "agent_complete" });
-        }
-      } catch (err) {
-        if (!controller.signal.aborted) {
-          dispatch({
-            type: "error",
-            message: err instanceof Error ? err.message : "Stream failed",
-          });
-        }
       }
-    },
-    [],
-  );
+    }
+  }, []);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();

@@ -111,7 +111,6 @@ export function useBudgetStatus() {
     queryFn: () => apiClient.getBudgetStatus(),
     // Budget should be fresh — user needs to know when approaching limits
     staleTime: 10_000,
-    refetchInterval: 30_000,
     refetchInterval: 60_000, // sync with budget check interval
   });
 }
@@ -585,5 +584,63 @@ export function useKnowledgeSearch(query: string) {
     queryFn: () => apiClient.ragSearch(query),
     enabled: query.length >= 2,
     placeholderData: keepPreviousData,
+  });
+}
+
+/* ── Productivity ── */
+
+export function useProductivityToday() {
+  return useQuery({
+    queryKey: queryKeys.productivity.today,
+    queryFn: () => apiClient.getProductivityToday(),
+  });
+}
+
+export function useProductivityStats(days?: number) {
+  return useQuery({
+    queryKey: queryKeys.productivity.stats(days),
+    queryFn: () => apiClient.getProductivityStats(days),
+  });
+}
+
+export function useProductivityHistory(opts?: { limit?: number; from?: string; to?: string }) {
+  const key = opts ? JSON.stringify(opts) : "";
+  return useQuery({
+    queryKey: queryKeys.productivity.history(key),
+    queryFn: () => apiClient.getProductivityHistory(opts),
+  });
+}
+
+export function useProductivityNext() {
+  return useQuery({
+    queryKey: ["productivity", "next"] as const,
+    queryFn: () => apiClient.getProductivityNext(),
+    // Don't refetch on every render — live-update via WS productivity channel
+    staleTime: 30_000,
+  });
+}
+
+export function useProductivityWeekly(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.productivity.weekly,
+    queryFn: () => apiClient.getProductivityWeekly(),
+    enabled,
+    staleTime: 5 * 60 * 1000, // 5 minutes — LLM call is expensive
+  });
+}
+
+/* ── Codebase Insights ── */
+
+export function useCodebaseInsights(status: "open" | "dismissed" | "resolved" = "open") {
+  return useQuery({
+    queryKey: queryKeys.codebase.insights(status),
+    queryFn: () => apiClient.listCodebaseInsights({ status, limit: 20 }),
+  });
+}
+
+export function useCodebaseInsightsCount() {
+  return useQuery({
+    queryKey: queryKeys.codebase.count,
+    queryFn: () => apiClient.getCodebaseInsightsCount(),
   });
 }

@@ -24,34 +24,29 @@ export const bridgeRoutes: FastifyPluginAsync = async (app) => {
   app.get<{
     Querystring: { userId?: string; limit?: string; perCategoryLimit?: string };
     Reply: BridgeSnapshotResponse | { error: string };
-  }>(
-    "/snapshot",
-    { schema: { tags: ["bridge"] } },
-    async (request, reply) => {
-      const targetUserId =
-        request.query.userId ?? (await getPrimaryAdminUserId(app.db)) ?? null;
+  }>("/snapshot", { schema: { tags: ["bridge"] } }, async (request, reply) => {
+    const targetUserId = request.query.userId ?? (await getPrimaryAdminUserId(app.db)) ?? null;
 
-      if (!targetUserId) {
-        return reply.status(404).send({ error: "No primary admin user configured" });
-      }
+    if (!targetUserId) {
+      return reply.status(404).send({ error: "No primary admin user configured" });
+    }
 
-      const limit = Number(request.query.limit ?? 40);
-      const perCategoryLimit = Number(request.query.perCategoryLimit ?? 8);
+    const limit = Number(request.query.limit ?? 40);
+    const perCategoryLimit = Number(request.query.perCategoryLimit ?? 8);
 
-      // Pull a generous pool (2× requested limit) so the ranker has room to work
-      const pool = await listMemoriesByUser(app.db, targetUserId, {
-        limit: Math.max(limit * 2, 80),
-      });
+    // Pull a generous pool (2× requested limit) so the ranker has room to work
+    const pool = await listMemoriesByUser(app.db, targetUserId, {
+      limit: Math.max(limit * 2, 80),
+    });
 
-      const snapshot = buildMemorySnapshot(pool as unknown as BridgeMemory[], {
-        limit,
-        perCategoryLimit,
-      });
+    const snapshot = buildMemorySnapshot(pool as unknown as BridgeMemory[], {
+      limit,
+      perCategoryLimit,
+    });
 
-      return {
-        ...snapshot,
-        userId: targetUserId,
-      };
-    },
-  );
+    return {
+      ...snapshot,
+      userId: targetUserId,
+    };
+  });
 };

@@ -97,7 +97,10 @@ function reducer(state: StreamState, action: StreamAction): StreamState {
     case "suggestions":
       return { ...state, suggestions: action.suggestions };
     case "rich_card":
-      return { ...state, richCards: [...state.richCards, { type: action.cardType, data: action.data }] };
+      return {
+        ...state,
+        richCards: [...state.richCards, { type: action.cardType, data: action.data }],
+      };
     case "done":
       return {
         ...state,
@@ -190,7 +193,10 @@ export function useStreamChat() {
               });
               break;
             case "error":
-              dispatch({ type: "error", message: (event.data.message as string) ?? "Unknown error" });
+              dispatch({
+                type: "error",
+                message: (event.data.message as string) ?? "Unknown error",
+              });
               break;
           }
         }

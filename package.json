@@ -24,6 +24,7 @@
     "db:migrate": "npm run db:migrate -w @ai-cofounder/db",
     "db:studio": "npm run db:studio -w @ai-cofounder/db",
     "db:seed": "npm run db:seed -w @ai-cofounder/db",
+    "productivity:setup": "bash scripts/setup-productivity.sh",
     "deploy:dry-run": "gh workflow run deploy.yml -f dry_run=true",
     "memory-bridge:sync": "tsx scripts/sync-memory-bridge.ts",
     "prepare": "husky"

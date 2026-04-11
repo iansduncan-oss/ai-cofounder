@@ -69,12 +69,8 @@ function createMockClient(
 
 // ---------- import module under test (after mocks) ----------
 
-const {
-  _wsClients,
-  _goalListeners,
-  broadcastInvalidation,
-  broadcastGoalEvent,
-} = await import("../plugins/websocket.js");
+const { _wsClients, _goalListeners, broadcastInvalidation, broadcastGoalEvent } =
+  await import("../plugins/websocket.js");
 
 // ---------- tests ----------
 

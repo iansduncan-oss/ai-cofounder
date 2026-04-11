@@ -227,7 +227,9 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   const expensiveLimitMax = parseInt(optionalEnv("RATE_LIMIT_EXPENSIVE_MAX", "20"), 10);
 
   if (apiSecret && jwtSecret) {
-    logger.info("JWT auth active — API_SECRET limited to bot routes (/api/channels/, /api/webhooks/)");
+    logger.info(
+      "JWT auth active — API_SECRET limited to bot routes (/api/channels/, /api/webhooks/)",
+    );
   } else if (apiSecret) {
     logger.info("API bearer token auth enabled (all /api/* routes)");
   }
@@ -310,8 +312,7 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
     // (channels + webhooks) so Discord/Slack bots continue to work without JWT.
     // Dashboard requests use JWT (handled by jwtGuardPlugin), not API_SECRET.
     if (apiSecret && url.startsWith("/api/") && !isInternalRequest(request)) {
-      const isBotRoute =
-        url.startsWith("/api/channels/") || url.startsWith("/api/webhooks/");
+      const isBotRoute = url.startsWith("/api/channels/") || url.startsWith("/api/webhooks/");
       const shouldCheck = jwtSecret ? isBotRoute : true;
       if (shouldCheck) {
         const authHeader = request.headers.authorization;
@@ -331,7 +332,9 @@ export const securityPlugin = fp(async (app: FastifyInstance) => {
   // Track 404s for rate-limiting + decrement in-flight counter
   app.addHook("onResponse", async (request, reply) => {
     // Decrement in-flight request counter
-    const concurrentKey = (request as unknown as Record<string, unknown>)._concurrentKey as string | undefined;
+    const concurrentKey = (request as unknown as Record<string, unknown>)._concurrentKey as
+      | string
+      | undefined;
     if (concurrentKey) {
       const count = inFlightRequests.get(concurrentKey) ?? 1;
       if (count <= 1) {

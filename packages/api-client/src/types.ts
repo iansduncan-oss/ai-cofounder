@@ -989,6 +989,127 @@ export interface UpdateFollowUpInput {
   source?: string;
 }
 
+/* ── Productivity Tracker ── */
+
+export type ProductivityMood = "great" | "good" | "okay" | "rough" | "terrible";
+
+export interface PlannedItem {
+  text: string;
+  completed: boolean;
+  /** When set, this item was auto-completed by the plan-sync service. */
+  completedBy?: string;
+  completedAt?: string;
+}
+
+export interface ProductivityLog {
+  id: string;
+  userId: string;
+  date: string;
+  plannedItems: PlannedItem[];
+  reflectionNotes?: string | null;
+  mood?: ProductivityMood | null;
+  energyLevel?: number | null;
+  completionScore?: number | null;
+  streakDays: number;
+  highlights?: string | null;
+  blockers?: string | null;
+  metadata?: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpsertProductivityInput {
+  date: string;
+  plannedItems?: PlannedItem[];
+  reflectionNotes?: string;
+  mood?: ProductivityMood;
+  energyLevel?: number;
+  highlights?: string;
+  blockers?: string;
+}
+
+export interface ProductivityStats {
+  totalDays: number;
+  avgCompletion: number;
+  avgEnergy: number;
+  moodCounts: Record<string, number>;
+  currentStreak: number;
+  history: {
+    date: string;
+    completionScore?: number | null;
+    mood?: string | null;
+    energyLevel?: number | null;
+  }[];
+}
+
+export interface ProductivityWeeklySummary {
+  summary: string;
+  stats: ProductivityStats;
+  entryCount: number;
+}
+
+export interface AutoPlanResult {
+  date: string;
+  plannedItems: PlannedItem[];
+  reasoning?: string;
+  skipped?: boolean;
+  reason?: string;
+}
+
+export interface PlanSyncResult {
+  date: string;
+  autoCompleted: Array<{ itemText: string; reason: string }>;
+  itemsAdded: Array<{ text: string; reason: string }>;
+  completionScore: number | null;
+  needsReplan?: boolean;
+  shouldNotify?: boolean;
+  skipped?: boolean;
+  reason?: string;
+}
+
+export interface NextTaskResult {
+  date: string;
+  next: PlannedItem | null;
+  remaining: number;
+  total: number;
+  completed: number;
+  completionScore: number | null;
+  streakDays: number;
+  allDone: boolean;
+}
+
+/* ── Codebase Insights ── */
+
+export type InsightCategory = "fix" | "improve" | "add" | "review" | "followup" | "security" | "other";
+export type InsightSeverity = "low" | "medium" | "high" | "critical";
+export type InsightStatus = "open" | "dismissed" | "resolved";
+
+export interface CodebaseInsight {
+  id: string;
+  fingerprint: string;
+  category: InsightCategory;
+  severity: InsightSeverity;
+  title: string;
+  description?: string | null;
+  suggestedAction?: string | null;
+  reference?: string | null;
+  source: string;
+  status: InsightStatus;
+  hitCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  resolvedAt?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface CodebaseScanResult {
+  insightsCreated: number;
+  insightsRefreshed: number;
+  signalsGathered: number;
+  prunedCount: number;
+  durationMs: number;
+}
+
 /* ── App Settings ── */
 
 export interface AppSettings {

@@ -11,7 +11,11 @@ import { promisify } from "node:util";
 const execFileAsync = promisify(execFile);
 const logger = createLogger("deploy-health");
 
-const CONTAINERS = ["ai-cofounder-agent-server", "ai-cofounder-discord-bot", "ai-cofounder-slack-bot"];
+const CONTAINERS = [
+  "ai-cofounder-agent-server",
+  "ai-cofounder-discord-bot",
+  "ai-cofounder-slack-bot",
+];
 
 export interface HealthCheckResult {
   service: string;
@@ -82,9 +86,11 @@ export class DeployHealthService {
       });
       logger.info({ deploymentId, commitSha: commitSha.slice(0, 7) }, "deploy verified healthy");
 
-      await this.notificationService.sendBriefing(
-        `✅ Deploy \`${commitSha.slice(0, 7)}\` verified healthy. All services passing health checks.`,
-      ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
+      await this.notificationService
+        .sendBriefing(
+          `✅ Deploy \`${commitSha.slice(0, 7)}\` verified healthy. All services passing health checks.`,
+        )
+        .catch((err) => logger.warn({ err }, "deploy health event write failed"));
     } else {
       logger.warn({ deploymentId, checks }, "deploy health check failed");
       await this.handleDeployFailure(deploymentId, commitSha, previousSha, checks);
@@ -98,10 +104,11 @@ export class DeployHealthService {
     checks?: HealthCheckResult[],
   ): Promise<void> {
     const containerLogs = await this.fetchContainerLogs();
-    const errorSummary = checks
-      ?.filter((c) => c.status !== "healthy")
-      .map((c) => `${c.service}: ${c.error ?? c.status}`)
-      .join("; ") ?? "Unknown failure";
+    const errorSummary =
+      checks
+        ?.filter((c) => c.status !== "healthy")
+        .map((c) => `${c.service}: ${c.error ?? c.status}`)
+        .join("; ") ?? "Unknown failure";
 
     // Fetch git diff for RCA context
     const gitDiff = previousSha ? await this.fetchGitDiffStat(previousSha, commitSha) : undefined;
@@ -126,9 +133,9 @@ export class DeployHealthService {
           completedAt: new Date(),
         });
         logger.info({ deploymentId }, "deploy recovered after remediation");
-        await this.notificationService.sendBriefing(
-          `🔧 Deploy \`${commitSha.slice(0, 7)}\` recovered after remediation.`,
-        ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
+        await this.notificationService
+          .sendBriefing(`🔧 Deploy \`${commitSha.slice(0, 7)}\` recovered after remediation.`)
+          .catch((err) => logger.warn({ err }, "deploy health event write failed"));
         return;
       }
     }
@@ -168,13 +175,17 @@ export class DeployHealthService {
     const statusEmoji = rolledBack ? "🔄" : "❌";
     const message = [
       `${statusEmoji} Deploy \`${commitSha.slice(0, 7)}\` failed.`,
-      rolledBack ? `Rolled back to \`${previousSha?.slice(0, 7)}\`.` : "No previous version available for rollback.",
+      rolledBack
+        ? `Rolled back to \`${previousSha?.slice(0, 7)}\`.`
+        : "No previous version available for rollback.",
       "",
       "**Root Cause Analysis:**",
       rootCause,
     ].join("\n");
 
-    await this.notificationService.sendBriefing(message).catch((err) => logger.warn({ err }, "deploy health notification failed"));
+    await this.notificationService
+      .sendBriefing(message)
+      .catch((err) => logger.warn({ err }, "deploy health notification failed"));
   }
 
   /**
@@ -237,14 +248,19 @@ export class DeployHealthService {
       soakMetrics: metrics,
     });
 
-    logger.info({ deploymentId, soakStatus, avgLatency, failedChecks: failedChecks.length }, "soak monitoring complete");
+    logger.info(
+      { deploymentId, soakStatus, avgLatency, failedChecks: failedChecks.length },
+      "soak monitoring complete",
+    );
 
     if (soakStatus === "failed") {
       await this.handleDeployFailure(deploymentId, commitSha, previousSha);
     } else if (soakStatus === "degraded") {
-      await this.notificationService.sendBriefing(
-        `⚠️ Deploy \`${commitSha.slice(0, 7)}\` soak test shows degradation: ${failedChecks.length} failed checks, avg latency ${Math.round(avgLatency)}ms${hasElevatedRestarts ? ", container restarts detected" : ""}.`,
-      ).catch((err) => logger.warn({ err }, "deploy health event write failed"));
+      await this.notificationService
+        .sendBriefing(
+          `⚠️ Deploy \`${commitSha.slice(0, 7)}\` soak test shows degradation: ${failedChecks.length} failed checks, avg latency ${Math.round(avgLatency)}ms${hasElevatedRestarts ? ", container restarts detected" : ""}.`,
+        )
+        .catch((err) => logger.warn({ err }, "deploy health event write failed"));
     }
   }
 
@@ -272,12 +288,18 @@ export class DeployHealthService {
     }
 
     try {
-      await execFileAsync("ssh", [
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=30",
-        `${vpsUser}@${vpsHost}`,
-        command,
-      ], { timeout: 120_000 });
+      await execFileAsync(
+        "ssh",
+        [
+          "-o",
+          "StrictHostKeyChecking=accept-new",
+          "-o",
+          "ConnectTimeout=30",
+          `${vpsUser}@${vpsHost}`,
+          command,
+        ],
+        { timeout: 120_000 },
+      );
 
       const result: RemediationAction = { action, result: "success", timestamp: now };
       if (deploymentId) {
@@ -324,7 +346,10 @@ export class DeployHealthService {
         promptParts.push("", "Git diff summary:", gitDiff.slice(0, 1000));
       }
 
-      promptParts.push("", "Provide a concise root cause diagnosis (2-3 sentences) and a recommended fix (1-2 sentences).");
+      promptParts.push(
+        "",
+        "Provide a concise root cause diagnosis (2-3 sentences) and a recommended fix (1-2 sentences).",
+      );
 
       const result = await this.llmRegistry.complete("simple", {
         system: "You are a concise DevOps diagnostic assistant.",
@@ -356,12 +381,18 @@ export class DeployHealthService {
       `cd /opt/ai-cofounder && sudo docker compose -f docker-compose.prod.yml up -d --force-recreate`,
     ].join(" && ");
 
-    await execFileAsync("ssh", [
-      "-o", "StrictHostKeyChecking=accept-new",
-      "-o", "ConnectTimeout=30",
-      `${vpsUser}@${vpsHost}`,
-      rollbackScript,
-    ], { timeout: 120_000 });
+    await execFileAsync(
+      "ssh",
+      [
+        "-o",
+        "StrictHostKeyChecking=accept-new",
+        "-o",
+        "ConnectTimeout=30",
+        `${vpsUser}@${vpsHost}`,
+        rollbackScript,
+      ],
+      { timeout: 120_000 },
+    );
   }
 
   /**
@@ -376,15 +407,23 @@ export class DeployHealthService {
 
     for (const container of CONTAINERS) {
       try {
-        const { stdout } = await execFileAsync("ssh", [
-          "-o", "StrictHostKeyChecking=accept-new",
-          "-o", "ConnectTimeout=10",
-          `${vpsUser}@${vpsHost}`,
-          `sudo docker logs --tail 100 ${container} 2>&1 || echo 'No logs available'`,
-        ], { timeout: 30_000 });
+        const { stdout } = await execFileAsync(
+          "ssh",
+          [
+            "-o",
+            "StrictHostKeyChecking=accept-new",
+            "-o",
+            "ConnectTimeout=10",
+            `${vpsUser}@${vpsHost}`,
+            `sudo docker logs --tail 100 ${container} 2>&1 || echo 'No logs available'`,
+          ],
+          { timeout: 30_000 },
+        );
         logSections.push(`=== ${container} ===\n${stdout}`);
       } catch (err) {
-        logSections.push(`=== ${container} ===\nLog fetch failed: ${err instanceof Error ? err.message : String(err)}`);
+        logSections.push(
+          `=== ${container} ===\nLog fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -400,7 +439,12 @@ export class DeployHealthService {
       if (res.ok) {
         return { service: "agent-server", status: "healthy", latencyMs };
       }
-      return { service: "agent-server", status: "unhealthy", latencyMs, error: `HTTP ${res.status}` };
+      return {
+        service: "agent-server",
+        status: "unhealthy",
+        latencyMs,
+        error: `HTTP ${res.status}`,
+      };
     } catch (err) {
       return {
         service: "agent-server",
@@ -417,30 +461,45 @@ export class DeployHealthService {
     if (!vpsHost) return 0;
 
     try {
-      const { stdout } = await execFileAsync("ssh", [
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=10",
-        `${vpsUser}@${vpsHost}`,
-        `sudo docker inspect --format '{{.RestartCount}}' ${CONTAINERS[0]} 2>/dev/null || echo '0'`,
-      ], { timeout: 15_000 });
+      const { stdout } = await execFileAsync(
+        "ssh",
+        [
+          "-o",
+          "StrictHostKeyChecking=accept-new",
+          "-o",
+          "ConnectTimeout=10",
+          `${vpsUser}@${vpsHost}`,
+          `sudo docker inspect --format '{{.RestartCount}}' ${CONTAINERS[0]} 2>/dev/null || echo '0'`,
+        ],
+        { timeout: 15_000 },
+      );
       return parseInt(stdout.trim(), 10) || 0;
     } catch {
       return 0;
     }
   }
 
-  private async fetchGitDiffStat(previousSha: string, commitSha: string): Promise<string | undefined> {
+  private async fetchGitDiffStat(
+    previousSha: string,
+    commitSha: string,
+  ): Promise<string | undefined> {
     const vpsHost = optionalEnv("VPS_HOST", "");
     const vpsUser = optionalEnv("VPS_USER", "ian");
     if (!vpsHost) return undefined;
 
     try {
-      const { stdout } = await execFileAsync("ssh", [
-        "-o", "StrictHostKeyChecking=accept-new",
-        "-o", "ConnectTimeout=10",
-        `${vpsUser}@${vpsHost}`,
-        `cd /opt/ai-cofounder && git diff --stat ${previousSha}..${commitSha} 2>/dev/null || echo 'Git diff unavailable'`,
-      ], { timeout: 15_000 });
+      const { stdout } = await execFileAsync(
+        "ssh",
+        [
+          "-o",
+          "StrictHostKeyChecking=accept-new",
+          "-o",
+          "ConnectTimeout=10",
+          `${vpsUser}@${vpsHost}`,
+          `cd /opt/ai-cofounder && git diff --stat ${previousSha}..${commitSha} 2>/dev/null || echo 'Git diff unavailable'`,
+        ],
+        { timeout: 15_000 },
+      );
       return stdout.trim();
     } catch {
       return undefined;

@@ -41,10 +41,9 @@ describe("useAutoHighlight", () => {
 
   it("only processes new cards, not previously seen ones", () => {
     const initialCards: RichCardInfo[] = [{ type: "goal_progress", data: {} }];
-    const { rerender } = renderHook(
-      ({ cards }) => useAutoHighlight(cards),
-      { initialProps: { cards: initialCards } },
-    );
+    const { rerender } = renderHook(({ cards }) => useAutoHighlight(cards), {
+      initialProps: { cards: initialCards },
+    });
 
     expect(mockHighlightPanel).toHaveBeenCalledTimes(1);
     expect(mockHighlightPanel).toHaveBeenCalledWith("goals");
@@ -56,10 +55,7 @@ describe("useAutoHighlight", () => {
     expect(mockHighlightPanel).not.toHaveBeenCalled();
 
     // Add a new card — should only process the new one
-    const updatedCards: RichCardInfo[] = [
-      ...initialCards,
-      { type: "alert_detected", data: {} },
-    ];
+    const updatedCards: RichCardInfo[] = [...initialCards, { type: "alert_detected", data: {} }];
     rerender({ cards: updatedCards });
     expect(mockHighlightPanel).toHaveBeenCalledTimes(1);
     expect(mockHighlightPanel).toHaveBeenCalledWith("monitor");

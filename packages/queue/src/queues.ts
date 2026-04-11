@@ -14,7 +14,23 @@ export interface AgentTaskJob {
 }
 
 export interface MonitoringJob {
-  check: "github_ci" | "github_prs" | "vps_health" | "vps_containers" | "approval_timeout_sweep" | "budget_check" | "dlq_check" | "follow_up_reminders" | "sandbox_orphan_cleanup" | "self_healing_check" | "discord_hourly_digest" | "custom";
+  check:
+    | "github_ci"
+    | "github_prs"
+    | "vps_health"
+    | "vps_containers"
+    | "approval_timeout_sweep"
+    | "budget_check"
+    | "dlq_check"
+    | "follow_up_reminders"
+    | "sandbox_orphan_cleanup"
+    | "self_healing_check"
+    | "discord_hourly_digest"
+    | "productivity_nudge"
+    | "productivity_sync"
+    | "proactive_check"
+    | "codebase_scan"
+    | "custom";
   target?: string; // repo name, service name, etc.
   metadata?: Record<string, unknown>;
 }
@@ -55,7 +71,17 @@ export interface RagIngestionJob {
 }
 
 export interface ReflectionJob {
-  action: "analyze_goal" | "weekly_patterns" | "analyze_user_patterns" | "extract_decision" | "consolidate_memories" | "process_pattern_feedback" | "create_episode" | "learn_procedure" | "memory_lifecycle" | "analyze_failures";
+  action:
+    | "analyze_goal"
+    | "weekly_patterns"
+    | "analyze_user_patterns"
+    | "extract_decision"
+    | "consolidate_memories"
+    | "process_pattern_feedback"
+    | "create_episode"
+    | "learn_procedure"
+    | "memory_lifecycle"
+    | "analyze_failures";
   goalId?: string;
   goalTitle?: string;
   status?: string;
@@ -159,8 +185,8 @@ function getOrCreateQueue<T>(name: string): Queue<T> {
     const queue = new Queue<T>(name, {
       connection: getRedisConnection(),
       defaultJobOptions: {
-        removeOnComplete: { age: 24 * 3600, count: 1000 },  // 24h TTL, max 1000
-        removeOnFail: { age: 7 * 24 * 3600, count: 500 },   // 7d TTL for debugging
+        removeOnComplete: { age: 24 * 3600, count: 1000 }, // 24h TTL, max 1000
+        removeOnFail: { age: 7 * 24 * 3600, count: 500 }, // 7d TTL for debugging
         attempts: 3,
         backoff: { type: "exponential", delay: 2000 },
       },

@@ -150,10 +150,7 @@ describe("MonitoringService – runFullCheck", () => {
     const service = makeService();
 
     // Both endpoints return errors
-    mockFetchSequence(
-      { ok: false, status: 403 },
-      { ok: false, status: 403 },
-    );
+    mockFetchSequence({ ok: false, status: 403 }, { ok: false, status: 403 });
 
     vi.spyOn(service, "checkVPSHealth").mockResolvedValue(null);
     vi.spyOn(service, "checkBackupHealth").mockResolvedValue(null);
