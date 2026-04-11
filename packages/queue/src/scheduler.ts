@@ -222,36 +222,16 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info("Scheduled DLQ check every 5 minutes");
 
-  // ── Follow-up reminders (daily at 9 AM) ──
-
-  await monitoringQueue.upsertJobScheduler(
-    "follow-up-reminders",
-    {
-      pattern: `0 ${briefingHour} * * *`,
-      tz: briefingTimezone,
-    },
-    {
-      name: "follow-up-reminders",
-      data: { check: "follow_up_reminders" } satisfies MonitoringJob,
-    },
-  );
-  logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled daily follow-up reminders");
-
-  // ── Productivity check-in nudge (daily at 10 AM, 1h after briefing) ──
-
-  const nudgeHour = (briefingHour + 1) % 24;
-  await monitoringQueue.upsertJobScheduler(
-    "productivity-nudge",
-    {
-      pattern: `0 ${nudgeHour} * * *`,
-      tz: briefingTimezone,
-    },
-    {
-      name: "productivity-nudge",
-      data: { check: "productivity_nudge" } satisfies MonitoringJob,
-    },
-  );
-  logger.info({ hour: nudgeHour, tz: briefingTimezone }, "Scheduled daily productivity nudge");
+  // NOTE: follow-up reminders and the standalone productivity nudge have been
+  // intentionally consolidated INTO the morning briefing to reduce message volume.
+  // The morning briefing now:
+  //   1. Auto-generates today's plan (via generateDailyPlan in merge mode)
+  //   2. Marks overdue follow-ups as reminder-sent
+  //   3. Shows both the plan and the overdue follow-ups inline
+  //
+  // The handlers remain in place (queue plugin) for backwards compatibility if a
+  // manual `productivity_nudge` or `follow_up_reminders` job is enqueued, but no
+  // scheduler registers them as recurring anymore.
 
   // ── Codebase scan (every 4 hours) — discovers things to fix/improve/add ──
 

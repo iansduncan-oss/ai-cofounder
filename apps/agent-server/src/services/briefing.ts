@@ -11,6 +11,8 @@ import {
   upsertBriefingCache,
   getProductivityLog,
   getPrimaryAdminUserId,
+  listDueFollowUps,
+  markFollowUpReminderSent,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -37,6 +39,7 @@ export interface BriefingData {
     mood: string | null;
     energyLevel: number | null;
   };
+  overdueFollowUps?: Array<{ id: string; title: string; dueDate: Date | null }>;
 }
 
 const STALE_THRESHOLD_HOURS = 48;
@@ -46,7 +49,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   yesterday.setDate(yesterday.getDate() - 1);
   yesterday.setHours(0, 0, 0, 0);
 
-  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, adminUserId] =
+  const [activeGoals, completedGoals, taskCounts, usage, schedules, sessions, pendingApprovals, adminUserId, dueFollowUps] =
     await Promise.all([
       listActiveGoals(db),
       listRecentlyCompletedGoals(db, yesterday),
@@ -56,6 +59,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
       listRecentWorkSessions(db, 5),
       listPendingApprovals(db),
       getPrimaryAdminUserId(db),
+      listDueFollowUps(db),
     ]);
 
   // Fetch today's productivity log if admin user exists
@@ -105,6 +109,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     pendingApprovalCount: pendingApprovals.length,
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
     productivity,
+    overdueFollowUps: dueFollowUps.map((f) => ({ id: f.id, title: f.title, dueDate: f.dueDate })),
   };
 }
 
@@ -242,6 +247,19 @@ export function formatBriefing(data: BriefingData): string {
   // Pending approvals
   if (data.pendingApprovalCount > 0) {
     lines.push(`**Pending Approvals:** ${data.pendingApprovalCount} matter(s) awaiting your sign-off, sir`);
+    lines.push("");
+  }
+
+  // Overdue follow-ups (folded in to avoid separate reminder DMs)
+  if (data.overdueFollowUps && data.overdueFollowUps.length > 0) {
+    lines.push(`**Overdue Follow-ups (${data.overdueFollowUps.length}):**`);
+    for (const f of data.overdueFollowUps.slice(0, 5)) {
+      const when = f.dueDate ? ` (was due ${f.dueDate.toLocaleDateString()})` : "";
+      lines.push(`  - ${f.title}${when}`);
+    }
+    if (data.overdueFollowUps.length > 5) {
+      lines.push(`  _...and ${data.overdueFollowUps.length - 5} more_`);
+    }
     lines.push("");
   }
 
@@ -420,7 +438,30 @@ export async function sendDailyBriefing(
   llmRegistry?: LlmRegistry,
   adminUserId?: string,
 ): Promise<string> {
+  // Auto-generate today's plan BEFORE gathering briefing data so the plan
+  // shows up in the message. Uses merge mode so a manual check-in is preserved.
+  if (llmRegistry) {
+    try {
+      const { generateDailyPlan } = await import("./auto-planner.js");
+      await generateDailyPlan(db, llmRegistry, { merge: true });
+    } catch (err) {
+      logger.warn({ err }, "auto-plan generation failed in briefing (non-fatal)");
+    }
+  }
+
   const data = await gatherBriefingData(db);
+
+  // Mark overdue follow-ups as reminder-sent so the standalone reminder job
+  // won't also DM them. Non-fatal if it fails.
+  if (data.overdueFollowUps && data.overdueFollowUps.length > 0) {
+    for (const fu of data.overdueFollowUps) {
+      try {
+        await markFollowUpReminderSent(db, fu.id);
+      } catch (err) {
+        logger.warn({ err, id: fu.id }, "mark reminder-sent failed (non-fatal)");
+      }
+    }
+  }
 
   // Enrich with Google Calendar + Gmail data when admin user is available
   if (adminUserId) {
@@ -499,12 +540,26 @@ function buildEveningPrompt(data: BriefingData): string {
     }
   }
 
+  // Productivity wrap-up — how did today's plan go?
+  if (data.productivity) {
+    const p = data.productivity;
+    const done = p.todayPlan.filter((i) => i.completed).length;
+    const total = p.todayPlan.length;
+    lines.push("");
+    lines.push(`Today's plan: ${done}/${total} complete (${p.completionScore ?? 0}%), streak: ${p.streakDays} day(s)`);
+    const remaining = p.todayPlan.filter((i) => !i.completed);
+    if (remaining.length > 0) {
+      lines.push(`Items left: ${remaining.slice(0, 3).map((i) => `"${i.text}"`).join(", ")}${remaining.length > 3 ? `, +${remaining.length - 3} more` : ""}`);
+    }
+  }
+
   lines.push("");
   lines.push(
     "Based on this data, write an evening summary. Include: " +
-      "(1) a brief acknowledgement of what was accomplished today, " +
+      "(1) a brief acknowledgement of what was accomplished today (use the productivity completion score if provided), " +
       "(2) anything left open that carries over to tomorrow, " +
-      "(3) a suggested top priority for tomorrow morning. " +
+      "(3) a suggested top priority for tomorrow morning, " +
+      "(4) a short reflection prompt at the end asking sir to log highlights/blockers via `/reflect`. " +
       "Frame it warmly — sir is winding down. Example opening: 'Good evening, sir. A productive day, all told.'",
   );
 

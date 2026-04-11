@@ -29,11 +29,20 @@ interface PushedRecord {
 }
 
 /** Global daily cap across all proactive pushes. */
-const DAILY_PUSH_CAP = 6;
+const DAILY_PUSH_CAP = 3;
 
 /** Work hours: only fire proactive pushes during this window. */
 const WORK_HOUR_START = 8;
 const WORK_HOUR_END = 20;
+
+/**
+ * Which triggers to actually evaluate. Critical insights are always on — they're
+ * the only true "page me immediately" category. The others are opt-in via env
+ * to keep the default experience to: 1 morning + 1 evening + critical urgents.
+ *
+ * Set PROACTIVE_CHATTY=1 to enable wake_up, stall, celebration, and end_of_day.
+ */
+const CHATTY = process.env.PROACTIVE_CHATTY === "1";
 
 /** Per-trigger cooldowns (milliseconds). */
 const COOLDOWNS: Record<ProactivePushType, number> = {
@@ -97,13 +106,21 @@ export class ProactiveEngine {
       return { evaluated: 0, fired };
     }
 
-    // Evaluate triggers in priority order. Return on first fired (one push per tick).
-    const triggers: Array<() => Promise<{ fired: boolean; type?: ProactivePushType }>> = [
-      () => this.evalEndOfDay(adminUserId, log, pushed),
-      () => this.evalCelebration(adminUserId, log, pushed),
-      () => this.evalStall(adminUserId, log, pushed),
-      () => this.evalWakeUp(adminUserId, log, pushed),
-    ];
+    // Default behavior: only critical_insight fires (via direct call from scanner).
+    // Everything else is gated behind PROACTIVE_CHATTY=1.
+    //
+    // Rationale: morning briefing now includes the plan and follow-ups (no more
+    // wake_up needed), and the evening briefing now includes the productivity
+    // wrap-up + reflection prompt (no more end_of_day needed). Celebration and
+    // stall are nice-to-haves that add message volume.
+    const triggers: Array<() => Promise<{ fired: boolean; type?: ProactivePushType }>> = CHATTY
+      ? [
+          () => this.evalEndOfDay(adminUserId, log, pushed),
+          () => this.evalCelebration(adminUserId, log, pushed),
+          () => this.evalStall(adminUserId, log, pushed),
+          () => this.evalWakeUp(adminUserId, log, pushed),
+        ]
+      : [];
 
     let evaluated = 0;
     for (const trigger of triggers) {
