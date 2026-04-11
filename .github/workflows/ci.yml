@@ -51,6 +51,10 @@ jobs:
       - name: Build all packages
         run: npm run build
 
+      - name: Enable pgvector extension
+        run: |
+          PGPASSWORD=ci psql -h localhost -U ci -d ai_cofounder_test -c "CREATE EXTENSION IF NOT EXISTS vector;"
+
       - name: Push schema to test DB
         run: npm run db:push
 

@@ -1,0 +1,67 @@
+name: ai-cofounder-adguard
+services:
+  # Unbound — recursive, validating, caching DNS resolver.
+  # AdGuard Home forwards to this container on 5335/tcp+udp. No upstream
+  # resolver needed — Unbound talks directly to the root servers.
+  unbound:
+    image: mvance/unbound:1.23.0
+    container_name: unbound
+    restart: unless-stopped
+    # unbound.conf lives in a host bind mount so you can edit + reload
+    # without rebuilding the image.
+    volumes:
+      - ./unbound/a-records.conf:/opt/unbound/etc/unbound/a-records.conf:ro
+      - ./unbound/unbound.conf:/opt/unbound/etc/unbound/unbound.conf:ro
+      - unbound_data:/opt/unbound/etc/unbound/var
+    # Only expose to the adguard container on the internal network.
+    # No host port — nothing outside this compose project can reach it.
+    expose:
+      - "5335/tcp"
+      - "5335/udp"
+    healthcheck:
+      test: ["CMD", "drill", "-p", "5335", "@127.0.0.1", "cloudflare.com"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    networks:
+      adguard_internal:
+        aliases:
+          - unbound
+
+  adguard:
+    image: adguard/adguardhome:v0.107.60
+    container_name: adguard
+    restart: unless-stopped
+    depends_on:
+      unbound:
+        condition: service_healthy
+    volumes:
+      - adguard_work:/opt/adguardhome/work
+      - adguard_conf:/opt/adguardhome/conf
+    ports:
+      # DNS — expose on the Tailscale interface only so the homelab
+      # clients can reach it, but the public internet cannot.
+      - "${TAILSCALE_IP}:53:53/tcp"
+      - "${TAILSCALE_IP}:53:53/udp"
+      # Admin UI — bind to localhost; reach via SSH tunnel or NPM proxy.
+      - "127.0.0.1:3100:3000/tcp"
+      # Initial setup wizard runs on 3000 too, but AdGuard flips to the
+      # configured port after setup. Keep this mapping while the wizard
+      # is active, then optionally remove.
+      - "127.0.0.1:3001:3000/tcp"
+      # DNS-over-HTTPS (optional — uncomment if exposing DoH via NPM)
+      # - "127.0.0.1:443:443/tcp"
+      # - "127.0.0.1:853:853/tcp"
+    mem_limit: 256m
+    networks:
+      - adguard_internal
+
+volumes:
+  unbound_data:
+  adguard_work:
+  adguard_conf:
+
+networks:
+  adguard_internal:
+    driver: bridge

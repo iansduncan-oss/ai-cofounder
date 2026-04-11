@@ -1,0 +1,94 @@
+# Authentik blueprint — pre-seeds applications for the existing
+# aviontechs services so you don't have to click through them in the UI
+# the first time. Loaded automatically from /blueprints/local on start.
+#
+# Docs: https://docs.goauthentik.io/developer-docs/blueprints/
+version: 1
+metadata:
+  name: AI Cofounder — default applications
+entries:
+  # ── Groups ──────────────────────────────────────────────────────
+  - model: authentik_core.group
+    identifiers:
+      name: aviontechs-admins
+    attrs:
+      is_superuser: true
+      attributes:
+        description: "Full admin access to all aviontechs services"
+
+  # ── Provider: OIDC for the dashboard ───────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    identifiers:
+      name: dashboard-oidc
+    attrs:
+      client_type: confidential
+      redirect_uris: "https://dashboard.aviontechs.com/auth/callback"
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+      authorization_flow: !Find [authentik_flows.flow, [slug, "default-provider-authorization-implicit-consent"]]
+
+  # ── Provider: forward-auth (for Grafana, n8n, Uptime Kuma, NPM admin) ──
+  # Use this with NPM's "Access List → Access Rules → Forward Auth"
+  # feature to gate any proxy host behind Authentik without touching
+  # the upstream service's own auth.
+  - model: authentik_providers_proxy.proxyprovider
+    identifiers:
+      name: aviontechs-forward-auth
+    attrs:
+      external_host: https://auth.aviontechs.com
+      mode: forward_single
+      authorization_flow: !Find [authentik_flows.flow, [slug, "default-provider-authorization-implicit-consent"]]
+
+  # ── Applications ───────────────────────────────────────────────
+  - model: authentik_core.application
+    identifiers:
+      slug: dashboard
+    attrs:
+      name: AI Cofounder Dashboard
+      provider: !KeyOf dashboard-oidc
+      meta_launch_url: "https://dashboard.aviontechs.com"
+      policy_engine_mode: any
+      group: aviontechs
+
+  - model: authentik_core.application
+    identifiers:
+      slug: grafana
+    attrs:
+      name: Grafana
+      provider: !KeyOf aviontechs-forward-auth
+      meta_launch_url: "https://grafana.aviontechs.com"
+      policy_engine_mode: any
+      group: aviontechs
+
+  - model: authentik_core.application
+    identifiers:
+      slug: n8n
+    attrs:
+      name: n8n
+      provider: !KeyOf aviontechs-forward-auth
+      meta_launch_url: "https://n8n.aviontechs.com"
+      policy_engine_mode: any
+      group: aviontechs
+
+  - model: authentik_core.application
+    identifiers:
+      slug: uptime-kuma
+    attrs:
+      name: Uptime Kuma
+      provider: !KeyOf aviontechs-forward-auth
+      meta_launch_url: "https://status.aviontechs.com"
+      policy_engine_mode: any
+      group: aviontechs
+
+  # ── Outpost: one embedded outpost handles all forward-auth apps ──
+  - model: authentik_outposts.outpost
+    identifiers:
+      name: aviontechs-proxy-outpost
+    attrs:
+      type: proxy
+      providers:
+        - !KeyOf aviontechs-forward-auth
+      config:
+        authentik_host: https://auth.aviontechs.com
+        authentik_host_insecure: false
+        log_level: info
+        docker_network: avion_avion_net
