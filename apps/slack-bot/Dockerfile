@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 WORKDIR /app
 
 # Install dependencies
@@ -17,7 +17,7 @@ COPY apps/slack-bot/ apps/slack-bot/
 RUN npx turbo run build --filter=@ai-cofounder/slack-bot
 
 # Production stage
-FROM node:24-alpine
+FROM node:25-alpine
 WORKDIR /app
 
 RUN addgroup -g 1001 appgroup \
