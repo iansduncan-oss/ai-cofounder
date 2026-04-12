@@ -1,7 +1,7 @@
 name: ai-cofounder
 services:
   docker-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: ai-cofounder-docker-proxy
     restart: unless-stopped
     volumes:

@@ -117,6 +117,7 @@ services:
       - avion_avion_net
 
   alertmanager-discord:
+    # No versioned tags published upstream; pin to digest on next deploy
     image: benjojo/alertmanager-discord:latest
     container_name: ai-cofounder-alertmanager-discord
     restart: unless-stopped
