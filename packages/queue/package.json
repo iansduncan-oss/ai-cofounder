@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@ai-cofounder/shared": "*",
-    "bullmq": "^5.34.8",
+    "bullmq": "^5.73.4",
     "ioredis": "^5.9.3"
   },
   "devDependencies": {
