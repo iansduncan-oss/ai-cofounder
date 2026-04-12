@@ -5,44 +5,26 @@ import type {
   LlmToolUseContent,
   LlmToolResultContent,
   LlmTextContent,
-  LlmThinkingContent,
   TaskCategory,
   EmbeddingService,
 } from "@ai-cofounder/llm";
-import { createLogger, optionalEnv, sanitizeToolResult } from "@ai-cofounder/shared";
-import type { AgentRole, AgentMessage, GoalScope } from "@ai-cofounder/shared";
+import { createLogger, sanitizeToolResult } from "@ai-cofounder/shared";
+import type { AgentRole, AgentMessage } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
-import { retrieve, formatContext } from "@ai-cofounder/rag";
 import {
-  createGoal,
-  createTask,
-  updateGoalStatus,
-  updateTaskDependencies,
-  recallMemories,
-  searchMemoriesByVector,
   createApproval,
-  getApproval,
-  listPendingApprovals,
   createMilestone,
   recordToolExecution,
-  getConversation,
-  saveThinkingTrace,
   recordLlmUsage,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
-import { SessionContextService } from "../services/session-context.js";
-
-/** Tools that require explicit user approval before execution */
-const DESTRUCTIVE_TOOLS = new Set(["delete_file", "delete_directory", "git_push", "git_checkout"]);
-import { ContextualAwarenessService } from "../services/contextual-awareness.js";
 import { recordToolMetrics } from "../plugins/observability.js";
 import { recordActionSafe } from "../services/action-recorder.js";
 import type { StreamCallback } from "./stream-events.js";
 import type { N8nService } from "../services/n8n.js";
 import type { WorkspaceService } from "../services/workspace.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
-import { notifyApprovalCreated, notifyGoalProposed } from "../services/notifications.js";
-import { classifyGoalScope, scopeRequiresApproval } from "../services/scope-classifier.js";
+import { notifyApprovalCreated } from "../services/notifications.js";
 import {
   buildSharedToolList,
   executeWithTierCheck,
@@ -65,7 +47,6 @@ import type { VpsCommandService } from "../services/vps-command.js";
 import type { FailurePatternService } from "../services/failure-patterns.js";
 import { ToolCache } from "../services/tool-cache.js";
 import { ComplexityEstimator } from "../services/complexity-estimator.js";
-import { ToolEfficacyService } from "../services/tool-efficacy.js";
 import {
   DELEGATE_TO_SUBAGENT_TOOL,
   DELEGATE_PARALLEL_TOOL,
@@ -74,22 +55,35 @@ import {
 import { createSubagentRun, getSubagentRun } from "@ai-cofounder/db";
 import { enqueueSubagentTask } from "@ai-cofounder/queue";
 
-/* ── Result types ── */
+import {
+  CREATE_PLAN_TOOL,
+  CREATE_MILESTONE_TOOL,
+  REQUEST_APPROVAL_TOOL,
+  DESTRUCTIVE_TOOLS,
+  type CreatePlanInput,
+} from "./orchestrator/tool-definitions.js";
+import { persistPlan, buildPlanSummary, type PlanResult } from "./orchestrator/plan-persister.js";
+import {
+  completeWithRetry,
+  extractAndStoreThinking,
+  filterAvailableTools,
+  sanitizeToolInput,
+  summarizeToolResult,
+  checkOrCreateDestructiveApproval,
+  trimHistory,
+} from "./orchestrator/helpers.js";
+import {
+  buildMemoryContext,
+  resolveActiveProjectSlug,
+  retrieveRagContext,
+  appendEfficacyAndFailureHints,
+} from "./orchestrator/context-builder.js";
 
-export interface PlanResult {
-  goalId: string;
-  goalTitle: string;
-  scope?: GoalScope;
-  requiresApproval?: boolean;
-  tasks: Array<{
-    id: string;
-    title: string;
-    assignedAgent: AgentRole;
-    orderIndex: number;
-    parallelGroup?: number | null;
-    dependsOn?: string[] | null;
-  }>;
-}
+// Re-export types and helpers used by external callers and tests
+export { validateDependencyGraph } from "./orchestrator/dependency-graph.js";
+export type { PlanResult } from "./orchestrator/plan-persister.js";
+
+/* ── Result types ── */
 
 export interface OrchestratorResult {
   conversationId: string;
@@ -100,202 +94,6 @@ export interface OrchestratorResult {
   usage?: { inputTokens: number; outputTokens: number };
   plan?: PlanResult;
   suggestions?: string[];
-}
-
-/* ── Tool definition for LLM ── */
-
-const CREATE_PLAN_TOOL: LlmTool = {
-  name: "create_plan",
-  description:
-    "Decompose a user request into a goal with ordered tasks assigned to specialist agents. " +
-    "Use this when a request involves multiple steps, requires research, code, or review, " +
-    "or would benefit from structured planning. Do NOT use for simple questions.",
-  input_schema: {
-    type: "object",
-    properties: {
-      goal_title: {
-        type: "string",
-        description: "Concise title for the overall goal (2-8 words)",
-      },
-      goal_description: {
-        type: "string",
-        description: "Full description of what needs to be accomplished",
-      },
-      goal_priority: {
-        type: "string",
-        enum: ["low", "medium", "high", "critical"],
-        description: "Priority level based on urgency and importance",
-      },
-      tasks: {
-        type: "array",
-        items: {
-          type: "object",
-          properties: {
-            title: {
-              type: "string",
-              description: "Short task title (2-8 words)",
-            },
-            description: {
-              type: "string",
-              description: "What this task involves and expected output",
-            },
-            assigned_agent: {
-              type: "string",
-              enum: ["researcher", "coder", "reviewer", "planner"],
-              description:
-                "Which specialist agent should handle this task: " +
-                "researcher (gather info), coder (write/edit code), " +
-                "reviewer (critique/validate), planner (break down further)",
-            },
-            parallel_group: {
-              type: "integer",
-              description:
-                "Optional group number for parallel execution. Tasks with the same group run concurrently. " +
-                "Groups execute sequentially (0 before 1 before 2). Omit to run sequentially.",
-            },
-            depends_on: {
-              type: "array",
-              items: { type: "integer" },
-              description:
-                "Optional array of zero-based task indices that must complete before this task runs. " +
-                "Enables DAG-based parallel execution. Tasks with no dependencies run as soon as possible " +
-                "(up to concurrency limit). Prefer this over parallel_group for complex dependencies.",
-            },
-          },
-          required: ["title", "description", "assigned_agent"],
-        },
-        description: "Ordered list of tasks to complete the goal",
-      },
-      milestone_id: {
-        type: "string",
-        description: "Optional milestone ID to associate this goal with (from create_milestone)",
-      },
-      scope: {
-        type: "string",
-        enum: ["read_only", "local", "external", "destructive"],
-        description:
-          "Estimated scope of the plan's side effects: " +
-          "read_only (only reads data), local (modifies local files/code), " +
-          "external (sends emails, deploys, pushes code), destructive (deletes data, drops tables). " +
-          "Plans with external or destructive scope require human approval before execution.",
-      },
-    },
-    required: ["goal_title", "goal_description", "goal_priority", "tasks"],
-  },
-};
-
-const REQUEST_APPROVAL_TOOL: LlmTool = {
-  name: "request_approval",
-  description:
-    "Request human approval before executing a sensitive or high-impact action. " +
-    "Use this when a plan involves: deploying code, spending money, sending external communications, " +
-    "deleting data, changing infrastructure, or any action that's hard to reverse. " +
-    "The user will be notified and must approve via Discord before execution continues.",
-  input_schema: {
-    type: "object",
-    properties: {
-      task_id: {
-        type: "string",
-        description: "ID of the task that needs approval (from a previously created plan)",
-      },
-      reason: {
-        type: "string",
-        description:
-          "Clear explanation of what will happen and why approval is needed (1-3 sentences)",
-      },
-    },
-    required: ["task_id", "reason"],
-  },
-};
-
-const CREATE_MILESTONE_TOOL: LlmTool = {
-  name: "create_milestone",
-  description:
-    "Create a milestone that groups related goals into a phased plan with dependencies. " +
-    "Use this for complex multi-step projects that span multiple goals. " +
-    "After creating a milestone, use create_plan to add goals to it.",
-  input_schema: {
-    type: "object",
-    properties: {
-      title: {
-        type: "string",
-        description: "Milestone title describing the overall objective",
-      },
-      description: {
-        type: "string",
-        description: "Full description of what this milestone achieves",
-      },
-      order_index: {
-        type: "number",
-        description: "Order in the overall project plan (0-based)",
-      },
-      due_date: {
-        type: "string",
-        description: "Optional target date in ISO-8601 format",
-      },
-    },
-    required: ["title", "description"],
-  },
-};
-
-/* ── Internal types ── */
-
-interface CreatePlanInput {
-  goal_title: string;
-  goal_description: string;
-  goal_priority: "low" | "medium" | "high" | "critical";
-  milestone_id?: string;
-  scope?: GoalScope;
-  tasks: Array<{
-    title: string;
-    description: string;
-    assigned_agent: "researcher" | "coder" | "reviewer" | "planner";
-    parallel_group?: number;
-    depends_on?: number[];
-  }>;
-}
-
-/**
- * Validate that a dependency graph (expressed as zero-based task indices) has no cycles.
- * Uses Kahn's algorithm for topological sort — if not all nodes are visited, a cycle exists.
- */
-export function validateDependencyGraph(tasks: CreatePlanInput["tasks"]): void {
-  const n = tasks.length;
-  const inDegree = new Array<number>(n).fill(0);
-  const adj = new Array<number[]>(n);
-  for (let i = 0; i < n; i++) adj[i] = [];
-
-  for (let i = 0; i < n; i++) {
-    const deps = tasks[i].depends_on;
-    if (!deps) continue;
-    for (const dep of deps) {
-      if (dep < 0 || dep >= n || dep === i) {
-        throw new Error(`Task ${i} has invalid dependency index ${dep}`);
-      }
-      adj[dep].push(i);
-      inDegree[i]++;
-    }
-  }
-
-  // Kahn's algorithm
-  const queue: number[] = [];
-  for (let i = 0; i < n; i++) {
-    if (inDegree[i] === 0) queue.push(i);
-  }
-
-  let visited = 0;
-  while (queue.length > 0) {
-    const node = queue.shift()!;
-    visited++;
-    for (const neighbor of adj[node]) {
-      inDegree[neighbor]--;
-      if (inDegree[neighbor] === 0) queue.push(neighbor);
-    }
-  }
-
-  if (visited < n) {
-    throw new Error("Dependency cycle detected in task graph");
-  }
 }
 
 /* ── Orchestrator options ── */
@@ -389,128 +187,70 @@ export class Orchestrator {
     this.workspaceId = id;
   }
 
-  /**
-   * Call registry.complete with retry on transient failures (429/503).
-   * Exponential backoff: 2s, 4s. Max 2 retries.
-   */
-  private async completeWithRetry(
-    ...args: Parameters<LlmRegistry["complete"]>
-  ): ReturnType<LlmRegistry["complete"]> {
-    const MAX_RETRIES = 2;
-    const BASE_DELAY_MS = 2000;
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        return await this.registry.complete(...args);
-      } catch (err: unknown) {
-        const isRetryable =
-          err instanceof Error &&
-          (/429|rate.limit/i.test(err.message) ||
-            /503|service.unavailable/i.test(err.message) ||
-            /ECONNRESET|ECONNREFUSED|timeout/i.test(err.message));
-
-        if (!isRetryable || attempt === MAX_RETRIES) {
-          throw err;
-        }
-
-        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
-        this.logger.warn(
-          { attempt: attempt + 1, delay, error: (err as Error).message },
-          "LLM call failed, retrying",
-        );
-        await new Promise((resolve) => setTimeout(resolve, delay));
-      }
-    }
-
-    // Unreachable, but TypeScript needs it
-    throw new Error("completeWithRetry: exhausted retries");
+  private buildSharedToolListForRun(includeReviewer: boolean): LlmTool[] {
+    return buildSharedToolList(
+      {
+        db: this.db,
+        embeddingService: this.embeddingService,
+        n8nService: this.n8nService,
+        sandboxService: this.sandboxService,
+        workspaceService: this.workspaceService,
+        messagingService: this.messagingService,
+        projectRegistryService: this.projectRegistryService,
+        monitoringService: this.monitoringService,
+        browserService: this.browserService,
+        gmailService: this.gmailService,
+        calendarService: this.calendarService,
+        episodicMemoryService: this.episodicMemoryService,
+        proceduralMemoryService: this.proceduralMemoryService,
+        ...(includeReviewer ? { prReviewService: this.prReviewService } : {}),
+      },
+      undefined,
+      this.autonomyTierService,
+    );
   }
 
-  /**
-   * Extract native thinking content blocks, store as traces, and return only non-thinking blocks.
-   * Also parses legacy <thinking> tags from text blocks for backward compatibility.
-   */
-  private extractAndStoreThinking(
-    contentBlocks: (
-      | LlmTextContent
-      | LlmThinkingContent
-      | LlmToolUseContent
-      | LlmToolResultContent
-    )[],
-    conversationId: string,
-    round: number,
-  ): (LlmTextContent | LlmToolUseContent | LlmToolResultContent)[] {
-    const result: (LlmTextContent | LlmToolUseContent | LlmToolResultContent)[] = [];
+  private async loadContext(
+    message: string,
+    conversationId: string | undefined,
+    userId: string | undefined,
+    fullContext: boolean,
+  ): Promise<string> {
+    let memoryContext = await buildMemoryContext({
+      db: this.db,
+      userId,
+      message,
+      embeddingService: this.embeddingService,
+      episodicMemoryService: fullContext ? this.episodicMemoryService : undefined,
+      proceduralMemoryService: fullContext ? this.proceduralMemoryService : undefined,
+      fullContext,
+    });
 
-    for (const block of contentBlocks) {
-      if (block.type === "thinking") {
-        // Native thinking block from extended thinking
-        if (this.db && block.thinking) {
-          saveThinkingTrace(this.db, {
-            conversationId,
-            requestId: this.requestId,
-            round,
-            content: block.thinking,
-          }).catch((err) => this.logger.warn({ err }, "thinking trace save failed")); // fire-and-forget
-        }
-        continue; // Filter out thinking blocks
-      }
+    const activeProjectSlug = await resolveActiveProjectSlug(
+      this.db,
+      conversationId,
+      this.projectRegistryService,
+    );
 
-      if (block.type === "text") {
-        // Legacy: parse <thinking> tags from text content
-        const thinkingRegex = /<thinking>([\s\S]*?)<\/thinking>/g;
-        let match: RegExpExecArray | null;
-        const thinkingBlocks: string[] = [];
-        while ((match = thinkingRegex.exec(block.text)) !== null) {
-          thinkingBlocks.push(match[1].trim());
-        }
-        if (thinkingBlocks.length > 0 && this.db) {
-          for (const tb of thinkingBlocks) {
-            saveThinkingTrace(this.db, {
-              conversationId,
-              requestId: this.requestId,
-              round,
-              content: tb,
-            }).catch((err) => this.logger.warn({ err }, "thinking trace save failed"));
-          }
-        }
-        const stripped = block.text.replace(thinkingRegex, "").trim();
-        if (stripped) {
-          result.push({ type: "text", text: stripped });
-        }
-        continue;
-      }
-
-      result.push(block);
+    const ragContext = await retrieveRagContext(
+      this.db,
+      this.embeddingService,
+      this.registry,
+      message,
+      activeProjectSlug,
+    );
+    if (ragContext) {
+      const wrappedRag = `<user-data>\n${sanitizeForPrompt(ragContext)}\n</user-data>`;
+      memoryContext = memoryContext ? `${memoryContext}\n\n${wrappedRag}` : wrappedRag;
     }
 
-    return result;
-  }
+    memoryContext = await appendEfficacyAndFailureHints(
+      memoryContext,
+      this.db,
+      fullContext ? this.failurePatternsService : undefined,
+    );
 
-  /**
-   * Filter tools by evaluating optional preconditions.
-   * Also strips the preconditions property before passing to LLM API.
-   */
-  private async filterAvailableTools(tools: LlmTool[]): Promise<LlmTool[]> {
-    const results: LlmTool[] = [];
-    for (const tool of tools) {
-      if (tool.preconditions) {
-        try {
-          const available = await tool.preconditions();
-          if (!available) {
-            this.logger.debug({ tool: tool.name }, "tool precondition failed, filtering out");
-            continue;
-          }
-        } catch {
-          this.logger.debug({ tool: tool.name }, "tool precondition threw, filtering out");
-          continue;
-        }
-      }
-      // Strip preconditions before sending to LLM
-      const { preconditions: _p, ...cleanTool } = tool;
-      results.push(cleanTool as LlmTool);
-    }
-    return results;
+    return memoryContext;
   }
 
   async run(
@@ -524,192 +264,12 @@ export class Orchestrator {
     const id = conversationId ?? crypto.randomUUID();
     this.logger.info({ conversationId: id }, "orchestrator run started");
 
-    // Pre-load user memories for system prompt context
-    let memoryContext = "";
-    if (userId && this.db) {
-      const userMemories = await recallMemories(this.db, userId, { limit: 10 });
-
-      // Auto semantic retrieval: find memories relevant to the current message
-      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> =
-        [];
-      if (this.embeddingService) {
-        try {
-          const queryEmbedding = await this.embeddingService.embed(message);
-          const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
-          relevantMemories = vectorResults.map((m) => ({
-            id: m.id,
-            category: m.category,
-            key: m.key,
-            content: m.content,
-          }));
-        } catch (err) {
-          this.logger.warn({ err }, "auto semantic memory retrieval failed (non-fatal)");
-        }
-      }
-
-      // Merge: relevant first, then importance-based (dedupe by ID)
-      const seenIds = new Set(relevantMemories.map((m) => m.id));
-      const generalMemories = userMemories.filter((m) => !seenIds.has(m.id));
-
-      const parts: string[] = [];
-      if (relevantMemories.length > 0) {
-        parts.push("Relevant to this conversation:");
-        parts.push(
-          ...relevantMemories.map(
-            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
-          ),
-        );
-      }
-      if (generalMemories.length > 0) {
-        if (parts.length > 0) parts.push("");
-        parts.push("General knowledge:");
-        parts.push(
-          ...generalMemories.map(
-            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
-          ),
-        );
-      }
-
-      // Proactive decision surfacing (SESS-02): highlight decisions separately
-      if (relevantMemories.length > 0) {
-        const decisionMemories = relevantMemories.filter((m) => m.category === "decisions");
-        if (decisionMemories.length > 0) {
-          const decisionBlock = decisionMemories
-            .map((m) => `- ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`)
-            .join("\n");
-          parts.push("");
-          parts.push(
-            "Past decisions relevant to this topic (reference these naturally when applicable):",
-          );
-          parts.push(decisionBlock);
-        }
-      }
-
-      if (parts.length > 0) {
-        memoryContext = parts.join("\n");
-      }
-
-      // Proactive episodic memory priming
-      if (this.episodicMemoryService) {
-        try {
-          const episodes = await this.episodicMemoryService.recallEpisodes(message, { limit: 3 });
-          if (episodes.length > 0) {
-            const episodeBlock = [
-              "Recent relevant episodes:",
-              ...episodes.map(
-                (e) => `- ${sanitizeForPrompt(e.summary)} (importance: ${e.importance.toFixed(1)})`,
-              ),
-            ].join("\n");
-            memoryContext = memoryContext ? `${memoryContext}\n\n${episodeBlock}` : episodeBlock;
-          }
-        } catch (err) {
-          this.logger.warn({ err }, "episodic memory priming failed (non-fatal)");
-        }
-      }
-
-      // Proactive procedural memory priming
-      if (this.proceduralMemoryService) {
-        try {
-          const procedures = await this.proceduralMemoryService.findMatchingProcedures(message, 3);
-          if (procedures.length > 0) {
-            const procBlock = [
-              "Relevant procedures from past successes:",
-              ...procedures.map((p) => {
-                const total = p.successCount + p.failureCount;
-                const reliability = total > 0 ? ` (${p.successCount}/${total} successes)` : "";
-                return `- ${sanitizeForPrompt(p.triggerPattern)}${reliability}`;
-              }),
-            ].join("\n");
-            memoryContext = memoryContext ? `${memoryContext}\n\n${procBlock}` : procBlock;
-          }
-        } catch (err) {
-          this.logger.warn({ err }, "procedural memory priming failed (non-fatal)");
-        }
-      }
-
-      // Contextual awareness: inject time-of-day, recent activity, tone guidance
-      try {
-        const awarenessService = new ContextualAwarenessService(this.db, {
-          timezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
-        });
-        const contextBlock = await awarenessService.getContextBlock(userId);
-        if (contextBlock) {
-          memoryContext = contextBlock + (memoryContext ? "\n\n" + memoryContext : "");
-        }
-      } catch (err) {
-        this.logger.warn({ err }, "contextual awareness failed (non-fatal)");
-      }
-
-      // Session continuity context (MEM-04, SESS-01)
-      try {
-        const sessionContextService = new SessionContextService(this.db);
-        const returnBlock = await sessionContextService.getReturnContext(userId);
-        if (returnBlock) {
-          memoryContext = returnBlock + (memoryContext ? "\n\n" + memoryContext : "");
-        } else {
-          const sessionBlock = await sessionContextService.getRecentContext(userId);
-          if (sessionBlock) {
-            memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
-          }
-        }
-      } catch (err) {
-        this.logger.warn({ err }, "session context retrieval failed (non-fatal)");
-      }
-    }
-
-    // Resolve active project from conversation metadata
-    let activeProjectSlug: string | undefined;
-    if (this.db && conversationId) {
-      try {
-        const conv = await getConversation(this.db, conversationId);
-        const meta = conv?.metadata as { activeProjectId?: string } | null;
-        if (meta?.activeProjectId && this.projectRegistryService) {
-          const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
-          activeProjectSlug = proj?.slug;
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
-    // RAG retrieval: find relevant document chunks (scoped to active project if set)
-    const ragContext = await this.retrieveRagContext(message, activeProjectSlug);
-    if (ragContext) {
-      const wrappedRag = `<user-data>\n${sanitizeForPrompt(ragContext)}\n</user-data>`;
-      memoryContext = memoryContext ? `${memoryContext}\n\n${wrappedRag}` : wrappedRag;
-    }
-
-    // Tool efficacy hints
-    if (this.db) {
-      try {
-        const efficacyService = new ToolEfficacyService(this.db);
-        const hints = await efficacyService.getEfficacyHints();
-        if (hints) {
-          memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
-    // Failure pattern hints
-    if (this.failurePatternsService) {
-      try {
-        const failureHints = await this.failurePatternsService.formatPatternsForPrompt();
-        if (failureHints) {
-          memoryContext = memoryContext ? `${memoryContext}\n\n${failureHints}` : failureHints;
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
+    const memoryContext = await this.loadContext(message, conversationId, userId, true);
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
 
     // Build message history for context
     const messages: LlmMessage[] = [];
-
-    const trimmed = history?.length ? this.trimHistory(history) : [];
+    const trimmed = history?.length ? trimHistory(history) : [];
     if (trimmed.length) {
       for (const msg of trimmed) {
         messages.push({
@@ -718,7 +278,6 @@ export class Orchestrator {
         });
       }
     }
-
     messages.push({ role: "user", content: message });
 
     // Build tools array: orchestrator-only tools + shared tools
@@ -733,36 +292,16 @@ export class Orchestrator {
         ]
       : [];
 
-    rawTools.push(
-      ...buildSharedToolList(
-        {
-          db: this.db,
-          embeddingService: this.embeddingService,
-          n8nService: this.n8nService,
-          sandboxService: this.sandboxService,
-          workspaceService: this.workspaceService,
-          messagingService: this.messagingService,
-          projectRegistryService: this.projectRegistryService,
-          monitoringService: this.monitoringService,
-          browserService: this.browserService,
-          gmailService: this.gmailService,
-          calendarService: this.calendarService,
-          episodicMemoryService: this.episodicMemoryService,
-          proceduralMemoryService: this.proceduralMemoryService,
-          prReviewService: this.prReviewService,
-        },
-        undefined,
-        this.autonomyTierService,
-      ),
-    );
+    rawTools.push(...this.buildSharedToolListForRun(true));
 
-    const tools = await this.filterAvailableTools(rawTools);
+    const tools = await filterAvailableTools(rawTools);
     const toolCache = new ToolCache();
 
     try {
       let totalInputTokens = 0;
       let totalOutputTokens = 0;
       let plan: PlanResult | undefined;
+
       // Estimate task complexity for dynamic budgets
       const estimator = new ComplexityEstimator();
       const complexity = estimator.estimate({
@@ -782,7 +321,7 @@ export class Orchestrator {
 
       // Agentic tool-use loop with dynamic budgets
       const useThinking = complexity.thinkingTokenBudget > 0;
-      let response = await this.completeWithRetry(this.taskCategory, {
+      let response = await completeWithRetry(this.registry, this.taskCategory, {
         system: systemPrompt,
         messages,
         tools,
@@ -812,7 +351,11 @@ export class Orchestrator {
 
             // Destructive tools require an approved approval before execution
             if (DESTRUCTIVE_TOOLS.has(block.name)) {
-              const approvalResult = await this.checkOrCreateDestructiveApproval(block.name, id);
+              const approvalResult = await checkOrCreateDestructiveApproval(
+                this.db,
+                block.name,
+                id,
+              );
               if (!approvalResult.approved) {
                 toolResults.push({
                   type: "tool_result",
@@ -850,7 +393,7 @@ export class Orchestrator {
         messages.push({ role: "assistant", content: response.content });
         messages.push({ role: "user", content: toolResults });
 
-        response = await this.completeWithRetry(this.taskCategory, {
+        response = await completeWithRetry(this.registry, this.taskCategory, {
           system: systemPrompt,
           messages,
           tools,
@@ -863,7 +406,12 @@ export class Orchestrator {
       }
 
       // Extract thinking traces and filter to non-thinking content
-      const finalContent = this.extractAndStoreThinking(response.content, id, round);
+      const finalContent = extractAndStoreThinking(response.content, {
+        db: this.db,
+        conversationId: id,
+        round,
+        requestId: this.requestId,
+      });
 
       // Extract final text response
       const textBlocks = finalContent
@@ -873,7 +421,7 @@ export class Orchestrator {
       let responseText = textBlocks.join("\n");
 
       if (!responseText && plan) {
-        responseText = this.buildPlanSummary(plan);
+        responseText = buildPlanSummary(plan);
       }
 
       this.logger.info(
@@ -939,118 +487,17 @@ export class Orchestrator {
 
     await onEvent({ type: "thinking", data: { round: 0, message: "Loading context..." } });
 
-    // Reuse run() setup: memory loading
-    let memoryContext = "";
-    if (userId && this.db) {
-      const userMemories = await recallMemories(this.db, userId, { limit: 10 });
-      let relevantMemories: Array<{ id: string; category: string; key: string; content: string }> =
-        [];
-      if (this.embeddingService) {
-        try {
-          const queryEmbedding = await this.embeddingService.embed(message);
-          const vectorResults = await searchMemoriesByVector(this.db, queryEmbedding, userId, 5);
-          relevantMemories = vectorResults.map((m) => ({
-            id: m.id,
-            category: m.category,
-            key: m.key,
-            content: m.content,
-          }));
-        } catch {
-          /* non-fatal */
-        }
-      }
-      const seenIds = new Set(relevantMemories.map((m) => m.id));
-      const generalMemories = userMemories.filter((m) => !seenIds.has(m.id));
-      const parts: string[] = [];
-      if (relevantMemories.length > 0) {
-        parts.push("Relevant to this conversation:");
-        parts.push(
-          ...relevantMemories.map(
-            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
-          ),
-        );
-      }
-      if (generalMemories.length > 0) {
-        if (parts.length > 0) parts.push("");
-        parts.push("General knowledge:");
-        parts.push(
-          ...generalMemories.map(
-            (m) => `- [${m.category}] ${sanitizeForPrompt(m.key)}: ${sanitizeForPrompt(m.content)}`,
-          ),
-        );
-      }
-      if (parts.length > 0) memoryContext = parts.join("\n");
-
-      // Contextual awareness for streaming
-      try {
-        const awarenessService = new ContextualAwarenessService(this.db, {
-          timezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
-        });
-        const contextBlock = await awarenessService.getContextBlock(userId);
-        if (contextBlock) {
-          memoryContext = contextBlock + (memoryContext ? "\n\n" + memoryContext : "");
-        }
-      } catch {
-        /* non-fatal */
-      }
-
-      // Session continuity for streaming
-      try {
-        const sessionContextService = new SessionContextService(this.db);
-        const returnBlock = await sessionContextService.getReturnContext(userId);
-        if (returnBlock) {
-          memoryContext = returnBlock + (memoryContext ? "\n\n" + memoryContext : "");
-        } else {
-          const sessionBlock = await sessionContextService.getRecentContext(userId);
-          if (sessionBlock) {
-            memoryContext = sessionBlock + (memoryContext ? `\n\n${memoryContext}` : "");
-          }
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
-    // Resolve active project from conversation metadata
-    let activeProjectSlugStream: string | undefined;
-    if (this.db && conversationId) {
-      try {
-        const conv = await getConversation(this.db, conversationId);
-        const meta = conv?.metadata as { activeProjectId?: string } | null;
-        if (meta?.activeProjectId && this.projectRegistryService) {
-          const proj = this.projectRegistryService.getActiveProject(meta.activeProjectId);
-          activeProjectSlugStream = proj?.slug;
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
-    // RAG retrieval: find relevant document chunks (scoped to active project if set)
-    const ragContext = await this.retrieveRagContext(message, activeProjectSlugStream);
-    if (ragContext) {
-      const wrappedRag = `<user-data>\n${sanitizeForPrompt(ragContext)}\n</user-data>`;
-      memoryContext = memoryContext ? `${memoryContext}\n\n${wrappedRag}` : wrappedRag;
-    }
-
-    // Tool efficacy hints (stream path)
-    if (this.db) {
-      try {
-        const efficacyService = new ToolEfficacyService(this.db);
-        const hints = await efficacyService.getEfficacyHints();
-        if (hints) {
-          memoryContext = memoryContext ? `${memoryContext}\n\n${hints}` : hints;
-        }
-      } catch {
-        /* non-fatal */
-      }
-    }
-
+    // Streaming path uses the lighter context (no episodic/procedural priming, no decision surfacing)
+    const memoryContext = await this.loadContext(message, conversationId, userId, false);
     const systemPrompt = await buildSystemPrompt(memoryContext || undefined, this.db);
+
     const messages: LlmMessage[] = [];
-    const trimmed = history?.length ? this.trimHistory(history) : [];
+    const trimmed = history?.length ? trimHistory(history) : [];
     for (const msg of trimmed) {
-      messages.push({ role: msg.role === "user" ? "user" : "assistant", content: msg.content });
+      messages.push({
+        role: msg.role === "user" ? "user" : "assistant",
+        content: msg.content,
+      });
     }
     messages.push({ role: "user", content: message });
 
@@ -1064,29 +511,9 @@ export class Orchestrator {
           CHECK_SUBAGENT_TOOL,
         ]
       : [];
-    rawToolsStream.push(
-      ...buildSharedToolList(
-        {
-          db: this.db,
-          embeddingService: this.embeddingService,
-          n8nService: this.n8nService,
-          sandboxService: this.sandboxService,
-          workspaceService: this.workspaceService,
-          messagingService: this.messagingService,
-          projectRegistryService: this.projectRegistryService,
-          monitoringService: this.monitoringService,
-          browserService: this.browserService,
-          gmailService: this.gmailService,
-          calendarService: this.calendarService,
-          episodicMemoryService: this.episodicMemoryService,
-          proceduralMemoryService: this.proceduralMemoryService,
-        },
-        undefined,
-        this.autonomyTierService,
-      ),
-    );
+    rawToolsStream.push(...this.buildSharedToolListForRun(false));
 
-    const tools = await this.filterAvailableTools(rawToolsStream);
+    const tools = await filterAvailableTools(rawToolsStream);
     const toolCache = new ToolCache();
 
     try {
@@ -1104,7 +531,7 @@ export class Orchestrator {
       };
 
       if (signal?.aborted) throw new Error("Request aborted");
-      let response = await this.completeWithRetry(this.taskCategory, {
+      let response = await completeWithRetry(this.registry, this.taskCategory, {
         system: systemPrompt,
         messages,
         tools,
@@ -1129,12 +556,16 @@ export class Orchestrator {
             const toolInput = block.input as Record<string, unknown>;
             await onEvent({
               type: "tool_call",
-              data: { tool: block.name, input: this.sanitizeToolInput(toolInput) },
+              data: { tool: block.name, input: sanitizeToolInput(toolInput) },
             });
 
             // Destructive tools require an approved approval before execution
             if (DESTRUCTIVE_TOOLS.has(block.name)) {
-              const approvalResult = await this.checkOrCreateDestructiveApproval(block.name, id);
+              const approvalResult = await checkOrCreateDestructiveApproval(
+                this.db,
+                block.name,
+                id,
+              );
               if (!approvalResult.approved) {
                 await onEvent({
                   type: "tool_result",
@@ -1169,7 +600,7 @@ export class Orchestrator {
 
             await onEvent({
               type: "tool_result",
-              data: { tool: block.name, summary: this.summarizeToolResult(block.name, result) },
+              data: { tool: block.name, summary: summarizeToolResult(block.name, result) },
             });
             toolResults.push({
               type: "tool_result",
@@ -1187,7 +618,7 @@ export class Orchestrator {
           data: { round: round + 1, message: `Processing (round ${round + 1})...` },
         });
         if (signal?.aborted) throw new Error("Request aborted");
-        response = await this.completeWithRetry(this.taskCategory, {
+        response = await completeWithRetry(this.registry, this.taskCategory, {
           system: systemPrompt,
           messages,
           tools,
@@ -1200,13 +631,18 @@ export class Orchestrator {
       }
 
       // Extract thinking traces and filter to non-thinking content
-      const finalContent = this.extractAndStoreThinking(response.content, id, round);
+      const finalContent = extractAndStoreThinking(response.content, {
+        db: this.db,
+        conversationId: id,
+        round,
+        requestId: this.requestId,
+      });
       const textBlocks = finalContent
         .filter((b): b is LlmTextContent => b.type === "text")
         .map((b) => b.text);
       let responseText = textBlocks.join("\n");
 
-      if (!responseText && plan) responseText = this.buildPlanSummary(plan);
+      if (!responseText && plan) responseText = buildPlanSummary(plan);
 
       // If the provider didn't stream text deltas directly, emit chunks for progressive rendering
       if (!streamedDirectly) {
@@ -1260,118 +696,6 @@ export class Orchestrator {
       await onEvent({ type: "error", data: { error: errorMsg } });
       throw err;
     }
-  }
-
-  private sanitizeToolInput(
-    input: Record<string, unknown> | null | undefined,
-  ): Record<string, unknown> {
-    if (!input) return {};
-    const sanitized: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(input)) {
-      if (typeof value === "string" && value.length > 200) {
-        sanitized[key] = value.slice(0, 200) + "...";
-      } else {
-        sanitized[key] = value;
-      }
-    }
-    return sanitized;
-  }
-
-  private summarizeToolResult(toolName: string, result: unknown): string {
-    if (!result || typeof result !== "object") return "completed";
-    const r = result as Record<string, unknown>;
-    if (r.error) return `error: ${String(r.error).slice(0, 100)}`;
-    switch (toolName) {
-      case "create_plan":
-        return `Plan created: ${r.goalTitle ?? ""}`;
-      case "search_web":
-        return `Found results`;
-      case "save_memory":
-        return `Saved: ${r.key ?? ""}`;
-      case "recall_memories": {
-        if (Array.isArray(result)) return `Recalled ${result.length} memories`;
-        const rm = result as Record<string, unknown>;
-        const memCount = Array.isArray(rm.memories) ? rm.memories.length : 0;
-        const hasRag = Boolean(rm.ragContext);
-        return `Recalled ${memCount} memories${hasRag ? " + RAG context" : ""}`;
-      }
-      case "execute_code":
-        return `Exit code: ${r.exitCode ?? "?"}`;
-      case "read_file":
-        return `Read: ${r.path ?? ""}`;
-      case "write_file":
-        return `Wrote: ${r.path ?? ""}`;
-      default:
-        return "completed";
-    }
-  }
-
-  /**
-   * Check if a destructive tool has already been approved for this conversation.
-   * If an approved approval exists, returns { approved: true }.
-   * Otherwise creates a new approval request and returns details for the agent.
-   */
-  private async checkOrCreateDestructiveApproval(
-    toolName: string,
-    conversationId: string,
-  ): Promise<{ approved: boolean; approvalId?: string; message?: string }> {
-    if (!this.db) {
-      // No DB = no approval system; fall back to blocking
-      return {
-        approved: false,
-        message: `Tool "${toolName}" requires approval but the approval system is unavailable. Ask the user to confirm this action.`,
-      };
-    }
-
-    // Check if there's already an approved approval for this tool in this conversation
-    const pending = await listPendingApprovals(this.db, 100);
-    // Also look for recently-approved ones — scan all approvals isn't ideal,
-    // but the reason field encodes the tool+conversation for matching.
-    // For now, check pending approvals and let the existing flow handle it.
-
-    // Look for an existing pending or approved approval for this exact action
-    const marker = `[destructive:${toolName}:${conversationId}]`;
-
-    // Check pending first — if one exists, remind the agent to wait
-    const existingPending = pending.find((a) => a.reason.includes(marker));
-    if (existingPending) {
-      // Re-check if it's been approved since we fetched
-      const current = await getApproval(this.db, existingPending.id);
-      if (current?.status === "approved") {
-        this.logger.info({ toolName, approvalId: current.id }, "destructive tool approval found");
-        return { approved: true };
-      }
-      return {
-        approved: false,
-        approvalId: existingPending.id,
-        message: `Tool "${toolName}" is awaiting approval (ID: ${existingPending.id}). The user can approve with /approve ${existingPending.id}. Do not retry until the user has approved.`,
-      };
-    }
-
-    // No existing approval — create one
-    const approval = await createApproval(this.db, {
-      requestedBy: "orchestrator",
-      reason: `${marker} Destructive tool "${toolName}" invoked during conversation ${conversationId}. Requires human approval before execution.`,
-    });
-
-    this.logger.info(
-      { toolName, approvalId: approval.id, conversationId },
-      "destructive tool approval requested",
-    );
-
-    // Notify the user
-    notifyApprovalCreated({
-      approvalId: approval.id,
-      taskId: "ad-hoc",
-      reason: `Destructive tool "${toolName}" needs your approval before it can execute.`,
-      requestedBy: "orchestrator",
-    }).catch((err) => this.logger.warn({ err }, "approval notification failed"));
-
-    return {
-      approved: false,
-      approvalId: approval.id,
-      message: `Tool "${toolName}" requires approval before execution. Approval ID: ${approval.id}. The user has been notified and can approve with /approve ${approval.id}. Do not retry until the user has approved.`,
-    };
   }
 
   private async executeTool(
@@ -1428,7 +752,10 @@ export class Orchestrator {
     switch (block.name) {
       case "create_plan": {
         if (!this.db) return { error: "Database not available" };
-        return this.persistPlan(conversationId, block.input as unknown as CreatePlanInput, userId);
+        return persistPlan(this.db, conversationId, block.input as unknown as CreatePlanInput, {
+          userId,
+          workspaceId: this.workspaceId,
+        });
       }
       case "create_milestone": {
         if (!this.db) return { error: "Database not available" };
@@ -1530,7 +857,9 @@ export class Orchestrator {
 
       case "delegate_parallel": {
         if (!this.db) return { error: "Database not available" };
-        const input = block.input as { tasks: Array<{ title: string; instruction: string }> };
+        const input = block.input as {
+          tasks: Array<{ title: string; instruction: string }>;
+        };
         const results = [];
         for (const task of input.tasks.slice(0, 5)) {
           const run = await createSubagentRun(this.db, {
@@ -1612,149 +941,5 @@ export class Orchestrator {
         return result;
       }
     }
-  }
-
-  private async retrieveRagContext(query: string, sourceId?: string): Promise<string | null> {
-    if (!this.db || !this.embeddingService) return null;
-    try {
-      const chunks = await retrieve(
-        this.db,
-        this.embeddingService.embed.bind(this.embeddingService),
-        query,
-        {
-          limit: 5,
-          minScore: 0.3,
-          diversifySources: true,
-          llmRegistry: this.registry,
-          enableReranking: true,
-          ...(sourceId ? { sourceId } : {}),
-        },
-      );
-      if (chunks.length === 0) return null;
-      return formatContext(chunks);
-    } catch (err) {
-      this.logger.warn({ err }, "RAG retrieval failed (non-fatal)");
-      return null;
-    }
-  }
-
-  private trimHistory(history: AgentMessage[], maxTokenEstimate = 8_000): AgentMessage[] {
-    let tokenCount = 0;
-    const trimmed: AgentMessage[] = [];
-    for (let i = history.length - 1; i >= 0; i--) {
-      const est = Math.ceil(history[i].content.length / 4);
-      if (tokenCount + est > maxTokenEstimate) break;
-      tokenCount += est;
-      trimmed.unshift(history[i]);
-    }
-    return trimmed;
-  }
-
-  private async persistPlan(
-    conversationId: string,
-    input: CreatePlanInput,
-    userId?: string,
-  ): Promise<PlanResult> {
-    const db = this.db!;
-
-    // Validate dependency graph before creating anything (cycle detection)
-    const hasDeps = input.tasks.some((t) => t.depends_on && t.depends_on.length > 0);
-    if (hasDeps) {
-      validateDependencyGraph(input.tasks);
-    }
-
-    // Classify scope — server-side keyword analysis merged with optional LLM hint
-    const scope = classifyGoalScope(input.tasks, input.scope);
-    const requiresApproval = scopeRequiresApproval(scope);
-
-    const goal = await createGoal(db, {
-      conversationId,
-      title: input.goal_title,
-      description: input.goal_description,
-      priority: input.goal_priority,
-      createdBy: userId,
-      milestoneId: input.milestone_id || undefined,
-      scope,
-      requiresApproval,
-      workspaceId: this.workspaceId ?? "",
-    });
-
-    // If approval required → "proposed"; otherwise → "active"
-    const initialStatus = requiresApproval ? "proposed" : "active";
-    await updateGoalStatus(db, goal.id, initialStatus);
-
-    // Pass 1: create all tasks to get UUIDs
-    const createdTasks: PlanResult["tasks"] = [];
-
-    // Pass 1: create all tasks (without dependencies)
-    for (let i = 0; i < input.tasks.length; i++) {
-      const t = input.tasks[i];
-      const task = await createTask(db, {
-        goalId: goal.id,
-        title: t.title,
-        description: t.description,
-        assignedAgent: t.assigned_agent,
-        orderIndex: i,
-        parallelGroup: t.parallel_group,
-        input: t.description,
-        workspaceId: this.workspaceId ?? "",
-      });
-
-      createdTasks.push({
-        id: task.id,
-        title: task.title,
-        assignedAgent: task.assignedAgent as AgentRole,
-        orderIndex: task.orderIndex,
-        parallelGroup: task.parallelGroup,
-      });
-    }
-
-    // Pass 2: resolve index-based depends_on to UUIDs and update tasks
-    if (hasDeps) {
-      for (let i = 0; i < input.tasks.length; i++) {
-        const depIndices = input.tasks[i].depends_on;
-        if (depIndices && depIndices.length > 0) {
-          const depUuids = depIndices
-            .filter((idx) => idx >= 0 && idx < createdTasks.length)
-            .map((idx) => createdTasks[idx].id);
-          if (depUuids.length > 0) {
-            await updateTaskDependencies(db, createdTasks[i].id, depUuids);
-            createdTasks[i].dependsOn = depUuids;
-          }
-        }
-      }
-    }
-
-    // Fire-and-forget notification for proposed goals
-    if (requiresApproval) {
-      notifyGoalProposed({
-        goalId: goal.id,
-        goalTitle: goal.title,
-        scope,
-        taskCount: createdTasks.length,
-      }).catch((err) => this.logger.warn({ err }, "Failed to notify goal proposed"));
-    }
-
-    return {
-      goalId: goal.id,
-      goalTitle: goal.title,
-      scope,
-      requiresApproval,
-      tasks: createdTasks,
-    };
-  }
-
-  private buildPlanSummary(plan: PlanResult): string {
-    const taskLines = plan.tasks
-      .map((t, i) => `${i + 1}. ${t.title} (${t.assignedAgent})`)
-      .join("\n");
-
-    let summary = `Plan created: ${plan.goalTitle}\n\nTasks:\n${taskLines}`;
-
-    if (plan.requiresApproval) {
-      summary += `\n\n⚠️ This plan has **${plan.scope}** scope and requires human approval before execution. Status: proposed.`;
-    }
-
-    return summary;
   }
 }
