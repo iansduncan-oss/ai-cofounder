@@ -100,7 +100,7 @@ export const queuePlugin = fp(async (app) => {
           }
           if (expired.length > 0) {
             logger.info({ count: expired.length }, "Auto-denied expired pending approvals");
-            app.agentEvents.emit("ws:approval_change");
+            app.agentEvents?.emit("ws:approval_change");
           }
           break;
         }
@@ -172,7 +172,7 @@ export const queuePlugin = fp(async (app) => {
           try {
             const result = await scanner.scan({ synthesize: true });
             logger.info(result, "scheduled codebase scan complete");
-            app.agentEvents.emit("ws:codebase_updated");
+            app.agentEvents?.emit("ws:codebase_updated");
           } catch (err) {
             logger.warn({ err }, "scheduled codebase scan failed");
           }
@@ -348,14 +348,14 @@ export const queuePlugin = fp(async (app) => {
           // Full check for custom/unknown
           await app.monitoringService.runFullCheck();
       }
-      app.agentEvents.emit("ws:monitoring_complete");
+      app.agentEvents?.emit("ws:monitoring_complete");
     },
 
     notification: async (job) => {
       const { title, message } = job.data;
       await app.notificationService.sendBriefing(`**${title}**\n${message}`);
       logger.info({ jobId: job.id, type: job.data.type }, "Notification delivered");
-      app.agentEvents.emit("ws:notification_complete");
+      app.agentEvents?.emit("ws:notification_complete");
     },
 
     briefing: async (job) => {
@@ -365,7 +365,7 @@ export const queuePlugin = fp(async (app) => {
       if (type === "weekly") {
         const { sendWeeklySummary } = await import("../services/briefing.js");
         await sendWeeklySummary(app.db, app.notificationService, app.llmRegistry);
-        app.agentEvents.emit("ws:briefing_complete");
+        app.agentEvents?.emit("ws:briefing_complete");
         return;
       }
 
@@ -389,7 +389,7 @@ export const queuePlugin = fp(async (app) => {
         logger.warn({ err }, "vault daily note failed (non-fatal)");
       }
 
-      app.agentEvents.emit("ws:briefing_complete");
+      app.agentEvents?.emit("ws:briefing_complete");
     },
 
     pipeline: async (job) => {
@@ -405,7 +405,7 @@ export const queuePlugin = fp(async (app) => {
         app.n8nService, // n8n post-pipeline trigger
       );
       await executor.execute(job.data);
-      app.agentEvents.emit("ws:pipeline_complete");
+      app.agentEvents?.emit("ws:pipeline_complete");
     },
 
     reflection: async (job) => {
@@ -542,7 +542,7 @@ export const queuePlugin = fp(async (app) => {
       }
 
       // Notify dashboard via WS
-      app.agentEvents.emit("ws:deploy_change");
+      app.agentEvents?.emit("ws:deploy_change");
     },
 
     meetingPrep: async (job) => {
