@@ -1,4 +1,4 @@
-FROM node:24-alpine AS base
+FROM node:25-alpine AS base
 WORKDIR /app
 
 # Install dependencies — copy ALL workspace package.json files
@@ -35,7 +35,7 @@ RUN rm -rf packages/*/node_modules/drizzle-orm \
     && npx turbo run build --filter=@ai-cofounder/agent-server --filter=@ai-cofounder/dashboard
 
 # Production stage
-FROM node:24-alpine
+FROM node:25-alpine
 WORKDIR /app
 
 # Install Docker CLI for sandbox code execution and Chromium for browser automation
