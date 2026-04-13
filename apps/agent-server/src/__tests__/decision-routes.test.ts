@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  mockDbModule,
+  mockLlmModule,
+  createMockComplete,
+  setupTestEnv,
+} from "@ai-cofounder/test-utils";
 
-beforeAll(() => {
-  process.env.ANTHROPIC_API_KEY = "test-key-not-real";
-  process.env.DATABASE_URL = "postgres://test:test@localhost:5432/test";
-  process.env.BRIEFING_HOUR = "25"; // Prevent scheduler from consuming mocks
-});
+setupTestEnv({ BRIEFING_HOUR: "25" });
 
+const mockComplete = createMockComplete();
 const mockListDecisions = vi.fn();
 const mockSaveMemory = vi.fn();
 
@@ -100,36 +102,7 @@ vi.mock("@ai-cofounder/db", () => ({
   workSessions: {},
 }));
 
-vi.mock("@ai-cofounder/llm", () => {
-  const mockComplete = vi.fn().mockResolvedValue({
-    content: [{ type: "text", text: "Mock response" }],
-    model: "test-model",
-    stop_reason: "end_turn",
-    usage: { inputTokens: 10, outputTokens: 20 },
-    provider: "test",
-  });
-  class MockLlmRegistry {
-    complete = mockComplete;
-    completeDirect = mockComplete;
-    register = vi.fn();
-    getProvider = vi.fn();
-    resolveProvider = vi.fn();
-    listProviders = vi.fn().mockReturnValue([]);
-    getProviderHealth = vi.fn().mockReturnValue([]);
-  }
-  return {
-    LlmRegistry: MockLlmRegistry,
-    AnthropicProvider: class {},
-    GroqProvider: class {},
-    OpenRouterProvider: class {},
-    GeminiProvider: class {},
-    OllamaProvider: class {},
-    TogetherProvider: class {},
-    CerebrasProvider: class {},
-    HuggingFaceProvider: class {},
-    createEmbeddingService: vi.fn(),
-  };
-});
+vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 
 const { buildServer } = await import("../server.js");
 

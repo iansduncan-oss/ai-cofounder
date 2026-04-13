@@ -1,10 +1,24 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { mockSharedModule } from "@ai-cofounder/test-utils";
-import { mockDbModule } from "@ai-cofounder/test-utils";
+import { describe, it, expect, vi } from "vitest";
+import {
+  mockSharedModule,
+  mockDbModule,
+  mockLlmModule,
+  mockQueueModule,
+  mockSandboxModule,
+  createMockComplete,
+  createTestApp,
+} from "@ai-cofounder/test-utils";
+
+const mockComplete = createMockComplete();
 
 vi.mock("@ai-cofounder/shared", () => mockSharedModule());
 
-const mockCreateFollowUp = vi.fn().mockResolvedValue({ id: "fu-1", title: "Test", status: "pending", createdAt: new Date().toISOString() });
+const mockCreateFollowUp = vi.fn().mockResolvedValue({
+  id: "fu-1",
+  title: "Test",
+  status: "pending",
+  createdAt: new Date().toISOString(),
+});
 const mockGetFollowUp = vi.fn().mockResolvedValue(null);
 const mockListFollowUps = vi.fn().mockResolvedValue({ data: [], total: 0 });
 const mockUpdateFollowUp = vi.fn().mockResolvedValue(null);
@@ -23,75 +37,17 @@ vi.mock("@ai-cofounder/db", () => ({
   markFollowUpReminderSent: (...args: unknown[]) => mockMarkFollowUpReminderSent(...args),
 }));
 
-vi.mock("@ai-cofounder/llm", () => {
-  class MockLlmRegistry {
-    complete = vi.fn();
-    completeDirect = vi.fn();
-    register = vi.fn();
-    getProvider = vi.fn();
-    resolveProvider = vi.fn();
-    listProviders = vi.fn().mockReturnValue([]);
-    getProviderHealth = vi.fn().mockReturnValue([]);
-    getStatsSnapshots = vi.fn().mockReturnValue([]);
-  }
-  return { LlmRegistry: MockLlmRegistry, AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {},
-    OllamaProvider: class {},
-    TogetherProvider: class {},
-    CerebrasProvider: class {},
-    HuggingFaceProvider: class {}, createEmbeddingService: vi.fn() };
-});
+vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 
-vi.mock("@ai-cofounder/queue", () => ({
-  RedisPubSub: vi.fn().mockImplementation(() => ({
-    subscribe: vi.fn(),
-    publish: vi.fn(),
-    close: vi.fn(),
-  })),
-  setupRecurringJobs: vi.fn(),
-  getMonitoringQueue: vi.fn().mockReturnValue({ add: vi.fn(), upsertJobScheduler: vi.fn() }),
-  getNotificationQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getAgentTaskQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getBriefingQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getPipelineQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getRagIngestionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getReflectionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getSubagentTaskQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getDeployVerificationQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getDeadLetterQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getAutonomousSessionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getMeetingPrepQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  closeAllQueues: vi.fn(),
-  listDeadLetterJobs: vi.fn().mockResolvedValue([]),
-  enqueueRagIngestion: vi.fn().mockResolvedValue(undefined),
-}));
+const { queueModule } = mockQueueModule();
+vi.mock("@ai-cofounder/queue", () => queueModule);
 
-vi.mock("@ai-cofounder/sandbox", () => ({
-  createSandboxService: vi.fn().mockReturnValue({ available: false }),
-  hashCode: vi.fn().mockReturnValue("hash"),
-}));
-
-import { beforeAll } from "vitest";
+vi.mock("@ai-cofounder/sandbox", () => mockSandboxModule());
 
 const { buildServer } = await import("../server.js");
-
-let app: Awaited<ReturnType<typeof buildServer>>["app"];
-
-beforeAll(async () => {
-  const server = await buildServer();
-  app = server.app;
-  await app.ready();
-});
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-afterAll(async () => {
-  if (app) await app.close();
-});
+const { app } = await createTestApp(buildServer);
 
 describe("Follow-up Routes", () => {
-
   it("POST /api/follow-ups creates a follow-up", async () => {
     const res = await app.inject({
       method: "POST",
@@ -111,7 +67,10 @@ describe("Follow-up Routes", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     expect(body.data).toHaveLength(1);
-    expect(mockListFollowUps).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ status: "pending" }));
+    expect(mockListFollowUps).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: "pending" }),
+    );
   });
 
   it("GET /api/follow-ups/:id returns a follow-up", async () => {
@@ -135,7 +94,11 @@ describe("Follow-up Routes", () => {
       payload: { status: "done" },
     });
     expect(res.statusCode).toBe(200);
-    expect(mockUpdateFollowUp).toHaveBeenCalledWith(expect.anything(), "fu-1", expect.objectContaining({ status: "done" }));
+    expect(mockUpdateFollowUp).toHaveBeenCalledWith(
+      expect.anything(),
+      "fu-1",
+      expect.objectContaining({ status: "done" }),
+    );
   });
 
   it("PATCH /api/follow-ups/:id returns 404 when not found", async () => {

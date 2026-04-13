@@ -1,5 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { mockSharedModule, mockDbModule } from "@ai-cofounder/test-utils";
+import { describe, it, expect, vi } from "vitest";
+import {
+  mockSharedModule,
+  mockDbModule,
+  mockLlmModule,
+  mockQueueModule,
+  mockSandboxModule,
+  createMockComplete,
+  createTestApp,
+} from "@ai-cofounder/test-utils";
+
+const mockComplete = createMockComplete();
 
 vi.mock("@ai-cofounder/shared", () => mockSharedModule());
 
@@ -15,78 +25,31 @@ vi.mock("@ai-cofounder/db", () => ({
   globalSearch: (...args: unknown[]) => mockGlobalSearch(...args),
 }));
 
-vi.mock("@ai-cofounder/llm", () => {
-  class MockLlmRegistry {
-    complete = vi.fn();
-    completeDirect = vi.fn();
-    register = vi.fn();
-    getProvider = vi.fn();
-    resolveProvider = vi.fn();
-    listProviders = vi.fn().mockReturnValue([]);
-    getProviderHealth = vi.fn().mockReturnValue([]);
-    getStatsSnapshots = vi.fn().mockReturnValue([]);
-  }
-  return { LlmRegistry: MockLlmRegistry, AnthropicProvider: class {}, GroqProvider: class {}, OpenRouterProvider: class {}, GeminiProvider: class {},
-    OllamaProvider: class {},
-    TogetherProvider: class {},
-    CerebrasProvider: class {},
-    HuggingFaceProvider: class {}, createEmbeddingService: vi.fn() };
-});
+vi.mock("@ai-cofounder/llm", () => mockLlmModule(mockComplete));
 
-vi.mock("@ai-cofounder/queue", () => ({
-  RedisPubSub: vi.fn().mockImplementation(() => ({
-    subscribe: vi.fn(),
-    publish: vi.fn(),
-    close: vi.fn(),
-  })),
-  setupRecurringJobs: vi.fn(),
-  getMonitoringQueue: vi.fn().mockReturnValue({ add: vi.fn(), upsertJobScheduler: vi.fn() }),
-  getNotificationQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getAgentTaskQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getBriefingQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getPipelineQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getRagIngestionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getReflectionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getSubagentTaskQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getDeployVerificationQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getDeadLetterQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getAutonomousSessionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getMeetingPrepQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  closeAllQueues: vi.fn(),
-  listDeadLetterJobs: vi.fn().mockResolvedValue([]),
-  enqueueRagIngestion: vi.fn().mockResolvedValue(undefined),
-}));
+const { queueModule } = mockQueueModule();
+vi.mock("@ai-cofounder/queue", () => queueModule);
 
-vi.mock("@ai-cofounder/sandbox", () => ({
-  createSandboxService: vi.fn().mockReturnValue({ available: false }),
-  hashCode: vi.fn().mockReturnValue("hash"),
-}));
+vi.mock("@ai-cofounder/sandbox", () => mockSandboxModule());
 
 const { buildServer } = await import("../server.js");
-
-let app: Awaited<ReturnType<typeof buildServer>>["app"];
-
-beforeEach(() => {
-  vi.clearAllMocks();
-});
-
-afterAll(async () => {
-  if (app) await app.close();
-});
+const { app } = await createTestApp(buildServer);
 
 describe("Search Routes", () => {
-  beforeEach(async () => {
-    if (!app) {
-      const server = await buildServer();
-      app = server.app;
-      await app.ready();
-    }
-  });
-
   it("GET /api/search?q=test returns categorized results", async () => {
     mockGlobalSearch.mockResolvedValueOnce({
-      goals: [{ id: "g-1", title: "Test Goal", status: "active", createdAt: new Date().toISOString() }],
-      tasks: [{ id: "t-1", title: "Test Task", status: "pending", goalId: "g-1", createdAt: new Date().toISOString() }],
+      goals: [
+        { id: "g-1", title: "Test Goal", status: "active", createdAt: new Date().toISOString() },
+      ],
+      tasks: [
+        {
+          id: "t-1",
+          title: "Test Task",
+          status: "pending",
+          goalId: "g-1",
+          createdAt: new Date().toISOString(),
+        },
+      ],
       conversations: [],
       memories: [],
     });
