@@ -3,133 +3,191 @@ import { sql } from "drizzle-orm";
 import { getProviderHealthHistory, getToolStats, getErrorSummary } from "@ai-cofounder/db";
 import { pingRedis, getAllQueueStatus } from "@ai-cofounder/queue";
 import { optionalEnv } from "@ai-cofounder/shared";
-import { gatherBriefingData, formatBriefing, generateLlmBriefing, sendDailyBriefing } from "../services/briefing.js";
+import {
+  gatherBriefingData,
+  formatBriefing,
+  generateLlmBriefing,
+  sendDailyBriefing,
+} from "../services/briefing.js";
 import { getActivePersona } from "@ai-cofounder/db";
 
 export const healthRoutes: FastifyPluginAsync = async (app) => {
-  app.get("/health", { schema: { tags: ["health"] } }, async (_request, reply) => {
-    reply.header("Cache-Control", "public, max-age=30");
-    let dbStatus = "ok";
-    try {
-      await app.db.execute(sql`SELECT 1`);
-    } catch {
-      dbStatus = "unreachable";
-    }
-
-    // Redis health check — only if REDIS_URL is configured
-    let redisStatus = "disabled";
-    const redisUrl = optionalEnv("REDIS_URL", "");
-    if (redisUrl) {
-      redisStatus = await pingRedis();
-    }
-
-    const isHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
-
-    if (!isHealthy) {
-      reply.code(503);
-    }
-
-    return {
-      status: isHealthy ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      database: dbStatus,
-      redis: redisStatus,
-    };
-  });
-
-  /** GET /health/full — aggregated health check across all subsystems */
-  app.get("/health/full", { schema: { tags: ["health"] } }, async (_request, reply) => {
-    // Core: Database
-    let dbStatus = "ok";
-    try {
-      await app.db.execute(sql`SELECT 1`);
-    } catch {
-      dbStatus = "unreachable";
-    }
-
-    // Core: Redis
-    let redisStatus = "disabled";
-    const redisUrl = optionalEnv("REDIS_URL", "");
-    if (redisUrl) {
-      redisStatus = await pingRedis();
-    }
-
-    // LLM Providers
-    const providers = app.llmRegistry.getProviderHealth();
-    const llmTotal = providers.length;
-    const llmAvailable = providers.filter((p) => p.available).length;
-    const llmStatus = llmTotal === 0 ? "none" : llmAvailable === llmTotal ? "ok" : "degraded";
-    const circuitBreakers = app.llmRegistry.getCircuitBreakerStates();
-
-    // Queue status (if Redis available)
-    let queueStatus: { status: string; dlqSize: number; queues: Awaited<ReturnType<typeof getAllQueueStatus>> } | undefined;
-    if (redisUrl) {
+  app.get(
+    "/health",
+    {
+      schema: {
+        tags: ["health"],
+        summary: "Basic liveness/readiness probe",
+        description:
+          "Fast health check that verifies the database is reachable and (if configured) Redis is pingable. " +
+          "Returns 200 with `{ status: 'ok' }` when healthy, or 503 with `{ status: 'degraded' }` otherwise. " +
+          "Suitable for Kubernetes liveness probes, load balancer health checks, and uptime monitoring. " +
+          "Cached for 30s via `Cache-Control: public, max-age=30`.",
+      },
+    },
+    async (_request, reply) => {
+      reply.header("Cache-Control", "public, max-age=30");
+      let dbStatus = "ok";
       try {
-        const queues = await getAllQueueStatus();
-        const dlq = queues.find((q) => q.name === "dead-letter");
-        const dlqSize = dlq ? dlq.waiting + dlq.failed : 0;
-        queueStatus = {
-          status: dlqSize > 10 ? "degraded" : "ok",
-          dlqSize,
-          queues,
-        };
+        await app.db.execute(sql`SELECT 1`);
       } catch {
-        queueStatus = { status: "unreachable", dlqSize: 0, queues: [] };
+        dbStatus = "unreachable";
       }
-    }
 
-    // External services — config detection only (no active probing)
-    const github = !!(optionalEnv("GITHUB_TOKEN", "") && optionalEnv("GITHUB_MONITORED_REPOS", ""));
-    const vps = !!(optionalEnv("VPS_HOST", "") && optionalEnv("VPS_USER", ""));
-    const tts = !!app.ttsService?.isConfigured();
+      // Redis health check — only if REDIS_URL is configured
+      let redisStatus = "disabled";
+      const redisUrl = optionalEnv("REDIS_URL", "");
+      if (redisUrl) {
+        redisStatus = await pingRedis();
+      }
 
-    // Overall: ok if DB+Redis healthy and DLQ not overflowing, degraded otherwise
-    const coreHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
-    const overallHealthy = coreHealthy && queueStatus?.status !== "degraded";
+      const isHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
 
-    if (!coreHealthy) {
-      reply.code(503);
-    }
+      if (!isHealthy) {
+        reply.code(503);
+      }
 
-    return {
-      status: overallHealthy ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      core: {
+      return {
+        status: isHealthy ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
         database: dbStatus,
         redis: redisStatus,
+      };
+    },
+  );
+
+  /** GET /health/full — aggregated health check across all subsystems */
+  app.get(
+    "/health/full",
+    {
+      schema: {
+        tags: ["health"],
+        summary: "Aggregated health across all subsystems",
+        description:
+          "Comprehensive status check including database, Redis, LLM providers (per-provider health + circuit " +
+          "breaker states), BullMQ queue backlogs (dead-letter size), and external service configuration " +
+          "(GitHub, VPS, TTS). Returns 503 if core services (DB or Redis) are unhealthy. Used by the " +
+          "monitoring dashboard and deploy verification.",
       },
-      llm: {
-        status: llmStatus,
-        available: llmAvailable,
-        total: llmTotal,
-        circuitBreakers,
-      },
-      ...(queueStatus ? { queue: queueStatus } : {}),
-      external: {
-        github: github ? "configured" : "not_configured",
-        vps: vps ? "configured" : "not_configured",
-        tts: tts ? "configured" : "not_configured",
-      },
-    };
-  });
+    },
+    async (_request, reply) => {
+      // Core: Database
+      let dbStatus = "ok";
+      try {
+        await app.db.execute(sql`SELECT 1`);
+      } catch {
+        dbStatus = "unreachable";
+      }
+
+      // Core: Redis
+      let redisStatus = "disabled";
+      const redisUrl = optionalEnv("REDIS_URL", "");
+      if (redisUrl) {
+        redisStatus = await pingRedis();
+      }
+
+      // LLM Providers
+      const providers = app.llmRegistry.getProviderHealth();
+      const llmTotal = providers.length;
+      const llmAvailable = providers.filter((p) => p.available).length;
+      const llmStatus = llmTotal === 0 ? "none" : llmAvailable === llmTotal ? "ok" : "degraded";
+      const circuitBreakers = app.llmRegistry.getCircuitBreakerStates();
+
+      // Queue status (if Redis available)
+      let queueStatus:
+        | { status: string; dlqSize: number; queues: Awaited<ReturnType<typeof getAllQueueStatus>> }
+        | undefined;
+      if (redisUrl) {
+        try {
+          const queues = await getAllQueueStatus();
+          const dlq = queues.find((q) => q.name === "dead-letter");
+          const dlqSize = dlq ? dlq.waiting + dlq.failed : 0;
+          queueStatus = {
+            status: dlqSize > 10 ? "degraded" : "ok",
+            dlqSize,
+            queues,
+          };
+        } catch {
+          queueStatus = { status: "unreachable", dlqSize: 0, queues: [] };
+        }
+      }
+
+      // External services — config detection only (no active probing)
+      const github = !!(
+        optionalEnv("GITHUB_TOKEN", "") && optionalEnv("GITHUB_MONITORED_REPOS", "")
+      );
+      const vps = !!(optionalEnv("VPS_HOST", "") && optionalEnv("VPS_USER", ""));
+      const tts = !!app.ttsService?.isConfigured();
+
+      // Overall: ok if DB+Redis healthy and DLQ not overflowing, degraded otherwise
+      const coreHealthy = dbStatus === "ok" && (redisStatus === "ok" || redisStatus === "disabled");
+      const overallHealthy = coreHealthy && queueStatus?.status !== "degraded";
+
+      if (!coreHealthy) {
+        reply.code(503);
+      }
+
+      return {
+        status: overallHealthy ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        core: {
+          database: dbStatus,
+          redis: redisStatus,
+        },
+        llm: {
+          status: llmStatus,
+          available: llmAvailable,
+          total: llmTotal,
+          circuitBreakers,
+        },
+        ...(queueStatus ? { queue: queueStatus } : {}),
+        external: {
+          github: github ? "configured" : "not_configured",
+          vps: vps ? "configured" : "not_configured",
+          tts: tts ? "configured" : "not_configured",
+        },
+      };
+    },
+  );
 
   /** GET /health/providers — LLM provider health status */
-  app.get("/health/providers", { schema: { tags: ["health"] } }, async () => {
-    const providers = app.llmRegistry.getProviderHealth();
-    const allAvailable = providers.every((p) => p.available);
-    return {
-      status: allAvailable ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      providers,
-    };
-  });
+  app.get(
+    "/health/providers",
+    {
+      schema: {
+        tags: ["health"],
+        summary: "LLM provider availability snapshot",
+        description:
+          "Returns in-memory health state for each registered LLM provider (Anthropic, Groq, Gemini, " +
+          "OpenRouter, etc.) — available/unavailable based on recent successful vs. failed calls. Does " +
+          "NOT actively probe the providers.",
+      },
+    },
+    async () => {
+      const providers = app.llmRegistry.getProviderHealth();
+      const allAvailable = providers.every((p) => p.available);
+      return {
+        status: allAvailable ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+        providers,
+      };
+    },
+  );
 
   /** GET /health/providers/history — persisted provider health data */
   app.get<{ Querystring: { provider?: string } }>(
     "/health/providers/history",
-    { schema: { tags: ["health"] } },
+    {
+      schema: {
+        tags: ["health"],
+        summary: "Historical LLM provider health records",
+        description:
+          "Returns persisted provider health records from the database. Filter by `?provider=anthropic` to " +
+          "narrow to a single provider. Used for charting availability and error rates over time.",
+      },
+    },
     async (request) => {
       const { provider } = request.query;
       const records = await getProviderHealthHistory(app.db, provider);
@@ -141,68 +199,95 @@ export const healthRoutes: FastifyPluginAsync = async (app) => {
   );
 
   /** GET /health/deep — timed per-subsystem health check for deploy verification */
-  app.get("/health/deep", { schema: { tags: ["health"] } }, async (_request, reply) => {
-    const checks: Array<{ name: string; status: string; latencyMs: number; error?: string }> = [];
-    const start = performance.now();
+  app.get(
+    "/health/deep",
+    {
+      schema: {
+        tags: ["health"],
+        summary: "Timed per-subsystem probes for deploy verification",
+        description:
+          "Actively probes each subsystem (database, Redis, LLM providers) and measures latency in " +
+          "milliseconds. Returns 503 if any core service is unhealthy. Used by the deploy pipeline to " +
+          "gate rollouts — if /health/deep fails after a deploy, the circuit breaker rolls back.",
+      },
+    },
+    async (_request, reply) => {
+      const checks: Array<{ name: string; status: string; latencyMs: number; error?: string }> = [];
+      const start = performance.now();
 
-    // Database check
-    const dbStart = performance.now();
-    let dbStatus = "ok";
-    let dbError: string | undefined;
-    try {
-      await app.db.execute(sql`SELECT 1`);
-    } catch (err) {
-      dbStatus = "unreachable";
-      dbError = err instanceof Error ? err.message : String(err);
-    }
-    checks.push({ name: "database", status: dbStatus, latencyMs: Math.round(performance.now() - dbStart), ...(dbError ? { error: dbError } : {}) });
-
-    // Redis check
-    const redisUrl = optionalEnv("REDIS_URL", "");
-    const redisStart = performance.now();
-    let redisStatus: string;
-    let redisError: string | undefined;
-    if (!redisUrl) {
-      redisStatus = "disabled";
-    } else {
+      // Database check
+      const dbStart = performance.now();
+      let dbStatus = "ok";
+      let dbError: string | undefined;
       try {
-        const result = await pingRedis();
-        redisStatus = result === "ok" ? "ok" : "unreachable";
-        if (result !== "ok") redisError = "ping returned: " + result;
+        await app.db.execute(sql`SELECT 1`);
       } catch (err) {
-        redisStatus = "unreachable";
-        redisError = err instanceof Error ? err.message : String(err);
+        dbStatus = "unreachable";
+        dbError = err instanceof Error ? err.message : String(err);
       }
-    }
-    checks.push({ name: "redis", status: redisStatus, latencyMs: Math.round(performance.now() - redisStart), ...(redisError ? { error: redisError } : {}) });
+      checks.push({
+        name: "database",
+        status: dbStatus,
+        latencyMs: Math.round(performance.now() - dbStart),
+        ...(dbError ? { error: dbError } : {}),
+      });
 
-    // LLM check
-    const llmStart = performance.now();
-    const providers = app.llmRegistry.getProviderHealth();
-    let llmStatus: string;
-    if (providers.length === 0) {
-      llmStatus = "disabled";
-    } else {
-      const available = providers.filter((p) => p.available).length;
-      llmStatus = available === providers.length ? "ok" : "degraded";
-    }
-    checks.push({ name: "llm", status: llmStatus, latencyMs: Math.round(performance.now() - llmStart) });
+      // Redis check
+      const redisUrl = optionalEnv("REDIS_URL", "");
+      const redisStart = performance.now();
+      let redisStatus: string;
+      let redisError: string | undefined;
+      if (!redisUrl) {
+        redisStatus = "disabled";
+      } else {
+        try {
+          const result = await pingRedis();
+          redisStatus = result === "ok" ? "ok" : "unreachable";
+          if (result !== "ok") redisError = "ping returned: " + result;
+        } catch (err) {
+          redisStatus = "unreachable";
+          redisError = err instanceof Error ? err.message : String(err);
+        }
+      }
+      checks.push({
+        name: "redis",
+        status: redisStatus,
+        latencyMs: Math.round(performance.now() - redisStart),
+        ...(redisError ? { error: redisError } : {}),
+      });
 
-    const totalLatencyMs = Math.round(performance.now() - start);
-    const overallOk = checks.every((c) => c.status === "ok" || c.status === "disabled");
+      // LLM check
+      const llmStart = performance.now();
+      const providers = app.llmRegistry.getProviderHealth();
+      let llmStatus: string;
+      if (providers.length === 0) {
+        llmStatus = "disabled";
+      } else {
+        const available = providers.filter((p) => p.available).length;
+        llmStatus = available === providers.length ? "ok" : "degraded";
+      }
+      checks.push({
+        name: "llm",
+        status: llmStatus,
+        latencyMs: Math.round(performance.now() - llmStart),
+      });
 
-    if (!overallOk) {
-      reply.code(503);
-    }
+      const totalLatencyMs = Math.round(performance.now() - start);
+      const overallOk = checks.every((c) => c.status === "ok" || c.status === "disabled");
 
-    return {
-      status: overallOk ? "ok" : "degraded",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      totalLatencyMs,
-      checks,
-    };
-  });
+      if (!overallOk) {
+        reply.code(503);
+      }
+
+      return {
+        status: overallOk ? "ok" : "degraded",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        totalLatencyMs,
+        checks,
+      };
+    },
+  );
 
   /** GET /api/tools/stats — per-tool execution timing stats */
   app.get("/api/tools/stats", { schema: { tags: ["health"] } }, async (_request, reply) => {

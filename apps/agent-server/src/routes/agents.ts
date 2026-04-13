@@ -97,7 +97,19 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
 
   app.post<{ Body: RunBody }>(
     "/run",
-    { schema: { tags: ["agents"], body: RunBody } },
+    {
+      schema: {
+        tags: ["agents"],
+        summary: "Run the orchestrator on a user message",
+        description:
+          "The primary agent execution endpoint. Accepts a user message and an optional conversation history, " +
+          "then runs the orchestrator's agentic tool loop (up to 10 rounds). The orchestrator may create a goal/task plan, " +
+          "save/recall memories, execute code in the sandbox, browse the web, read/write workspace files, or delegate to " +
+          "specialist agents (researcher/coder/reviewer/planner/debugger/doc_writer). Usage is tracked against the " +
+          "DAILY_TOKEN_LIMIT env var — requests that exceed the limit return 429.",
+        body: RunBody,
+      },
+    },
     async (request, reply) => {
       // Enforce daily token limit if configured
       if (dailyTokenLimit > 0) {
@@ -246,7 +258,19 @@ export const agentRoutes: FastifyPluginAsync = async (app) => {
   // SSE streaming endpoint
   app.post<{ Body: RunBody }>(
     "/run/stream",
-    { schema: { tags: ["agents"], body: RunBody } },
+    {
+      schema: {
+        tags: ["agents"],
+        summary: "Run the orchestrator with Server-Sent Events streaming",
+        description:
+          "Same agent execution as POST /run, but streams progress via SSE. Emits events of type " +
+          "`thinking`, `tool_call`, `tool_result`, `text_delta`, `done`, and `error`. Prefer this endpoint " +
+          "for interactive UIs (dashboard, voice UI, Discord/Slack bots) so the user sees intermediate tool " +
+          "use and partial text as it's generated. Falls back to chunked `text_delta` events when the " +
+          "provider doesn't support native token-level streaming.",
+        body: RunBody,
+      },
+    },
     async (request, reply) => {
       if (dailyTokenLimit > 0) {
         const todayTotal = await getTodayTokenTotal(app.db);
