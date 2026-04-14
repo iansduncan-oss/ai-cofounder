@@ -79,18 +79,18 @@ Expected log lines:
 
 ## 3. Initial AdGuard setup wizard
 
-1. SSH tunnel to the admin UI: `ssh -L 3000:127.0.0.1:3001 vps`
+1. SSH tunnel to the admin UI: `ssh -L 3000:127.0.0.1:3002 vps`
 2. Open `http://127.0.0.1:3000/` on your laptop.
 3. Wizard:
    - **Web interface:** listen on all interfaces, port `3000`.
-     (The compose file maps both `3000` and `3001` → `3000` because
-     AdGuard reuses the port after setup.)
+     (The compose file maps `3400` and `3002` → `3000`. Port 3100 is
+     taken by agent-server, 3001 by Uptime Kuma.)
    - **DNS server:** listen on all interfaces, port `53`.
    - **Admin user:** pick a strong password. Stash it in
      Vaultwarden/1Password now.
 4. After the wizard finishes, **AdGuard will restart** and the setup
-   UI on `:3001` becomes unreachable. The working UI is on `:3000`
-   (still SSH-tunneled for now).
+   UI on `:3002` becomes unreachable. The working UI is on `:3400`
+   (SSH tunnel: `ssh -L 3400:127.0.0.1:3400 vps`).
 
 ---
 

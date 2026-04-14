@@ -4,7 +4,7 @@ services:
   # AdGuard Home forwards to this container on 5335/tcp+udp. No upstream
   # resolver needed — Unbound talks directly to the root servers.
   unbound:
-    image: mvance/unbound:1.23.0
+    image: mvance/unbound:1.22.0
     container_name: unbound
     restart: unless-stopped
     # unbound.conf lives in a host bind mount so you can edit + reload
@@ -45,11 +45,12 @@ services:
       - "${TAILSCALE_IP}:53:53/tcp"
       - "${TAILSCALE_IP}:53:53/udp"
       # Admin UI — bind to localhost; reach via SSH tunnel or NPM proxy.
-      - "127.0.0.1:3100:3000/tcp"
+      # NOTE: 3100 is taken by agent-server, 3001 by Uptime Kuma.
+      - "127.0.0.1:3400:3000/tcp"
       # Initial setup wizard runs on 3000 too, but AdGuard flips to the
       # configured port after setup. Keep this mapping while the wizard
       # is active, then optionally remove.
-      - "127.0.0.1:3001:3000/tcp"
+      - "127.0.0.1:3002:3000/tcp"
       # DNS-over-HTTPS (optional — uncomment if exposing DoH via NPM)
       # - "127.0.0.1:443:443/tcp"
       # - "127.0.0.1:853:853/tcp"
