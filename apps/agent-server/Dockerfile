@@ -3,7 +3,7 @@ WORKDIR /app
 
 # Install dependencies — copy ALL workspace package.json files
 # so npm ci lockfile resolution matches the full monorepo structure
-COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+COPY package.json package-lock.json turbo.json tsconfig.base.json .npmrc ./
 COPY apps/agent-server/package.json apps/agent-server/
 COPY apps/dashboard/package.json apps/dashboard/
 COPY apps/discord-bot/package.json apps/discord-bot/

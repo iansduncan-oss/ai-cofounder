@@ -2,7 +2,7 @@ FROM node:25-alpine AS base
 WORKDIR /app
 
 # Install dependencies
-COPY package.json package-lock.json turbo.json tsconfig.base.json ./
+COPY package.json package-lock.json turbo.json tsconfig.base.json .npmrc ./
 COPY apps/discord-bot/package.json apps/discord-bot/
 COPY packages/shared/package.json packages/shared/
 COPY packages/api-client/package.json packages/api-client/
