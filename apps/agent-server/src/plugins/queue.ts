@@ -834,15 +834,19 @@ export const queuePlugin = fp(async (app) => {
 
   startWorkers(processors);
 
-  // Set up recurring monitoring & briefing jobs
-  await setupRecurringJobs({
-    briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
-    briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
-    monitoringIntervalMinutes: 5,
-    autonomousSessionIntervalMinutes: Number(
-      optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30"),
-    ),
-  });
+  // Set up recurring monitoring & briefing jobs (non-fatal — server starts regardless)
+  try {
+    await setupRecurringJobs({
+      briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
+      briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
+      monitoringIntervalMinutes: 5,
+      autonomousSessionIntervalMinutes: Number(
+        optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30"),
+      ),
+    });
+  } catch (err) {
+    logger.error({ err }, "Failed to set up recurring jobs (server will continue without them)");
+  }
 
   // Seed YouTube Shorts pipeline template (idempotent)
   setImmediate(async () => {
