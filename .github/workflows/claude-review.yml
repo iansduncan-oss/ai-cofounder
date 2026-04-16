@@ -1,0 +1,44 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    # Run on PR events, or on @claude mentions in PR comments.
+    # Requires ANTHROPIC_API_KEY secret to be set.
+    # To enable: gh secret set ANTHROPIC_API_KEY
+    if: >
+      (github.event_name == 'pull_request' ||
+       (github.event_name == 'issue_comment' &&
+        github.event.issue.pull_request &&
+        contains(github.event.comment.body, '@claude'))) &&
+      github.repository_owner == 'iansduncan-oss'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-6
+          # Only review, no edits
+          allowed_tools: "Read,Glob,Grep,WebSearch"
+          # Custom review instructions
+          custom_instructions: |
+            You are reviewing a PR for the AI Cofounder project (Turborepo monorepo).
+            Focus on:
+            - Bug risks and logic errors
+            - Security issues (injection, auth bypass, secret leaks)
+            - Missing error handling for external calls
+            - Test coverage for new functionality
+            - Breaking changes to public APIs
+
+            Be concise. Only comment on actual issues, not style preferences.
+            The project uses: TypeScript strict mode, Fastify, Drizzle ORM, BullMQ, Vitest.
