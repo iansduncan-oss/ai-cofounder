@@ -3,10 +3,13 @@ import { OpenAICompatibleProvider } from "./openai-compatible.js";
 
 /**
  * Ollama provider — local LLM inference via OpenAI-compatible API.
- * Always available, never runs out of credits. Used as fallback when cloud providers are exhausted.
+ * Always available, never runs out of credits.
  *
- * Overrides: longer timeout (5 min for CPU inference), strips tools (local models
- * don't handle function calling reliably), caps max_tokens for faster responses.
+ * Guardrails for small models (3b):
+ * - Strips tools (small models don't handle function calling reliably)
+ * - Caps max_tokens to 1024 (prevents rambling/hallucination in long outputs)
+ * - 5-minute timeout for CPU inference
+ * - keep_alive: "5m" to auto-unload model after 5 min idle (frees RAM)
  */
 export class OllamaProvider extends OpenAICompatibleProvider {
   constructor(baseURL: string | undefined, defaultModel?: string) {
@@ -18,8 +21,22 @@ export class OllamaProvider extends OpenAICompatibleProvider {
     const stripped: LlmCompletionRequest = {
       ...request,
       tools: undefined,
-      max_tokens: Math.min(request.max_tokens ?? 2048, 2048),
+      max_tokens: Math.min(request.max_tokens ?? 1024, 1024),
     };
-    return super.complete(stripped);
+    const response = await super.complete(stripped);
+
+    // Validate response isn't empty or garbage (common with small models)
+    const text = response.content
+      .filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("");
+
+    if (!text.trim()) {
+      throw new Error(
+        "Ollama returned empty response — model may be overloaded or prompt too complex",
+      );
+    }
+
+    return response;
   }
 }
