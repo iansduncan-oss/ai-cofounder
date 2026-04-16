@@ -63,22 +63,19 @@ describe("LlmRegistry", () => {
   describe("resolveProvider", () => {
     it("returns first available provider for a task", () => {
       registry.register(mockProvider("ollama", true));
-      registry.register(mockProvider("groq", true));
 
       const result = registry.resolveProvider("conversation");
       expect(result).not.toBeNull();
-      // conversation route: anthropic → groq → ollama; anthropic not registered, groq is first available
-      expect(result!.provider.name).toBe("groq");
+      // All routes go to ollama only
+      expect(result!.provider.name).toBe("ollama");
     });
 
     it("skips unavailable providers", () => {
+      // ollama unavailable — should return null since it's the only route
       registry.register(mockProvider("ollama", false));
-      registry.register(mockProvider("groq", true));
 
-      // simple route: groq first, then ollama — groq is available
       const result = registry.resolveProvider("simple");
-      expect(result).not.toBeNull();
-      expect(result!.provider.name).toBe("groq");
+      expect(result).toBeNull();
     });
 
     it("returns null when no providers available", () => {
@@ -161,27 +158,24 @@ describe("LlmRegistry", () => {
       ).rejects.toThrow("All providers exhausted");
     });
 
-    it("routes different task categories to different providers", async () => {
+    it("routes all task categories to ollama", async () => {
       registry.register(mockProvider("ollama", true));
-      registry.register(mockProvider("groq", true));
 
-      // simple: groq → ollama; groq is first available
+      // All routes go to ollama only
       const simple = await registry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
-      expect(simple.provider).toBe("groq");
+      expect(simple.provider).toBe("ollama");
 
-      // research: anthropic → groq → ollama; groq is first available (no anthropic registered)
       const research = await registry.complete("research", {
         messages: [{ role: "user", content: "search" }],
       });
-      expect(research.provider).toBe("groq");
+      expect(research.provider).toBe("ollama");
 
-      // planning: groq → anthropic → ollama; groq is first available
       const planning = await registry.complete("planning", {
         messages: [{ role: "user", content: "plan" }],
       });
-      expect(planning.provider).toBe("groq");
+      expect(planning.provider).toBe("ollama");
     });
   });
 
@@ -245,41 +239,48 @@ describe("LlmRegistry", () => {
   describe("circuit breaker", () => {
     it("opens circuit after consecutive failures and skips provider", async () => {
       let callCount = 0;
-      // groq is first in the simple route, so use it as the failing provider
       const failing = mockProvider("groq", true, () => {
         callCount++;
         throw new Error(`fail-${callCount}`);
       });
       const ollama = mockProvider("ollama", true);
 
-      registry.register(failing);
-      registry.register(ollama);
+      // Use custom routes with groq→ollama to exercise circuit breaker
+      const multiRoutes = {
+        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        simple: [
+          { provider: "groq", model: "llama-3.1-8b-instant" },
+          { provider: "ollama", model: "llama3.1:8b" },
+        ],
+        research: [{ provider: "ollama", model: "llama3.1:8b" }],
+        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+      };
+      const cbRegistry = new LlmRegistry(multiRoutes);
+      cbRegistry.register(failing);
+      cbRegistry.register(ollama);
 
       // Exhaust the circuit breaker (5 consecutive failures for groq)
-      // simple route: groq -> ollama
       for (let i = 0; i < 5; i++) {
-        await registry.complete("simple", {
+        await cbRegistry.complete("simple", {
           messages: [{ role: "user", content: "hi" }],
         });
       }
 
       // Now groq's circuit should be open — next call should go straight to ollama
-      callCount = 0; // reset
-      await registry.complete("simple", {
+      callCount = 0;
+      await cbRegistry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
-      // groq should NOT have been called since circuit is open
       expect(callCount).toBe(0);
 
-      // Verify circuit state
-      const states = registry.getCircuitBreakerStates();
+      const states = cbRegistry.getCircuitBreakerStates();
       const groqState = states.find((s) => s.provider === "groq");
       expect(groqState?.state).toBe("open");
     });
 
     it("resets circuit breaker on success", async () => {
       let shouldFail = true;
-      // groq is first in the simple route
       const groq = mockProvider("groq", true, async () => {
         if (shouldFail) throw new Error("fail");
         return {
@@ -291,23 +292,33 @@ describe("LlmRegistry", () => {
       });
       const ollama = mockProvider("ollama", true);
 
-      registry.register(groq);
-      registry.register(ollama);
+      const multiRoutes = {
+        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        simple: [
+          { provider: "groq", model: "llama-3.1-8b-instant" },
+          { provider: "ollama", model: "llama3.1:8b" },
+        ],
+        research: [{ provider: "ollama", model: "llama3.1:8b" }],
+        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+      };
+      const cbRegistry = new LlmRegistry(multiRoutes);
+      cbRegistry.register(groq);
+      cbRegistry.register(ollama);
 
-      // Create 3 failures (under threshold) — simple route: groq -> ollama
+      // Create 3 failures (under threshold)
       for (let i = 0; i < 3; i++) {
-        await registry.complete("simple", {
+        await cbRegistry.complete("simple", {
           messages: [{ role: "user", content: "hi" }],
         });
       }
 
-      // Now succeed
       shouldFail = false;
-      await registry.complete("simple", {
+      await cbRegistry.complete("simple", {
         messages: [{ role: "user", content: "hi" }],
       });
 
-      const states = registry.getCircuitBreakerStates();
+      const states = cbRegistry.getCircuitBreakerStates();
       const groqState = states.find((s) => s.provider === "groq");
       expect(groqState?.state).toBe("closed");
       expect(groqState?.consecutiveFailures).toBe(0);
@@ -389,11 +400,22 @@ describe("LlmRegistry", () => {
       });
       const ollama = mockProvider("ollama", true);
 
-      registry.register(failing);
-      registry.register(ollama);
+      // Use custom routes with groq→ollama to test fallback
+      const multiRoutes = {
+        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        simple: [
+          { provider: "groq", model: "llama-3.1-8b-instant" },
+          { provider: "ollama", model: "llama3.1:8b" },
+        ],
+        research: [{ provider: "ollama", model: "llama3.1:8b" }],
+        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+      };
+      const fbRegistry = new LlmRegistry(multiRoutes);
+      fbRegistry.register(failing);
+      fbRegistry.register(ollama);
 
-      // simple route: groq -> ollama
-      const result = await registry.complete("simple", {
+      const result = await fbRegistry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
@@ -402,18 +424,27 @@ describe("LlmRegistry", () => {
 
     it("does not retry on non-transient errors", async () => {
       let attempt = 0;
-      // groq is first in the simple route
       const failing = mockProvider("groq", true, async () => {
         attempt++;
         throw new Error("invalid_api_key");
       });
       const ollama = mockProvider("ollama", true);
 
-      registry.register(failing);
-      registry.register(ollama);
+      const multiRoutes = {
+        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        simple: [
+          { provider: "groq", model: "llama-3.1-8b-instant" },
+          { provider: "ollama", model: "llama3.1:8b" },
+        ],
+        research: [{ provider: "ollama", model: "llama3.1:8b" }],
+        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+      };
+      const fbRegistry = new LlmRegistry(multiRoutes);
+      fbRegistry.register(failing);
+      fbRegistry.register(ollama);
 
-      // simple route: groq -> ollama
-      const result = await registry.complete("simple", {
+      const result = await fbRegistry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 

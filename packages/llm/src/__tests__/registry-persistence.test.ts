@@ -47,22 +47,33 @@ describe("LlmRegistry persistence methods", () => {
     });
 
     it("records errors in snapshots", async () => {
-      // groq is first in the simple route, so use it as the failing provider
       const failing: LlmProvider = {
         name: "groq",
         defaultModel: "groq-default",
         available: true,
         complete: vi.fn().mockRejectedValue(new Error("API error")),
       };
-      registry.register(failing);
-      registry.register(mockProvider("ollama", true));
 
-      // simple route: groq -> ollama
-      await registry.complete("simple", {
+      // Use custom routes with groq→ollama to exercise error recording
+      const multiRoutes = {
+        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        simple: [
+          { provider: "groq", model: "llama-3.1-8b-instant" },
+          { provider: "ollama", model: "llama3.1:8b" },
+        ],
+        research: [{ provider: "ollama", model: "llama3.1:8b" }],
+        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+      };
+      const errRegistry = new LlmRegistry(multiRoutes);
+      errRegistry.register(failing);
+      errRegistry.register(mockProvider("ollama", true));
+
+      await errRegistry.complete("simple", {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      const snapshots = registry.getStatsSnapshots();
+      const snapshots = errRegistry.getStatsSnapshots();
       const groqSnap = snapshots.find((s) => s.providerName === "groq");
       expect(groqSnap).toBeDefined();
       expect(groqSnap!.errorCount).toBe(1);
