@@ -11,7 +11,7 @@ import { OpenAICompatibleProvider } from "./openai-compatible.js";
 export class OllamaProvider extends OpenAICompatibleProvider {
   constructor(baseURL: string | undefined, defaultModel?: string) {
     const url = baseURL || "http://localhost:11434/v1";
-    super("ollama", baseURL ? "ollama" : undefined, defaultModel ?? "llama3.1:8b", url, 300_000);
+    super("ollama", baseURL ? "ollama" : undefined, defaultModel ?? "llama3.2:3b", url, 300_000);
   }
 
   override async complete(request: LlmCompletionRequest): Promise<LlmCompletionResponse> {

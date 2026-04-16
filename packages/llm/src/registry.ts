@@ -122,14 +122,16 @@ export interface RoutingOptions {
  * The registry tries each in order, falling back on provider unavailability or error.
  */
 // Ollama-only routing: free, local, always available.
+// Model is "default" — the registry resolves it to the provider's configured model
+// at call time (set via OLLAMA_MODEL env var, falls back to llama3.2:3b).
 // Groq/Anthropic remain registered as providers (for future re-enablement)
 // but are not in any route — all traffic goes to Ollama.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
-  planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-  conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
-  simple: [{ provider: "ollama", model: "llama3.1:8b" }],
-  research: [{ provider: "ollama", model: "llama3.1:8b" }],
-  code: [{ provider: "ollama", model: "llama3.1:8b" }],
+  planning: [{ provider: "ollama", model: "default" }],
+  conversation: [{ provider: "ollama", model: "default" }],
+  simple: [{ provider: "ollama", model: "default" }],
+  research: [{ provider: "ollama", model: "default" }],
+  code: [{ provider: "ollama", model: "default" }],
 };
 
 export class LlmRegistry {
@@ -348,7 +350,8 @@ export class LlmRegistry {
     for (const route of chain) {
       const provider = this.providers.get(route.provider);
       if (provider?.available) {
-        return { provider, model: route.model };
+        const model = route.model === "default" ? provider.defaultModel : route.model;
+        return { provider, model };
       }
     }
     return null;
@@ -406,10 +409,11 @@ export class LlmRegistry {
             "attempting completion",
           );
 
+          const resolvedModel = route.model === "default" ? provider.defaultModel : route.model;
           const start = Date.now();
           const response = await provider.complete({
             ...request,
-            model: route.model,
+            model: resolvedModel,
           });
           const latencyMs = Date.now() - start;
 

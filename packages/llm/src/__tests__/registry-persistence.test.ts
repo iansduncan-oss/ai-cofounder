@@ -56,14 +56,14 @@ describe("LlmRegistry persistence methods", () => {
 
       // Use custom routes with groq→ollama to exercise error recording
       const multiRoutes = {
-        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        planning: [{ provider: "ollama", model: "llama3.2:3b" }],
+        conversation: [{ provider: "ollama", model: "llama3.2:3b" }],
         simple: [
           { provider: "groq", model: "llama-3.1-8b-instant" },
-          { provider: "ollama", model: "llama3.1:8b" },
+          { provider: "ollama", model: "llama3.2:3b" },
         ],
-        research: [{ provider: "ollama", model: "llama3.1:8b" }],
-        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+        research: [{ provider: "ollama", model: "llama3.2:3b" }],
+        code: [{ provider: "ollama", model: "llama3.2:3b" }],
       };
       const errRegistry = new LlmRegistry(multiRoutes);
       errRegistry.register(failing);

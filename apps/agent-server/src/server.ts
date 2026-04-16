@@ -127,7 +127,10 @@ export function createLlmRegistry(): LlmRegistry {
   );
   registry.register(new GroqProvider(optionalEnv("GROQ_API_KEY", "")));
   registry.register(
-    new OllamaProvider(optionalEnv("OLLAMA_BASE_URL", ""), optionalEnv("OLLAMA_MODEL", "llama3.2")),
+    new OllamaProvider(
+      optionalEnv("OLLAMA_BASE_URL", ""),
+      optionalEnv("OLLAMA_MODEL", "llama3.2:3b"),
+    ),
   );
 
   return registry;

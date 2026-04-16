@@ -98,10 +98,10 @@ describe("LlmRegistry", () => {
         messages: [{ role: "user", content: "hello" }],
       });
 
-      // conversation: anthropic → groq → ollama; only ollama registered
+      // All routes use "default" → resolved to provider's defaultModel
       expect(ollama.complete).toHaveBeenCalledWith({
         messages: [{ role: "user", content: "hello" }],
-        model: "llama3.1:8b",
+        model: "ollama-default",
       });
       expect(result.provider).toBe("ollama");
     });
@@ -247,14 +247,14 @@ describe("LlmRegistry", () => {
 
       // Use custom routes with groq→ollama to exercise circuit breaker
       const multiRoutes = {
-        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        planning: [{ provider: "ollama", model: "llama3.2:3b" }],
+        conversation: [{ provider: "ollama", model: "llama3.2:3b" }],
         simple: [
           { provider: "groq", model: "llama-3.1-8b-instant" },
-          { provider: "ollama", model: "llama3.1:8b" },
+          { provider: "ollama", model: "llama3.2:3b" },
         ],
-        research: [{ provider: "ollama", model: "llama3.1:8b" }],
-        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+        research: [{ provider: "ollama", model: "llama3.2:3b" }],
+        code: [{ provider: "ollama", model: "llama3.2:3b" }],
       };
       const cbRegistry = new LlmRegistry(multiRoutes);
       cbRegistry.register(failing);
@@ -293,14 +293,14 @@ describe("LlmRegistry", () => {
       const ollama = mockProvider("ollama", true);
 
       const multiRoutes = {
-        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        planning: [{ provider: "ollama", model: "llama3.2:3b" }],
+        conversation: [{ provider: "ollama", model: "llama3.2:3b" }],
         simple: [
           { provider: "groq", model: "llama-3.1-8b-instant" },
-          { provider: "ollama", model: "llama3.1:8b" },
+          { provider: "ollama", model: "llama3.2:3b" },
         ],
-        research: [{ provider: "ollama", model: "llama3.1:8b" }],
-        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+        research: [{ provider: "ollama", model: "llama3.2:3b" }],
+        code: [{ provider: "ollama", model: "llama3.2:3b" }],
       };
       const cbRegistry = new LlmRegistry(multiRoutes);
       cbRegistry.register(groq);
@@ -402,14 +402,14 @@ describe("LlmRegistry", () => {
 
       // Use custom routes with groq→ollama to test fallback
       const multiRoutes = {
-        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        planning: [{ provider: "ollama", model: "llama3.2:3b" }],
+        conversation: [{ provider: "ollama", model: "llama3.2:3b" }],
         simple: [
           { provider: "groq", model: "llama-3.1-8b-instant" },
-          { provider: "ollama", model: "llama3.1:8b" },
+          { provider: "ollama", model: "llama3.2:3b" },
         ],
-        research: [{ provider: "ollama", model: "llama3.1:8b" }],
-        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+        research: [{ provider: "ollama", model: "llama3.2:3b" }],
+        code: [{ provider: "ollama", model: "llama3.2:3b" }],
       };
       const fbRegistry = new LlmRegistry(multiRoutes);
       fbRegistry.register(failing);
@@ -431,14 +431,14 @@ describe("LlmRegistry", () => {
       const ollama = mockProvider("ollama", true);
 
       const multiRoutes = {
-        planning: [{ provider: "ollama", model: "llama3.1:8b" }],
-        conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+        planning: [{ provider: "ollama", model: "llama3.2:3b" }],
+        conversation: [{ provider: "ollama", model: "llama3.2:3b" }],
         simple: [
           { provider: "groq", model: "llama-3.1-8b-instant" },
-          { provider: "ollama", model: "llama3.1:8b" },
+          { provider: "ollama", model: "llama3.2:3b" },
         ],
-        research: [{ provider: "ollama", model: "llama3.1:8b" }],
-        code: [{ provider: "ollama", model: "llama3.1:8b" }],
+        research: [{ provider: "ollama", model: "llama3.2:3b" }],
+        code: [{ provider: "ollama", model: "llama3.2:3b" }],
       };
       const fbRegistry = new LlmRegistry(multiRoutes);
       fbRegistry.register(failing);

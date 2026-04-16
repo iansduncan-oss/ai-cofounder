@@ -68,7 +68,7 @@ describe("OpenAI-compatible provider subclasses", () => {
     it("uses default localhost URL when not specified", () => {
       const provider = new OllamaProvider(undefined);
       expect(provider.name).toBe("ollama");
-      expect(provider.defaultModel).toBe("llama3.1:8b");
+      expect(provider.defaultModel).toBe("llama3.2:3b");
       // Unavailable without explicit baseURL (prevents routing to non-existent local instance)
       expect(provider.available).toBe(false);
     });
