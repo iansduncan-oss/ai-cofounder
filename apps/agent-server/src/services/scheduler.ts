@@ -21,7 +21,7 @@ import type { LlmRegistry, EmbeddingService } from "@ai-cofounder/llm";
 import type { N8nService } from "./n8n.js";
 import type { SandboxService } from "@ai-cofounder/sandbox";
 import type { WorkspaceService } from "./workspace.js";
-import { sendDailyBriefing } from "./briefing.js";
+// sendDailyBriefing removed — morning briefing handled exclusively by BullMQ job
 import type { NotificationService } from "./notifications.js";
 import type { AgentMessagingService } from "./agent-messaging.js";
 import type { AutonomyTierService } from "./autonomy-tier.js";
@@ -67,7 +67,7 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
   } = config;
 
   let running = false;
-  let lastBriefingDate = ""; // "YYYY-MM-DD" to send once per day
+  const _lastBriefingDate = ""; // unused — morning briefing moved to BullMQ
   let lastDecayDate = ""; // "YYYY-MM-DD" to decay once per day
   let lastCheckInHour = -1; // track last hour we ran proactive check-in
   let lastQuietCheckDate = ""; // "YYYY-MM-DD" to send quiet check-in at most once per day
@@ -94,22 +94,9 @@ export function startScheduler(config: SchedulerConfig): { stop: () => void } {
       .join("");
     const hour = Number(localTime.find((p) => p.type === "hour")?.value ?? 0);
 
-    // Daily briefing: send once when hour matches (check DB cache to survive restarts)
-    if (hour >= briefingHour && lastBriefingDate !== dateStr && notificationService) {
-      lastBriefingDate = dateStr;
-      try {
-        const { getBriefingCache } = await import("@ai-cofounder/db");
-        const cached = await getBriefingCache(db, dateStr);
-        if (cached) {
-          logger.debug({ dateStr }, "briefing already sent today (cached), skipping");
-        } else {
-          await sendDailyBriefing(db, notificationService, llmRegistry);
-          logger.info({ dateStr }, "daily briefing sent by scheduler");
-        }
-      } catch (err) {
-        logger.error({ err }, "failed to send daily briefing");
-      }
-    }
+    // Daily briefing: handled exclusively by BullMQ morning-briefing job.
+    // Removed from polling scheduler to prevent duplicate sends.
+    // (1 recap/day policy — BullMQ job includes auto-plan + follow-ups)
 
     // Memory decay: run once per day at any hour
     if (lastDecayDate !== dateStr) {

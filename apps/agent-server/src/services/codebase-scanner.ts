@@ -1,4 +1,4 @@
-import { createLogger, optionalEnv } from "@ai-cofounder/shared";
+import { createLogger } from "@ai-cofounder/shared";
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import { readFile } from "node:fs/promises";
@@ -92,7 +92,22 @@ export class CodebaseScannerService {
     // 5. Recurring failure patterns from DB
     signals.push(...(await this.gatherFailurePatternSignals()));
 
-    const before = await listCodebaseInsights(this.db, { status: "open", limit: 1000 });
+    let before: Awaited<ReturnType<typeof listCodebaseInsights>>;
+    try {
+      before = await listCodebaseInsights(this.db, { status: "open", limit: 1000 });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("does not exist")) {
+        logger.debug("codebase_insights table missing — skipping scan");
+        return {
+          insightsCreated: 0,
+          insightsRefreshed: 0,
+          signalsGathered: signals.length,
+          prunedCount: 0,
+          durationMs: Date.now() - start,
+        };
+      }
+      throw err;
+    }
     const existingFingerprints = new Set(before.data.map((i) => i.fingerprint));
 
     let refreshedCount = 0;
@@ -112,7 +127,10 @@ export class CodebaseScannerService {
     // Don't wait for the 30-min proactive tick.
     if (newCriticalTitles.length > 0 && this.proactiveEngine) {
       try {
-        await this.proactiveEngine.pushCriticalInsights(newCriticalTitles.length, newCriticalTitles);
+        await this.proactiveEngine.pushCriticalInsights(
+          newCriticalTitles.length,
+          newCriticalTitles,
+        );
       } catch (err) {
         logger.warn({ err }, "failed to push critical insights proactively (non-fatal)");
       }
@@ -134,7 +152,13 @@ export class CodebaseScannerService {
 
     const durationMs = Date.now() - start;
     logger.info(
-      { signals: signals.length, created: createdCount + synthCreated, refreshed: refreshedCount, pruned: prunedCount, durationMs },
+      {
+        signals: signals.length,
+        created: createdCount + synthCreated,
+        refreshed: refreshedCount,
+        pruned: prunedCount,
+        durationMs,
+      },
       "codebase scan complete",
     );
 
@@ -151,10 +175,14 @@ export class CodebaseScannerService {
 
   private async gatherRecentCommits(repoDir: string, maxCount: number): Promise<string[]> {
     try {
-      const { stdout } = await execFile("git", ["log", "--oneline", `-${maxCount}`, `--since=${RECENT_WINDOW_HOURS}.hours.ago`], {
-        cwd: repoDir,
-        maxBuffer: 1_000_000,
-      });
+      const { stdout } = await execFile(
+        "git",
+        ["log", "--oneline", `-${maxCount}`, `--since=${RECENT_WINDOW_HOURS}.hours.ago`],
+        {
+          cwd: repoDir,
+          maxBuffer: 1_000_000,
+        },
+      );
       return stdout.trim().split("\n").filter(Boolean);
     } catch (err) {
       logger.debug({ err, repoDir }, "git log failed (not a git repo or no recent commits)");
@@ -177,7 +205,9 @@ export class CodebaseScannerService {
       );
       files = [...new Set(stdout.trim().split("\n").filter(Boolean))]
         .filter((f) => /\.(ts|tsx|js|jsx|py|go|rs|java|rb|md)$/.test(f))
-        .filter((f) => !f.includes("node_modules") && !f.includes("dist/") && !f.includes(".turbo/"))
+        .filter(
+          (f) => !f.includes("node_modules") && !f.includes("dist/") && !f.includes(".turbo/"),
+        )
         .slice(0, MAX_FILES_TO_SCAN);
     } catch (err) {
       logger.debug({ err }, "git recent files query failed");
@@ -274,7 +304,8 @@ export class CodebaseScannerService {
           severity: (p.frequency >= 10 ? "high" : "medium") as InsightSeverity,
           title: `Recurring failure: ${p.toolName} (${p.errorCategory})`,
           description: `${p.errorMessage.slice(0, 200)} — seen ${p.frequency}x`,
-          suggestedAction: p.resolution ?? `Investigate root cause of ${p.toolName} ${p.errorCategory} errors`,
+          suggestedAction:
+            p.resolution ?? `Investigate root cause of ${p.toolName} ${p.errorCategory} errors`,
           reference: p.toolName,
           metadata: { frequency: p.frequency, errorCategory: p.errorCategory },
         }));
@@ -301,13 +332,16 @@ export class CodebaseScannerService {
       "Output JSON only, exactly like this:",
       '{"insights": [{"category": "add|improve|fix|other", "severity": "low|medium|high", "title": "...", "description": "...", "suggestedAction": "..."}]}',
       "",
-      "If nothing worth suggesting, return {\"insights\": []}.",
+      'If nothing worth suggesting, return {"insights": []}.',
       "",
       "--- RECENT COMMITS ---",
       recentCommits.slice(0, 15).join("\n") || "(none)",
       "",
       "--- RAW SIGNALS ALREADY CAPTURED ---",
-      rawSignals.slice(0, 20).map((s) => `[${s.category}] ${s.title}`).join("\n") || "(none)",
+      rawSignals
+        .slice(0, 20)
+        .map((s) => `[${s.category}] ${s.title}`)
+        .join("\n") || "(none)",
     ].join("\n");
 
     const response = await this.llmRegistry.complete("simple", {
@@ -324,7 +358,15 @@ export class CodebaseScannerService {
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return 0;
 
-    let parsed: { insights?: Array<{ category: string; severity: string; title: string; description?: string; suggestedAction?: string }> };
+    let parsed: {
+      insights?: Array<{
+        category: string;
+        severity: string;
+        title: string;
+        description?: string;
+        suggestedAction?: string;
+      }>;
+    };
     try {
       parsed = JSON.parse(match[0]);
     } catch {
@@ -336,10 +378,18 @@ export class CodebaseScannerService {
     const validCats: InsightCategory[] = ["fix", "improve", "add", "other"];
     const validSevs: InsightSeverity[] = ["low", "medium", "high", "critical"];
     for (const item of parsed.insights.slice(0, 5)) {
-      const category = validCats.includes(item.category as InsightCategory) ? (item.category as InsightCategory) : "other";
-      const severity = validSevs.includes(item.severity as InsightSeverity) ? (item.severity as InsightSeverity) : "medium";
+      const category = validCats.includes(item.category as InsightCategory)
+        ? (item.category as InsightCategory)
+        : "other";
+      const severity = validSevs.includes(item.severity as InsightSeverity)
+        ? (item.severity as InsightSeverity)
+        : "medium";
       if (!item.title || typeof item.title !== "string") continue;
-      const fingerprint = fingerprintOf({ source: "llm_synthesis", title: item.title, reference: undefined });
+      const fingerprint = fingerprintOf({
+        source: "llm_synthesis",
+        title: item.title,
+        reference: undefined,
+      });
       await upsertCodebaseInsight(this.db, {
         fingerprint,
         source: "llm_synthesis",

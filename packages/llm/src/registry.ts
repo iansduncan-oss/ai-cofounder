@@ -121,34 +121,15 @@ export interface RoutingOptions {
  * Each task category maps to an ordered list of (provider, model) pairs.
  * The registry tries each in order, falling back on provider unavailability or error.
  */
-// Cost-optimized routing: Groq primary (Anthropic credits at $0), Anthropic as
-// quality fallback (auto-recovers when credits are topped up via health check),
-// Ollama as always-available free last resort.
+// Ollama-only routing: free, local, always available.
+// Groq/Anthropic remain registered as providers (for future re-enablement)
+// but are not in any route — all traffic goes to Ollama.
 const DEFAULT_ROUTES: Record<TaskCategory, ModelRoute[]> = {
-  planning: [
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "ollama", model: "llama3.1:8b" },
-  ],
-  conversation: [
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "ollama", model: "llama3.1:8b" },
-  ],
-  simple: [
-    { provider: "groq", model: "llama-3.1-8b-instant" },
-    { provider: "ollama", model: "llama3.1:8b" },
-  ],
-  research: [
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "ollama", model: "llama3.1:8b" },
-  ],
-  code: [
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
-    { provider: "anthropic", model: "claude-sonnet-4-20250514" },
-    { provider: "ollama", model: "llama3.1:8b" },
-  ],
+  planning: [{ provider: "ollama", model: "llama3.1:8b" }],
+  conversation: [{ provider: "ollama", model: "llama3.1:8b" }],
+  simple: [{ provider: "ollama", model: "llama3.1:8b" }],
+  research: [{ provider: "ollama", model: "llama3.1:8b" }],
+  code: [{ provider: "ollama", model: "llama3.1:8b" }],
 };
 
 export class LlmRegistry {

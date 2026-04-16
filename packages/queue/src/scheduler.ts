@@ -80,23 +80,11 @@ export async function setupRecurringJobs(options?: {
   );
   logger.info({ hour: briefingHour, tz: briefingTimezone }, "Scheduled morning briefing");
 
-  // ── Evening summary (daily at 8 PM) ──
-
-  await briefingQueue.upsertJobScheduler(
-    "evening-briefing",
-    {
-      pattern: `0 20 * * *`,
-      tz: briefingTimezone,
-    },
-    {
-      name: "evening-briefing",
-      data: {
-        type: "evening" as const,
-        deliveryChannels: ["slack", "discord"],
-      } satisfies BriefingJob,
-    },
-  );
-  logger.info("Scheduled evening briefing at 20:00");
+  // ── Evening summary DISABLED ──
+  // User preference: exactly 1 recap per day (morning only).
+  // Remove the scheduled job if it exists from a previous deployment.
+  await briefingQueue.removeJobScheduler("evening-briefing").catch(() => {});
+  logger.info("Evening briefing disabled (1 recap/day policy)");
 
   // ── Weekly summary briefing (Monday at briefingHour) ──
 

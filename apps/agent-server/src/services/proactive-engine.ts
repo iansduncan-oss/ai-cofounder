@@ -6,7 +6,6 @@ import {
   getPrimaryAdminUserId,
   listRecentlyCompletedTasks,
   listRecentlyCompletedFollowUps,
-  listCodebaseInsights,
 } from "@ai-cofounder/db";
 import type { LlmRegistry } from "@ai-cofounder/llm";
 import type { NotificationService } from "./notifications.js";
@@ -16,11 +15,11 @@ const logger = createLogger("proactive-engine");
 
 /** Types of proactive pushes, used for dedup + cooldown tracking. */
 export type ProactivePushType =
-  | "wake_up"            // 11 AM+ and no completions yet
-  | "stall"              // 2h+ idle during work hours with pending items
-  | "critical_insight"   // new critical codebase issue
-  | "celebration"        // just hit 100% completion
-  | "end_of_day";        // 5:30 PM wrap-up
+  | "wake_up" // 11 AM+ and no completions yet
+  | "stall" // 2h+ idle during work hours with pending items
+  | "critical_insight" // new critical codebase issue
+  | "celebration" // just hit 100% completion
+  | "end_of_day"; // 5:30 PM wrap-up
 
 interface PushedRecord {
   type: ProactivePushType;
@@ -52,11 +51,11 @@ const CHATTY = process.env.PROACTIVE_CHATTY !== "0";
 
 /** Per-trigger cooldowns (milliseconds). */
 const COOLDOWNS: Record<ProactivePushType, number> = {
-  wake_up: 24 * 60 * 60 * 1000,         // once per day
-  stall: 2 * 60 * 60 * 1000,            // once per 2h
-  critical_insight: 60 * 60 * 1000,     // once per hour
-  celebration: 24 * 60 * 60 * 1000,     // once per day
-  end_of_day: 24 * 60 * 60 * 1000,      // once per day
+  wake_up: 24 * 60 * 60 * 1000, // once per day
+  stall: 2 * 60 * 60 * 1000, // once per 2h
+  critical_insight: 60 * 60 * 1000, // once per hour
+  celebration: 24 * 60 * 60 * 1000, // once per day
+  end_of_day: 24 * 60 * 60 * 1000, // once per day
 };
 
 function isWorkHours(date = new Date()): boolean {
@@ -102,8 +101,21 @@ export class ProactiveEngine {
     if (!adminUserId) return { evaluated: 0, fired };
 
     const today = todayStr();
-    const log = await getProductivityLog(this.db, adminUserId, today);
-    const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+    let log: Awaited<ReturnType<typeof getProductivityLog>>;
+    try {
+      log = await getProductivityLog(this.db, adminUserId, today);
+    } catch (err: unknown) {
+      // Gracefully handle missing productivity_logs table (migration not yet run)
+      if (err instanceof Error && err.message.includes("does not exist")) {
+        logger.debug("productivity_logs table missing — skipping proactive tick");
+        return { evaluated: 0, fired };
+      }
+      throw err;
+    }
+    const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<
+      string,
+      unknown
+    >;
     const pushed = this.readPushes(metadata);
 
     // Global daily cap
@@ -152,7 +164,10 @@ export class ProactiveEngine {
 
     const today = todayStr();
     const log = await getProductivityLog(this.db, adminUserId, today);
-    const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+    const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<
+      string,
+      unknown
+    >;
     const pushed = this.readPushes(metadata);
 
     if (pushed.length >= DAILY_PUSH_CAP) return false;
@@ -166,7 +181,12 @@ export class ProactiveEngine {
       "_Auto-prioritized for today's plan._",
     ];
 
-    await this.send(adminUserId, lines.join("\n"), "critical_insight", `${newCriticalCount} critical`);
+    await this.send(
+      adminUserId,
+      lines.join("\n"),
+      "critical_insight",
+      `${newCriticalCount} critical`,
+    );
     return true;
   }
 
@@ -189,14 +209,17 @@ export class ProactiveEngine {
       currentLog = await getProductivityLog(this.db, userId, todayStr());
     }
 
-    const items = (currentLog?.plannedItems as Array<{ text: string; completed: boolean }> | null) ?? [];
+    const items =
+      (currentLog?.plannedItems as Array<{ text: string; completed: boolean }> | null) ?? [];
     if (items.length === 0) return { fired: false };
 
     const completedCount = items.filter((i) => i.completed).length;
     if (completedCount > 0) return { fired: false };
 
     // Pick the item that looks smallest — proxy by shortest text
-    const easiest = [...items.filter((i) => !i.completed)].sort((a, b) => a.text.length - b.text.length)[0];
+    const easiest = [...items.filter((i) => !i.completed)].sort(
+      (a, b) => a.text.length - b.text.length,
+    )[0];
     if (!easiest) return { fired: false };
 
     const hour = now.getHours();
@@ -304,11 +327,15 @@ export class ProactiveEngine {
     const score = log?.completionScore ?? 0;
 
     const lines: string[] = [];
-    lines.push(`**End of day, sir.** ${completedCount}/${items.length} items complete (${score}%).`);
+    lines.push(
+      `**End of day, sir.** ${completedCount}/${items.length} items complete (${score}%).`,
+    );
 
     if (items.length === 0) {
       lines.push("");
-      lines.push("_No plan was logged today. Tomorrow I'll generate one automatically at your morning briefing._");
+      lines.push(
+        "_No plan was logged today. Tomorrow I'll generate one automatically at your morning briefing._",
+      );
     } else if (completedCount === items.length) {
       lines.push("");
       lines.push("_A clean sweep. Well executed._");
@@ -323,7 +350,9 @@ export class ProactiveEngine {
     }
 
     lines.push("");
-    lines.push("_Log a quick reflection with \`/reflect\` so tomorrow's plan can learn from today._");
+    lines.push(
+      "_Log a quick reflection with \`/reflect\` so tomorrow's plan can learn from today._",
+    );
 
     await this.send(userId, lines.join("\n"), "end_of_day", `${completedCount}/${items.length}`);
     return { fired: true, type: "end_of_day" };
@@ -336,7 +365,9 @@ export class ProactiveEngine {
     if (!Array.isArray(raw)) return [];
     return raw.filter(
       (r): r is PushedRecord =>
-        typeof r === "object" && r !== null && typeof (r as Record<string, unknown>).type === "string",
+        typeof r === "object" &&
+        r !== null &&
+        typeof (r as Record<string, unknown>).type === "string",
     );
   }
 
@@ -352,7 +383,12 @@ export class ProactiveEngine {
     return true;
   }
 
-  private async send(userId: string, message: string, type: ProactivePushType, context?: string): Promise<void> {
+  private async send(
+    userId: string,
+    message: string,
+    type: ProactivePushType,
+    context?: string,
+  ): Promise<void> {
     try {
       await this.notificationService.sendBriefing(message);
     } catch (err) {
@@ -364,7 +400,10 @@ export class ProactiveEngine {
     try {
       const today = todayStr();
       const log = await getProductivityLog(this.db, userId, today);
-      const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<string, unknown>;
+      const metadata = ((log?.metadata as Record<string, unknown> | null) ?? {}) as Record<
+        string,
+        unknown
+      >;
       const pushes = this.readPushes(metadata);
       pushes.push({ type, at: new Date().toISOString(), context });
       const newMeta: Record<string, unknown> = { ...metadata, proactivePushes: pushes };
