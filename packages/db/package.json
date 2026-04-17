@@ -19,7 +19,7 @@
   "dependencies": {
     "@ai-cofounder/shared": "*",
     "drizzle-orm": "^0.45.1",
-    "postgres": "^3.4.8"
+    "postgres": "^3.4.9"
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
