@@ -163,6 +163,8 @@ services:
       - VPS_USER=ian
       - SSH_KEY_PATH=/home/appuser/.ssh/id_ed25519
       - ENABLE_ADAPTIVE_ROUTING=${ENABLE_ADAPTIVE_ROUTING:-false}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434/v1}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
     mem_limit: 512m
     extra_hosts:
       - "host.docker.internal:host-gateway"
