@@ -1077,6 +1077,38 @@ export async function listActiveGoals(db: Db, workspaceId?: string): Promise<Goa
   return rows;
 }
 
+/**
+ * Find an existing non-terminal goal whose title matches exactly (case-insensitive).
+ * Used for deduplication — prevents creating duplicate goals from recurring monitoring/scheduling.
+ * Returns the first matching goal or undefined.
+ */
+export async function findActiveGoalByTitle(
+  db: Db,
+  title: string,
+  workspaceId?: string,
+): Promise<{ id: string; title: string; status: string; createdAt: Date } | undefined> {
+  const conditions = [
+    ilike(goals.title, title),
+    inArray(goals.status, ["draft", "proposed", "active"]),
+    isNull(goals.deletedAt),
+  ];
+  if (workspaceId) conditions.push(eq(goals.workspaceId, workspaceId));
+
+  const rows = await db
+    .select({
+      id: goals.id,
+      title: goals.title,
+      status: goals.status,
+      createdAt: goals.createdAt,
+    })
+    .from(goals)
+    .where(and(...conditions))
+    .orderBy(desc(goals.createdAt))
+    .limit(1);
+
+  return rows[0];
+}
+
 export async function listRecentlyCompletedGoals(db: Db, since: Date, workspaceId?: string) {
   const conditions = [
     eq(goals.status, "completed"),

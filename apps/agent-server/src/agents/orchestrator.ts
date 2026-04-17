@@ -28,6 +28,7 @@ import {
   getConversation,
   saveThinkingTrace,
   recordLlmUsage,
+  findActiveGoalByTitle,
 } from "@ai-cofounder/db";
 import { buildSystemPrompt, sanitizeForPrompt } from "./prompts/system.js";
 import { SessionContextService } from "../services/session-context.js";
@@ -1666,6 +1667,20 @@ export class Orchestrator {
     // Classify scope — server-side keyword analysis merged with optional LLM hint
     const scope = classifyGoalScope(input.tasks, input.scope);
     const requiresApproval = scopeRequiresApproval(scope);
+
+    // Deduplication: skip creation if an active goal with the same title already exists
+    const existingGoal = await findActiveGoalByTitle(db, input.goal_title, this.workspaceId ?? "");
+    if (existingGoal) {
+      this.logger.info(
+        { existingGoalId: existingGoal.id, title: input.goal_title },
+        "duplicate goal skipped — active goal with same title already exists",
+      );
+      return {
+        goalId: existingGoal.id,
+        goalTitle: `[existing] ${existingGoal.title}`,
+        tasks: [],
+      };
+    }
 
     const goal = await createGoal(db, {
       conversationId,
