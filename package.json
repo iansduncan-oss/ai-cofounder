@@ -41,10 +41,10 @@
   "packageManager": "npm@11.6.2",
   "devDependencies": {
     "@types/node": "^25.3.3",
-    "@vitest/coverage-v8": "^4.1.4",
-    "eslint": "^10.2.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "prettier": "^3.8.3",
@@ -52,15 +52,15 @@
     "tsx": "^4.21.0",
     "turbo": "^2.9.6",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.58.2",
-    "vitest": "^4.1.4"
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.1.5"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-arm64-gnu": "^4.59.0",
-    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@rollup/rollup-linux-arm64-gnu": "^4.60.2",
+    "@rollup/rollup-linux-x64-gnu": "^4.60.2",
     "lightningcss-linux-x64-gnu": "^1.32.0",
     "lightningcss-linux-arm64-musl": "^1.32.0",
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.2",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.4",
     "@tailwindcss/oxide-linux-arm64-musl": "^4.2.2"
   },
   "overrides": {
@@ -89,8 +89,8 @@
     }
   },
   "dependencies": {
-    "@tailwindcss/oxide-darwin-arm64": "^4.2.2",
-    "axios": "^1.15.0",
+    "@tailwindcss/oxide-darwin-arm64": "^4.2.4",
+    "axios": "^1.15.1",
     "fastify": "^5.8.5",
     "lightningcss-darwin-arm64": "^1.32.0"
   }
