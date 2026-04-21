@@ -19,7 +19,8 @@ COPY packages/rag/package.json packages/rag/
 COPY packages/bot-handlers/package.json packages/bot-handlers/
 COPY packages/mcp-server/package.json packages/mcp-server/
 COPY packages/test-utils/package.json packages/test-utils/
-RUN npm ci --force
+RUN npm ci --force \
+    && rm -rf packages/*/node_modules/drizzle-orm
 
 # Copy source and build
 COPY packages/shared/ packages/shared/
