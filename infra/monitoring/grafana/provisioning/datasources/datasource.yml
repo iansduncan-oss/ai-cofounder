@@ -7,3 +7,21 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+
+  - name: YouTube Analytics
+    type: postgres
+    uid: youtube-analytics-pg
+    access: proxy
+    url: avion-postgres-1:5432
+    user: avion
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      database: youtube_analytics
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1600
+      timescaledb: false
+    editable: false

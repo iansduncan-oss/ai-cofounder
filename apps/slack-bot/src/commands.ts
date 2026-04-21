@@ -548,7 +548,7 @@ export function registerCommands(app: App): void {
     });
 
     let lastEditTime = 0;
-    const THROTTLE_MS = 1500;
+    const THROTTLE_MS = 1000;
     const replyTs = thinkingMsg.ts;
 
     const result = await handleAskStreaming(client, ctx, command.text, async (text) => {
@@ -954,7 +954,7 @@ export function registerCommands(app: App): void {
 
     const result = await handleAskStreaming(client, ctx, text, async (chunk) => {
       const now = Date.now();
-      if (replyTs && now - lastEditTime >= 1500) {
+      if (replyTs && now - lastEditTime >= 1000) {
         lastEditTime = now;
         try {
           await slackClient.chat.update({
@@ -1031,7 +1031,7 @@ export function registerCommands(app: App): void {
 
     const result = await handleAskStreaming(client, ctx, text, async (chunk) => {
       const now = Date.now();
-      if (replyTs && now - lastEditTime >= 1500) {
+      if (replyTs && now - lastEditTime >= 1000) {
         lastEditTime = now;
         try {
           await slackClient.chat.update({ channel, ts: replyTs, text: truncate(chunk, 3000) });

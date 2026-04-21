@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { createLogger } from "@ai-cofounder/shared";
 import type { Db } from "@ai-cofounder/db";
 import {
@@ -60,6 +61,38 @@ export interface BriefingData {
 }
 
 const STALE_THRESHOLD_HOURS = 48;
+const VAULT_CONTEXT_PATH = "/opt/jarvis-vault/.briefing-context.md";
+
+async function buildSystemInsights(
+  failurePatternRows: {
+    toolName: string;
+    errorCategory: string;
+    frequency: number;
+    errorMessage: string | null;
+  }[],
+): Promise<string[]> {
+  const insights = failurePatternRows
+    .filter((p) => p.frequency >= 3)
+    .map(
+      (p) =>
+        `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`,
+    );
+
+  // Append vault context if the file exists
+  try {
+    const vaultContext = await readFile(VAULT_CONTEXT_PATH, "utf-8");
+    const lines = vaultContext
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    insights.push(...lines);
+  } catch {
+    // File missing or unreadable — not an error, vault context is optional
+    logger.debug("Vault briefing context not found at %s, skipping", VAULT_CONTEXT_PATH);
+  }
+
+  return insights;
+}
 
 export async function gatherBriefingData(db: Db): Promise<BriefingData> {
   const yesterday = new Date();
@@ -135,12 +168,7 @@ export async function gatherBriefingData(db: Db): Promise<BriefingData> {
     staleGoalCount: goalsWithStaleness.filter((g) => g.hoursStale >= STALE_THRESHOLD_HOURS).length,
     productivity,
     overdueFollowUps: dueFollowUps.map((f) => ({ id: f.id, title: f.title, dueDate: f.dueDate })),
-    systemInsights: failurePatternRows
-      .filter((p) => p.frequency >= 3)
-      .map(
-        (p) =>
-          `**${p.toolName}** (${p.errorCategory}): ${p.frequency}x — "${(p.errorMessage ?? "").slice(0, 80)}"`,
-      ),
+    systemInsights: await buildSystemInsights(failurePatternRows),
   };
 }
 
