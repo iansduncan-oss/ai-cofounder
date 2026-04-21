@@ -19,7 +19,8 @@ COPY packages/rag/package.json packages/rag/
 COPY packages/bot-handlers/package.json packages/bot-handlers/
 COPY packages/mcp-server/package.json packages/mcp-server/
 COPY packages/test-utils/package.json packages/test-utils/
-RUN npm ci --ignore-scripts --force
+RUN npm ci --ignore-scripts --force \
+    && npm install --no-save --force lightningcss @tailwindcss/oxide
 
 # Copy source and build
 COPY packages/shared/ packages/shared/
@@ -31,8 +32,7 @@ COPY packages/queue/ packages/queue/
 COPY packages/rag/ packages/rag/
 COPY apps/agent-server/ apps/agent-server/
 COPY apps/dashboard/ apps/dashboard/
-RUN rm -rf packages/*/node_modules/drizzle-orm \
-    && npx turbo run build --filter=@ai-cofounder/agent-server --filter=@ai-cofounder/dashboard
+RUN npx turbo run build --filter=@ai-cofounder/agent-server --filter=@ai-cofounder/dashboard
 
 # Production stage
 FROM node:25-alpine
