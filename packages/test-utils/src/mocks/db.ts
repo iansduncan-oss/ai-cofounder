@@ -56,6 +56,7 @@ export function mockDbModule() {
     listActiveGoals: vi.fn().mockResolvedValue([]),
     listGoalBacklog: vi.fn().mockResolvedValue([]),
     listRecentlyCompletedGoals: vi.fn().mockResolvedValue([]),
+    findActiveGoalByTitle: vi.fn().mockResolvedValue(null),
     updateGoalStatus: vi.fn().mockResolvedValue({}),
     updateGoalScope: vi.fn().mockResolvedValue({}),
     updateGoalMetadata: vi.fn().mockResolvedValue({}),
@@ -114,25 +115,21 @@ export function mockDbModule() {
     recordLlmUsage: vi.fn().mockResolvedValue(undefined),
     getTodayTokenTotal: vi.fn().mockResolvedValue(0),
     getTodayTokenUsage: vi.fn().mockResolvedValue(0),
-    getUsageSummary: vi
-      .fn()
-      .mockResolvedValue({
-        totalCostUsd: 0,
-        requestCount: 0,
-        totalInputTokens: 0,
-        totalOutputTokens: 0,
-        byProvider: {},
-        byModel: {},
-        byAgent: {},
-      }),
-    getCostByGoal: vi
-      .fn()
-      .mockResolvedValue({
-        totalCostUsd: 0,
-        totalInputTokens: 0,
-        totalOutputTokens: 0,
-        requestCount: 0,
-      }),
+    getUsageSummary: vi.fn().mockResolvedValue({
+      totalCostUsd: 0,
+      requestCount: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      byProvider: {},
+      byModel: {},
+      byAgent: {},
+    }),
+    getCostByGoal: vi.fn().mockResolvedValue({
+      totalCostUsd: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      requestCount: 0,
+    }),
     getTopExpensiveGoals: vi.fn().mockResolvedValue([]),
     getCostByDay: vi.fn().mockResolvedValue([]),
     // Schedules
@@ -269,18 +266,16 @@ export function mockDbModule() {
     getTriggeredPatterns: vi.fn().mockResolvedValue([]),
     incrementPatternAcceptCount: vi.fn().mockResolvedValue({ id: "up-1" }),
     incrementPatternHitCount: vi.fn().mockResolvedValue({ id: "up-1", hitCount: 1 }),
-    getPatternAnalytics: vi
-      .fn()
-      .mockResolvedValue({
-        totalPatterns: 0,
-        activePatterns: 0,
-        totalHits: 0,
-        totalAccepts: 0,
-        overallAcceptRate: 0,
-        avgConfidence: 0,
-        byType: {},
-        patterns: [],
-      }),
+    getPatternAnalytics: vi.fn().mockResolvedValue({
+      totalPatterns: 0,
+      activePatterns: 0,
+      totalHits: 0,
+      totalAccepts: 0,
+      overallAcceptRate: 0,
+      avgConfidence: 0,
+      byType: {},
+      patterns: [],
+    }),
     getActionHeatmap: vi.fn().mockResolvedValue([]),
     getRecentUserActionSummary: vi.fn().mockResolvedValue([]),
     getLastUserMessageTimestamp: vi.fn().mockResolvedValue(null),
@@ -288,33 +283,29 @@ export function mockDbModule() {
     listPatterns: vi.fn().mockResolvedValue([]),
     togglePatternActive: vi.fn().mockResolvedValue({ id: "up-1", isActive: true }),
     deletePattern: vi.fn().mockResolvedValue(true),
-    createPattern: vi
-      .fn()
-      .mockResolvedValue({
-        id: "up-new",
-        patternType: "recurring_action",
-        description: "Test",
-        suggestedAction: "Do something",
-        triggerCondition: {},
-        confidence: 50,
-        hitCount: 0,
-        acceptCount: 0,
-        isActive: true,
-      }),
+    createPattern: vi.fn().mockResolvedValue({
+      id: "up-new",
+      patternType: "recurring_action",
+      description: "Test",
+      suggestedAction: "Do something",
+      triggerCondition: {},
+      confidence: 50,
+      hitCount: 0,
+      acceptCount: 0,
+      isActive: true,
+    }),
     updatePattern: vi.fn().mockResolvedValue({ id: "up-1", description: "Updated" }),
     adjustPatternConfidence: vi.fn().mockResolvedValue({ id: "up-1", confidence: 55 }),
     deactivateLowConfidencePatterns: vi.fn().mockResolvedValue(0),
     userActions: {},
     userPatterns: {},
     // Deployments
-    createDeployment: vi
-      .fn()
-      .mockResolvedValue({
-        id: "deploy-1",
-        commitSha: "abc1234",
-        shortSha: "abc1234",
-        status: "started",
-      }),
+    createDeployment: vi.fn().mockResolvedValue({
+      id: "deploy-1",
+      commitSha: "abc1234",
+      shortSha: "abc1234",
+      status: "started",
+    }),
     updateDeploymentStatus: vi.fn().mockResolvedValue({ id: "deploy-1" }),
     getLatestDeployment: vi.fn().mockResolvedValue(null),
     listDeployments: vi.fn().mockResolvedValue([]),
@@ -343,14 +334,12 @@ export function mockDbModule() {
     getUserTimezone: vi.fn().mockResolvedValue(null),
     setUserTimezone: vi.fn().mockResolvedValue({ id: "user-1" }),
     // Session engagement
-    upsertSessionEngagement: vi
-      .fn()
-      .mockResolvedValue({
-        id: "se-1",
-        messageCount: 0,
-        complexityScore: 50,
-        energyLevel: "normal",
-      }),
+    upsertSessionEngagement: vi.fn().mockResolvedValue({
+      id: "se-1",
+      messageCount: 0,
+      complexityScore: 50,
+      energyLevel: "normal",
+    }),
     getLatestSessionEngagement: vi.fn().mockResolvedValue(null),
     getSessionEngagementHistory: vi.fn().mockResolvedValue([]),
     sessionEngagement: {},
@@ -365,27 +354,23 @@ export function mockDbModule() {
     cancelWorkSession: vi.fn().mockResolvedValue(null),
     journalEntries: {},
     // Registered projects
-    createRegisteredProject: vi
-      .fn()
-      .mockResolvedValue({
-        id: "proj-1",
-        name: "test-project",
-        slug: "test-project",
-        workspacePath: "/tmp/test",
-      }),
+    createRegisteredProject: vi.fn().mockResolvedValue({
+      id: "proj-1",
+      name: "test-project",
+      slug: "test-project",
+      workspacePath: "/tmp/test",
+    }),
     listRegisteredProjects: vi.fn().mockResolvedValue([]),
     getRegisteredProjectByName: vi.fn().mockResolvedValue(null),
     getRegisteredProjectById: vi.fn().mockResolvedValue(null),
     updateRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1" }),
     deleteRegisteredProject: vi.fn().mockResolvedValue({ id: "proj-1", isActive: false }),
-    createProjectDependency: vi
-      .fn()
-      .mockResolvedValue({
-        id: "dep-1",
-        sourceProjectId: "proj-1",
-        targetProjectId: "proj-2",
-        dependencyType: "uses",
-      }),
+    createProjectDependency: vi.fn().mockResolvedValue({
+      id: "dep-1",
+      sourceProjectId: "proj-1",
+      targetProjectId: "proj-2",
+      dependencyType: "uses",
+    }),
     listProjectDependencies: vi.fn().mockResolvedValue([]),
     deleteProjectDependency: vi.fn().mockResolvedValue({ id: "dep-1" }),
     registeredProjects: {},
@@ -430,44 +415,38 @@ export function mockDbModule() {
     listRecentlyCompletedFollowUps: vi.fn().mockResolvedValue([]),
     followUps: {},
     // Productivity tracker
-    upsertProductivityLog: vi
-      .fn()
-      .mockResolvedValue({
-        id: "pl-1",
-        date: "2025-01-01",
-        streakDays: 1,
-        plannedItems: [],
-        completionScore: null,
-        mood: null,
-        energyLevel: null,
-      }),
+    upsertProductivityLog: vi.fn().mockResolvedValue({
+      id: "pl-1",
+      date: "2025-01-01",
+      streakDays: 1,
+      plannedItems: [],
+      completionScore: null,
+      mood: null,
+      energyLevel: null,
+    }),
     getProductivityLog: vi.fn().mockResolvedValue(null),
     listProductivityLogs: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     getProductivityStreak: vi.fn().mockResolvedValue(0),
-    getProductivityStats: vi
-      .fn()
-      .mockResolvedValue({
-        totalDays: 0,
-        avgCompletion: 0,
-        avgEnergy: 0,
-        moodCounts: {},
-        currentStreak: 0,
-        history: [],
-      }),
+    getProductivityStats: vi.fn().mockResolvedValue({
+      totalDays: 0,
+      avgCompletion: 0,
+      avgEnergy: 0,
+      moodCounts: {},
+      currentStreak: 0,
+      history: [],
+    }),
     deleteProductivityLog: vi.fn().mockResolvedValue(null),
     productivityLogs: {},
     // Codebase insights
-    upsertCodebaseInsight: vi
-      .fn()
-      .mockResolvedValue({
-        id: "ci-1",
-        fingerprint: "fp",
-        status: "open",
-        category: "fix",
-        severity: "medium",
-        title: "test",
-        hitCount: 1,
-      }),
+    upsertCodebaseInsight: vi.fn().mockResolvedValue({
+      id: "ci-1",
+      fingerprint: "fp",
+      status: "open",
+      category: "fix",
+      severity: "medium",
+      title: "test",
+      hitCount: 1,
+    }),
     listCodebaseInsights: vi.fn().mockResolvedValue({ data: [], total: 0 }),
     updateCodebaseInsightStatus: vi.fn().mockResolvedValue(null),
     pruneStaleCodebaseInsights: vi.fn().mockResolvedValue(0),
@@ -500,14 +479,12 @@ export function mockDbModule() {
     countActiveMemories: vi.fn().mockResolvedValue(0),
     findSimilarMemories: vi.fn().mockResolvedValue([]),
     // Failure patterns
-    upsertFailurePattern: vi
-      .fn()
-      .mockResolvedValue({
-        id: "fp-1",
-        toolName: "test_tool",
-        errorCategory: "error",
-        frequency: 1,
-      }),
+    upsertFailurePattern: vi.fn().mockResolvedValue({
+      id: "fp-1",
+      toolName: "test_tool",
+      errorCategory: "error",
+      frequency: 1,
+    }),
     listFailurePatterns: vi.fn().mockResolvedValue([]),
     getFailurePatternsForTool: vi.fn().mockResolvedValue([]),
     incrementFailureFrequency: vi.fn().mockResolvedValue(undefined),
