@@ -4,7 +4,19 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["ai-cofounder"],
+      "targetBlank": false,
+      "title": "AI Cofounder Dashboards",
+      "tooltip": "Navigate to other dashboards",
+      "type": "dashboards"
+    }
+  ],
   "panels": [
     {
       "title": "CPU Usage",
@@ -124,7 +136,12 @@
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
         "defaults": {
-          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "gradientMode": "scheme" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 30,
+            "gradientMode": "scheme"
+          },
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
@@ -152,7 +169,12 @@
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "fieldConfig": {
         "defaults": {
-          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 30, "gradientMode": "scheme" },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 30,
+            "gradientMode": "scheme"
+          },
           "unit": "bytes",
           "thresholds": {
             "mode": "absolute",
@@ -242,7 +264,10 @@
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "CPU %" },
-            "properties": [{ "id": "unit", "value": "percentunit" }, { "id": "decimals", "value": 2 }]
+            "properties": [
+              { "id": "unit", "value": "percentunit" },
+              { "id": "decimals", "value": 2 }
+            ]
           },
           {
             "matcher": { "id": "byName", "options": "Memory" },
@@ -274,7 +299,14 @@
         {
           "id": "organize",
           "options": {
-            "excludeByName": { "Time": true, "__name__": true, "id": true, "image": true, "instance": true, "job": true },
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "id": true,
+              "image": true,
+              "instance": true,
+              "job": true
+            },
             "renameByName": { "name": "Container", "Value #A": "CPU %", "Value #B": "Memory" }
           }
         }
@@ -284,7 +316,31 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["ai-cofounder", "system"],
-  "templating": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+        "definition": "label_values(up, job)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(up, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
   "time": { "from": "now-6h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",

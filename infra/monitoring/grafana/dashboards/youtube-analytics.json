@@ -6,6 +6,19 @@
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["ai-cofounder"],
+      "targetBlank": false,
+      "title": "AI Cofounder Dashboards",
+      "tooltip": "Navigate to other dashboards",
+      "type": "dashboards"
+    }
+  ],
   "refresh": "5m",
   "time": {
     "from": "now-30d",
