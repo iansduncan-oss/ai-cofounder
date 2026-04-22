@@ -27,7 +27,7 @@
     "productivity:setup": "bash scripts/setup-productivity.sh",
     "deploy:dry-run": "gh workflow run deploy.yml -f dry_run=true",
     "memory-bridge:sync": "tsx scripts/sync-memory-bridge.ts",
-    "prepare": "husky"
+    "prepare": "node -e \"try{require('child_process').execSync('husky',{stdio:'inherit'})}catch(e){}\""
   },
   "lint-staged": {
     "*.{ts,tsx}": [
