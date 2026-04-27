@@ -90,7 +90,7 @@
   },
   "dependencies": {
     "@tailwindcss/oxide-darwin-arm64": "^4.2.4",
-    "axios": "^1.15.1",
+    "axios": "^1.15.2",
     "fastify": "^5.8.5",
     "lightningcss-darwin-arm64": "^1.32.0"
   }
