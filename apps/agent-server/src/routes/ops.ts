@@ -163,7 +163,7 @@ ${healingContext}
           isAutonomous: true,
         });
 
-        result = await orchestrator.run(prompt, `ops-diagnose-${Date.now()}`, [], "ops-agent");
+        result = await orchestrator.run(prompt, `ops-diagnose-${Date.now()}`, [], undefined);
       } catch (err) {
         logger.error({ err }, "orchestrator diagnosis failed");
         // Mark alerts back to unprocessed on failure
