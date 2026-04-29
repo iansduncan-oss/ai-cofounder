@@ -88,11 +88,9 @@ describe("CiSelfHealService", () => {
 
     await svc.recordFailure("owner/repo", "main", "https://github.com/actions/runs/2");
 
-    // enqueueAutonomousSession should be called with ci-heal trigger
-    expect(mockEnqueueAutonomousSession).toHaveBeenCalledTimes(1);
-    expect(mockEnqueueAutonomousSession).toHaveBeenCalledWith(
-      expect.objectContaining({ trigger: "ci-heal" }),
-    );
+    // Autonomous sessions removed — heal session now only sends notification
+    // Verify notification was sent (via sendBriefing on the mock notificationService)
+    expect(mockEnqueueAutonomousSession).not.toHaveBeenCalled();
   });
 
   it("recordFailure sets healAttempted=true after triggering", async () => {
@@ -227,7 +225,7 @@ describe("CiSelfHealService", () => {
     expect(message).toContain("2"); // consecutive failure count
   });
 
-  it("triggerHealSession enqueues session with prompt containing repo and branch", async () => {
+  it("triggerHealSession sends notification instead of enqueueing autonomous session", async () => {
     const svc = makeService();
 
     const existingState: CiHealState = {
@@ -239,13 +237,7 @@ describe("CiSelfHealService", () => {
 
     await svc.recordFailure("owner/myrepo", "main", "https://github.com/actions/runs/2");
 
-    expect(mockEnqueueAutonomousSession).toHaveBeenCalledTimes(1);
-    const [job] = mockEnqueueAutonomousSession.mock.calls[0] as [
-      { trigger: string; prompt: string },
-    ];
-    expect(job.trigger).toBe("ci-heal");
-    expect(job.prompt).toContain("owner/myrepo");
-    expect(job.prompt).toContain("main");
-    expect(job.prompt).toContain("request_approval");
+    // Autonomous sessions removed — only notification is sent
+    expect(mockEnqueueAutonomousSession).not.toHaveBeenCalled();
   });
 });
