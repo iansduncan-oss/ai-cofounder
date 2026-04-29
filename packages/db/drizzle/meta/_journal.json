@@ -379,6 +379,13 @@
       "when": 1775779200000,
       "tag": "0053_add_more_performance_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1777536000000,
+      "tag": "0054_add_productivity_and_insights",
+      "breakpoints": true
     }
   ]
 }
