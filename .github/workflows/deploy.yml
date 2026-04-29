@@ -184,6 +184,9 @@ jobs:
 
           DEPLOY_START=$(date +%s)
 
+          echo "==> Fixing .git ownership (safety net)..."
+          sudo chown -R ian:ian .git
+
           echo "==> Pulling latest code..."
           git fetch origin main
           git reset --hard origin/main
