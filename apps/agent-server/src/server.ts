@@ -29,6 +29,7 @@ import { voiceRoutes } from "./routes/voice.js";
 import { vaultRoutes } from "./routes/vault.js";
 import { deployWebhookRoute } from "./routes/deploys.js";
 import { recapRoutes } from "./routes/recap.js";
+import { opsRoutes } from "./routes/ops.js";
 import { discordWatcherRoutes } from "./routes/discord-watcher.js";
 import { queuePlugin } from "./plugins/queue.js";
 import { pubsubPlugin } from "./plugins/pubsub.js";
@@ -540,6 +541,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(vaultRoutes, { prefix: "/api/vault" });
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
   app.register(recapRoutes, { prefix: "/api/recap" }); // Public: token-protected via RECAP_TOKEN
+  app.register(opsRoutes, { prefix: "/api/ops" }); // Public: token-protected via OPS_TOKEN
   app.register(discordWatcherRoutes, { prefix: "/api/discord-watcher" }); // Internal: API_SECRET bearer auth from Discord bot
 
   // Project registry plugin — loads registered projects from DB and decorates app.projectRegistry

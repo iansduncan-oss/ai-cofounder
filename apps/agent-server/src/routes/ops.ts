@@ -1,12 +1,28 @@
 import type { FastifyPluginAsync } from "fastify";
 import { createOpsAlert, listOpsAlerts, updateOpsAlert } from "@ai-cofounder/db";
-import { createLogger } from "@ai-cofounder/shared";
+import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 
 const logger = createLogger("ops");
 
+/** Verify OPS_TOKEN query param (same pattern as recap routes) */
+function verifyToken(token: string | undefined): boolean {
+  const opsToken = optionalEnv("OPS_TOKEN", "");
+  if (!opsToken) return true; // No token configured = allow all (dev mode)
+  return token === opsToken;
+}
+
 export const opsRoutes: FastifyPluginAsync = async (app) => {
+  // Token verification hook for all ops routes
+  app.addHook("onRequest", async (request, reply) => {
+    const token = (request.query as Record<string, string>).token;
+    if (!verifyToken(token)) {
+      reply.status(401).send({ error: "Invalid ops token" });
+    }
+  });
+
   /** POST /api/ops/alerts — Ingest an alert from n8n or manual submission */
   app.post<{
+    Querystring: { token?: string };
     Body: {
       source: "alertmanager" | "deploy" | "health" | "manual";
       severity?: string;
@@ -29,7 +45,7 @@ export const opsRoutes: FastifyPluginAsync = async (app) => {
 
   /** GET /api/ops/alerts — List alerts, optionally filtered by status */
   app.get<{
-    Querystring: { status?: string; limit?: string };
+    Querystring: { token?: string; status?: string; limit?: string };
   }>(
     "/alerts",
     { schema: { tags: ["ops"] } },
@@ -44,6 +60,7 @@ export const opsRoutes: FastifyPluginAsync = async (app) => {
 
   /** PATCH /api/ops/alerts/:id — Update alert status/resolution */
   app.patch<{
+    Querystring: { token?: string };
     Params: { id: string };
     Body: {
       status?: "unprocessed" | "processing" | "resolved" | "ignored" | "needs-review";
