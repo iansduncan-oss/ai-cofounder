@@ -1,0 +1,122 @@
+{
+  "name": "Ops Agent Health Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "17 */4 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 4 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ai-cofounder-agent-server:3100/api/ops/alerts?status=unprocessed",
+        "options": { "timeout": 10000 }
+      },
+      "id": "fetch-alerts",
+      "name": "Fetch Unprocessed Alerts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ai-cofounder-agent-server:3100/health/full",
+        "options": { "timeout": 10000 }
+      },
+      "id": "fetch-health",
+      "name": "Fetch Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://ai-cofounder-agent-server:3100/api/errors/summary?hours=4",
+        "options": { "timeout": 10000 }
+      },
+      "id": "fetch-errors",
+      "name": "Fetch Error Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [470, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "const alerts = $('Fetch Unprocessed Alerts').first().json;\nconst health = $('Fetch Health').first().json;\nconst errors = $('Fetch Error Summary').first().json;\n\n// Parse alerts (could be array directly or wrapped)\nconst alertList = Array.isArray(alerts) ? alerts : (alerts.data || []);\nconst alertCount = alertList.length;\n\n// Health status\nconst dbOk = health.core?.database === 'ok';\nconst redisOk = health.core?.redis === 'ok';\nconst llmCount = health.llm?.available || 0;\nconst llmTotal = health.llm?.total || 0;\nconst healthOk = health.status === 'ok';\n\n// Error summary\nconst totalErrors = errors.totalErrors || errors.total || 0;\nconst topErrors = (errors.errors || errors.summary || []).slice(0, 3);\n\n// Determine overall status\nlet color = 3066993; // green\nlet status = 'All Clear';\nconst issues = [];\n\nif (!healthOk) {\n  color = 15548997; // red\n  status = 'UNHEALTHY';\n  if (!dbOk) issues.push('Database DOWN');\n  if (!redisOk) issues.push('Redis DOWN');\n}\n\nif (alertCount > 0) {\n  const criticals = alertList.filter(a => a.severity === 'critical');\n  if (criticals.length > 0) {\n    color = 15548997; // red\n    status = `${criticals.length} Critical Alert(s)`;\n  } else {\n    color = 16776960; // yellow\n    status = `${alertCount} Unprocessed Alert(s)`;\n  }\n  alertList.forEach(a => issues.push(`[${a.severity}] ${a.title}`));\n}\n\nif (totalErrors > 10 && color === 3066993) {\n  color = 16776960; // yellow\n  if (status === 'All Clear') status = 'Elevated Errors';\n}\n\n// Build description\nconst lines = [];\nlines.push(`**Status:** ${status}`);\nlines.push(`**Health:** DB ${dbOk ? '✅' : '❌'} | Redis ${redisOk ? '✅' : '❌'} | LLM ${llmCount}/${llmTotal}`);\nlines.push(`**Errors (4h):** ${totalErrors}`);\n\nif (issues.length > 0) {\n  lines.push('');\n  lines.push('**Issues:**');\n  issues.forEach(i => lines.push(`• ${i}`));\n}\n\nif (topErrors.length > 0 && totalErrors > 0) {\n  lines.push('');\n  lines.push('**Top Errors:**');\n  topErrors.forEach(e => lines.push(`• ${e.message || e.error || 'Unknown'} (×${e.count || 1})`));\n}\n\nconst description = lines.join('\\n');\n\n// Build alert resolution payloads if we should auto-resolve info alerts\nconst resolvePayloads = alertList\n  .filter(a => a.severity === 'info' && a.source === 'manual')\n  .map(a => ({ id: a.id, status: 'resolved', resolution: 'Auto-resolved by ops agent health check' }));\n\nreturn [{ json: { color, description, alertCount, resolvePayloads, healthOk } }];"
+      },
+      "id": "analyze",
+      "name": "Analyze & Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.DISCORD_FOLLOWUP_WEBHOOK_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ embeds: [{ title: '🤖 Ops Agent Run', description: $json.description, color: $json.color, timestamp: new Date().toISOString(), footer: { text: 'Next run in 4 hours' } }] }) }}",
+        "options": {}
+      },
+      "id": "post-discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [920, 400]
+    }
+  ],
+  "connections": {
+    "Every 4 Hours": {
+      "main": [
+        [
+          { "node": "Fetch Unprocessed Alerts", "type": "main", "index": 0 },
+          { "node": "Fetch Health", "type": "main", "index": 0 },
+          { "node": "Fetch Error Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Fetch Unprocessed Alerts": {
+      "main": [
+        [{ "node": "Analyze & Format", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Health": {
+      "main": [
+        [{ "node": "Analyze & Format", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch Error Summary": {
+      "main": [
+        [{ "node": "Analyze & Format", "type": "main", "index": 0 }]
+      ]
+    },
+    "Analyze & Format": {
+      "main": [
+        [{ "node": "Post to Discord", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "ops" },
+    { "name": "monitoring" }
+  ]
+}
