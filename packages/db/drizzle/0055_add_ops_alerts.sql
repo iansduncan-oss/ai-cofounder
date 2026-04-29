@@ -1,6 +1,13 @@
--- Ops alerts table for autonomous ops agent alert intake
-CREATE TYPE "public"."ops_alert_source" AS ENUM('alertmanager', 'deploy', 'health', 'manual');
-CREATE TYPE "public"."ops_alert_status" AS ENUM('unprocessed', 'processing', 'resolved', 'ignored', 'needs-review');
+-- Ops alerts table for autonomous ops agent alert intake (idempotent)
+DO $$ BEGIN
+  CREATE TYPE "public"."ops_alert_source" AS ENUM('alertmanager', 'deploy', 'health', 'manual');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "public"."ops_alert_status" AS ENUM('unprocessed', 'processing', 'resolved', 'ignored', 'needs-review');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE TABLE IF NOT EXISTS "ops_alerts" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

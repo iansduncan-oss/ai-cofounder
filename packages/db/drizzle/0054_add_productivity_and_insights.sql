@@ -1,9 +1,19 @@
--- Create enums for codebase insights
-CREATE TYPE "public"."insight_category" AS ENUM('fix', 'improve', 'add', 'review', 'followup', 'security', 'other');
-CREATE TYPE "public"."insight_severity" AS ENUM('low', 'medium', 'high', 'critical');
+-- Create enums for codebase insights (idempotent)
+DO $$ BEGIN
+  CREATE TYPE "public"."insight_category" AS ENUM('fix', 'improve', 'add', 'review', 'followup', 'security', 'other');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TYPE "public"."insight_severity" AS ENUM('low', 'medium', 'high', 'critical');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Create enums for productivity logs
-CREATE TYPE "public"."productivity_mood" AS ENUM('great', 'good', 'okay', 'rough', 'terrible');
+DO $$ BEGIN
+  CREATE TYPE "public"."productivity_mood" AS ENUM('great', 'good', 'okay', 'rough', 'terrible');
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Create codebase_insights table
 CREATE TABLE IF NOT EXISTS "codebase_insights" (
