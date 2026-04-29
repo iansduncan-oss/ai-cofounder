@@ -29,7 +29,6 @@ import { agentInfoRoutes } from "../routes/agent-info.js";
 import { deployRoutes } from "../routes/deploys.js";
 import { patternRoutes } from "../routes/patterns.js";
 import { autonomyRoutes } from "../routes/autonomy.js";
-import { autonomousRoutes } from "../routes/autonomous.js";
 import { contextRoutes } from "../routes/context.js";
 import { journalRoutes } from "../routes/journal.js";
 import { projectRoutes } from "../routes/projects.js";
@@ -183,7 +182,6 @@ export async function jwtGuardPlugin(app: FastifyInstance) {
   app.register(deployRoutes, { prefix: "/api/deploys" });
   app.register(patternRoutes, { prefix: "/api/patterns" });
   app.register(autonomyRoutes, { prefix: "/api/autonomy/tiers" });
-  app.register(autonomousRoutes, { prefix: "/api/autonomous" });
   app.register(contextRoutes, { prefix: "/api/context" });
   app.register(journalRoutes, { prefix: "/api/journal" });
   app.register(projectRoutes);

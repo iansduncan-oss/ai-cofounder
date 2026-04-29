@@ -840,9 +840,6 @@ export const queuePlugin = fp(async (app) => {
       briefingHour: Number(optionalEnv("BRIEFING_HOUR", "9")),
       briefingTimezone: optionalEnv("BRIEFING_TIMEZONE", "America/New_York"),
       monitoringIntervalMinutes: 5,
-      autonomousSessionIntervalMinutes: Number(
-        optionalEnv("AUTONOMOUS_SESSION_INTERVAL_MINUTES", "30"),
-      ),
     });
   } catch (err) {
     logger.error({ err }, "Failed to set up recurring jobs (server will continue without them)");

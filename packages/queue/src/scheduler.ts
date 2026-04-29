@@ -4,14 +4,12 @@ import {
   getBriefingQueue,
   getReflectionQueue,
   getRagIngestionQueue,
-  getAutonomousSessionQueue,
   getMeetingPrepQueue,
 } from "./queues.js";
 import type {
   MonitoringJob,
   BriefingJob,
   ReflectionJob,
-  AutonomousSessionJob,
   MeetingPrepJob,
 } from "./queues.js";
 
@@ -25,7 +23,6 @@ export async function setupRecurringJobs(options?: {
   briefingHour?: number;
   briefingTimezone?: string;
   monitoringIntervalMinutes?: number;
-  autonomousSessionIntervalMinutes?: number;
 }): Promise<void> {
   const {
     briefingHour = 6,
@@ -329,24 +326,6 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled self-healing check every 15 minutes");
-
-  // ── Recurring autonomous session (configurable interval, default 30 min) ──
-
-  const autonomousIntervalMin =
-    options?.autonomousSessionIntervalMinutes ??
-    Number(process.env.AUTONOMOUS_SESSION_INTERVAL_MINUTES ?? 30);
-  const autonomousSessionQueue = getAutonomousSessionQueue();
-  await autonomousSessionQueue.upsertJobScheduler(
-    "recurring-autonomous-session",
-    {
-      every: autonomousIntervalMin * 60 * 1000,
-    },
-    {
-      name: "autonomous-session",
-      data: { trigger: "schedule" } satisfies AutonomousSessionJob,
-    },
-  );
-  logger.info({ intervalMin: autonomousIntervalMin }, "Scheduled recurring autonomous session");
 
   // ── Discord hourly digest (top of every hour) ──
 

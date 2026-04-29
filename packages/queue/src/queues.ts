@@ -117,13 +117,6 @@ export interface DeployVerificationJob {
   errorLog?: string;
 }
 
-export interface AutonomousSessionJob {
-  trigger: "schedule" | "manual" | "ci-heal";
-  tokenBudget?: number;
-  timeBudgetMs?: number;
-  prompt?: string;
-}
-
 export interface MeetingPrepJob {
   action: "generate_upcoming" | "send_notifications";
 }
@@ -161,7 +154,6 @@ export const QUEUE_NAMES = {
   REFLECTIONS: "reflections",
   DEPLOY_VERIFICATION: "deploy-verification",
   DEAD_LETTER: "dead-letter",
-  AUTONOMOUS_SESSIONS: "autonomous-sessions",
   MEETING_PREP: "meeting-prep",
   DISCORD_TRIAGE: "discord-triage",
 } as const;
@@ -234,10 +226,6 @@ export function getDeployVerificationQueue(): Queue<DeployVerificationJob> {
 
 export function getDeadLetterQueue(): Queue<DeadLetterJob> {
   return getOrCreateQueue<DeadLetterJob>(QUEUE_NAMES.DEAD_LETTER);
-}
-
-export function getAutonomousSessionQueue(): Queue<AutonomousSessionJob> {
-  return getOrCreateQueue<AutonomousSessionJob>(QUEUE_NAMES.AUTONOMOUS_SESSIONS);
 }
 
 export function getMeetingPrepQueue(): Queue<MeetingPrepJob> {

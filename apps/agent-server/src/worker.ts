@@ -21,15 +21,12 @@ import { createWorkspaceService } from "./services/workspace.js";
 import { createNotificationService } from "./services/notifications.js";
 import { SubagentRunner } from "./services/subagent.js";
 import { AgentMessagingService } from "./services/agent-messaging.js";
-import { DistributedLockService } from "./services/distributed-lock.js";
 import { PlanRepairService } from "./services/plan-repair.js";
 import { createDiscordService } from "./services/discord.js";
 import { createVpsCommandService } from "./services/vps-command.js";
 import { ProceduralMemoryService } from "./services/procedural-memory.js";
 import { AdaptiveRoutingService } from "./services/adaptive-routing.js";
 import { SelfHealingService } from "./services/self-healing.js";
-import Redis from "ioredis";
-
 const logger = createLogger("worker");
 
 export async function main() {
@@ -95,11 +92,7 @@ export async function main() {
   // Agent messaging service
   const messagingService = new AgentMessagingService(db, redisPubSub);
 
-  // Distributed lock service for autonomous session exclusion
-  const lockRedis = new Redis(redisUrl);
-  const lockService = new DistributedLockService(lockRedis);
-
-  // Subagent runner for autonomous subagent tasks
+  // Subagent runner for subagent tasks
   const subagentRunner = new SubagentRunner(
     llmRegistry,
     db,
@@ -152,18 +145,6 @@ export async function main() {
       await subagentRunner.run(job.data);
       logger.info({ jobId: job.id, subagentRunId }, "Subagent task completed");
     },
-
-    autonomousSession: async (job) => {
-      const { trigger, tokenBudget, timeBudgetMs, prompt } = job.data;
-      logger.info({ jobId: job.id, trigger }, "Starting autonomous session from queue");
-      const { runAutonomousSession } = await import("./autonomous-session.js");
-      const result = await runAutonomousSession(
-        db, llmRegistry, embeddingService, sandboxService, workspaceService, messagingService,
-        lockService,
-        { trigger, tokenBudget, timeBudgetMs, prompt, discordService, vpsCommandService, selfHealingService },
-      );
-      logger.info({ jobId: job.id, status: result.status, tokensUsed: result.tokensUsed }, "Autonomous session finished");
-    },
   });
 
   logger.info("Worker started — waiting for jobs");
@@ -174,7 +155,6 @@ export async function main() {
     await stopWorkers();     // waits for active job to finish
     await closeAllQueues();  // close queue connections
     await redisPubSub.close(); // close publisher connection
-    await lockRedis.quit();  // close lock service Redis connection
     logger.info("Worker shut down cleanly");
     process.exit(0);
   };

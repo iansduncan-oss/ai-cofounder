@@ -39,7 +39,6 @@ vi.mock("@ai-cofounder/queue", () => ({
   getRagIngestionQueue: () => mockQueue,
   getReflectionQueue: () => mockQueue,
   getDeadLetterQueue: () => mockQueue,
-  getAutonomousSessionQueue: () => mockQueue,
   getDeployVerificationQueue: () => mockQueue,
 }));
 

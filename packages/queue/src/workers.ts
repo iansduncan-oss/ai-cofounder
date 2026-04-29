@@ -12,7 +12,6 @@ import {
   type ReflectionJob,
   type SubagentTaskJob,
   type DeployVerificationJob,
-  type AutonomousSessionJob,
   type MeetingPrepJob,
   type DiscordTriageJob,
 } from "./queues.js";
@@ -35,7 +34,6 @@ export type RagIngestionProcessor = (job: Job<RagIngestionJob>) => Promise<void>
 export type ReflectionProcessor = (job: Job<ReflectionJob>) => Promise<void>;
 export type SubagentTaskProcessor = (job: Job<SubagentTaskJob>) => Promise<void>;
 export type DeployVerificationProcessor = (job: Job<DeployVerificationJob>) => Promise<void>;
-export type AutonomousSessionProcessor = (job: Job<AutonomousSessionJob>) => Promise<void>;
 export type MeetingPrepProcessor = (job: Job<MeetingPrepJob>) => Promise<void>;
 export type DiscordTriageProcessor = (job: Job<DiscordTriageJob>) => Promise<void>;
 
@@ -49,7 +47,6 @@ export interface WorkerProcessors {
   reflection?: ReflectionProcessor;
   subagentTask?: SubagentTaskProcessor;
   deployVerification?: DeployVerificationProcessor;
-  autonomousSession?: AutonomousSessionProcessor;
   meetingPrep?: MeetingPrepProcessor;
   discordTriage?: DiscordTriageProcessor;
 }
@@ -186,22 +183,6 @@ export function startWorkers(processors: WorkerProcessors): void {
       },
     );
     attachWorkerEvents(worker, QUEUE_NAMES.DEPLOY_VERIFICATION);
-    activeWorkers.push(worker);
-  }
-
-  if (processors.autonomousSession) {
-    const worker = new Worker<AutonomousSessionJob>(
-      QUEUE_NAMES.AUTONOMOUS_SESSIONS,
-      processors.autonomousSession,
-      {
-        connection,
-        concurrency: 1,              // one autonomous session at a time
-        lockDuration: 1_800_000,     // 30 min — sessions can be long-running
-        stalledInterval: 60_000,     // check stalls every 60s
-        maxStalledCount: 1,          // re-queue once if stalled, then fail
-      },
-    );
-    attachWorkerEvents(worker, QUEUE_NAMES.AUTONOMOUS_SESSIONS);
     activeWorkers.push(worker);
   }
 

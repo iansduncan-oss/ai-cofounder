@@ -11,7 +11,6 @@ import {
   getReflectionQueue,
   getSubagentTaskQueue,
   getDeadLetterQueue,
-  getAutonomousSessionQueue,
   getDeployVerificationQueue,
   getMeetingPrepQueue,
   getDiscordTriageQueue,
@@ -25,7 +24,6 @@ import {
   type ReflectionJob,
   type SubagentTaskJob,
   type DeadLetterJob,
-  type AutonomousSessionJob,
   type MeetingPrepJob,
   type DiscordTriageJob,
 } from "./queues.js";
@@ -150,15 +148,6 @@ export async function enqueueDiscordTriage(
     { jobId: added.id, channelId: job.channelId, channelName: job.channelName, messageCount: job.messages.length },
     "Discord triage job enqueued",
   );
-  return added.id;
-}
-
-export async function enqueueAutonomousSession(
-  job: AutonomousSessionJob,
-): Promise<string | undefined> {
-  const queue = getAutonomousSessionQueue();
-  const added = await queue.add("autonomous-session", job);
-  logger.info({ jobId: added.id, trigger: job.trigger }, "Autonomous session enqueued");
   return added.id;
 }
 
@@ -335,7 +324,6 @@ export async function retryDeadLetterJob(dlqJobId: string): Promise<{ requeued: 
     "rag-ingestion": getRagIngestionQueue,
     "reflections": getReflectionQueue,
     "deploy-verification": getDeployVerificationQueue,
-    "autonomous-sessions": getAutonomousSessionQueue,
     "discord-triage": getDiscordTriageQueue,
   };
 
@@ -378,7 +366,6 @@ export async function getStaleJobCounts(thresholdMs = 30 * 60 * 1000): Promise<S
     { name: "pipelines", queue: getPipelineQueue() },
     { name: "rag-ingestion", queue: getRagIngestionQueue() },
     { name: "reflections", queue: getReflectionQueue() },
-    { name: "autonomous-sessions", queue: getAutonomousSessionQueue() },
     { name: "discord-triage", queue: getDiscordTriageQueue() },
   ];
 
@@ -416,7 +403,6 @@ export async function trimEventStreams(maxLen = 500): Promise<void> {
     getPipelineQueue(),
     getRagIngestionQueue(),
     getReflectionQueue(),
-    getAutonomousSessionQueue(),
     getMeetingPrepQueue(),
     getDiscordTriageQueue(),
   ];

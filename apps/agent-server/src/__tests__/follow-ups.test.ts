@@ -58,7 +58,6 @@ vi.mock("@ai-cofounder/queue", () => ({
   getSubagentTaskQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
   getDeployVerificationQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
   getDeadLetterQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
-  getAutonomousSessionQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
   getMeetingPrepQueue: vi.fn().mockReturnValue({ add: vi.fn() }),
   closeAllQueues: vi.fn(),
   listDeadLetterJobs: vi.fn().mockResolvedValue([]),

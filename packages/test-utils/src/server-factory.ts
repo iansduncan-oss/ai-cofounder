@@ -72,7 +72,6 @@ export function mockQueueModule(): {
       getSubagentTaskQueue: mockQueueGetter(),
       getDeployVerificationQueue: mockQueueGetter(),
       getDeadLetterQueue: mockQueueGetter(),
-      getAutonomousSessionQueue: mockQueueGetter(),
       getMeetingPrepQueue: mockQueueGetter(),
       listDeadLetterJobs: vi.fn().mockResolvedValue([]),
     },

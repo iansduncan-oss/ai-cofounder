@@ -125,28 +125,8 @@ export class CiSelfHealService {
 
     await this.notificationService.sendBriefing(notificationText);
 
-    // Enqueue autonomous heal session
-    const prompt = [
-      `CI has failed ${state.count} consecutive times on ${repo} branch ${branch}.`,
-      state.lastWorkflowUrl
-        ? `Last failing workflow run: ${state.lastWorkflowUrl}`
-        : undefined,
-      `First failure detected at: ${state.firstFailedAt}`,
-      ``,
-      `Your task:`,
-      `1. Fetch the failing workflow run jobs via the GitHub API to identify which step failed.`,
-      `2. Examine the error output from the failing step to determine the root cause.`,
-      `3. Fix the code in the repository to resolve the CI failure.`,
-      `4. Commit the fix on a new branch named autonomous/ci-fix-${branch.replace(/\//g, "-")}-${Date.now()}.`,
-      `5. Create a pull request with a clear description of the root cause and fix.`,
-      `6. Use the request_approval tool (yellow-tier) before merging — do NOT merge without approval.`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const { enqueueAutonomousSession } = await import("@ai-cofounder/queue");
-    await enqueueAutonomousSession({ trigger: "ci-heal", prompt });
-
-    logger.info({ repo, branch }, "CI self-heal session enqueued");
+    // Autonomous session system has been removed.
+    // CI self-heal now only sends the notification above for manual intervention.
+    logger.info({ repo, branch }, "CI self-heal notification sent (autonomous sessions removed)");
   }
 }
