@@ -16,3 +16,4 @@ export * from "./repositories/tasks.js";
 export * from "./repositories/user-activity.js";
 export * from "./repositories/users.js";
 export * from "./repositories/workflows.js";
+export * from "./repositories/ops.js";

@@ -69,6 +69,32 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/ops/alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'alertmanager', severity: $('Classify & Format').item.json.level, title: $('Classify & Format').item.json.embed.title, body: $('Dedup Alerts (30min)').item.json }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "store-ops-alert",
+      "name": "Store Ops Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1350, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      },
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
@@ -90,6 +116,11 @@
     "Classify & Format": {
       "main": [
         [{ "node": "Send to Discord", "type": "main", "index": 0 }]
+      ]
+    },
+    "Send to Discord": {
+      "main": [
+        [{ "node": "Store Ops Alert", "type": "main", "index": 0 }]
       ]
     }
   },

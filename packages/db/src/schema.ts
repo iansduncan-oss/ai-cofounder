@@ -1062,6 +1062,39 @@ export const productivityLogs = pgTable(
   (table) => [uniqueIndex("idx_productivity_logs_user_date").on(table.userId, table.date)],
 );
 
+/* ── Ops Alerts (autonomous ops agent alert intake) ── */
+
+export const opsAlertSourceEnum = pgEnum("ops_alert_source", [
+  "alertmanager",
+  "deploy",
+  "health",
+  "manual",
+]);
+
+export const opsAlertStatusEnum = pgEnum("ops_alert_status", [
+  "unprocessed",
+  "processing",
+  "resolved",
+  "ignored",
+  "needs-review",
+]);
+
+export const opsAlerts = pgTable(
+  "ops_alerts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: opsAlertSourceEnum("source").notNull(),
+    severity: text("severity").notNull().default("warning"), // critical, warning, info
+    title: text("title").notNull(),
+    body: jsonb("body"),
+    status: opsAlertStatusEnum("status").notNull().default("unprocessed"),
+    resolution: text("resolution"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+  },
+  (table) => [index("idx_ops_alerts_status").on(table.status, table.createdAt)],
+);
+
 /* ── Failure Patterns (tool error tracking and resolutions) ── */
 
 export const failurePatterns = pgTable("failure_patterns", {

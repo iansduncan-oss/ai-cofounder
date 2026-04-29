@@ -131,6 +131,32 @@
           "name": "Agent Server API Key"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AGENT_SERVER_URL || 'http://localhost:3100' }}/api/ops/alerts",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ source: 'deploy', severity: 'critical', title: 'Deploy Failed: ' + $('Extract Failure Details').item.json.workflowName, body: { repo: $('Extract Failure Details').item.json.repo, branch: $('Extract Failure Details').item.json.branch, sha: $('Extract Failure Details').item.json.sha, actor: $('Extract Failure Details').item.json.actor, runUrl: $('Extract Failure Details').item.json.runUrl } }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "store-ops-alert",
+      "name": "Store Ops Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1130, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "agent-server-auth",
+          "name": "Agent Server API Key"
+        }
+      },
+      "onError": "continueErrorOutput"
     }
   ],
   "connections": {
@@ -148,7 +174,8 @@
       "main": [
         [
           { "node": "Discord Alert", "type": "main", "index": 0 },
-          { "node": "Trigger Agent Investigation", "type": "main", "index": 0 }
+          { "node": "Trigger Agent Investigation", "type": "main", "index": 0 },
+          { "node": "Store Ops Alert", "type": "main", "index": 0 }
         ]
       ]
     }

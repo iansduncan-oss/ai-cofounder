@@ -386,6 +386,13 @@
       "when": 1777536000000,
       "tag": "0054_add_productivity_and_insights",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1777539600000,
+      "tag": "0055_add_ops_alerts",
+      "breakpoints": true
     }
   ]
 }
