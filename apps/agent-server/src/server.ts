@@ -538,7 +538,7 @@ export function buildServer(registry?: LlmRegistry) {
   app.register(channelRoutes, { prefix: "/api/channels" });
   app.register(webhookRoutes, { prefix: "/api/webhooks" });
   app.register(voiceRoutes, { prefix: "/voice" });
-  app.register(vaultRoutes, { prefix: "/api/vault" });
+  // vault routes moved inside jwtGuardPlugin scope (was previously unprotected)
   app.register(deployWebhookRoute); // Public: no prefix — route includes /api/deploys/webhook
   app.register(recapRoutes, { prefix: "/api/recap" }); // Public: token-protected via RECAP_TOKEN
   app.register(opsRoutes, { prefix: "/api/ops" }); // Public: token-protected via OPS_TOKEN

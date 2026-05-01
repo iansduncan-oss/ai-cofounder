@@ -1,15 +1,23 @@
 import type { FastifyPluginAsync } from "fastify";
+import { timingSafeEqual } from "node:crypto";
 import { createOpsAlert, listOpsAlerts, updateOpsAlert } from "@ai-cofounder/db";
 import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 import { Orchestrator } from "../agents/orchestrator.js";
 
 const logger = createLogger("ops");
 
-/** Verify OPS_TOKEN query param (same pattern as recap routes) */
+/** Verify OPS_TOKEN query param — required in production, optional in dev */
 function verifyToken(token: string | undefined): boolean {
   const opsToken = optionalEnv("OPS_TOKEN", "");
-  if (!opsToken) return true; // No token configured = allow all (dev mode)
-  return token === opsToken;
+  if (!opsToken) {
+    // In production, deny access when OPS_TOKEN is not configured
+    if (process.env.NODE_ENV === "production") return false;
+    return true; // Dev mode only
+  }
+  if (!token) return false;
+  // Timing-safe comparison to prevent timing attacks
+  if (token.length !== opsToken.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(opsToken));
 }
 
 export const opsRoutes: FastifyPluginAsync = async (app) => {

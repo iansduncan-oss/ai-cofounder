@@ -98,10 +98,15 @@ export async function executeQueryDatabase(
   }
 
   try {
-    const rows = await db.execute(sql.raw(queryText));
-    const resultArray = Array.isArray(rows)
-      ? rows
-      : ((rows as unknown as { rows: unknown[] }).rows ?? []);
+    // Execute inside a READ ONLY transaction to prevent writes via SELECT INTO,
+    // function side effects (lo_export, dblink), etc.
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql.raw("SET TRANSACTION READ ONLY"));
+      return tx.execute(sql.raw(queryText));
+    });
+    const resultArray = Array.isArray(result)
+      ? result
+      : ((result as unknown as { rows: unknown[] }).rows ?? []);
     const sliced = resultArray.slice(0, MAX_ROWS) as Record<string, unknown>[];
     return {
       rows: sliced,

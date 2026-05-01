@@ -12,6 +12,10 @@ vi.mock("@ai-cofounder/db", () => ({
   ...mockDbModule(),
   createDb: vi.fn().mockReturnValue({
     execute: (...args: unknown[]) => mockDbExecute(...args),
+    transaction: async (fn: (tx: any) => Promise<any>) => {
+      const tx = { execute: (...args: unknown[]) => mockDbExecute(...args) };
+      return fn(tx);
+    },
   }),
 }));
 
@@ -54,7 +58,8 @@ beforeEach(() => {
 
 describe("Database routes", () => {
   it("GET /api/database/query — returns results for valid SELECT", async () => {
-    mockDbExecute.mockResolvedValueOnce([{ count: 5 }]);
+    // First call: SET TRANSACTION READ ONLY, second call: actual query
+    mockDbExecute.mockResolvedValueOnce(undefined).mockResolvedValueOnce([{ count: 5 }]);
 
     const { app } = buildServer();
     const res = await app.inject({
@@ -94,7 +99,8 @@ describe("Database routes", () => {
   });
 
   it("GET /api/database/query — returns 400 on query execution error", async () => {
-    mockDbExecute.mockRejectedValueOnce(new Error("syntax error"));
+    // First call (SET TRANSACTION READ ONLY) succeeds, second (query) fails
+    mockDbExecute.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("syntax error"));
 
     const { app } = buildServer();
     const res = await app.inject({

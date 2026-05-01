@@ -5,17 +5,18 @@ import { createLogger, optionalEnv } from "@ai-cofounder/shared";
 const execFileAsync = promisify(execFile);
 const logger = createLogger("vps-command");
 
-const BLOCKED_PATTERNS = [
-  /\brm\s+-rf\s+\/(?!\w)/i,
-  /\bmkfs\b/i,
-  /\bdd\s+if=/i,
-  /\bshutdown\b/i,
-  /\breboot\b/i,
-  /\bsystemctl\s+(stop|disable)\s+(docker|sshd?)\b/i,
-  /\bufw\s+(disable|reset)\b/i,
-  /\biptables\s+-F\b/i,
-  /\b(passwd|usermod|userdel)\b/i,
-  /\bchmod\s+777\s+\//i,
+/** Allowlist: only these command prefixes are permitted on the VPS */
+const ALLOWED_COMMANDS = [
+  /^docker\s+(compose|logs|ps|inspect|stats|top|port)\b/,
+  /^docker\s+compose\s+-f\s+[\w./-]+\s+(logs|ps|restart|up|down|pull|exec)\b/,
+  /^cd\s+\/opt\/ai-cofounder\s+&&\s+docker\s+compose\b/,
+  /^(cat|head|tail|less|grep|wc|du|df|free|uptime|top|htop|ps|lsof|ss|netstat|whoami|hostname|uname|date|journalctl)\b/,
+  /^systemctl\s+(status|is-active|is-enabled|show|list-units)\b/,
+  /^git\s+(log|status|diff|show|branch|rev-parse)\b/,
+  /^ls\b/,
+  /^find\s+\/opt\b/,
+  /^curl\s+(--head|-I|--silent|-s)\b/,
+  /^npm\s+(ls|list|outdated|audit)\b/,
 ];
 
 export interface VpsCommandResult {
@@ -34,25 +35,24 @@ export class VpsCommandService {
   ) {}
 
   async execute(command: string, opts?: { timeoutSeconds?: number }): Promise<VpsCommandResult> {
-    // Safety check
-    for (const pattern of BLOCKED_PATTERNS) {
-      if (pattern.test(command)) {
-        logger.warn({ command: command.slice(0, 100) }, "blocked dangerous VPS command");
-        return {
-          stdout: "",
-          stderr: `Command blocked: matches safety rule ${pattern}`,
-          exitCode: 1,
-          durationMs: 0,
-          blocked: true,
-        };
-      }
+    // Safety check: only allow known-safe command patterns
+    const trimmedCmd = command.trim();
+    const allowed = ALLOWED_COMMANDS.some((pattern) => pattern.test(trimmedCmd));
+    if (!allowed) {
+      logger.warn({ command: trimmedCmd.slice(0, 100) }, "blocked non-allowlisted VPS command");
+      return {
+        stdout: "",
+        stderr: "Command blocked: not in the allowed commands list. Only diagnostic and Docker management commands are permitted.",
+        exitCode: 1,
+        durationMs: 0,
+        blocked: true,
+      };
     }
 
     const timeoutMs = Math.min((opts?.timeoutSeconds ?? 60) * 1000, 300_000);
     const sshArgs = [
       "-o", "ConnectTimeout=10",
       "-o", "StrictHostKeyChecking=accept-new",
-      "-o", "UserKnownHostsFile=/dev/null",
       "-o", "BatchMode=yes",
       "-o", "LogLevel=ERROR",
       ...(this.sshKeyPath ? ["-i", this.sshKeyPath] : []),
@@ -97,8 +97,11 @@ export class VpsCommandService {
 
   /** Convenience: restart a Docker compose service */
   async restartService(service: string, composeFile = "docker-compose.prod.yml"): Promise<VpsCommandResult> {
+    // Sanitize inputs to prevent command injection
+    const safeFile = composeFile.replace(/[^a-zA-Z0-9._-]/g, "");
+    const safeService = service.replace(/[^a-zA-Z0-9._-]/g, "");
     return this.execute(
-      `cd /opt/ai-cofounder && docker compose -f ${composeFile} restart ${service}`,
+      `cd /opt/ai-cofounder && docker compose -f ${safeFile} restart ${safeService}`,
       { timeoutSeconds: 120 },
     );
   }

@@ -24,10 +24,12 @@ const LANGUAGE_COMMANDS: Record<SandboxLanguage, (code: string, deps?: string[])
   typescript: (code, deps) => {
     const safeDeps = sanitizeDeps(deps);
     const install = safeDeps.length ? `npm install --no-save ${safeDeps.join(" ")} && ` : "";
+    // Use base64 encoding to avoid shell escaping issues entirely
+    const encoded = Buffer.from(code).toString("base64");
     return [
       "sh",
       "-c",
-      `${install}echo '${escapeShell(code)}' > /tmp/run.ts && npx --yes tsx /tmp/run.ts`,
+      `${install}echo '${encoded}' | base64 -d > /tmp/run.ts && npx --yes tsx /tmp/run.ts`,
     ];
   },
   javascript: (code, deps) => {

@@ -11,7 +11,19 @@ vi.mock("drizzle-orm", () => ({
 const { executeQueryDatabase } = await import("../agents/tools/database-tools.js");
 
 function createMockDb() {
-  return { execute: mockExecute } as any;
+  return {
+    execute: mockExecute,
+    transaction: async (fn: (tx: any) => Promise<any>) => {
+      const tx = { execute: mockExecute };
+      return fn(tx);
+    },
+  } as any;
+}
+
+/** Get the actual query call (skipping the SET TRANSACTION READ ONLY call) */
+function getQueryCall() {
+  // calls[0] is SET TRANSACTION READ ONLY, calls[1] is the actual query
+  return mockExecute.mock.calls[1]?.[0];
 }
 
 describe("executeQueryDatabase", () => {
@@ -228,31 +240,31 @@ describe("executeQueryDatabase", () => {
   describe("LIMIT handling", () => {
     it("appends LIMIT when not present", async () => {
       await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
-      const arg = mockExecute.mock.calls[0][0];
+      const arg = getQueryCall();
       expect(arg.queryChunks[0]).toContain("LIMIT 100");
     });
 
     it("respects user-provided limit (capped at 100)", async () => {
       await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 50);
-      const arg = mockExecute.mock.calls[0][0];
+      const arg = getQueryCall();
       expect(arg.queryChunks[0]).toContain("LIMIT 50");
     });
 
     it("caps limit to 100 when user requests more", async () => {
       await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 500);
-      const arg = mockExecute.mock.calls[0][0];
+      const arg = getQueryCall();
       expect(arg.queryChunks[0]).toContain("LIMIT 100");
     });
 
     it("enforces minimum limit of 1", async () => {
       await executeQueryDatabase(createMockDb(), "SELECT * FROM users", 0);
-      const arg = mockExecute.mock.calls[0][0];
+      const arg = getQueryCall();
       expect(arg.queryChunks[0]).toContain("LIMIT 1");
     });
 
     it("does not append LIMIT if already present", async () => {
       await executeQueryDatabase(createMockDb(), "SELECT * FROM users LIMIT 10");
-      const arg = mockExecute.mock.calls[0][0];
+      const arg = getQueryCall();
       // Should not have double LIMIT
       const limitCount = (arg.queryChunks[0].match(/LIMIT/gi) || []).length;
       expect(limitCount).toBe(1);
@@ -294,7 +306,10 @@ describe("executeQueryDatabase", () => {
     });
 
     it("handles DB errors gracefully", async () => {
-      mockExecute.mockRejectedValue(new Error('relation "users" does not exist'));
+      // First call (SET TRANSACTION READ ONLY) succeeds, second (query) fails
+      mockExecute
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('relation "users" does not exist'));
       const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
       expect(result).toEqual({
         error: 'Query failed: relation "users" does not exist',
@@ -302,7 +317,9 @@ describe("executeQueryDatabase", () => {
     });
 
     it("handles non-Error throws", async () => {
-      mockExecute.mockRejectedValue("connection timeout");
+      mockExecute
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce("connection timeout");
       const result = await executeQueryDatabase(createMockDb(), "SELECT * FROM users");
       expect(result).toEqual({
         error: "Query failed: connection timeout",
