@@ -390,6 +390,59 @@ export async function getStaleJobCounts(thresholdMs = 30 * 60 * 1000): Promise<S
 }
 
 /**
+ * Daily queue maintenance: drain old dead-letter jobs and clean stale waiting jobs.
+ * Dead-letter jobs older than maxAgeDays are removed (they've served their debugging purpose).
+ * Stale waiting jobs older than staleHours in non-DLQ queues are removed (outdated monitoring/notification jobs).
+ */
+export async function runQueueMaintenance(
+  maxAgeDays = 7,
+  staleHours = 24,
+): Promise<{ dlqRemoved: number; staleRemoved: number }> {
+  const logger = createLogger("queue-maintenance");
+  let dlqRemoved = 0;
+  let staleRemoved = 0;
+
+  // 1. Clean old dead-letter jobs
+  const dlq = getDeadLetterQueue();
+  const dlqJobs = await dlq.getWaiting(0, 500);
+  const dlqCutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  for (const job of dlqJobs) {
+    if (job.timestamp < dlqCutoff) {
+      await job.remove();
+      dlqRemoved++;
+    }
+  }
+
+  // 2. Clean stale waiting jobs in operational queues
+  const queues = [
+    getMonitoringQueue(),
+    getNotificationQueue(),
+    getBriefingQueue(),
+    getReflectionQueue(),
+    getDiscordTriageQueue(),
+  ];
+  const staleCutoff = Date.now() - staleHours * 60 * 60 * 1000;
+  for (const queue of queues) {
+    try {
+      const waiting = await queue.getWaiting(0, 200);
+      for (const job of waiting) {
+        if (job.timestamp < staleCutoff) {
+          await job.remove();
+          staleRemoved++;
+        }
+      }
+    } catch {
+      // Queue not available — skip
+    }
+  }
+
+  if (dlqRemoved > 0 || staleRemoved > 0) {
+    logger.info({ dlqRemoved, staleRemoved }, "queue maintenance completed");
+  }
+  return { dlqRemoved, staleRemoved };
+}
+
+/**
  * Trim BullMQ event streams to prevent unbounded Redis growth.
  * Each queue has a `:events` stream that grows indefinitely.
  */

@@ -30,6 +30,7 @@ export interface MonitoringJob {
     | "productivity_sync"
     | "proactive_check"
     | "codebase_scan"
+    | "queue_maintenance"
     | "custom";
   target?: string; // repo name, service name, etc.
   metadata?: Record<string, unknown>;

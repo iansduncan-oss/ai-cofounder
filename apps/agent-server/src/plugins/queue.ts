@@ -136,6 +136,14 @@ export const queuePlugin = fp(async (app) => {
           }
           break;
         }
+        case "queue_maintenance": {
+          const { runQueueMaintenance } = await import("@ai-cofounder/queue");
+          const { dlqRemoved, staleRemoved } = await runQueueMaintenance(7, 24);
+          if (dlqRemoved > 0 || staleRemoved > 0) {
+            logger.info({ dlqRemoved, staleRemoved }, "daily queue maintenance completed");
+          }
+          break;
+        }
         case "follow_up_reminders": {
           const { listDueFollowUps, markFollowUpReminderSent } = await import("@ai-cofounder/db");
           const { getNotificationQueue } = await import("@ai-cofounder/queue");

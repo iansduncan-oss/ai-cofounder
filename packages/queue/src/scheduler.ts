@@ -341,4 +341,20 @@ export async function setupRecurringJobs(options?: {
     },
   );
   logger.info("Scheduled Discord hourly digest");
+
+  // ── Queue maintenance (daily at 3 AM) ──
+  // Drains dead-letter jobs older than 7 days and stale waiting jobs older than 24h
+
+  await monitoringQueue.upsertJobScheduler(
+    "queue-maintenance",
+    {
+      pattern: "0 3 * * *",
+      tz: briefingTimezone,
+    },
+    {
+      name: "queue-maintenance",
+      data: { check: "queue_maintenance" } satisfies MonitoringJob,
+    },
+  );
+  logger.info("Scheduled daily queue maintenance at 3 AM");
 }
