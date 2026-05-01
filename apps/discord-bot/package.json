@@ -13,7 +13,7 @@
     "@ai-cofounder/api-client": "*",
     "@ai-cofounder/bot-handlers": "*",
     "@ai-cofounder/shared": "*",
-    "discord.js": "^14.26.3"
+    "discord.js": "^14.26.4"
   },
   "devDependencies": {
     "@types/node": "^22.15.3"
