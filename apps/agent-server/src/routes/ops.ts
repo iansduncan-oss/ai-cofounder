@@ -6,7 +6,16 @@ import { Orchestrator } from "../agents/orchestrator.js";
 
 const logger = createLogger("ops");
 
-/** Verify OPS_TOKEN query param — required in production, optional in dev */
+/** Extract bearer token from Authorization header, falling back to query param */
+function extractToken(request: { headers: { authorization?: string }; query: Record<string, string> }): string | undefined {
+  const authHeader = request.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return (request.query as Record<string, string>).token;
+}
+
+/** Verify OPS_TOKEN — required in production, optional in dev */
 function verifyToken(token: string | undefined): boolean {
   const opsToken = optionalEnv("OPS_TOKEN", "");
   if (!opsToken) {
@@ -23,7 +32,7 @@ function verifyToken(token: string | undefined): boolean {
 export const opsRoutes: FastifyPluginAsync = async (app) => {
   // Token verification hook for all ops routes
   app.addHook("onRequest", async (request, reply) => {
-    const token = (request.query as Record<string, string>).token;
+    const token = extractToken(request as any);
     if (!verifyToken(token)) {
       reply.status(401).send({ error: "Invalid ops token" });
     }

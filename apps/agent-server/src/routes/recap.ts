@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import { timingSafeEqual } from "node:crypto";
 import { optionalEnv, createLogger } from "@ai-cofounder/shared";
 import {
   listActiveGoals,
@@ -12,10 +13,19 @@ import {
 
 const logger = createLogger("recap");
 
+/** Extract bearer token from Authorization header, falling back to query param */
+function extractToken(request: { headers: { authorization?: string }; query: Record<string, string> }): string | undefined {
+  const authHeader = request.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.slice(7);
+  }
+  return (request.query as Record<string, string>).token;
+}
+
 export const recapRoutes: FastifyPluginAsync = async (app) => {
   /**
    * POST /api/recap — Generate and post a system recap to Discord.
-   * Protected by a simple token query param (RECAP_TOKEN env var).
+   * Protected by RECAP_TOKEN via Authorization header (or query param fallback).
    * Designed to be called by scheduled triggers.
    */
   app.post<{ Querystring: { token?: string }; Body: { period?: string } }>(
@@ -23,8 +33,11 @@ export const recapRoutes: FastifyPluginAsync = async (app) => {
     { schema: { tags: ["recap"] } },
     async (request, reply) => {
       const recapToken = optionalEnv("RECAP_TOKEN", "");
-      if (recapToken && request.query.token !== recapToken) {
-        return reply.status(401).send({ error: "Invalid recap token" });
+      if (recapToken) {
+        const token = extractToken(request as any);
+        if (!token || token.length !== recapToken.length || !timingSafeEqual(Buffer.from(token), Buffer.from(recapToken))) {
+          return reply.status(401).send({ error: "Invalid recap token" });
+        }
       }
 
       const webhookUrl = optionalEnv("DISCORD_FOLLOWUP_WEBHOOK_URL", "");
